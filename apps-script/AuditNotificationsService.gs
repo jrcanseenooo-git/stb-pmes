@@ -1,0 +1,137 @@
+/**
+ * AuditService.gs
+ * Every write action in the system creates an audit log entry.
+ */
+
+const AuditService = (() => {
+
+  function log(action, module_, details, user) {
+    const profile = AuthService.getProfile(user)
+    const sheet   = SpreadsheetService.getSheet(SHEET.AUDIT)
+    SpreadsheetService.appendRow(sheet, {
+      id:          SpreadsheetService.generateId('AUD-'),
+      timestamp:   new Date().toISOString(),
+      userId:      profile.id,
+      userEmail:   user.email,
+      userName:    profile.fullName,
+      role:        profile.role,
+      action:      action,
+      module:      module_,
+      details:     details || '',
+      ipAddress:   ''   // GAS cannot read client IP
+    })
+    return { logged: true }
+  }
+
+  function list(params, user) {
+    AuthService.requireRole(user, 'System Administrator', 'Bureau Director')
+    const sheet = SpreadsheetService.getSheet(SHEET.AUDIT)
+    let rows    = SpreadsheetService.getAllRows(sheet)
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+
+    if (params.userId) rows = rows.filter(r => r.userId === params.userId)
+    if (params.module) rows = rows.filter(r => r.module === params.module)
+    if (params.action) rows = rows.filter(r => r.action === params.action)
+    if (params.from)   rows = rows.filter(r => r.timestamp >= params.from)
+    if (params.to)     rows = rows.filter(r => r.timestamp <= params.to)
+
+    return SpreadsheetService.paginate(rows, params.page, params.pageSize)
+  }
+
+  function export_(params, user) {
+    AuthService.requireRole(user, 'System Administrator', 'Bureau Director')
+    const { items } = list({ ...params, pageSize: 9999 }, user)
+    // Return as CSV string
+    const headers = ['timestamp','userEmail','userName','role','action','module','details']
+    const lines   = [headers.join(',')]
+    items.forEach(r => {
+      lines.push(headers.map(h => `"${(r[h] || '').replace(/"/g, '""')}"`).join(','))
+    })
+    return { csv: lines.join('\n') }
+  }
+
+  return { log, list, export_ }
+})()
+
+
+/**
+ * NotificationsService.gs
+ */
+
+const NotificationsService = (() => {
+
+  function list(user) {
+    const profile = AuthService.getProfile(user)
+    const sheet   = SpreadsheetService.getSheet(SHEET.NOTIFICATIONS)
+    return SpreadsheetService.getAllRows(sheet)
+      .filter(r => r.recipientId === profile.id || r.recipientId === 'all')
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(0, 30)
+  }
+
+  function markRead(id, user) {
+    const sheet = SpreadsheetService.getSheet(SHEET.NOTIFICATIONS)
+    return SpreadsheetService.updateRow(sheet, id, { read: true, readAt: new Date().toISOString() })
+  }
+
+  function markAllRead(user) {
+    const profile = AuthService.getProfile(user)
+    const sheet   = SpreadsheetService.getSheet(SHEET.NOTIFICATIONS)
+    const rows    = SpreadsheetService.getAllRows(sheet)
+      .filter(r => r.recipientId === profile.id && !r.read)
+    rows.forEach(r => SpreadsheetService.updateRow(sheet, r.id, { read: true }))
+    return { updated: rows.length }
+  }
+
+  /** Called internally when status changes */
+  function createForStatusChange(accomplishment, newStatus, actorProfile) {
+    const sheet = SpreadsheetService.getSheet(SHEET.NOTIFICATIONS)
+    const messages = {
+      'Approved':     `Your IPCR entry "${accomplishment.target}" has been approved.`,
+      'For Revision': `Revision requested for "${accomplishment.target}". Please check remarks.`,
+      'Delayed':      `Target "${accomplishment.target}" is now marked as Delayed.`
+    }
+    const message = messages[newStatus]
+    if (!message) return
+
+    SpreadsheetService.appendRow(sheet, {
+      id:          SpreadsheetService.generateId('NOT-'),
+      recipientId: accomplishment.userId,
+      type:        newStatus === 'Approved' ? 'approval' : newStatus === 'For Revision' ? 'revision' : 'alert',
+      message,
+      relatedId:   accomplishment.id,
+      module:      'Accomplishments',
+      read:        false,
+      createdAt:   new Date().toISOString()
+    })
+  }
+
+  /** Scheduled: create deadline reminder notifications */
+  function createDeadlineReminders() {
+    const accSheet    = SpreadsheetService.getSheet(SHEET.ACCOMPLISHMENTS)
+    const notifSheet  = SpreadsheetService.getSheet(SHEET.NOTIFICATIONS)
+    const rows        = SpreadsheetService.getAllRows(accSheet)
+      .filter(r => !r.deleted && !['Completed','Approved'].includes(r.status))
+    const now         = new Date()
+    const twoDaysOut  = new Date(now.getTime() + 2 * 86400000)
+
+    rows.forEach(r => {
+      if (!r.deadline) return
+      const dl = new Date(r.deadline)
+      if (dl > now && dl <= twoDaysOut) {
+        SpreadsheetService.appendRow(notifSheet, {
+          id:          SpreadsheetService.generateId('NOT-'),
+          recipientId: r.userId,
+          type:        'deadline',
+          message:     `Deadline in 2 days: "${r.target}" (${r.deadline})`,
+          relatedId:   r.id,
+          module:      'Accomplishments',
+          read:        false,
+          createdAt:   now.toISOString()
+        })
+      }
+    })
+  }
+
+  return { list, markRead, markAllRead, createForStatusChange, createDeadlineReminders }
+})()

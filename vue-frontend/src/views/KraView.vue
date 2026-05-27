@@ -9,7 +9,7 @@
       </div>
       <button class="btn btn-primary" @click="openNewFormModal">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+          <path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
         </svg>
         New Form
       </button>
@@ -18,7 +18,8 @@
     <!-- ── Filter tabs ── -->
     <div class="filter-bar">
       <div class="filter-tabs">
-        <button v-for="t in statusTabs" :key="t.value" :class="['ftab', activeStatus === t.value && 'active']"
+        <button v-for="t in statusTabs" :key="t.value"
+          :class="['ftab', activeStatus === t.value && 'active']"
           @click="activeStatus = t.value">
           {{ t.label }}
           <span v-if="countByStatus(t.value)" class="ftab-count">{{ countByStatus(t.value) }}</span>
@@ -47,8 +48,8 @@
     <!-- ── Empty state ── -->
     <div v-else-if="filteredForms.length === 0" class="empty-state">
       <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-        <rect x="8" y="6" width="32" height="36" rx="3" stroke="#CBD5E1" stroke-width="2" />
-        <path d="M16 16h16M16 22h12M16 28h8" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round" />
+        <rect x="8" y="6" width="32" height="36" rx="3" stroke="#CBD5E1" stroke-width="2"/>
+        <path d="M16 16h16M16 22h12M16 28h8" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round"/>
       </svg>
       <p class="empty-title">No forms yet</p>
       <p class="empty-sub">Create your first IPCRF or CCEF form to get started.</p>
@@ -72,7 +73,7 @@
           <div class="form-position">{{ form.position || authStore.profile?.position || '—' }}</div>
           <div class="form-division">
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path d="M6 1L1 4v7h4V8h2v3h4V4L6 1z" stroke="#94A3B8" stroke-width="1.2" />
+              <path d="M6 1L1 4v7h4V8h2v3h4V4L6 1z" stroke="#94A3B8" stroke-width="1.2"/>
             </svg>
             {{ form.divisionName || '—' }}
           </div>
@@ -111,14 +112,14 @@
                 <label class="field-label">Form Type <span class="req">*</span></label>
                 <div class="radio-group">
                   <label class="radio-opt" :class="newForm.type === 'IPCRF' && 'selected'">
-                    <input type="radio" v-model="newForm.type" value="IPCRF" />
+                    <input type="radio" v-model="newForm.type" value="IPCRF"/>
                     <div class="radio-content">
                       <div class="radio-title">IPCRF</div>
                       <div class="radio-sub">Regular / Co-term / Casual</div>
                     </div>
                   </label>
                   <label class="radio-opt" :class="newForm.type === 'CCEF' && 'selected'">
-                    <input type="radio" v-model="newForm.type" value="CCEF" />
+                    <input type="radio" v-model="newForm.type" value="CCEF"/>
                     <div class="radio-content">
                       <div class="radio-title">CCEF</div>
                       <div class="radio-sub">Contract of Service (CoS)</div>
@@ -141,12 +142,11 @@
               </div>
               <div class="field full">
                 <label class="field-label">Immediate Supervisor</label>
-                <input v-model="newForm.immediateSupervisor" class="field-input" placeholder="e.g. Darlene R. Dancel" />
+                <input v-model="newForm.immediateSupervisor" class="field-input" placeholder="e.g. Darlene R. Dancel"/>
               </div>
               <div class="field full">
                 <label class="field-label">Supervisor's Position</label>
-                <input v-model="newForm.supervisorPosition" class="field-input"
-                  placeholder="e.g. Division Chief / SWO V" />
+                <input v-model="newForm.supervisorPosition" class="field-input" placeholder="e.g. Division Chief / SWO V"/>
               </div>
             </div>
           </div>
@@ -174,8 +174,7 @@
               </span>
               <div>
                 <h3 class="modal-title">
-                  {{ activeForm.semester === '1' || activeForm.semester === 1 ? '1st' : '2nd' }} Semester · {{
-                  activeForm.year }}
+                  {{ activeForm.semester === '1' || activeForm.semester === 1 ? '1st' : '2nd' }} Semester · {{ activeForm.year }}
                 </h3>
                 <p class="modal-sub">{{ activeForm.employeeName }} · {{ activeForm.divisionName }}</p>
               </div>
@@ -204,14 +203,14 @@
                 <div class="flex-row gap-8" v-if="activeForm.status === 'DRAFT'">
                   <button class="btn btn-sm" @click="openKRALibrary('Core')">
                     <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                      <circle cx="5.5" cy="5.5" r="4" stroke="currentColor" stroke-width="1.3" />
-                      <path d="M9 9l2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+                      <circle cx="5.5" cy="5.5" r="4" stroke="currentColor" stroke-width="1.3"/>
+                      <path d="M9 9l2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
                     </svg>
                     Pick from Library
                   </button>
                   <button class="btn btn-sm btn-primary" @click="openCustomEntry('Core')">
                     <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                      <path d="M6.5 1v11M1 6.5h11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+                      <path d="M6.5 1v11M1 6.5h11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
                     </svg>
                     Add Custom
                   </button>
@@ -226,11 +225,8 @@
                 <table class="entries-tbl">
                   <thead>
                     <tr>
-                      <th>#</th>
-                      <th>KRA / Success Indicator</th>
-                      <th>Rating Period</th>
-                      <th>Weight</th>
-                      <th>MOV</th>
+                      <th>#</th><th>KRA / Success Indicator</th><th>Rating Period</th>
+                      <th>Weight</th><th>MOV</th>
                       <th v-if="canRate">E</th>
                       <th v-if="canRate">Q</th>
                       <th v-if="canRate">T</th>
@@ -260,24 +256,24 @@
                       <!-- Rating columns for DC -->
                       <template v-if="canRate">
                         <td class="td-rating">
-                          <select v-model="entry.ratingEfficiency" class="rating-select" @change="saveRating(entry)"
-                            :disabled="entry.efficiencyGuide === 'N/A' || !entry.efficiencyGuide">
+                          <select v-model="entry.ratingEfficiency" class="rating-select"
+                            @change="saveRating(entry)" :disabled="entry.efficiencyGuide === 'N/A' || !entry.efficiencyGuide">
                             <option value="">–</option>
-                            <option v-for="s in [5, 4, 3, 2, 1]" :key="s" :value="s">{{ s }}</option>
+                            <option v-for="s in [5,4,3,2,1]" :key="s" :value="s">{{ s }}</option>
                           </select>
                         </td>
                         <td class="td-rating">
-                          <select v-model="entry.ratingQuality" class="rating-select" @change="saveRating(entry)"
-                            :disabled="entry.qualityGuide === 'N/A' || !entry.qualityGuide">
+                          <select v-model="entry.ratingQuality" class="rating-select"
+                            @change="saveRating(entry)" :disabled="entry.qualityGuide === 'N/A' || !entry.qualityGuide">
                             <option value="">–</option>
-                            <option v-for="s in [5, 4, 3, 2, 1]" :key="s" :value="s">{{ s }}</option>
+                            <option v-for="s in [5,4,3,2,1]" :key="s" :value="s">{{ s }}</option>
                           </select>
                         </td>
                         <td class="td-rating">
-                          <select v-model="entry.ratingTimeliness" class="rating-select" @change="saveRating(entry)"
-                            :disabled="entry.timelinessGuide === 'N/A' || !entry.timelinessGuide">
+                          <select v-model="entry.ratingTimeliness" class="rating-select"
+                            @change="saveRating(entry)" :disabled="entry.timelinessGuide === 'N/A' || !entry.timelinessGuide">
                             <option value="">–</option>
-                            <option v-for="s in [5, 4, 3, 2, 1]" :key="s" :value="s">{{ s }}</option>
+                            <option v-for="s in [5,4,3,2,1]" :key="s" :value="s">{{ s }}</option>
                           </select>
                         </td>
                         <td class="td-avg">
@@ -289,8 +285,7 @@
                       </template>
                       <td class="td-actions">
                         <button class="icon-btn" @click="editEntry(entry)" title="Edit">✎</button>
-                        <button v-if="activeForm.status === 'DRAFT'" class="icon-btn danger" @click="removeEntry(entry)"
-                          title="Remove">✕</button>
+                        <button v-if="activeForm.status === 'DRAFT'" class="icon-btn danger" @click="removeEntry(entry)" title="Remove">✕</button>
                       </td>
                     </tr>
                   </tbody>
@@ -316,15 +311,9 @@
                 <table class="entries-tbl">
                   <thead>
                     <tr>
-                      <th>#</th>
-                      <th>KRA / Success Indicator</th>
-                      <th>Rating Period</th>
-                      <th>Weight</th>
-                      <th>MOV</th>
-                      <th v-if="canRate">E</th>
-                      <th v-if="canRate">Q</th>
-                      <th v-if="canRate">T</th>
-                      <th v-if="canRate">Avg</th>
+                      <th>#</th><th>KRA / Success Indicator</th><th>Rating Period</th>
+                      <th>Weight</th><th>MOV</th>
+                      <th v-if="canRate">E</th><th v-if="canRate">Q</th><th v-if="canRate">T</th><th v-if="canRate">Avg</th>
                       <th>Actions</th>
                     </tr>
                   </thead>
@@ -343,19 +332,19 @@
                         <td class="td-rating">
                           <select v-model="entry.ratingEfficiency" class="rating-select" @change="saveRating(entry)">
                             <option value="">–</option>
-                            <option v-for="s in [5, 4, 3, 2, 1]" :key="s" :value="s">{{ s }}</option>
+                            <option v-for="s in [5,4,3,2,1]" :key="s" :value="s">{{ s }}</option>
                           </select>
                         </td>
                         <td class="td-rating">
                           <select v-model="entry.ratingQuality" class="rating-select" @change="saveRating(entry)">
                             <option value="">–</option>
-                            <option v-for="s in [5, 4, 3, 2, 1]" :key="s" :value="s">{{ s }}</option>
+                            <option v-for="s in [5,4,3,2,1]" :key="s" :value="s">{{ s }}</option>
                           </select>
                         </td>
                         <td class="td-rating">
                           <select v-model="entry.ratingTimeliness" class="rating-select" @change="saveRating(entry)">
                             <option value="">–</option>
-                            <option v-for="s in [5, 4, 3, 2, 1]" :key="s" :value="s">{{ s }}</option>
+                            <option v-for="s in [5,4,3,2,1]" :key="s" :value="s">{{ s }}</option>
                           </select>
                         </td>
                         <td class="td-avg">
@@ -367,8 +356,7 @@
                       </template>
                       <td class="td-actions">
                         <button class="icon-btn" @click="editEntry(entry)">✎</button>
-                        <button v-if="activeForm.status === 'DRAFT'" class="icon-btn danger"
-                          @click="removeEntry(entry)">✕</button>
+                        <button v-if="activeForm.status === 'DRAFT'" class="icon-btn danger" @click="removeEntry(entry)">✕</button>
                       </td>
                     </tr>
                   </tbody>
@@ -412,7 +400,7 @@
               <div class="section-header">
                 <h4 class="section-title">Log Your Accomplishments</h4>
               </div>
-              <div v-for="entry in allEntries" :key="'acc-' + entry.id" class="acc-row">
+              <div v-for="entry in allEntries" :key="'acc-'+entry.id" class="acc-row">
                 <div class="acc-si">
                   <div class="si-kra">{{ entry.kraName }}</div>
                   <div class="si-text">{{ entry.successIndicator }}</div>
@@ -426,7 +414,8 @@
                 <div class="acc-field">
                   <label class="field-label">MOV Reference Codes</label>
                   <input v-model="entry.movReferences" class="field-input"
-                    placeholder="e.g. STB-CYD-MEM-25-06-106835-E (comma-separated)" @blur="saveAccomplishment(entry)" />
+                    placeholder="e.g. STB-CYD-MEM-25-06-106835-E (comma-separated)"
+                    @blur="saveAccomplishment(entry)"/>
                 </div>
               </div>
             </div>
@@ -478,10 +467,10 @@
             <div class="lib-filters">
               <div class="search-box">
                 <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                  <circle cx="5.5" cy="5.5" r="4" stroke="#94A3B8" stroke-width="1.3" />
-                  <path d="M9 9l2.5 2.5" stroke="#94A3B8" stroke-width="1.3" stroke-linecap="round" />
+                  <circle cx="5.5" cy="5.5" r="4" stroke="#94A3B8" stroke-width="1.3"/>
+                  <path d="M9 9l2.5 2.5" stroke="#94A3B8" stroke-width="1.3" stroke-linecap="round"/>
                 </svg>
-                <input v-model="libSearch" placeholder="Search indicators..." type="text" />
+                <input v-model="libSearch" placeholder="Search indicators..." type="text"/>
               </div>
               <select v-model="libPhase" class="filter-select">
                 <option value="">All Phases</option>
@@ -499,8 +488,8 @@
             <!-- Position level weight note -->
             <div class="weight-note">
               <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                <circle cx="6.5" cy="6.5" r="5.5" stroke="#3B82F6" stroke-width="1.2" />
-                <path d="M6.5 6v3M6.5 4v.1" stroke="#3B82F6" stroke-width="1.2" stroke-linecap="round" />
+                <circle cx="6.5" cy="6.5" r="5.5" stroke="#3B82F6" stroke-width="1.2"/>
+                <path d="M6.5 6v3M6.5 4v.1" stroke="#3B82F6" stroke-width="1.2" stroke-linecap="round"/>
               </svg>
               Weights shown for position level <strong>{{ positionLevel }}</strong>
               ({{ activeForm?.position || authStore.profile?.position || 'your position' }})
@@ -526,7 +515,8 @@
                       <span class="mov-chip">MOV: {{ item.meansOfVerification?.substring(0, 60) }}...</span>
                     </div>
                   </div>
-                  <button v-if="!isSelected(item.id)" class="btn btn-sm btn-primary" @click="addFromLibrary(item)">
+                  <button v-if="!isSelected(item.id)" class="btn btn-sm btn-primary"
+                    @click="addFromLibrary(item)">
                     + Add
                   </button>
                   <span v-else class="already-added">✓ Added</span>
@@ -555,7 +545,7 @@
             <div class="form-grid-2">
               <div class="field full">
                 <label class="field-label">KRA Name <span class="req">*</span></label>
-                <input v-model="customEntry.kraName" class="field-input" placeholder="e.g. Pilot Testing" />
+                <input v-model="customEntry.kraName" class="field-input" placeholder="e.g. Pilot Testing"/>
               </div>
               <div class="field full">
                 <label class="field-label">Success Indicator <span class="req">*</span></label>
@@ -579,8 +569,7 @@
               </div>
               <div class="field">
                 <label class="field-label">Weight (%)</label>
-                <input v-model.number="customEntry.weight" type="number" min="1" max="100" class="field-input"
-                  placeholder="e.g. 15" />
+                <input v-model.number="customEntry.weight" type="number" min="1" max="100" class="field-input" placeholder="e.g. 15"/>
               </div>
               <div class="field">
                 <label class="field-label">Classification</label>
@@ -593,8 +582,7 @@
               </div>
               <div class="field full">
                 <label class="field-label">Means of Verification (MOV)</label>
-                <input v-model="customEntry.meansOfVerification" class="field-input"
-                  placeholder="e.g. Memo endorsed to DC" />
+                <input v-model="customEntry.meansOfVerification" class="field-input" placeholder="e.g. Memo endorsed to DC"/>
               </div>
               <div class="field full">
                 <label class="field-label">Accomplishment</label>
@@ -619,10 +607,20 @@
       <div v-if="toast.show" :class="['toast', `toast-${toast.type}`]">{{ toast.msg }}</div>
     </transition>
 
-    <ConfirmModal :show="confirmState.show" type="confirmState.type" :title="confirmState.title"
-      :message="confirmState.message" :details="confirmState.details" :note="confirmState.note"
-      :confirm-label="confirmState.confirmLabel" :cancel-label="confirmState.cancelLabel"
-      :loading="confirmState.loading" @confirm="onConfirm" @cancel="onCancel" />
+    <!-- Confirm Modal -->
+    <ConfirmModal
+      :show="confirmState.show"
+      :type="confirmState.type"
+      :title="confirmState.title"
+      :message="confirmState.message"
+      :details="confirmState.details"
+      :note="confirmState.note"
+      :confirm-label="confirmState.confirmLabel"
+      :cancel-label="confirmState.cancelLabel"
+      :loading="confirmState.loading"
+      @confirm="onConfirm"
+      @cancel="onCancel"
+    />
 
   </div>
 </template>
@@ -635,33 +633,33 @@ import ConfirmModal from '@/components/common/ConfirmModal.vue'
 import { useConfirm, CONFIRMS } from '@/composables/useConfirm'
 
 const authStore = useAuthStore()
-const { confirm, confirmState, onConfirm, onCancel, setLoading } = useConfirm()
+const { confirm, confirmState, onConfirm, onCancel } = useConfirm()
 
 // ── State ──
-const forms = ref([])
-const loading = ref(false)
-const creating = ref(false)
-const activeStatus = ref('ALL')
-const filterType = ref('')
-const filterSemester = ref('')
-const showNewFormModal = ref(false)
-const activeForm = ref(null)
-const activeFormTab = ref('Indicators')
-const allEntries = ref([])
-const showKRALibrary = ref(false)
-const showCustomEntry = ref(false)
-const editingEntry = ref(null)
-const savingEntry = ref(false)
-const libraryItems = ref([])
-const libLoading = ref(false)
-const libSearch = ref('')
-const libPhase = ref('')
+const forms             = ref([])
+const loading           = ref(false)
+const creating          = ref(false)
+const activeStatus      = ref('ALL')
+const filterType        = ref('')
+const filterSemester    = ref('')
+const showNewFormModal  = ref(false)
+const activeForm        = ref(null)
+const activeFormTab     = ref('Indicators')
+const allEntries        = ref([])
+const showKRALibrary    = ref(false)
+const showCustomEntry   = ref(false)
+const editingEntry      = ref(null)
+const savingEntry       = ref(false)
+const libraryItems      = ref([])
+const libLoading        = ref(false)
+const libSearch         = ref('')
+const libPhase          = ref('')
 const libClassification = ref('')
 const currentFunctionType = ref('Core')
-const toast = ref({ show: false, msg: '', type: 'success' })
+const toast             = ref({ show: false, msg: '', type: 'success' })
 
 const newForm = ref({
-  type: 'IPCRF', semester: '1',
+  type: 'IPCRF', semester: String(new Date().getMonth() < 6 ? 1 : 2),
   year: new Date().getFullYear(),
   immediateSupervisor: '', supervisorPosition: ''
 })
@@ -680,47 +678,38 @@ const yearOptions = computed(() => {
   return [y - 1, y, y + 1]
 })
 
-const canRate = computed(() => ['Division Chief', 'Bureau Director', 'Assistant Bureau Director', 'System Administrator'].includes(authStore.role))
-const canApprove = computed(() => ['Division Chief', 'Bureau Director', 'Assistant Bureau Director', 'System Administrator'].includes(authStore.role))
+const canRate    = computed(() => ['Division Chief','Bureau Director','Assistant Bureau Director','System Administrator'].includes(authStore.role))
+const canApprove = computed(() => ['Division Chief','Bureau Director','Assistant Bureau Director','System Administrator'].includes(authStore.role))
 
 const positionLevel = computed(() => {
-  const pos = authStore.profile?.position || ''
-  if (/\biv\b/i.test(pos)) return 'IV'
-  if (/\bii\b/i.test(pos)) return 'II'
+  const pos = (authStore.profile?.position || '').toLowerCase()
+  if (/\biv\b/.test(pos)) return 'IV'
+  if (/\bii\b/.test(pos)) return 'II'
   return 'III'
 })
 
 const statusTabs = [
-  { label: 'All', value: 'ALL' },
-  { label: 'Draft', value: 'DRAFT' },
+  { label: 'All',       value: 'ALL'       },
+  { label: 'Draft',     value: 'DRAFT'     },
   { label: 'Submitted', value: 'SUBMITTED' },
-  { label: 'Approved', value: 'APPROVED' },
-  { label: 'Rated', value: 'RATED' },
+  { label: 'Approved',  value: 'APPROVED'  },
+  { label: 'Rated',     value: 'RATED'     },
   { label: 'Finalized', value: 'FINALIZED' }
 ]
-
-const formTabs = computed(() => {
-  const tabs = ['Indicators', 'Accomplishments', 'Part II Feedback']
-  return tabs
-})
 
 const filteredForms = computed(() => {
   let f = forms.value
   if (activeStatus.value !== 'ALL') f = f.filter(x => x.status === activeStatus.value)
-  if (filterType.value) f = f.filter(x => x.type === filterType.value)
+  if (filterType.value)     f = f.filter(x => x.type     === filterType.value)
   if (filterSemester.value) f = f.filter(x => String(x.semester) === filterSemester.value)
   return f
 })
 
-const coreEntries = computed(() => allEntries.value.filter(e => e.functionType === 'Core' || e.functionType === 'Strategic'))
-const supportEntries = computed(() => allEntries.value.filter(e => e.functionType === 'Support'))
-
-const phases = computed(() => [...new Set(libraryItems.value.map(i => i.phase))].sort())
-
-const filteredPhases = computed(() => {
-  const items = filteredLibraryItemsAll()
-  return [...new Set(items.map(i => i.phase))].sort()
-})
+const activeEntries  = computed(() => allEntries.value.filter(e => e.kraName !== "[DELETED]" && e.successIndicator !== "[DELETED]"))
+const coreEntries    = computed(() => activeEntries.value.filter(e => e.functionType === "Core" || e.functionType === "Strategic"))
+const supportEntries = computed(() => activeEntries.value.filter(e => e.functionType === "Support"))
+const phases         = computed(() => [...new Set(libraryItems.value.map(i => i.phase))].sort())
+const filteredPhases = computed(() => [...new Set(filteredLibraryItemsAll().map(i => i.phase))].sort())
 
 // ── Methods ──
 function countByStatus(status) {
@@ -731,8 +720,8 @@ function countByStatus(status) {
 async function loadForms() {
   loading.value = true
   try {
-    const result = await ipcrfApi.list()
-    forms.value = (result.items ?? result ?? [])
+    const result  = await ipcrfApi.list()
+    forms.value   = result.items ?? result ?? []
   } catch (e) {
     showToast('Could not load forms: ' + e.message, 'error')
   } finally {
@@ -742,20 +731,18 @@ async function loadForms() {
 
 async function createForm() {
   const ok = await confirm(CONFIRMS.createForm(
-    newForm.value.type,
-    newForm.value.semester,
-    newForm.value.year
+    newForm.value.type, newForm.value.semester, newForm.value.year
   ))
   if (!ok) return
 
   creating.value = true
   try {
     const form = await ipcrfApi.create({
-      type: newForm.value.type,
-      semester: newForm.value.semester,
-      year: newForm.value.year,
+      type:                newForm.value.type,
+      semester:            newForm.value.semester,
+      year:                newForm.value.year,
       immediateSupervisor: newForm.value.immediateSupervisor,
-      supervisorPosition: newForm.value.supervisorPosition
+      supervisorPosition:  newForm.value.supervisorPosition
     })
     forms.value.unshift(form)
     showNewFormModal.value = false
@@ -769,11 +756,11 @@ async function createForm() {
 }
 
 async function openForm(form) {
-  activeForm.value = { ...form }
+  activeForm.value   = { ...form }
   activeFormTab.value = 'Indicators'
-  // Load entries
+  allEntries.value   = []
   try {
-    const entries = await ipcrfApi.getEntries(form.id)
+    const entries    = await ipcrfApi.getEntries(form.id)
     allEntries.value = entries || []
   } catch (e) {
     allEntries.value = []
@@ -782,12 +769,12 @@ async function openForm(form) {
 
 async function openKRALibrary(funcType) {
   currentFunctionType.value = funcType
-  showKRALibrary.value = true
+  showKRALibrary.value      = true
   if (libraryItems.value.length === 0) {
     libLoading.value = true
     try {
-      const items = await kraLibrary.list()
-      libraryItems.value = items || []
+      const items       = await kraLibrary.list()
+      libraryItems.value = Array.isArray(items) ? items : (items?.items ?? [])
     } catch (e) {
       showToast('Could not load KRA library: ' + e.message, 'error')
     } finally {
@@ -800,11 +787,13 @@ function filteredLibraryItemsAll() {
   let items = libraryItems.value
   if (libSearch.value) {
     const q = libSearch.value.toLowerCase()
-    items = items.filter(i => i.kraName?.toLowerCase().includes(q) || i.performanceIndicator?.toLowerCase().includes(q))
+    items = items.filter(i =>
+      (i.kraName || '').toLowerCase().includes(q) ||
+      (i.performanceIndicator || '').toLowerCase().includes(q)
+    )
   }
-  if (libPhase.value) items = items.filter(i => i.phase === libPhase.value)
+  if (libPhase.value)          items = items.filter(i => i.phase === libPhase.value)
   if (libClassification.value) items = items.filter(i => i.classification === libClassification.value)
-  // Filter by function type
   items = items.filter(i =>
     currentFunctionType.value === 'Support'
       ? i.functionType === 'Support'
@@ -822,36 +811,54 @@ function isSelected(masterKRAId) {
 }
 
 function getWeight(item) {
-  if (positionLevel.value === 'II') return item.weightII || item.weightIII || '—'
-  if (positionLevel.value === 'IV') return item.weightIV || item.weightIII || '—'
-  return item.weightIII || '—'
+  if (positionLevel.value === 'II')  return item.weightII  || item.weightIII || ''
+  if (positionLevel.value === 'IV')  return item.weightIV  || item.weightIII || ''
+  return item.weightIII || ''
 }
 
 async function addFromLibrary(item) {
+  // Confirm before adding
+  const ok = await confirm({
+    type:         'info',
+    title:        'Add Indicator',
+    message:      `Add "${item.kraName}" to your ${currentFunctionType.value === 'Support' ? 'Support' : 'Core'} Function indicators?`,
+    details: [
+      { label: 'Indicator',      value: item.kraName },
+      { label: 'Classification', value: item.classification },
+      { label: 'Weight',         value: getWeight(item) + '%' },
+      { label: 'Function Type',  value: currentFunctionType.value }
+    ],
+    confirmLabel: '+ Add Indicator',
+    cancelLabel:  'Cancel'
+  })
+  if (!ok) return
+
   try {
     const weight = getWeight(item)
-    const entry = await ipcrfApi.addEntry(activeForm.value.id, {
-      masterKRAId: item.id,
-      functionType: currentFunctionType.value,
-      kraName: item.kraName,
-      successIndicator: item.performanceIndicator,  // ← was wrong field name
-      applicableRatingPeriod: 'Both semesters',
-      weight: String(weight),
-      classification: item.classification,
-      efficiencyGuide: item.efficiencyGuide || '',
-      qualityGuide: item.qualityGuide || '',
-      timelinessGuide: item.timelinessGuide || '',
-      meansOfVerification: item.meansOfVerification || '',
-      isCustom: false
+    const funcType = currentFunctionType.value   // capture before any state change
+    const entry  = await ipcrfApi.addEntry(activeForm.value.id, {
+      masterKRAId:           item.id,
+      functionType:          funcType,
+      kraName:               item.kraName,
+      successIndicator:      item.performanceIndicator,
+      applicableRatingPeriod:'Both semesters',
+      weight:                String(weight),
+      classification:        item.classification,
+      efficiencyGuide:       item.efficiencyGuide        || '',
+      qualityGuide:          item.qualityGuide           || '',
+      timelinessGuide:       item.timelinessGuide        || '',
+      meansOfVerification:   item.meansOfVerification    || '',
+      isCustom:              false
     })
-    // Map the response correctly
+    // Ensure all fields populated, functionType forced to current selection
     allEntries.value.push({
       ...entry,
-      kraName: entry.kraName || item.kraName,
+      kraName:          entry.kraName          || item.kraName,
       successIndicator: entry.successIndicator || item.performanceIndicator,
-      weight: entry.weight || weight
+      weight:           entry.weight           || weight,
+      functionType:     funcType               // force correct function type
     })
-    showToast(`"${item.kraName}" added!`)
+    showToast(`"${item.kraName}" added to ${funcType} Functions!`)
   } catch (e) {
     showToast('Failed to add: ' + e.message, 'error')
   }
@@ -859,32 +866,31 @@ async function addFromLibrary(item) {
 
 function openCustomEntry(funcType) {
   currentFunctionType.value = funcType
-  editingEntry.value = null
-  customEntry.value = { ...defaultCustomEntry(), functionType: funcType }
-  showCustomEntry.value = true
+  editingEntry.value        = null
+  customEntry.value         = { ...defaultCustomEntry(), functionType: funcType }
+  showCustomEntry.value     = true
 }
 
 function editEntry(entry) {
-  editingEntry.value = entry
-  customEntry.value = {
-    kraName: entry.kraName,
-    successIndicator: entry.successIndicator,
-    functionType: entry.functionType,
-    applicableRatingPeriod: entry.applicableRatingPeriod,
-    weight: entry.weight,
-    classification: entry.classification,
-    meansOfVerification: entry.meansOfVerification,
-    accomplishment: entry.accomplishment,
-    movReferences: entry.movReferences,
-    remarks: entry.remarks
+  editingEntry.value    = entry
+  customEntry.value     = {
+    kraName:               entry.kraName,
+    successIndicator:      entry.successIndicator,
+    functionType:          entry.functionType,
+    applicableRatingPeriod:entry.applicableRatingPeriod,
+    weight:                entry.weight,
+    classification:        entry.classification,
+    meansOfVerification:   entry.meansOfVerification,
+    accomplishment:        entry.accomplishment,
+    movReferences:         entry.movReferences,
+    remarks:               entry.remarks
   }
   showCustomEntry.value = true
 }
 
 async function saveCustomEntry() {
   if (!customEntry.value.kraName || !customEntry.value.successIndicator) {
-    showToast('KRA Name and Success Indicator are required', 'error')
-    return
+    showToast('KRA Name and Success Indicator are required', 'error'); return
   }
   const ok = await confirm(CONFIRMS.saveEntry(!!editingEntry.value))
   if (!ok) return
@@ -892,14 +898,12 @@ async function saveCustomEntry() {
   savingEntry.value = true
   try {
     if (editingEntry.value) {
-      const updated = await ipcrfApi.updateEntry(editingEntry.value.id, customEntry.value)
+      await ipcrfApi.updateEntry(editingEntry.value.id, customEntry.value)
       const idx = allEntries.value.findIndex(e => e.id === editingEntry.value.id)
       if (idx !== -1) allEntries.value[idx] = { ...allEntries.value[idx], ...customEntry.value }
       showToast('Indicator updated!')
     } else {
-      const entry = await ipcrfApi.addEntry(activeForm.value.id, {
-        ...customEntry.value, isCustom: true
-      })
+      const entry = await ipcrfApi.addEntry(activeForm.value.id, { ...customEntry.value, isCustom: true })
       allEntries.value.push(entry)
       showToast('Custom indicator added!')
     }
@@ -927,24 +931,25 @@ async function saveAccomplishment(entry) {
   try {
     await ipcrfApi.updateEntry(entry.id, {
       accomplishment: entry.accomplishment,
-      movReferences: entry.movReferences
+      movReferences:  entry.movReferences
     })
-  } catch (e) { }
+  } catch (e) { /* silent */ }
 }
 
 async function saveRating(entry) {
   try {
     await ipcrfApi.rateEntry(entry.id, {
       ratingEfficiency: entry.ratingEfficiency,
-      ratingQuality: entry.ratingQuality,
+      ratingQuality:    entry.ratingQuality,
       ratingTimeliness: entry.ratingTimeliness,
-      accomplishment: entry.accomplishment,
-      movReferences: entry.movReferences
+      accomplishment:   entry.accomplishment,
+      movReferences:    entry.movReferences
     })
-    // Recompute avg locally
     const vals = [entry.ratingEfficiency, entry.ratingQuality, entry.ratingTimeliness]
       .map(Number).filter(v => !isNaN(v) && v > 0)
-    entry.ratingAverage = vals.length ? (vals.reduce((s, v) => s + v, 0) / vals.length).toFixed(5) : ''
+    entry.ratingAverage = vals.length
+      ? (vals.reduce((s, v) => s + v, 0) / vals.length).toFixed(5)
+      : ''
   } catch (e) {
     showToast('Could not save rating: ' + e.message, 'error')
   }
@@ -952,11 +957,7 @@ async function saveRating(entry) {
 
 async function submitForm() {
   const form = activeForm.value
-  const ok = await confirm(CONFIRMS.submitForm(
-    form.type,
-    form.semester,
-    form.year
-  ))
+  const ok   = await confirm(CONFIRMS.submitForm(form.type, form.semester, form.year))
   if (!ok) return
   try {
     await ipcrfApi.submit(form.id)
@@ -971,14 +972,14 @@ async function submitForm() {
 
 async function approveForm() {
   const form = activeForm.value
-  const ok = await confirm(CONFIRMS.approveForm(form.employeeName, form.type))
+  const ok   = await confirm(CONFIRMS.approveForm(form.employeeName, form.type))
   if (!ok) return
   try {
     await ipcrfApi.approve(form.id)
     activeForm.value.status = 'APPROVED'
     const idx = forms.value.findIndex(f => f.id === form.id)
     if (idx !== -1) forms.value[idx].status = 'APPROVED'
-    showToast('Form approved! Staff can now log accomplishments.')
+    showToast('Form approved!')
   } catch (e) {
     showToast('Approve failed: ' + e.message, 'error')
   }
@@ -1004,12 +1005,12 @@ async function computeScore() {
   try {
     const result = await ipcrfApi.computeScore(activeForm.value.id)
     activeForm.value.finalNumericalRating = result.spmsScore
-    activeForm.value.adjectivalRating = result.adjectivalRating
+    activeForm.value.adjectivalRating     = result.adjectivalRating
     activeForm.value.status = 'RATED'
     const idx = forms.value.findIndex(f => f.id === activeForm.value.id)
     if (idx !== -1) {
       forms.value[idx].finalNumericalRating = result.spmsScore
-      forms.value[idx].adjectivalRating = result.adjectivalRating
+      forms.value[idx].adjectivalRating     = result.adjectivalRating
       forms.value[idx].status = 'RATED'
     }
     showToast(`Score: ${parseFloat(result.spmsScore).toFixed(2)} — ${result.adjectivalRating}`)
@@ -1021,27 +1022,28 @@ async function computeScore() {
 async function saveFormMeta() {
   try {
     await ipcrfApi.update(activeForm.value.id, {
-      feedbackStrengths: activeForm.value.feedbackStrengths,
+      feedbackStrengths:           activeForm.value.feedbackStrengths,
       feedbackAreasForImprovement: activeForm.value.feedbackAreasForImprovement,
-      feedbackComments: activeForm.value.feedbackComments
+      feedbackComments:            activeForm.value.feedbackComments
     })
-  } catch (e) { }
+  } catch (e) { /* silent */ }
 }
 
 function openNewFormModal() {
-  newForm.value = { type: 'IPCRF', semester: String(getCurrentSemester()), year: new Date().getFullYear(), immediateSupervisor: '', supervisorPosition: '' }
+  newForm.value = {
+    type: 'IPCRF',
+    semester: String(new Date().getMonth() < 6 ? 1 : 2),
+    year: new Date().getFullYear(),
+    immediateSupervisor: '', supervisorPosition: ''
+  }
   showNewFormModal.value = true
 }
 
-function getCurrentSemester() {
-  return new Date().getMonth() < 6 ? 1 : 2
-}
-
-// ── Helpers ──
+// ── UI helpers ──
 function statusClass(status) {
   const map = {
-    DRAFT: 's-gray', SUBMITTED: 's-blue', APPROVED: 's-green',
-    FOR_RATING: 's-amber', RATED: 's-purple', FINALIZED: 's-green'
+    DRAFT:'s-gray', SUBMITTED:'s-blue', APPROVED:'s-green',
+    FOR_RATING:'s-amber', RATED:'s-purple', FINALIZED:'s-green'
   }
   return map[status] || 's-gray'
 }
@@ -1055,15 +1057,14 @@ function ratingColorClass(avg) {
 }
 
 function adjectivalColor(label) {
-  if (label === 'Outstanding') return 'rating-outstanding'
-  if (label === 'Very Satisfactory') return 'rating-vs'
-  if (label === 'Satisfactory') return 'rating-sat'
+  if (label === 'Outstanding')      return 'rating-outstanding'
+  if (label === 'Very Satisfactory')return 'rating-vs'
+  if (label === 'Satisfactory')     return 'rating-sat'
   return 'rating-low'
 }
 
 function classificationClass(c) {
-  const map = { 'Simple': 'cl-simple', 'Complex': 'cl-complex', 'Highly Technical': 'cl-ht', 'Exempted': 'cl-ex' }
-  return map[c] || 'cl-simple'
+  return { 'Simple':'cl-simple','Complex':'cl-complex','Highly Technical':'cl-ht','Exempted':'cl-ex' }[c] || 'cl-simple'
 }
 
 function showToast(msg, type = 'success') {
@@ -1076,1090 +1077,196 @@ onMounted(loadForms)
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-
-* {
-  box-sizing: border-box;
-}
-
-.content {
-  padding: 16px 20px 24px;
-  font-family: 'Inter', sans-serif;
-  font-size: 13px;
-  color: #0F172A;
-  min-height: 100%;
-}
+*{box-sizing:border-box;}
+.content{padding:16px 20px 24px;font-family:'Inter',sans-serif;font-size:13px;color:#0F172A;min-height:100%;}
 
 /* Header */
-.page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 20px;
-}
-
-.page-title {
-  font-size: 18px;
-  font-weight: 700;
-  color: #0F172A;
-  margin-bottom: 2px;
-}
-
-.page-sub {
-  font-size: 12px;
-  color: #94A3B8;
-}
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;}
+.page-title{font-size:18px;font-weight:700;color:#0F172A;margin-bottom:2px;}
+.page-sub{font-size:12px;color:#94A3B8;}
 
 /* Filter bar */
-.filter-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.filter-tabs {
-  display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
-}
-
-.filter-right {
-  display: flex;
-  gap: 8px;
-}
-
-.ftab {
-  padding: 5px 12px;
-  border-radius: 6px;
-  border: 1px solid #E2E8F0;
-  background: #fff;
-  font-size: 12px;
-  color: #64748B;
-  cursor: pointer;
-  transition: all .15s;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-family: 'Inter', sans-serif;
-}
-
-.ftab:hover {
-  border-color: #3B82F6;
-  color: #3B82F6;
-}
-
-.ftab.active {
-  background: #0F172A;
-  color: #fff;
-  border-color: #0F172A;
-  font-weight: 500;
-}
-
-.ftab-count {
-  background: #EF4444;
-  color: #fff;
-  font-size: 9px;
-  font-weight: 700;
-  padding: 1px 5px;
-  border-radius: 10px;
-}
-
-.filter-select {
-  padding: 5px 9px;
-  border: 1px solid #E2E8F0;
-  border-radius: 6px;
-  font-size: 12px;
-  font-family: 'Inter', sans-serif;
-  color: #0F172A;
-  background: #fff;
-  outline: none;
-  cursor: pointer;
-}
+.filter-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:12px;flex-wrap:wrap;}
+.filter-tabs{display:flex;gap:4px;flex-wrap:wrap;}
+.filter-right{display:flex;gap:8px;}
+.ftab{padding:5px 12px;border-radius:6px;border:1px solid #E2E8F0;background:#fff;font-size:12px;color:#64748B;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:5px;font-family:'Inter',sans-serif;}
+.ftab:hover{border-color:#3B82F6;color:#3B82F6;}
+.ftab.active{background:#0F172A;color:#fff;border-color:#0F172A;font-weight:500;}
+.ftab-count{background:#EF4444;color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:10px;}
+.filter-select{padding:5px 9px;border:1px solid #E2E8F0;border-radius:6px;font-size:12px;font-family:'Inter',sans-serif;color:#0F172A;background:#fff;outline:none;cursor:pointer;}
 
 /* Loading & empty */
-.loading-wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  padding: 48px;
-  color: #94A3B8;
-}
-
-.spinner-lg {
-  width: 28px;
-  height: 28px;
-  border: 2.5px solid #E2E8F0;
-  border-top-color: #3B82F6;
-  border-radius: 50%;
-  animation: spin .6s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  padding: 60px 24px;
-  color: #94A3B8;
-  text-align: center;
-}
-
-.empty-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: #374151;
-}
-
-.empty-sub {
-  font-size: 13px;
-  color: #94A3B8;
-  margin-bottom: 4px;
-}
+.loading-wrap{display:flex;flex-direction:column;align-items:center;gap:12px;padding:48px;color:#94A3B8;}
+.spinner-lg{width:28px;height:28px;border:2.5px solid #E2E8F0;border-top-color:#3B82F6;border-radius:50%;animation:spin .6s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.empty-state{display:flex;flex-direction:column;align-items:center;gap:10px;padding:60px 24px;color:#94A3B8;text-align:center;}
+.empty-title{font-size:15px;font-weight:600;color:#374151;}
+.empty-sub{font-size:13px;color:#94A3B8;margin-bottom:4px;}
 
 /* Forms grid */
-.forms-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 14px;
-}
-
-.form-card {
-  background: #fff;
-  border: 1px solid #E2E8F0;
-  border-radius: 12px;
-  padding: 16px;
-  cursor: pointer;
-  transition: all .15s;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.form-card:hover {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, .08);
-  border-color: #BFDBFE;
-  transform: translateY(-2px);
-}
-
-.form-card-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.form-type-badge {
-  padding: 3px 9px;
-  border-radius: 5px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: .5px;
-}
-
-.type-ipcrf {
-  background: #EFF6FF;
-  color: #1D4ED8;
-}
-
-.type-ccef {
-  background: #F0FDF4;
-  color: #15803D;
-}
-
-.form-period {
-  font-size: 11px;
-  color: #94A3B8;
-  margin-bottom: 3px;
-}
-
-.form-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: #0F172A;
-}
-
-.form-position {
-  font-size: 11px;
-  color: #64748B;
-  margin-bottom: 2px;
-}
-
-.form-division {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 11px;
-  color: #94A3B8;
-}
-
-.form-card-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-top: 8px;
-  border-top: 1px solid #F1F5F9;
-}
-
-.score-val {
-  font-size: 18px;
-  font-weight: 700;
-  color: #0F172A;
-}
-
-.score-label {
-  font-size: 10px;
-  color: #22C55E;
-  font-weight: 600;
-}
-
-.score-pending {
-  font-size: 11px;
-  color: #94A3B8;
-}
-
-.form-entries-count {
-  font-size: 10px;
-  color: #94A3B8;
-}
+.forms-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;}
+.form-card{background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:16px;cursor:pointer;transition:all .15s;display:flex;flex-direction:column;gap:10px;}
+.form-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.08);border-color:#BFDBFE;transform:translateY(-2px);}
+.form-card-top{display:flex;align-items:center;justify-content:space-between;}
+.form-type-badge{padding:3px 9px;border-radius:5px;font-size:11px;font-weight:700;letter-spacing:.5px;}
+.type-ipcrf{background:#EFF6FF;color:#1D4ED8;}
+.type-ccef{background:#F0FDF4;color:#15803D;}
+.form-period{font-size:11px;color:#94A3B8;margin-bottom:3px;}
+.form-name{font-size:14px;font-weight:600;color:#0F172A;}
+.form-position{font-size:11px;color:#64748B;margin-bottom:2px;}
+.form-division{display:flex;align-items:center;gap:4px;font-size:11px;color:#94A3B8;}
+.form-card-footer{display:flex;align-items:center;justify-content:space-between;padding-top:8px;border-top:1px solid #F1F5F9;}
+.score-val{font-size:18px;font-weight:700;color:#0F172A;}
+.score-label{font-size:10px;color:#22C55E;font-weight:600;}
+.score-pending{font-size:11px;color:#94A3B8;}
+.form-entries-count{font-size:10px;color:#94A3B8;}
 
 /* Status pills */
-.status-pill {
-  display: inline-flex;
-  padding: 2px 8px;
-  border-radius: 20px;
-  font-size: 10px;
-  font-weight: 600;
-}
-
-.s-gray {
-  background: #F1F5F9;
-  color: #64748B;
-}
-
-.s-blue {
-  background: #EFF6FF;
-  color: #1D4ED8;
-}
-
-.s-green {
-  background: #F0FDF4;
-  color: #15803D;
-}
-
-.s-amber {
-  background: #FFFBEB;
-  color: #B45309;
-}
-
-.s-purple {
-  background: #F5F3FF;
-  color: #7C3AED;
-}
+.status-pill{display:inline-flex;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;}
+.s-gray  {background:#F1F5F9;color:#64748B;}
+.s-blue  {background:#EFF6FF;color:#1D4ED8;}
+.s-green {background:#F0FDF4;color:#15803D;}
+.s-amber {background:#FFFBEB;color:#B45309;}
+.s-purple{background:#F5F3FF;color:#7C3AED;}
 
 /* Buttons */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 13px;
-  border-radius: 7px;
-  border: 1px solid #E2E8F0;
-  background: #fff;
-  color: #374151;
-  font-size: 12px;
-  cursor: pointer;
-  font-family: 'Inter', sans-serif;
-  transition: all .15s;
-}
-
-.btn:hover {
-  border-color: #3B82F6;
-  color: #3B82F6;
-  background: #F8FAFC;
-}
-
-.btn:disabled {
-  opacity: .5;
-  cursor: not-allowed;
-}
-
-.btn-primary {
-  background: #2563EB;
-  color: #fff;
-  border-color: #2563EB;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: #1D4ED8;
-  border-color: #1D4ED8;
-  color: #fff;
-}
-
-.btn-sm {
-  padding: 4px 9px;
-  font-size: 11px;
-}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border-radius:7px;border:1px solid #E2E8F0;background:#fff;color:#374151;font-size:12px;cursor:pointer;font-family:'Inter',sans-serif;transition:all .15s;}
+.btn:hover{border-color:#3B82F6;color:#3B82F6;background:#F8FAFC;}
+.btn:disabled{opacity:.5;cursor:not-allowed;}
+.btn-primary{background:#2563EB;color:#fff;border-color:#2563EB;}
+.btn-primary:hover:not(:disabled){background:#1D4ED8;border-color:#1D4ED8;color:#fff;}
+.btn-sm{padding:4px 9px;font-size:11px;}
 
 /* Modal */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, .5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 200;
-  padding: 16px;
-  backdrop-filter: blur(3px);
-}
-
-.modal {
-  background: #fff;
-  border-radius: 14px;
-  width: 100%;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, .18);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  max-height: 90vh;
-}
-
-.modal-sm {
-  max-width: 480px;
-}
-
-.modal-md {
-  max-width: 600px;
-}
-
-.modal-xl {
-  max-width: 900px;
-}
-
-.modal-hd {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  padding: 20px 24px 16px;
-  border-bottom: 1px solid #F1F5F9;
-  flex-shrink: 0;
-}
-
-.form-hd-info {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.form-hd-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.modal-title {
-  font-size: 15px;
-  font-weight: 700;
-  color: #0F172A;
-  margin-bottom: 2px;
-}
-
-.modal-sub {
-  font-size: 12px;
-  color: #94A3B8;
-}
-
-.modal-close {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 16px;
-  color: #94A3B8;
-  padding: 4px 8px;
-  border-radius: 5px;
-}
-
-.modal-close:hover {
-  color: #374151;
-  background: #F1F5F9;
-}
-
-.modal-tabs {
-  display: flex;
-  border-bottom: 1px solid #F1F5F9;
-  padding: 0 24px;
-  flex-shrink: 0;
-}
-
-.mtab {
-  padding: 10px 14px;
-  border-bottom: 2px solid transparent;
-  font-size: 12px;
-  color: #94A3B8;
-  cursor: pointer;
-  background: none;
-  border-left: none;
-  border-right: none;
-  border-top: none;
-  font-family: 'Inter', sans-serif;
-  transition: all .15s;
-}
-
-.mtab:hover {
-  color: #374151;
-}
-
-.mtab.active {
-  color: #2563EB;
-  border-bottom-color: #2563EB;
-  font-weight: 500;
-}
-
-.modal-body {
-  padding: 20px 24px;
-  overflow-y: auto;
-  flex: 1;
-}
-
-.modal-body-scroll {
-  overflow-y: auto;
-  max-height: calc(90vh - 180px);
-}
-
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 14px 24px;
-  border-top: 1px solid #F1F5F9;
-  background: #F8FAFC;
-  flex-shrink: 0;
-}
+.modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.5);display:flex;align-items:center;justify-content:center;z-index:200;padding:16px;backdrop-filter:blur(3px);}
+.modal{background:#fff;border-radius:14px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.18);overflow:hidden;display:flex;flex-direction:column;max-height:90vh;}
+.modal-sm{max-width:480px;}
+.modal-md{max-width:600px;}
+.modal-xl{max-width:900px;}
+.modal-hd{display:flex;align-items:flex-start;justify-content:space-between;padding:20px 24px 16px;border-bottom:1px solid #F1F5F9;flex-shrink:0;}
+.form-hd-info{display:flex;align-items:center;gap:10px;}
+.form-hd-actions{display:flex;align-items:center;gap:10px;}
+.modal-title{font-size:15px;font-weight:700;color:#0F172A;margin-bottom:2px;}
+.modal-sub{font-size:12px;color:#94A3B8;}
+.modal-close{background:none;border:none;cursor:pointer;font-size:16px;color:#94A3B8;padding:4px 8px;border-radius:5px;}
+.modal-close:hover{color:#374151;background:#F1F5F9;}
+.modal-tabs{display:flex;border-bottom:1px solid #F1F5F9;padding:0 24px;flex-shrink:0;}
+.mtab{padding:10px 14px;border-bottom:2px solid transparent;font-size:12px;color:#94A3B8;cursor:pointer;background:none;border-left:none;border-right:none;border-top:none;font-family:'Inter',sans-serif;transition:all .15s;}
+.mtab:hover{color:#374151;}
+.mtab.active{color:#2563EB;border-bottom-color:#2563EB;font-weight:500;}
+.modal-body{padding:20px 24px;overflow-y:auto;flex:1;}
+.modal-body-scroll{overflow-y:auto;max-height:calc(90vh - 180px);}
+.modal-footer{display:flex;justify-content:flex-end;gap:8px;padding:14px 24px;border-top:1px solid #F1F5F9;background:#F8FAFC;flex-shrink:0;}
 
 /* Form fields */
-.form-grid-2 {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.field.full {
-  grid-column: span 2;
-}
-
-.field-label {
-  font-size: 11px;
-  font-weight: 600;
-  color: #374151;
-  text-transform: uppercase;
-  letter-spacing: .3px;
-}
-
-.req {
-  color: #EF4444;
-}
-
-.field-input {
-  padding: 8px 11px;
-  border: 1.5px solid #E2E8F0;
-  border-radius: 8px;
-  font-size: 13px;
-  font-family: 'Inter', sans-serif;
-  color: #0F172A;
-  outline: none;
-  transition: border-color .15s;
-}
-
-.field-input:focus {
-  border-color: #3B82F6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, .1);
-}
-
-.field-select {
-  padding: 8px 11px;
-  border: 1.5px solid #E2E8F0;
-  border-radius: 8px;
-  font-size: 13px;
-  font-family: 'Inter', sans-serif;
-  color: #0F172A;
-  background: #fff;
-  outline: none;
-  cursor: pointer;
-}
-
-.field-select:focus {
-  border-color: #3B82F6;
-}
-
-.acc-textarea {
-  padding: 8px 11px;
-  border: 1.5px solid #E2E8F0;
-  border-radius: 8px;
-  font-size: 12px;
-  font-family: 'Inter', sans-serif;
-  color: #0F172A;
-  outline: none;
-  resize: vertical;
-  width: 100%;
-  transition: border-color .15s;
-}
-
-.acc-textarea:focus {
-  border-color: #3B82F6;
-}
-
-.acc-textarea:disabled {
-  background: #F8FAFC;
-  color: #94A3B8;
-}
+.form-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field.full{grid-column:span 2;}
+.field-label{font-size:11px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:.3px;}
+.req{color:#EF4444;}
+.field-input{padding:8px 11px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;color:#0F172A;outline:none;transition:border-color .15s;}
+.field-input:focus{border-color:#3B82F6;box-shadow:0 0 0 3px rgba(59,130,246,.1);}
+.field-select{padding:8px 11px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;color:#0F172A;background:#fff;outline:none;cursor:pointer;}
+.field-select:focus{border-color:#3B82F6;}
+.acc-textarea{padding:8px 11px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:12px;font-family:'Inter',sans-serif;color:#0F172A;outline:none;resize:vertical;width:100%;transition:border-color .15s;}
+.acc-textarea:focus{border-color:#3B82F6;}
+.acc-textarea:disabled{background:#F8FAFC;color:#94A3B8;}
 
 /* Radio group */
-.radio-group {
-  display: flex;
-  gap: 10px;
-}
-
-.radio-opt {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  border: 1.5px solid #E2E8F0;
-  border-radius: 9px;
-  cursor: pointer;
-  flex: 1;
-  transition: all .15s;
-}
-
-.radio-opt:hover {
-  border-color: #3B82F6;
-}
-
-.radio-opt.selected {
-  border-color: #2563EB;
-  background: #EFF6FF;
-}
-
-.radio-opt input {
-  accent-color: #2563EB;
-}
-
-.radio-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: #0F172A;
-}
-
-.radio-sub {
-  font-size: 10px;
-  color: #94A3B8;
-  margin-top: 1px;
-}
+.radio-group{display:flex;gap:10px;}
+.radio-opt{display:flex;align-items:center;gap:8px;padding:10px 14px;border:1.5px solid #E2E8F0;border-radius:9px;cursor:pointer;flex:1;transition:all .15s;}
+.radio-opt:hover{border-color:#3B82F6;}
+.radio-opt.selected{border-color:#2563EB;background:#EFF6FF;}
+.radio-opt input{accent-color:#2563EB;}
+.radio-title{font-size:13px;font-weight:600;color:#0F172A;}
+.radio-sub{font-size:10px;color:#94A3B8;margin-top:1px;}
 
 /* Section headers */
-.section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
-.section-title {
-  font-size: 13px;
-  font-weight: 700;
-  color: #0F172A;
-}
-
-.section-sub {
-  font-size: 11px;
-  color: #94A3B8;
-  margin-top: 2px;
-}
-
-.mt-20 {
-  margin-top: 24px;
-}
-
-.flex-row {
-  display: flex;
-  align-items: center;
-}
-
-.gap-8 {
-  gap: 8px;
-}
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.section-title{font-size:13px;font-weight:700;color:#0F172A;}
+.section-sub{font-size:11px;color:#94A3B8;margin-top:2px;}
+.mt-20{margin-top:24px;}
+.flex-row{display:flex;align-items:center;}
+.gap-8{gap:8px;}
 
 /* Entries table */
-.entries-table-wrap {
-  overflow-x: auto;
-  border: 1px solid #E2E8F0;
-  border-radius: 10px;
-  margin-bottom: 8px;
-}
-
-.entries-tbl {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 11px;
-}
-
-.entries-tbl th {
-  padding: 7px 10px;
-  text-align: left;
-  color: #718096;
-  font-weight: 500;
-  border-bottom: 1px solid #E2E8F0;
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: .3px;
-  background: #F8FAFC;
-  white-space: nowrap;
-}
-
-.entries-tbl td {
-  padding: 8px 10px;
-  border-bottom: 1px solid #F1F5F9;
-  vertical-align: top;
-}
-
-.entries-tbl tr:last-child td {
-  border-bottom: none;
-}
-
-.entries-tbl tr:hover td {
-  background: #FAFAFA;
-}
-
-.td-num {
-  width: 30px;
-  color: #94A3B8;
-  font-weight: 600;
-}
-
-.td-si {
-  max-width: 300px;
-}
-
-.si-kra {
-  font-size: 11px;
-  font-weight: 600;
-  color: #1E40AF;
-  margin-bottom: 2px;
-}
-
-.si-text {
-  font-size: 11px;
-  color: #374151;
-  line-height: 1.4;
-}
-
-.td-period {
-  white-space: nowrap;
-}
-
-.td-weight,
-.td-rating,
-.td-avg {
-  text-align: center;
-}
-
-.td-actions {
-  white-space: nowrap;
-}
-
-.period-badge {
-  padding: 2px 6px;
-  background: #EFF6FF;
-  color: #1D4ED8;
-  border-radius: 4px;
-  font-size: 9px;
-  font-weight: 600;
-}
-
-.weight-badge {
-  padding: 2px 7px;
-  background: #F0FDF4;
-  color: #15803D;
-  border-radius: 4px;
-  font-size: 9px;
-  font-weight: 600;
-}
-
-.custom-tag {
-  display: inline-block;
-  padding: 1px 5px;
-  background: #FEF9C3;
-  color: #854D0E;
-  border-radius: 3px;
-  font-size: 9px;
-  font-weight: 600;
-  margin-top: 3px;
-}
-
-.mov-hint {
-  font-size: 9px;
-  color: #94A3B8;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 120px;
-}
-
-.rating-select {
-  padding: 3px 4px;
-  border: 1px solid #E2E8F0;
-  border-radius: 4px;
-  font-size: 11px;
-  font-family: 'Inter', sans-serif;
-  width: 44px;
-}
-
-.avg-val {
-  font-weight: 700;
-  font-size: 12px;
-}
-
-.rating-outstanding {
-  color: #15803D;
-}
-
-.rating-vs {
-  color: #2563EB;
-}
-
-.rating-sat {
-  color: #B45309;
-}
-
-.rating-low {
-  color: #DC2626;
-}
-
-.muted-dash {
-  color: #CBD5E1;
-}
-
-.icon-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 3px 6px;
-  border-radius: 4px;
-  font-size: 12px;
-  color: #64748B;
-  transition: all .15s;
-}
-
-.icon-btn:hover {
-  background: #F1F5F9;
-}
-
-.icon-btn.danger:hover {
-  background: #FEF2F2;
-  color: #DC2626;
-}
-
-.empty-entries {
-  padding: 16px;
-  text-align: center;
-  color: #94A3B8;
-  font-size: 12px;
-  background: #F8FAFC;
-  border-radius: 8px;
-  border: 1px dashed #E2E8F0;
-  margin-bottom: 8px;
-}
+.entries-table-wrap{overflow-x:auto;border:1px solid #E2E8F0;border-radius:10px;margin-bottom:8px;}
+.entries-tbl{width:100%;border-collapse:collapse;font-size:11px;}
+.entries-tbl th{padding:7px 10px;text-align:left;color:#718096;font-weight:500;border-bottom:1px solid #E2E8F0;font-size:10px;text-transform:uppercase;letter-spacing:.3px;background:#F8FAFC;white-space:nowrap;}
+.entries-tbl td{padding:8px 10px;border-bottom:1px solid #F1F5F9;vertical-align:top;}
+.entries-tbl tr:last-child td{border-bottom:none;}
+.entries-tbl tr:hover td{background:#FAFAFA;}
+.td-num{width:30px;color:#94A3B8;font-weight:600;}
+.td-si{max-width:300px;}
+.si-kra{font-size:11px;font-weight:600;color:#1E40AF;margin-bottom:2px;}
+.si-text{font-size:11px;color:#374151;line-height:1.4;}
+.td-period{white-space:nowrap;}
+.td-weight,.td-rating,.td-avg{text-align:center;}
+.td-actions{white-space:nowrap;}
+.period-badge{padding:2px 6px;background:#EFF6FF;color:#1D4ED8;border-radius:4px;font-size:9px;font-weight:600;}
+.weight-badge{padding:2px 7px;background:#F0FDF4;color:#15803D;border-radius:4px;font-size:9px;font-weight:600;}
+.custom-tag{display:inline-block;padding:1px 5px;background:#FEF9C3;color:#854D0E;border-radius:3px;font-size:9px;font-weight:600;margin-top:3px;}
+.mov-hint{font-size:9px;color:#94A3B8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px;}
+.rating-select{padding:3px 4px;border:1px solid #E2E8F0;border-radius:4px;font-size:11px;font-family:'Inter',sans-serif;width:44px;}
+.avg-val{font-weight:700;font-size:12px;}
+.rating-outstanding{color:#15803D;}
+.rating-vs{color:#2563EB;}
+.rating-sat{color:#B45309;}
+.rating-low{color:#DC2626;}
+.muted-dash{color:#CBD5E1;}
+.icon-btn{background:none;border:none;cursor:pointer;padding:3px 6px;border-radius:4px;font-size:12px;color:#64748B;transition:all .15s;}
+.icon-btn:hover{background:#F1F5F9;}
+.icon-btn.danger:hover{background:#FEF2F2;color:#DC2626;}
+.empty-entries{padding:16px;text-align:center;color:#94A3B8;font-size:12px;background:#F8FAFC;border-radius:8px;border:1px dashed #E2E8F0;margin-bottom:8px;}
 
 /* Score summary */
-.score-summary {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-  padding: 16px 20px;
-  background: linear-gradient(135deg, #EFF6FF, #F0FDF4);
-  border: 1px solid #BFDBFE;
-  border-radius: 10px;
-  margin-top: 16px;
-}
-
-.score-item {
-  text-align: center;
-}
-
-.score-num {
-  font-size: 22px;
-  font-weight: 700;
-  color: #0F172A;
-}
-
-.score-lbl {
-  font-size: 10px;
-  color: #64748B;
-  text-transform: uppercase;
-  letter-spacing: .4px;
-  margin-top: 2px;
-}
-
-.score-divider {
-  width: 1px;
-  height: 40px;
-  background: #CBD5E1;
-}
+.score-summary{display:flex;align-items:center;gap:24px;padding:16px 20px;background:linear-gradient(135deg,#EFF6FF,#F0FDF4);border:1px solid #BFDBFE;border-radius:10px;margin-top:16px;}
+.score-item{text-align:center;}
+.score-num{font-size:22px;font-weight:700;color:#0F172A;}
+.score-lbl{font-size:10px;color:#64748B;text-transform:uppercase;letter-spacing:.4px;margin-top:2px;}
+.score-divider{width:1px;height:40px;background:#CBD5E1;}
 
 /* Actions */
-.entry-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 16px;
-  padding-top: 12px;
-  border-top: 1px solid #F1F5F9;
-}
+.entry-actions{display:flex;gap:8px;margin-top:16px;padding-top:12px;border-top:1px solid #F1F5F9;}
 
 /* Accomplishments */
-.acc-row {
-  border: 1px solid #E2E8F0;
-  border-radius: 10px;
-  padding: 14px;
-  margin-bottom: 10px;
-  background: #fff;
-}
-
-.acc-si {
-  margin-bottom: 10px;
-}
-
-.acc-field {
-  margin-bottom: 10px;
-}
-
-.feedback-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
+.acc-row{border:1px solid #E2E8F0;border-radius:10px;padding:14px;margin-bottom:10px;background:#fff;}
+.acc-si{margin-bottom:10px;}
+.acc-field{margin-bottom:10px;}
+.feedback-grid{display:flex;flex-direction:column;gap:14px;}
 
 /* KRA Library */
-.lib-filters {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
-  flex-wrap: wrap;
-}
-
-.search-box {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: #F8FAFC;
-  border: 1.5px solid #E2E8F0;
-  border-radius: 7px;
-  padding: 6px 10px;
-  flex: 1;
-  min-width: 200px;
-}
-
-.search-box input {
-  border: none;
-  background: transparent;
-  font-size: 12px;
-  color: #0F172A;
-  outline: none;
-  width: 100%;
-  font-family: 'Inter', sans-serif;
-}
-
-.weight-note {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 8px 12px;
-  background: #EFF6FF;
-  border: 1px solid #BFDBFE;
-  border-radius: 7px;
-  font-size: 12px;
-  color: #1D4ED8;
-  margin-bottom: 14px;
-}
-
-.lib-phase-group {
-  margin-bottom: 20px;
-}
-
-.lib-phase-header {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .7px;
-  color: #64748B;
-  padding: 6px 0;
-  border-bottom: 1px solid #E2E8F0;
-  margin-bottom: 8px;
-}
-
-.lib-item {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 10px 12px;
-  border: 1px solid #F1F5F9;
-  border-radius: 8px;
-  margin-bottom: 6px;
-  transition: all .15s;
-}
-
-.lib-item:hover {
-  border-color: #BFDBFE;
-  background: #F8FBFF;
-}
-
-.lib-item-selected {
-  border-color: #22C55E;
-  background: #F0FDF4;
-}
-
-.lib-item-info {
-  flex: 1;
-}
-
-.lib-item-kra {
-  font-size: 12px;
-  font-weight: 600;
-  color: #1E40AF;
-  margin-bottom: 2px;
-}
-
-.lib-item-indicator {
-  font-size: 11px;
-  color: #374151;
-  line-height: 1.5;
-  margin-bottom: 6px;
-}
-
-.lib-item-meta {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-.classification-badge {
-  padding: 2px 7px;
-  border-radius: 4px;
-  font-size: 9px;
-  font-weight: 600;
-}
-
-.cl-simple {
-  background: #F0FDF4;
-  color: #15803D;
-}
-
-.cl-complex {
-  background: #EFF6FF;
-  color: #1D4ED8;
-}
-
-.cl-ht {
-  background: #FEF9C3;
-  color: #854D0E;
-}
-
-.cl-ex {
-  background: #F5F3FF;
-  color: #7C3AED;
-}
-
-.weight-chip {
-  padding: 2px 6px;
-  background: #F1F5F9;
-  color: #374151;
-  border-radius: 4px;
-  font-size: 9px;
-  font-weight: 600;
-}
-
-.mov-chip {
-  font-size: 9px;
-  color: #94A3B8;
-}
-
-.already-added {
-  color: #22C55E;
-  font-size: 12px;
-  font-weight: 600;
-}
+.lib-filters{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
+.search-box{display:flex;align-items:center;gap:6px;background:#F8FAFC;border:1.5px solid #E2E8F0;border-radius:7px;padding:6px 10px;flex:1;min-width:200px;}
+.search-box input{border:none;background:transparent;font-size:12px;color:#0F172A;outline:none;width:100%;font-family:'Inter',sans-serif;}
+.weight-note{display:flex;align-items:center;gap:7px;padding:8px 12px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:7px;font-size:12px;color:#1D4ED8;margin-bottom:14px;}
+.lib-phase-group{margin-bottom:20px;}
+.lib-phase-header{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#64748B;padding:6px 0;border-bottom:1px solid #E2E8F0;margin-bottom:8px;}
+.lib-item{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding:10px 12px;border:1px solid #F1F5F9;border-radius:8px;margin-bottom:6px;transition:all .15s;}
+.lib-item:hover{border-color:#BFDBFE;background:#F8FBFF;}
+.lib-item-selected{border-color:#22C55E;background:#F0FDF4;}
+.lib-item-info{flex:1;}
+.lib-item-kra{font-size:12px;font-weight:600;color:#1E40AF;margin-bottom:2px;}
+.lib-item-indicator{font-size:11px;color:#374151;line-height:1.5;margin-bottom:6px;}
+.lib-item-meta{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+.classification-badge{padding:2px 7px;border-radius:4px;font-size:9px;font-weight:600;}
+.cl-simple{background:#F0FDF4;color:#15803D;}
+.cl-complex{background:#EFF6FF;color:#1D4ED8;}
+.cl-ht{background:#FEF9C3;color:#854D0E;}
+.cl-ex{background:#F5F3FF;color:#7C3AED;}
+.weight-chip{padding:2px 6px;background:#F1F5F9;color:#374151;border-radius:4px;font-size:9px;font-weight:600;}
+.mov-chip{font-size:9px;color:#94A3B8;}
+.already-added{color:#22C55E;font-size:12px;font-weight:600;}
 
 /* Toast */
-.toast {
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 16px;
-  background: #fff;
-  border-radius: 10px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, .12);
-  border: 1px solid #E2E8F0;
-  font-size: 13px;
-  color: #0F172A;
-  z-index: 300;
-  max-width: 360px;
-}
-
-.toast-success {
-  border-left: 3px solid #22C55E;
-}
-
-.toast-error {
-  border-left: 3px solid #EF4444;
-}
+.toast{position:fixed;bottom:24px;right:24px;display:flex;align-items:center;gap:8px;padding:12px 16px;background:#fff;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.12);border:1px solid #E2E8F0;font-size:13px;color:#0F172A;z-index:300;max-width:360px;}
+.toast-success{border-left:3px solid #22C55E;}
+.toast-error  {border-left:3px solid #EF4444;}
 
 /* Transitions */
-.modal-fade-enter-active,
-.modal-fade-leave-active {
-  transition: all .2s ease;
-}
-
-.modal-fade-enter-from,
-.modal-fade-leave-to {
-  opacity: 0;
-  transform: scale(.97) translateY(8px);
-}
-
-.toast-slide-enter-active,
-.toast-slide-leave-active {
-  transition: all .25s ease;
-}
-
-.toast-slide-enter-from,
-.toast-slide-leave-to {
-  opacity: 0;
-  transform: translateY(12px);
-}
-
-.spinner-sm {
-  width: 13px;
-  height: 13px;
-  border: 1.5px solid rgba(255, 255, 255, .3);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: spin .6s linear infinite;
-}
+.modal-fade-enter-active,.modal-fade-leave-active{transition:all .2s ease;}
+.modal-fade-enter-from,.modal-fade-leave-to{opacity:0;transform:scale(.97) translateY(8px);}
+.toast-slide-enter-active,.toast-slide-leave-active{transition:all .25s ease;}
+.toast-slide-enter-from,.toast-slide-leave-to{opacity:0;transform:translateY(12px);}
+.spinner-sm{width:13px;height:13px;border:1.5px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;}
 </style>

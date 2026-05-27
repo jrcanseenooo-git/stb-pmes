@@ -18,7 +18,7 @@ const IPCRFService = (() => {
     let rows = SpreadsheetService.getAllRows(SpreadsheetService.getSheet('IPCRForms'))
 
     // Filter by role
-    if (['Staff','Contractor'].includes(profile.role)) {
+    if (['Staff', 'Contractor'].includes(profile.role)) {
       rows = rows.filter(r => r.userId === profile.id)
     } else if (profile.role === 'Division Chief') {
       rows = rows.filter(r => r.divisionId === profile.divisionId)
@@ -27,9 +27,9 @@ const IPCRFService = (() => {
 
     // Optional filters
     if (params.semester) rows = rows.filter(r => String(r.semester) === String(params.semester))
-    if (params.year)     rows = rows.filter(r => String(r.year)     === String(params.year))
-    if (params.type)     rows = rows.filter(r => r.type === params.type)
-    if (params.userId)   rows = rows.filter(r => r.userId === params.userId)
+    if (params.year) rows = rows.filter(r => String(r.year) === String(params.year))
+    if (params.type) rows = rows.filter(r => r.type === params.type)
+    if (params.userId) rows = rows.filter(r => r.userId === params.userId)
     if (params.divisionId) rows = rows.filter(r => r.divisionId === params.divisionId)
 
     rows.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
@@ -38,7 +38,7 @@ const IPCRFService = (() => {
 
   function getForm(id, user) {
     const sheet = SpreadsheetService.getSheet('IPCRForms')
-    const form  = SpreadsheetService.getRow(sheet, id)
+    const form = SpreadsheetService.getRow(sheet, id)
     if (!form) throw HttpError('Form not found', 404)
     // Attach entries
     form.entries = getEntries(id, user)
@@ -47,46 +47,46 @@ const IPCRFService = (() => {
 
   function createForm(body, user) {
     const profile = AuthService.getProfile(user)
-    const now     = new Date().toISOString()
-    const sheet   = SpreadsheetService.getSheet('IPCRForms')
+    const now = new Date().toISOString()
+    const sheet = SpreadsheetService.getSheet('IPCRForms')
 
     // Determine employment type → form type
     const empType = profile.type || 'Regular'
     const formType = (empType === 'CoS' || empType === 'Contractor') ? 'CCEF' : 'IPCRF'
 
     const form = {
-      id:                   SpreadsheetService.generateId('FORM-'),
-      type:                 body.type || formType,
-      userId:               profile.id,
-      employeeName:         profile.fullName,
-      position:             profile.position || '',
-      positionLevel:        resolvePositionLevel(profile.position),
-      divisionId:           profile.divisionId || body.divisionId || '',
-      divisionName:         profile.divisionName || body.divisionName || '',
-      semester:             body.semester || 1,
-      year:                 body.year || new Date().getFullYear(),
-      status:               'DRAFT',
-      coreFunctionWeight:   70,
+      id: SpreadsheetService.generateId('FORM-'),
+      type: body.type || formType,
+      userId: profile.id,
+      employeeName: profile.fullName,
+      position: profile.position || '',
+      positionLevel: resolvePositionLevel(profile.position),
+      divisionId: profile.divisionId || body.divisionId || '',
+      divisionName: profile.divisionName || body.divisionName || '',
+      semester: body.semester || 1,
+      year: body.year || new Date().getFullYear(),
+      status: 'DRAFT',
+      coreFunctionWeight: 70,
       supportFunctionWeight: 30,
       finalNumericalRating: '',
-      adjectivalRating:     '',
-      immediateSupervisor:  body.immediateSupervisor || '',
-      supervisorPosition:   body.supervisorPosition  || '',
-      approvingAuthority:   body.approvingAuthority  || 'Helen Y. Suzara',
-      authorityPosition:    body.authorityPosition   || 'Bureau Director',
-      dateSignedRatee:      '',
+      adjectivalRating: '',
+      immediateSupervisor: body.immediateSupervisor || '',
+      supervisorPosition: body.supervisorPosition || '',
+      approvingAuthority: body.approvingAuthority || 'Helen Y. Suzara',
+      authorityPosition: body.authorityPosition || 'Bureau Director',
+      dateSignedRatee: '',
       dateSignedSupervisor: '',
-      dateSignedAuthority:  '',
-      feedbackStrengths:    '',
+      dateSignedAuthority: '',
+      feedbackStrengths: '',
       feedbackAreasForImprovement: '',
-      feedbackComments:     '',
+      feedbackComments: '',
       feedbackRecommendations: '',
-      submittedAt:          '',
-      approvedAt:           '',
-      ratedAt:              '',
-      finalizedAt:          '',
-      createdAt:            now,
-      updatedAt:            now
+      submittedAt: '',
+      approvedAt: '',
+      ratedAt: '',
+      finalizedAt: '',
+      createdAt: now,
+      updatedAt: now
     }
 
     SpreadsheetService.appendRow(sheet, form)
@@ -96,13 +96,13 @@ const IPCRFService = (() => {
 
   function updateForm(id, body, user) {
     const sheet = SpreadsheetService.getSheet('IPCRForms')
-    const form  = SpreadsheetService.getRow(sheet, id)
+    const form = SpreadsheetService.getRow(sheet, id)
     if (!form) throw HttpError('Form not found', 404)
 
-    const allowed = ['DRAFT','SUBMITTED']
+    const allowed = ['DRAFT', 'SUBMITTED']
     if (!allowed.includes(form.status) && body.status !== 'APPROVED') {
       const profile = AuthService.getProfile(user)
-      if (!['Division Chief','Bureau Director','Assistant Bureau Director','System Administrator'].includes(profile.role)) {
+      if (!['Division Chief', 'Bureau Director', 'Assistant Bureau Director', 'System Administrator'].includes(profile.role)) {
         throw HttpError('Cannot edit a form that is already ' + form.status, 403)
       }
     }
@@ -111,13 +111,13 @@ const IPCRFService = (() => {
       ...body,
       updatedAt: new Date().toISOString()
     })
-    AuditService.log('UPDATE', 'IPCRF', `Updated form ${id}: ${JSON.stringify(body).substring(0,100)}`, user)
+    AuditService.log('UPDATE', 'IPCRF', `Updated form ${id}: ${JSON.stringify(body).substring(0, 100)}`, user)
     return updated
   }
 
   function submitForm(id, user) {
     const sheet = SpreadsheetService.getSheet('IPCRForms')
-    const form  = SpreadsheetService.getRow(sheet, id)
+    const form = SpreadsheetService.getRow(sheet, id)
     if (!form) throw HttpError('Form not found', 404)
     if (form.status !== 'DRAFT') throw HttpError('Only DRAFT forms can be submitted', 400)
 
@@ -143,7 +143,7 @@ const IPCRFService = (() => {
 
   function approveForm(id, body, user) {
     const profile = AuthService.getProfile(user)
-    if (!['Division Chief','Bureau Director','Assistant Bureau Director','System Administrator'].includes(profile.role)) {
+    if (!['Division Chief', 'Bureau Director', 'Assistant Bureau Director', 'System Administrator'].includes(profile.role)) {
       throw HttpError('Only Division Chiefs and above can approve forms', 403)
     }
 
@@ -159,7 +159,7 @@ const IPCRFService = (() => {
 
   function submitForRating(id, user) {
     const sheet = SpreadsheetService.getSheet('IPCRForms')
-    const form  = SpreadsheetService.getRow(sheet, id)
+    const form = SpreadsheetService.getRow(sheet, id)
     if (!form) throw HttpError('Form not found', 404)
 
     const updated = SpreadsheetService.updateRow(sheet, id, {
@@ -176,15 +176,18 @@ const IPCRFService = (() => {
 
   function getEntries(formId, user) {
     const sheet = SpreadsheetService.getSheet('FormEntries')
-    const rows  = SpreadsheetService.getAllRows(sheet)
+    const rows = SpreadsheetService.getAllRows(sheet)
     return rows
-      .filter(r => r.formId === formId)
+      .filter(r => r.formId === formId
+        && r.kraName !== '[DELETED]'
+        && r.successIndicator !== '[DELETED]'
+        && !r.deleted)
       .sort((a, b) => Number(a.order) - Number(b.order))
   }
 
   function addEntry(formId, body, user) {
-    const sheet   = SpreadsheetService.getSheet('IPCRForms')
-    const form    = SpreadsheetService.getRow(sheet, formId)
+    const sheet = SpreadsheetService.getSheet('IPCRForms')
+    const form = SpreadsheetService.getRow(sheet, formId)
     if (!form) throw HttpError('Form not found', 404)
     if (!['DRAFT'].includes(form.status)) {
       const profile = AuthService.getProfile(user)
@@ -200,43 +203,43 @@ const IPCRFService = (() => {
     // Auto-fill weight from MasterKRALibrary if masterKRAId provided
     if (body.masterKRAId && !weight) {
       const libSheet = SpreadsheetService.getSheet('MasterKRALibrary')
-      const libRow   = SpreadsheetService.getRow(libSheet, body.masterKRAId)
+      const libRow = SpreadsheetService.getRow(libSheet, body.masterKRAId)
       if (libRow) {
-        weight = posLevel === 'II'  ? libRow.weightII  :
-                 posLevel === 'IV'  ? libRow.weightIV  :
-                                     libRow.weightIII
+        weight = posLevel === 'II' ? libRow.weightII :
+          posLevel === 'IV' ? libRow.weightIV :
+            libRow.weightIII
       }
     }
 
     const entrySheet = SpreadsheetService.getSheet('FormEntries')
-    const existing   = getEntries(formId, user)
-    const now        = new Date().toISOString()
+    const existing = getEntries(formId, user)
+    const now = new Date().toISOString()
 
     const entry = {
-      id:                   SpreadsheetService.generateId('FE-'),
+      id: SpreadsheetService.generateId('FE-'),
       formId,
-      masterKRAId:          body.masterKRAId        || '',
-      functionType:         body.functionType        || 'Core',
-      kraName:              body.kraName             || '',
-      successIndicator:     body.successIndicator    || '',
+      masterKRAId: body.masterKRAId || '',
+      functionType: body.functionType || 'Core',
+      kraName: body.kraName || '',
+      successIndicator: body.successIndicator || '',
       applicableRatingPeriod: body.applicableRatingPeriod || 'Both semesters',
-      weight:               weight                   || body.weight || '',
-      classification:       body.classification      || '',
-      efficiencyGuide:      body.efficiencyGuide     || '',
-      qualityGuide:         body.qualityGuide        || '',
-      timelinessGuide:      body.timelinessGuide     || '',
-      meansOfVerification:  body.meansOfVerification || '',
-      accomplishment:       body.accomplishment      || '',
-      ratingEfficiency:     '',
-      ratingQuality:        '',
-      ratingTimeliness:     '',
-      ratingAverage:        '',
-      movReferences:        body.movReferences       || '',
-      remarks:              body.remarks             || '',
-      isCustom:             body.isCustom            || false,
-      order:                existing.length + 1,
-      createdAt:            now,
-      updatedAt:            now
+      weight: weight || body.weight || '',
+      classification: body.classification || '',
+      efficiencyGuide: body.efficiencyGuide || '',
+      qualityGuide: body.qualityGuide || '',
+      timelinessGuide: body.timelinessGuide || '',
+      meansOfVerification: body.meansOfVerification || '',
+      accomplishment: body.accomplishment || '',
+      ratingEfficiency: '',
+      ratingQuality: '',
+      ratingTimeliness: '',
+      ratingAverage: '',
+      movReferences: body.movReferences || '',
+      remarks: body.remarks || '',
+      isCustom: body.isCustom || false,
+      order: existing.length + 1,
+      createdAt: now,
+      updatedAt: now
     }
 
     SpreadsheetService.appendRow(entrySheet, entry)
@@ -255,7 +258,9 @@ const IPCRFService = (() => {
 
   function deleteEntry(entryId, user) {
     const sheet = SpreadsheetService.getSheet('FormEntries')
+    // Hard delete: mark as deleted so getEntries filters it out
     SpreadsheetService.updateRow(sheet, entryId, {
+      deleted: true,
       kraName: '[DELETED]',
       successIndicator: '[DELETED]',
       updatedAt: new Date().toISOString()
@@ -270,7 +275,7 @@ const IPCRFService = (() => {
 
   function rateEntry(entryId, body, user) {
     const profile = AuthService.getProfile(user)
-    if (!['Division Chief','Bureau Director','Assistant Bureau Director','System Administrator'].includes(profile.role)) {
+    if (!['Division Chief', 'Bureau Director', 'Assistant Bureau Director', 'System Administrator'].includes(profile.role)) {
       throw HttpError('Only Division Chiefs and above can rate entries', 403)
     }
 
@@ -278,23 +283,23 @@ const IPCRFService = (() => {
     const entry = SpreadsheetService.getRow(sheet, entryId)
     if (!entry) throw HttpError('Entry not found', 404)
 
-    const e = parseFloat(body.ratingEfficiency)  || null
-    const q = parseFloat(body.ratingQuality)     || null
-    const t = parseFloat(body.ratingTimeliness)  || null
+    const e = parseFloat(body.ratingEfficiency) || null
+    const q = parseFloat(body.ratingQuality) || null
+    const t = parseFloat(body.ratingTimeliness) || null
 
     // Average = sum of non-null ratings / count of non-null
     const vals = [e, q, t].filter(v => v !== null && !isNaN(v))
-    const avg  = vals.length > 0 ? vals.reduce((s, v) => s + v, 0) / vals.length : null
+    const avg = vals.length > 0 ? vals.reduce((s, v) => s + v, 0) / vals.length : null
 
     const updated = SpreadsheetService.updateRow(sheet, entryId, {
-      ratingEfficiency:  e !== null ? e : 'N/A',
-      ratingQuality:     q !== null ? q : 'N/A',
-      ratingTimeliness:  t !== null ? t : 'N/A',
-      ratingAverage:     avg !== null ? avg.toFixed(5) : '',
-      accomplishment:    body.accomplishment || entry.accomplishment,
-      movReferences:     body.movReferences || entry.movReferences,
-      remarks:           body.remarks || entry.remarks,
-      updatedAt:         new Date().toISOString()
+      ratingEfficiency: e !== null ? e : 'N/A',
+      ratingQuality: q !== null ? q : 'N/A',
+      ratingTimeliness: t !== null ? t : 'N/A',
+      ratingAverage: avg !== null ? avg.toFixed(5) : '',
+      accomplishment: body.accomplishment || entry.accomplishment,
+      movReferences: body.movReferences || entry.movReferences,
+      remarks: body.remarks || entry.remarks,
+      updatedAt: new Date().toISOString()
     })
 
     AuditService.log('RATE_ENTRY', 'IPCRF', `Rated entry ${entryId} E:${e} Q:${q} T:${t} Avg:${avg}`, user)
@@ -307,14 +312,14 @@ const IPCRFService = (() => {
 
   function computeFormScore(formId, user) {
     const profile = AuthService.getProfile(user)
-    if (!['Division Chief','Bureau Director','Assistant Bureau Director','System Administrator'].includes(profile.role)) {
+    if (!['Division Chief', 'Bureau Director', 'Assistant Bureau Director', 'System Administrator'].includes(profile.role)) {
       throw HttpError('Insufficient permissions', 403)
     }
 
     const entries = getEntries(formId, user)
     if (!entries.length) throw HttpError('No entries found for this form', 400)
 
-    const coreEntries    = entries.filter(e => e.functionType === 'Core' || e.functionType === 'Strategic')
+    const coreEntries = entries.filter(e => e.functionType === 'Core' || e.functionType === 'Strategic')
     const supportEntries = entries.filter(e => e.functionType === 'Support')
 
     function computeSectionScore(sectionEntries) {
@@ -322,7 +327,7 @@ const IPCRFService = (() => {
       let weightedSum = 0
       sectionEntries.forEach(e => {
         const avg = parseFloat(e.ratingAverage)
-        const w   = parseFloat(e.weight)
+        const w = parseFloat(e.weight)
         if (!isNaN(avg) && !isNaN(w) && w > 0) {
           totalWeight += w
           weightedSum += avg * w
@@ -332,7 +337,7 @@ const IPCRFService = (() => {
       return weightedSum / totalWeight
     }
 
-    const coreScore    = computeSectionScore(coreEntries)
+    const coreScore = computeSectionScore(coreEntries)
     const supportScore = computeSectionScore(supportEntries)
 
     // SPMS Score = 70% core + 30% support (both already on 1-5 scale)
@@ -344,18 +349,18 @@ const IPCRFService = (() => {
     const formSheet = SpreadsheetService.getSheet('IPCRForms')
     SpreadsheetService.updateRow(formSheet, formId, {
       finalNumericalRating: spmsScore.toFixed(5),
-      adjectivalRating:     adjectival,
-      status:               'RATED',
-      ratedAt:              new Date().toISOString(),
-      updatedAt:            new Date().toISOString()
+      adjectivalRating: adjectival,
+      status: 'RATED',
+      ratedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     })
 
     AuditService.log('COMPUTE_SCORE', 'IPCRF', `Computed score for form ${formId}: ${spmsScore.toFixed(5)} - ${adjectival}`, user)
 
     return {
-      coreScore:    coreScore.toFixed(5),
+      coreScore: coreScore.toFixed(5),
       supportScore: supportScore.toFixed(5),
-      spmsScore:    spmsScore.toFixed(5),
+      spmsScore: spmsScore.toFixed(5),
       adjectivalRating: adjectival
     }
   }
@@ -368,7 +373,7 @@ const IPCRFService = (() => {
     const sheet = SpreadsheetService.getSheet('MasterKRALibrary')
     let rows = SpreadsheetService.getAllRows(sheet).filter(r => r.active !== false && r.active !== 'false')
 
-    if (params.phase)        rows = rows.filter(r => r.phase === params.phase)
+    if (params.phase) rows = rows.filter(r => r.phase === params.phase)
     if (params.functionType) rows = rows.filter(r => r.functionType === params.functionType)
     if (params.classification) rows = rows.filter(r => r.classification === params.classification)
     if (params.search) {
@@ -389,8 +394,8 @@ const IPCRFService = (() => {
   function resolvePositionLevel(position) {
     if (!position) return 'III'
     const p = position.toLowerCase()
-    if (p.includes(' ii') || p.match(/\bii\b/))  return 'II'
-    if (p.includes(' iv') || p.match(/\biv\b/))  return 'IV'
+    if (p.includes(' ii') || p.match(/\bii\b/)) return 'II'
+    if (p.includes(' iv') || p.match(/\biv\b/)) return 'IV'
     return 'III'  // Default: SWO III, PDO III, ITO I
   }
 

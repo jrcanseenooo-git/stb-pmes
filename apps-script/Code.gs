@@ -79,12 +79,20 @@ function handleRequest(e, httpMethod) {
 
 // ── Helpers ──
 function parseBody(e) {
+  // 1. Try real POST body first (future-proof)
   try {
     if (e.postData?.contents) return JSON.parse(e.postData.contents)
   } catch (err) {
     Logger.log('Body parse error: ' + err.message)
   }
-  return {}
+  // 2. Fall back to URL params — gasWrite() sends writes as GET with flattenParams()
+  //    Strip system keys so only payload fields reach the service layer
+  const SYSTEM_KEYS = new Set(['route', '_method', 'token'])
+  const body = {}
+  Object.entries(e.parameter || {}).forEach(([k, v]) => {
+    if (!SYSTEM_KEYS.has(k)) body[k] = v
+  })
+  return body
 }
 
 function respond(status, success, data, message) {

@@ -127,7 +127,7 @@
                   <div class="setting-label">{{ s.label }}</div>
                   <div class="setting-sub">{{ s.sub }}</div>
                 </div>
-                <button class="btn btn-xs">{{ s.action }}</button>
+                <button class="btn btn-xs" @click="handleSettingAction(s.action)">{{ s.action }}</button>
               </div>
             </div>
           </div>
@@ -189,6 +189,8 @@ import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { usersApi } from '@/services/api'
+import { sendPasswordResetEmail } from 'firebase/auth'
+import { auth } from '@/firebase'
 
 const authStore = useAuthStore()
 const router    = useRouter()
@@ -232,6 +234,18 @@ function openEdit() {
   saveError.value   = ''
   saveSuccess.value = false
   editMode.value    = true
+}
+
+async function handleSettingAction(action) {
+  if (action === 'Change') {
+    try {
+      const user = auth.currentUser
+      await sendPasswordResetEmail(auth, user.email)
+      alert(`Password reset email sent to ${user.email}. Check your inbox.`)
+    } catch (e) {
+      alert('Failed to send reset email: ' + e.message)
+    }
+  }
 }
 
 async function saveProfile() {

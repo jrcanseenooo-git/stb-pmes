@@ -1,46 +1,25 @@
-// src/composables/usePermissions.js
-// Centralised RBAC helper used by all components.
-
 import { computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
-import { ROLES } from '@/router'
 
 export function usePermissions() {
   const authStore = useAuthStore()
   const role      = computed(() => authStore.role)
 
-  const isAdmin    = computed(() => role.value === ROLES.ADMIN)
-  const isDirector = computed(() => role.value === ROLES.DIRECTOR)
-  const isAsstDir  = computed(() => role.value === ROLES.ASST_DIR)
-  const isDivChief = computed(() => role.value === ROLES.DIV_CHIEF)
-  const isStaff    = computed(() => role.value === ROLES.STAFF)
+  const isAdmin    = computed(() => role.value === 'System Administrator')
+  const isDirector = computed(() => role.value === 'Bureau Director')
+  const isAsstDir  = computed(() => role.value === 'Assistant Bureau Director')
+  const isDivChief = computed(() => role.value === 'Division Chief')
+  const isStaff    = computed(() => role.value === 'Staff')
 
-  /** Can view all divisions (bureau-wide) */
-  const canViewAllDivisions = computed(() =>
-    isAdmin.value || isDirector.value
-  )
-
-  /** Can approve / reject accomplishment submissions */
-  const canApprove = computed(() =>
-    isAdmin.value || isDirector.value || isAsstDir.value || isDivChief.value
-  )
-
-  /** Can manage users */
+  const canViewAllDivisions = computed(() => isAdmin.value || isDirector.value)
+  const canApprove = computed(() => isAdmin.value || isDirector.value || isAsstDir.value || isDivChief.value)
   const canManageUsers = computed(() => isAdmin.value)
-
-  /** Can view audit trail */
   const canViewAudit = computed(() => isAdmin.value || isDirector.value)
-
-  /** Can generate reports */
-  const canGenerateReports = computed(() =>
-    isAdmin.value || isDirector.value || isAsstDir.value || isDivChief.value
-  )
-
-  /** Division scope: returns divisionId restriction or null for bureau-wide */
+  const canGenerateReports = computed(() => isAdmin.value || isDirector.value || isAsstDir.value || isDivChief.value)
   const divisionScope = computed(() => {
-    if (isAdmin.value || isDirector.value) return null     // all
-    if (isAsstDir.value) return 'admin-pool'               // Admin Pool only
-    return authStore.profile?.divisionId ?? null           // own division
+    if (isAdmin.value || isDirector.value) return null
+    if (isAsstDir.value) return 'admin-pool'
+    return authStore.profile?.divisionId ?? null
   })
 
   return {

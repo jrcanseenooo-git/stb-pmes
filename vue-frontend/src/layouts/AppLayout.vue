@@ -229,15 +229,6 @@
         </div>
       </header>
 
-      <!-- Role bar -->
-      <div class="role-bar">
-        <span class="role-label">View as:</span>
-        <div class="role-tabs">
-          <button v-for="r in roles" :key="r" :class="['role-tab', activeRole === r && 'active']"
-            @click="activeRole = r">{{ r }}</button>
-        </div>
-      </div>
-
       <!-- Page content -->
       <main class="page-body">
         <RouterView />
@@ -269,10 +260,7 @@ const collapsed = ref(false)
 const search = ref('')
 const showNotifs = ref(false)
 const isMobile = ref(false)
-const activeRole = ref('Bureau Director')
 const showPwPrompt = ref(false)
-
-const roles = ['Bureau Director', 'Asst. Bureau Director', 'Division Chief', 'Staff / Employee', 'System Admin']
 
 const titleMap = {
   '/dashboard': { title: 'Dashboard', sub: 'Bureau Overview' },

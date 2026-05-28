@@ -84,6 +84,7 @@ export const usersApi = {
   get: (id) => gasGet(`users/${id}`),
   create: (data) => gasWrite("POST", "users", data),
   update: (id, data) => gasWrite("PUT", `users/${id}`, data),
+  updateProfile: (id, data) => gasWrite("PUT", `users/${id}/profile`, data),
   activate: (id) => gasWrite("PATCH", `users/${id}/activate`),
   deactivate: (id) => gasWrite("PATCH", `users/${id}/deactivate`),
 };

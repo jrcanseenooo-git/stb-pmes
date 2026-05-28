@@ -176,12 +176,14 @@ const IPCRFService = (() => {
 
   function getEntries(formId, user) {
     const sheet = SpreadsheetService.getSheet('FormEntries')
-    const rows = SpreadsheetService.getAllRows(sheet)
+    const rows  = SpreadsheetService.getAllRows(sheet)
     return rows
-      .filter(r => r.formId === formId
-        && r.kraName !== '[DELETED]'
-        && r.successIndicator !== '[DELETED]'
-        && !r.deleted)
+      .filter(r =>
+        r.formId === formId &&
+        r.deleted !== true &&
+        r.deleted !== 'true' &&
+        r.kraName !== '[DELETED]'
+      )
       .sort((a, b) => Number(a.order) - Number(b.order))
   }
 
@@ -249,24 +251,43 @@ const IPCRFService = (() => {
 
   function updateEntry(entryId, body, user) {
     const sheet = SpreadsheetService.getSheet('FormEntries')
-    const updated = SpreadsheetService.updateRow(sheet, entryId, {
-      ...body,
+ 
+    // Build the update object with only provided fields
+    const updates = {
       updatedAt: new Date().toISOString()
+    }
+ 
+    // Whitelist of allowed fields to update
+    const allowedFields = [
+      'kraName', 'successIndicator', 'functionType',
+      'applicableRatingPeriod', 'weight', 'classification',
+      'efficiencyGuide', 'qualityGuide', 'timelinessGuide',
+      'meansOfVerification', 'accomplishment',
+      'ratingEfficiency', 'ratingQuality', 'ratingTimeliness', 'ratingAverage',
+      'movReferences', 'remarks', 'order'
+    ]
+ 
+    allowedFields.forEach(field => {
+      if (body[field] !== undefined) {
+        updates[field] = body[field]
+      }
     })
+ 
+    const updated = SpreadsheetService.updateRow(sheet, entryId, updates)
+    Logger.log('Updated entry ' + entryId + ': ' + JSON.stringify(updates))
     return updated
   }
 
   function deleteEntry(entryId, user) {
     const sheet = SpreadsheetService.getSheet('FormEntries')
-    // Hard delete: mark as deleted so getEntries filters it out
-    SpreadsheetService.updateRow(sheet, entryId, {
-      deleted: true,
-      kraName: '[DELETED]',
-      successIndicator: '[DELETED]',
-      updatedAt: new Date().toISOString()
-    })
-    AuditService.log('DELETE_ENTRY', 'IPCRF', `Deleted entry ${entryId}`, user)
-    return { success: true }
+    try {
+      SpreadsheetService.hardDeleteRow(sheet, entryId)
+      AuditService.log('DELETE_ENTRY', 'IPCRF', `Hard deleted entry ${entryId}`, user)
+      return { success: true }
+    } catch(e) {
+      Logger.log('Delete entry error: ' + e.message)
+      throw e
+    }
   }
 
   // ────────────────────────────────────────────────────

@@ -87,6 +87,7 @@ export const usersApi = {
   updateProfile: (id, data) => gasWrite("PUT", `users/${id}/profile`, data),
   activate: (id) => gasWrite("PATCH", `users/${id}/activate`),
   deactivate: (id) => gasWrite("PATCH", `users/${id}/deactivate`),
+  resetPassword: (id, tempPassword) => gasWrite('POST', `users/${id}/reset-password`, { tempPassword }),
 };
 
 export const kraApi = {

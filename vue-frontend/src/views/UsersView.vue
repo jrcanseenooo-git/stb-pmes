@@ -497,10 +497,7 @@ function resetPassword(user) {
 
 async function confirmReset() {
   try {
-    await usersApi.update(resetTarget.value.id, {
-      tempPassword: resetTempPw.value,
-      mustChangePassword: true
-    })
+    await usersApi.resetPassword(resetTarget.value.id, resetTempPw.value)
     resetTarget.value.tempPassword = resetTempPw.value
     showToast(`Password reset for ${resetTarget.value.name}.`)
   } catch (e) {

@@ -72,6 +72,30 @@ const UsersService = (() => {
     return updated
   }
 
+  // Self-service: any user can update their own non-sensitive fields
+  function updateOwnProfile(id, body, user) {
+    const profile = AuthService.getProfile(user)
+    if (profile.id !== id) {
+      throw HttpError('You can only update your own profile', 403)
+    }
+    const ALLOWED_FIELDS = ['fullName', 'firstName', 'lastName', 'position', 'employeeNo']
+    const sanitized = {}
+    ALLOWED_FIELDS.forEach(f => { if (body[f] !== undefined) sanitized[f] = body[f] })
+
+    // Keep fullName in sync
+    if (sanitized.firstName || sanitized.lastName) {
+      const fn = sanitized.firstName || profile.firstName || ''
+      const ln = sanitized.lastName  || profile.lastName  || ''
+      sanitized.fullName = `${fn} ${ln}`.trim()
+    }
+    sanitized.updatedAt = new Date().toISOString()
+
+    const sheet   = SpreadsheetService.getSheet(SHEET.USERS)
+    const updated = SpreadsheetService.updateRow(sheet, id, sanitized)
+    AuditService.log('UPDATE_PROFILE', 'Users', `User updated own profile: ${id}`, user)
+    return updated
+  }
+
   function activate(id, user) {
     AuthService.requireRole(user, 'System Administrator')
     const sheet = SpreadsheetService.getSheet(SHEET.USERS)
@@ -100,5 +124,5 @@ const UsersService = (() => {
     return { success: true }
   }
 
-  return { list, get, create, update, activate, deactivate, resetPassword }
+  return { list, get, create, update, updateOwnProfile, activate, deactivate, resetPassword }
 })()

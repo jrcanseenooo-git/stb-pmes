@@ -11,15 +11,15 @@
       </div>
       <div class="profile-info">
         <h2 class="profile-name">{{ fullName }}</h2>
-        <p class="profile-role">{{ role }}</p>
+        <p class="profile-role">{{ position }}</p>
         <p class="profile-email">{{ email }}</p>
         <div class="profile-tags">
           <span class="tag tag-blue">{{ role }}</span>
           <span class="tag tag-green">Active</span>
-          <span class="tag tag-gray">S1 2025</span>
+          <span class="tag tag-gray">{{ divisionName }}</span>
         </div>
       </div>
-      <button class="btn btn-primary" @click="editMode = !editMode">
+      <button class="btn btn-primary" @click="editMode ? (editMode=false) : openEdit()">
         <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1 10L8.5 2.5l2 2L3 12H1V10z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
         {{ editMode ? 'Cancel' : 'Edit Profile' }}
       </button>
@@ -36,39 +36,45 @@
             <span class="card-title">Personal Information</span>
           </div>
           <div class="card-body">
+            <!-- Save feedback -->
+            <div v-if="saveSuccess" class="alert-success">✓ Profile saved successfully.</div>
+            <div v-if="saveError"   class="alert-error">{{ saveError }}</div>
+
             <div class="info-grid">
               <div class="info-item">
-                <label class="info-label">Full Name</label>
-                <div v-if="!editMode" class="info-val">{{ fullName }}</div>
-                <input v-else v-model="form.fullName" class="field-input"/>
+                <label class="info-label">First Name</label>
+                <div v-if="!editMode" class="info-val">{{ authStore.profile?.firstName || '—' }}</div>
+                <input v-else v-model="form.firstName" class="field-input" placeholder="First name"/>
+              </div>
+              <div class="info-item">
+                <label class="info-label">Last Name</label>
+                <div v-if="!editMode" class="info-val">{{ authStore.profile?.lastName || '—' }}</div>
+                <input v-else v-model="form.lastName" class="field-input" placeholder="Last name"/>
               </div>
               <div class="info-item">
                 <label class="info-label">Employee No.</label>
-                <div v-if="!editMode" class="info-val">DSWD-2021-0042</div>
-                <input v-else value="DSWD-2021-0042" class="field-input"/>
+                <div v-if="!editMode" class="info-val">{{ employeeNo }}</div>
+                <input v-else v-model="form.employeeNo" class="field-input" placeholder="e.g. DSWD-2021-0042"/>
               </div>
               <div class="info-item">
                 <label class="info-label">Email Address</label>
-                <div v-if="!editMode" class="info-val">{{ email }}</div>
-                <input v-else v-model="form.email" class="field-input"/>
+                <div class="info-val">{{ email }}</div>
               </div>
               <div class="info-item">
                 <label class="info-label">Position / Title</label>
-                <div v-if="!editMode" class="info-val">{{ role }}</div>
-                <input v-else v-model="form.role" class="field-input"/>
+                <div v-if="!editMode" class="info-val">{{ position }}</div>
+                <input v-else v-model="form.position" class="field-input" placeholder="e.g. Senior Admin Officer"/>
               </div>
               <div class="info-item">
                 <label class="info-label">Division</label>
-                <div v-if="!editMode" class="info-val">Bureau of Social Technology</div>
-                <input v-else value="Bureau of Social Technology" class="field-input"/>
-              </div>
-              <div class="info-item">
-                <label class="info-label">Date Joined</label>
-                <div class="info-val">January 15, 2021</div>
+                <div class="info-val">{{ divisionName }}</div>
               </div>
             </div>
             <div v-if="editMode" class="save-row">
-              <button class="btn btn-primary" @click="saveProfile">Save Changes</button>
+              <button class="btn btn-primary" :disabled="saving" @click="saveProfile">
+                <span v-if="saving">Saving…</span>
+                <span v-else>Save Changes</span>
+              </button>
               <button class="btn" @click="editMode=false">Cancel</button>
             </div>
           </div>
@@ -179,24 +185,80 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { usersApi } from '@/services/api'
 
 const authStore = useAuthStore()
 const router    = useRouter()
 const editMode  = ref(false)
+const saving    = ref(false)
+const saveError = ref('')
+const saveSuccess = ref(false)
 
-const fullName = computed(() => authStore.fullName || 'User')
-const role     = computed(() => authStore.role     || 'Staff')
-const email    = computed(() => authStore.user?.email || 'user@dswd.gov.ph')
-const initials = computed(() => authStore.initials || 'U')
+const fullName    = computed(() => authStore.profile?.fullName || authStore.fullName || 'User')
+const role        = computed(() => authStore.profile?.role     || 'Staff')
+const email       = computed(() => authStore.user?.email       || '')
+const initials    = computed(() => authStore.initials          || 'U')
+const employeeNo  = computed(() => authStore.profile?.employeeNo  || '—')
+const position    = computed(() => authStore.profile?.position    || '—')
+const divisionName= computed(() => authStore.profile?.divisionName|| '—')
+const userId      = computed(() => authStore.profile?.id)
 
-const form = ref({ fullName: fullName.value, email: email.value, role: role.value })
+// Editable form — synced from profile
+const form = ref({
+  fullName:     '',
+  firstName:    '',
+  lastName:     '',
+  position:     '',
+  employeeNo:   '',
+})
 
-function saveProfile() {
-  editMode.value = false
-  alert('Profile updated (connect to API to persist)')
+// Reset form whenever profile loads or edit mode opens
+watch(() => authStore.profile, (p) => {
+  if (p) {
+    form.value = {
+      fullName:   p.fullName   || '',
+      firstName:  p.firstName  || '',
+      lastName:   p.lastName   || '',
+      position:   p.position   || '',
+      employeeNo: p.employeeNo || '',
+    }
+  }
+}, { immediate: true })
+
+function openEdit() {
+  saveError.value   = ''
+  saveSuccess.value = false
+  editMode.value    = true
+}
+
+async function saveProfile() {
+  if (!userId.value) {
+    saveError.value = 'Cannot save: user profile not loaded.'
+    return
+  }
+  saving.value    = true
+  saveError.value = ''
+  try {
+    // Derive fullName from first+last if both filled, else use fullName field
+    const payload = {
+      ...form.value,
+      fullName: (form.value.firstName && form.value.lastName)
+        ? `${form.value.firstName} ${form.value.lastName}`.trim()
+        : form.value.fullName,
+    }
+    await usersApi.updateProfile(userId.value, payload)
+    // Refresh profile in store
+    await authStore.fetchProfile()
+    saveSuccess.value = true
+    editMode.value    = false
+  } catch (e) {
+    saveError.value = e.message || 'Failed to save. Please try again.'
+  } finally {
+    saving.value = false
+  }
 }
 
 async function handleLogout() {
@@ -205,24 +267,24 @@ async function handleLogout() {
 }
 
 const perfStats = [
-  { label: 'Targets',       value: '12',   color: '#2F80ED' },
-  { label: 'Completed',     value: '9',    color: '#27AE60' },
-  { label: 'Pending',       value: '2',    color: '#E9A840' },
-  { label: 'Rating',        value: '4.25', color: '#27AE60' }
+  { label: 'Targets',   value: '12',   color: '#2F80ED' },
+  { label: 'Completed', value: '9',    color: '#27AE60' },
+  { label: 'Pending',   value: '2',    color: '#E9A840' },
+  { label: 'Rating',    value: '4.25', color: '#27AE60' }
 ]
 
 const activity = [
-  { msg:'Submitted Q1 IPCR accomplishment entry',      time:'May 11, 2025 · 9:00 AM',  color:'#2F80ED' },
-  { msg:'Uploaded MOV: Training_Matrix_Q1.pdf',         time:'May 10, 2025 · 2:30 PM',  color:'#27AE60' },
-  { msg:'Revision requested on KRA 2 – SI-3',           time:'May 9, 2025 · 10:00 AM',  color:'#E9A840' },
-  { msg:'Accomplishment approved by Division Chief',    time:'May 8, 2025 · 4:00 PM',   color:'#27AE60' },
-  { msg:'Logged in to PMES',                            time:'May 8, 2025 · 8:01 AM',   color:'#718096' }
+  { msg:'Submitted Q1 IPCR accomplishment entry',   time:'May 11, 2025 · 9:00 AM',  color:'#2F80ED' },
+  { msg:'Uploaded MOV: Training_Matrix_Q1.pdf',      time:'May 10, 2025 · 2:30 PM',  color:'#27AE60' },
+  { msg:'Revision requested on KRA 2 – SI-3',        time:'May 9, 2025 · 10:00 AM',  color:'#E9A840' },
+  { msg:'Accomplishment approved by Division Chief', time:'May 8, 2025 · 4:00 PM',   color:'#27AE60' },
+  { msg:'Logged in to PMES',                         time:'May 8, 2025 · 8:01 AM',   color:'#718096' }
 ]
 
 const settings = [
   { label:'Change Password',     sub:'Last changed 3 months ago',         action:'Change', icon:'M1 7s2-5 6-5 6 5 6 5-2 5-6 5-6-5-6-5zM8 7a2 2 0 01-2 2 2 2 0 01-2-2 2 2 0 012-2 2 2 0 012 2z', iconBg:'#EBF4FF', iconColor:'#2F80ED' },
-  { label:'Email Notifications', sub:'Receive deadline & approval alerts', action:'Manage', icon:'M1 4a1 1 0 011-1h10a1 1 0 011 1v6a1 1 0 01-1 1H2a1 1 0 01-1-1V4zM1 5l6 4 6-4', iconBg:'#E6F4EA', iconColor:'#27AE60' },
-  { label:'Two-Factor Auth',     sub:'Not yet enabled',                    action:'Enable', icon:'M7 1L1 3.5v4c0 3 2.5 5 6 5.5 3.5-.5 6-2.5 6-5.5v-4L7 1z', iconBg:'#FEF3E2', iconColor:'#C8882A' }
+  { label:'Email Notifications', sub:'Receive deadline & approval alerts', action:'Manage', icon:'M1 4a1 1 0 011-1h10a1 1 0 011 1v6a1 1 0 01-1 1H2a1 1 0 01-1-1V4zM1 5l6 4 6-4',               iconBg:'#E6F4EA', iconColor:'#27AE60' },
+  { label:'Two-Factor Auth',     sub:'Not yet enabled',                    action:'Enable', icon:'M7 1L1 3.5v4c0 3 2.5 5 6 5.5 3.5-.5 6-2.5 6-5.5v-4L7 1z',                                   iconBg:'#FEF3E2', iconColor:'#C8882A' }
 ]
 </script>
 
@@ -269,6 +331,8 @@ const settings = [
 .field-input{padding:6px 9px;border:1px solid #E2E8F0;border-radius:6px;font-size:12px;font-family:'DM Sans',sans-serif;color:#1A2332;outline:none;transition:border-color .15s;}
 .field-input:focus{border-color:#2F80ED;}
 .save-row{display:flex;gap:8px;margin-top:14px;padding-top:14px;border-top:1px solid #E2E8F0;}
+.alert-success{padding:8px 12px;background:#E6F4EA;border:1px solid #A8D5B5;border-radius:7px;font-size:12px;color:#1E7E34;margin-bottom:12px;}
+.alert-error  {padding:8px 12px;background:#FEF2F2;border:1px solid #FECACA;border-radius:7px;font-size:12px;color:#B91C1C;margin-bottom:12px;}
 
 /* Performance */
 .perf-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}

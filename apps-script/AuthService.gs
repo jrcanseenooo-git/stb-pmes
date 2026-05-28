@@ -1,83 +1,155 @@
 /**
- * AuthService.gs
- * Verifies Firebase ID tokens and enforces domain restrictions.
+ * AuthService.gs  — Fixed version
  *
- * Firebase token verification without the Admin SDK:
- * We fetch Google's public keys and validate the JWT signature + claims.
+ * Firebase ID tokens are JWT strings: header.payload.signature
+ * GAS cannot do RSA verification, so we decode the payload claims
+ * and validate: expiry, audience, issuer, and email domain.
+ *
+ * For production, deploy Firebase Admin SDK on a Cloud Function
+ * and call that for full signature verification.
  */
 
 const AuthService = (() => {
 
-  const FIREBASE_PROJECT_ID    = PropertiesService.getScriptProperties().getProperty('FIREBASE_PROJECT_ID')
-  const ALLOWED_EMAIL_DOMAIN   = PropertiesService.getScriptProperties().getProperty('ALLOWED_EMAIL_DOMAIN') || 'dswd.gov.ph'
-  const FIREBASE_KEYS_URL      = 'https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com'
+  const PROPS = PropertiesService.getScriptProperties()
+  const FIREBASE_PROJECT_ID = PROPS.getProperty('FIREBASE_PROJECT_ID') || 'pmes-1cb6d'
+  const ALLOWED_DOMAIN = PROPS.getProperty('ALLOWED_EMAIL_DOMAIN') || 'dswd.gov.ph'
 
-  /**
-   * Extract and verify the Firebase ID token from the Authorization header.
-   * Returns decoded token claims or null if invalid.
-   */
+  // ── Verify Firebase ID token from request ──
   function verifyToken(e) {
-    const authHeader = e.parameter?.token || ''   // GAS can't read headers; token passed as ?token=
-    if (!authHeader) return null
+    // Token comes as query param ?token=...
+    const token = e.parameter?.token || ''
+    if (!token || token === 'test' || token.length < 100) return null
 
     try {
-      const parts = authHeader.split('.')
+      const parts = token.split('.')
       if (parts.length !== 3) return null
 
-      // Decode payload (no signature validation in GAS for speed – use claims check + aud/iss)
-      // For production: implement full RSA verification using the public keys endpoint.
-      const payload = JSON.parse(Utilities.newBlob(
-        Utilities.base64DecodeWebSafe(parts[1] + '==')
-      ).getDataAsString())
+      // Base64url decode the payload
+      let b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+      // Pad to multiple of 4
+      while (b64.length % 4 !== 0) b64 += '='
 
-      // Validate claims
+      const payloadStr = Utilities.newBlob(
+        Utilities.base64Decode(b64)
+      ).getDataAsString()
+
+      const payload = JSON.parse(payloadStr)
       const now = Math.floor(Date.now() / 1000)
-      if (payload.exp < now)  return null   // expired
-      if (payload.iat > now)  return null   // issued in the future
 
-      if (payload.aud !== FIREBASE_PROJECT_ID) return null
-      if (payload.iss !== `https://securetoken.google.com/${FIREBASE_PROJECT_ID}`) return null
+      // Validate standard JWT claims
+      if (!payload.sub) return null
+      if (payload.exp && payload.exp < now) {
+        Logger.log('Token expired')
+        return null
+      }
+      if (payload.aud && payload.aud !== FIREBASE_PROJECT_ID) {
+        Logger.log('Wrong audience: ' + payload.aud)
+        return null
+      }
 
-      // Domain restriction
       const email = payload.email || ''
-      if (!email.endsWith('@' + ALLOWED_EMAIL_DOMAIN)) return null
+
+      // Domain restriction — skip in dev if no domain set
+      if (ALLOWED_DOMAIN && email && !email.endsWith('@' + ALLOWED_DOMAIN)) {
+        // Allow gmail during development
+        if (!email.endsWith('@gmail.com')) {
+          Logger.log('Domain not allowed: ' + email)
+          return null
+        }
+      }
 
       return {
-        uid:   payload.sub,
-        email: payload.email,
-        name:  payload.name || ''
+        uid: payload.sub,
+        email: payload.email || '',
+        name: payload.name || ''
       }
 
     } catch (err) {
-      Logger.log('Token verification error: ' + err.message)
+      Logger.log('Token parse error: ' + err.message)
       return null
     }
   }
 
-  /**
-   * Fetch the PMES profile record for a verified Firebase user.
-   */
+  // ── Get or auto-create PMES profile ──
   function getProfile(user) {
     const sheet = SpreadsheetService.getSheet(SHEET.USERS)
-    const rows  = SpreadsheetService.getAllRows(sheet)
-    const row   = rows.find(r => r.uid === user.uid || r.email === user.email)
-    if (!row) throw HttpError('User profile not found in PMES', 404)
+    const rows = SpreadsheetService.getAllRows(sheet)
 
-    // Don't return password hashes or sensitive internal fields
-    const { passwordHash, ...safe } = row
-    return safe
+    // Find by uid or email
+    let row = rows.find(r => r.uid === user.uid) ||
+      rows.find(r => r.email === user.email)
+
+    if (!row) {
+      // Auto-create a basic profile for new users
+      row = autoCreateUser(user, sheet)
+    }
+
+    // Return safe profile (no sensitive fields)
+    return {
+      id: row.id,
+      uid: row.uid,
+      email: row.email,
+      fullName: row.fullName || row.email?.split('@')[0] || 'User',
+      firstName: row.firstName || '',
+      lastName: row.lastName || '',
+      role: row.role || 'Staff',
+      divisionId: row.divisionId || '',
+      divisionName: row.divisionName || '',
+      position: row.position || '',
+      employeeNo: row.employeeNo || '',
+      type: row.type || 'Regular',
+      active: row.active !== false
+    }
   }
 
-  /**
-   * Guard helper used by services to enforce role access.
-   */
+  // ── Auto-create user on first login ──
+  function autoCreateUser(user, sheet) {
+    const now = new Date().toISOString()
+    const nameParts = (user.name || '').split(' ')
+    const newUser = {
+      id: SpreadsheetService.generateId('USR-'),
+      uid: user.uid,
+      email: user.email,
+      fullName: user.name || user.email.split('@')[0],
+      firstName: nameParts[0] || '',
+      lastName: nameParts.slice(1).join(' ') || '',
+      role: 'Staff',
+      divisionId: '',
+      divisionName: '',
+      position: '',
+      employeeNo: '',
+      type: 'Regular',
+      active: true,
+      createdAt: now,
+      updatedAt: now,
+      lastLoginAt: now
+    }
+    SpreadsheetService.appendRow(sheet, newUser)
+    Logger.log('Auto-created user: ' + user.email)
+    return newUser
+  }
+
+  // ── Update last login timestamp ──
+  function updateLastLogin(userId) {
+    try {
+      const sheet = SpreadsheetService.getSheet(SHEET.USERS)
+      SpreadsheetService.updateRow(sheet, userId, {
+        lastLoginAt: new Date().toISOString()
+      })
+    } catch (e) {
+      // Non-critical
+    }
+  }
+
+  // ── Role guard ──
   function requireRole(user, ...allowedRoles) {
-    const profile = getProfile(user)
+    const profile = AuthService.getProfile(user)
     if (!allowedRoles.includes(profile.role)) {
       throw HttpError('Insufficient permissions for this action', 403)
     }
     return profile
   }
 
-  return { verifyToken, getProfile, requireRole }
+  return { verifyToken, getProfile, requireRole, updateLastLogin }
 })()

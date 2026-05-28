@@ -250,5 +250,43 @@ const UsersService = (() => {
     return 'III'
   }
 
-  return { list, get, create, update, activate, deactivate, resetPassword }
+  // ── UPDATE own profile + sync DRAFT IPCRF forms ──
+  function updateOwnProfile(id, body, user) {
+    const profile = AuthService.getProfile(user)
+    if (id !== profile.id) throw HttpError('Cannot update another user\'s profile', 403)
+
+    const sheet   = SpreadsheetService.getSheet(SHEET.USERS)
+    const updated = SpreadsheetService.updateRow(sheet, id, {
+      firstName:  body.firstName  || '',
+      lastName:   body.lastName   || '',
+      fullName:   `${body.firstName || ''} ${body.lastName || ''}`.trim(),
+      position:   body.position   || '',
+      employeeNo: body.employeeNo || '',
+      updatedAt:  new Date().toISOString()
+    })
+
+    // Sync position to DRAFT IPCRF forms
+    if (body.position) {
+      try {
+        const ipcrfSheet = SpreadsheetService.getSheet('IPCRForms')
+        const forms      = SpreadsheetService.getAllRows(ipcrfSheet)
+        forms.forEach(form => {
+          if (form.userId === id && form.status === 'DRAFT') {
+            SpreadsheetService.updateRow(ipcrfSheet, form.id, {
+              position:      body.position,
+              positionLevel: resolvePositionLevel(body.position),
+              employeeName:  updated.fullName
+            })
+          }
+        })
+      } catch (e) {
+        Logger.log('Could not sync IPCRF position: ' + e.message)
+      }
+    }
+
+    AuditService.log('UPDATE_PROFILE', 'Users', `Updated own profile: ${id}`, user)
+    return updated
+  }
+
+  return { list, get, create, update, updateOwnProfile, activate, deactivate, resetPassword }
 })()

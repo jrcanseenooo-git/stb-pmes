@@ -290,12 +290,3 @@ const UsersService = (() => {
 
   return { list, get, create, update, updateOwnProfile, activate, deactivate, resetPassword }
 })()
-
-function testSyncIPCRF() {
-  const sheet  = SpreadsheetService.getSheet('IPCRForms')
-  const forms  = SpreadsheetService.getAllRows(sheet)
-  Logger.log('Total IPCRF forms: ' + forms.length)
-  forms.forEach(f => {
-    Logger.log(`id: ${f.id} | userId: ${f.userId} | status: ${f.status} | position: ${f.position}`)
-  })
-}

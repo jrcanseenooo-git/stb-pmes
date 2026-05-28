@@ -111,7 +111,7 @@
         <div class="nav-group">
           <div v-if="!collapsed" class="nav-label">Administration</div>
           <div v-else class="nav-divider"></div>
-          <RouterLink to="/users" class="nav-item" active-class="active" :title="collapsed ? 'User Management' : ''">
+          <RouterLink v-if="canManageUsers" to="/users" class="nav-item" active-class="active" :title="collapsed ? 'User Management' : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <circle cx="8" cy="5.5" r="2.5" stroke="currentColor" stroke-width="1.4" />
@@ -257,9 +257,11 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { RouterView, RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { usePermissions } from '@/composables/usePermissions'
 import PasswordChangePrompt from '@/components/common/PasswordChangePrompt.vue'
 
 const authStore = useAuthStore()
+const { canManageUsers } = usePermissions()
 const route = useRoute()
 const router = useRouter()
 

@@ -19,9 +19,10 @@ const app = initializeApp(firebaseConfig)
 export const auth = getAuth(app)
 export const googleProvider = new GoogleAuthProvider()
 
-// Restrict sign-in to government domain
+// Restrict sign-in to government domain + always show account chooser
 googleProvider.setCustomParameters({
-  hd: import.meta.env.VITE_ALLOWED_EMAIL_DOMAIN || 'dswd.gov.ph'
+  hd: import.meta.env.VITE_ALLOWED_EMAIL_DOMAIN || 'dswd.gov.ph',
+  prompt: 'select_account'
 })
 
 export default app

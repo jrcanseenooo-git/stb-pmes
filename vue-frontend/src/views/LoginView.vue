@@ -74,7 +74,7 @@
           <div class="field">
             <label>
               Password
-              <a href="#" class="forgot" @click.prevent>Forgot password?</a>
+              <a href="#" class="forgot" @click.prevent="forgotPassword">Forgot password?</a>
             </label>
             <div class="input-wrap">
               <svg class="input-icon" width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -150,6 +150,8 @@
 
 <script setup>
 import { ref } from 'vue'
+import { sendPasswordResetEmail } from 'firebase/auth'
+import { auth } from '@/firebase'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
@@ -202,6 +204,20 @@ async function handleGoogleLogin() {
   } finally {
     loading.value = false
     loginMethod.value = ''
+  }
+}
+
+async function forgotPassword() {
+  if (!email.value) {
+    error.value = 'Enter your email address first, then click Forgot password.'
+    return
+  }
+  try {
+    await sendPasswordResetEmail(auth, email.value)
+    error.value = ''
+    alert(`Password reset email sent to ${email.value}. Check your inbox.`)
+  } catch (e) {
+    error.value = 'Could not send reset email. Make sure the email is registered.'
   }
 }
 </script>

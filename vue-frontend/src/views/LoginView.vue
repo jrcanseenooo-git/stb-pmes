@@ -37,7 +37,7 @@
             Secure Government Access
           </div>
           <h2>Sign in to your account</h2>
-          <p>Access restricted to <strong>@{{ domain }}</strong> accounts</p>
+          <p>Access is restricted to authorized accounts.</p>
         </div>
 
         <!-- Error -->
@@ -103,10 +103,10 @@
 
           <button type="submit" class="btn-primary" :disabled="loading">
             <span v-if="loading && loginMethod === 'email'" class="spinner"></span>
-            <svg v-else width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <!-- <svg v-else width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path d="M3 8h10M9 4l4 4-4 4" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            {{ loading && loginMethod === 'email' ? 'Signing in…' : 'Sign in' }}
+            </svg> -->
+            {{ loading && loginMethod === 'email' ? 'Signing in…' : 'Sign In' }}
           </button>
         </form>
 
@@ -126,7 +126,7 @@
             <path fill="#FBBC05" d="M3.964 10.706A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.706V4.962H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.038l3.007-2.332z"/>
             <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.962L3.964 7.294C4.672 5.163 6.656 3.58 9 3.58z"/>
           </svg>
-          {{ loading && loginMethod === 'google' ? 'Signing in…' : 'Sign in with Google' }}
+          {{ loading && loginMethod === 'google' ? 'Signing in…' : 'Sign In with Google' }}
         </button>
 
         <!-- Info note -->
@@ -135,7 +135,7 @@
             <circle cx="6.5" cy="6.5" r="5.5" stroke="#94A3B8" stroke-width="1.2"/>
             <path d="M6.5 6v3M6.5 4.5v.1" stroke="#94A3B8" stroke-width="1.2" stroke-linecap="round"/>
           </svg>
-          Use your <strong>@{{ domain }}</strong> Google account for seamless access.
+          Use your Google account for seamless access.
         </div>
 
         <!-- Footer -->

@@ -30,21 +30,51 @@ const UsersService = (() => {
     return row
   }
 
+  // ── Create Firebase Auth account via REST API ──
+  function createFirebaseAuthUser(email, password) {
+    const apiKey = PropertiesService.getScriptProperties().getProperty('FIREBASE_WEB_API_KEY')
+    if (!apiKey) {
+      Logger.log('FIREBASE_WEB_API_KEY not set — skipping Firebase Auth creation')
+      return null
+    }
+    try {
+      const url  = `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${apiKey}`
+      const resp = UrlFetchApp.fetch(url, {
+        method: 'POST',
+        contentType: 'application/json',
+        payload: JSON.stringify({ email, password, returnSecureToken: false }),
+        muteHttpExceptions: true
+      })
+      const result = JSON.parse(resp.getContentText())
+      if (result.error) {
+        Logger.log('Firebase Auth create error: ' + result.error.message)
+        return null
+      }
+      return result.localId  // Firebase UID
+    } catch (err) {
+      Logger.log('Firebase Auth create exception: ' + err.message)
+      return null
+    }
+  }
+
   function create(body, user) {
     AuthService.requireRole(user, 'System Administrator')
     const sheet = SpreadsheetService.getSheet(SHEET.USERS)
     const now   = new Date().toISOString()
 
+    // Create Firebase Auth account so the user can actually log in with email+password
+    const firebaseUid = createFirebaseAuthUser(body.email, body.tempPassword || '')
+
     const newUser = {
       id:           SpreadsheetService.generateId('USR-'),
-      uid:          '',
+      uid:          firebaseUid || '',
       email:        body.email        || '',
       fullName:     body.fullName     || `${body.firstName} ${body.lastName}`,
       firstName:    body.firstName    || '',
       lastName:     body.lastName     || '',
       role:         body.role         || 'Staff',
       divisionId:   body.divisionId   || '',
-      divisionName: body.division     || '',
+      divisionName: body.divisionName || body.division || '',
       position:     body.position     || '',
       employeeNo:   body.employeeNo   || '',
       type:         body.type         || 'Regular',
@@ -57,7 +87,7 @@ const UsersService = (() => {
     }
 
     SpreadsheetService.appendRow(sheet, newUser)
-    AuditService.log('CREATE', 'Users', `Created user: ${newUser.email}`, user)
+    AuditService.log('CREATE', 'Users', `Created user: ${newUser.email} (Firebase UID: ${firebaseUid || 'not created'})`, user)
     return newUser
   }
 

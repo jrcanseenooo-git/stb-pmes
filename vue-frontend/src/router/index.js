@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from "vue-router";
+import { useAuthStore } from "@/stores/auth";
 
 const AppLayout = () => import("@/layouts/AppLayout.vue");
 const AuthLayout = () => import("@/layouts/AuthLayout.vue");
@@ -19,6 +20,7 @@ const routes = [
   {
     path: "/",
     component: AppLayout,
+    meta: { requiresAuth: true },
     children: [
       {
         path: "dashboard",
@@ -49,6 +51,27 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes,
+});
+
+// ── Auth guard ──
+router.beforeEach(async (to) => {
+  const auth = useAuthStore();
+
+  // Wait for Firebase auth to initialise on first load
+  if (!auth.initialised) {
+    await auth.init();
+  }
+
+  const needsAuth = to.matched.some((r) => r.meta?.requiresAuth);
+
+  if (needsAuth && !auth.isAuthenticated) {
+    return { name: "Login", query: { redirect: to.fullPath } };
+  }
+
+  // Redirect away from login if already signed in
+  if (to.name === "Login" && auth.isAuthenticated) {
+    return { path: "/dashboard" };
+  }
 });
 
 export default router;

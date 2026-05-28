@@ -1,30 +1,63 @@
 /**
  * FirebaseAuthService.gs
- * Creates, updates, and manages Firebase Auth users directly from Apps Script
- * using Firebase Auth REST API + Google Identity Platform Admin API.
+ * Manages Firebase Auth users from Apps Script using a Service Account JWT.
+ * No GCP project linking required — works with any Firebase project.
  *
  * Setup required:
- *   1. Enable "Identity Toolkit API" in Google Cloud Console
- *   2. Set Script Property: FIREBASE_WEB_API_KEY = your Firebase Web API Key
- *   3. Set Script Property: FIREBASE_PROJECT_ID = pmes-1cb6d
- *
- * The Apps Script service account has access to the Firebase project
- * because it runs under the same Google Cloud project.
+ *   1. Firebase Console → Project Settings → Service Accounts
+ *   2. Click "Generate new private key" → download JSON
+ *   3. Add these Script Properties:
+ *      FIREBASE_PROJECT_ID    = your-project-id  (e.g. pmes-1cb6d)
+ *      FIREBASE_CLIENT_EMAIL  = value from "client_email" in the JSON
+ *      FIREBASE_PRIVATE_KEY   = value from "private_key" in the JSON
+ *                               (paste the full string including -----BEGIN/END-----)
  */
 
 const FirebaseAuthService = (() => {
 
-  const PROPS          = PropertiesService.getScriptProperties()
-  const PROJECT_ID     = PROPS.getProperty('FIREBASE_PROJECT_ID')    || 'pmes-1cb6d'
-  const WEB_API_KEY    = PROPS.getProperty('FIREBASE_WEB_API_KEY')   || ''
+  const PROPS        = PropertiesService.getScriptProperties()
+  const PROJECT_ID   = PROPS.getProperty('FIREBASE_PROJECT_ID')   || 'pmes-1cb6d'
+  const CLIENT_EMAIL = PROPS.getProperty('FIREBASE_CLIENT_EMAIL') || ''
+  const PRIVATE_KEY  = (PROPS.getProperty('FIREBASE_PRIVATE_KEY') || '').replace(/\\n/g, '\n')
 
-  // Identity Toolkit v1 endpoint (Admin operations via OAuth2)
-  const ADMIN_BASE     = `https://identitytoolkit.googleapis.com/v1/projects/${PROJECT_ID}`
-  const PUBLIC_BASE    = `https://identitytoolkit.googleapis.com/v1/accounts`
+  const ADMIN_BASE   = `https://identitytoolkit.googleapis.com/v1/projects/${PROJECT_ID}`
 
-  // ── Get OAuth2 token for Admin API calls ──
+  // ── Build a signed JWT and exchange it for an access token ──
   function getAdminToken() {
-    return ScriptApp.getOAuthToken()
+    if (!CLIENT_EMAIL || !PRIVATE_KEY) {
+      throw new Error('Missing FIREBASE_CLIENT_EMAIL or FIREBASE_PRIVATE_KEY in Script Properties')
+    }
+
+    const now     = Math.floor(Date.now() / 1000)
+    const header  = Utilities.base64EncodeWebSafe(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))
+    const claim   = Utilities.base64EncodeWebSafe(JSON.stringify({
+      iss:   CLIENT_EMAIL,
+      sub:   CLIENT_EMAIL,
+      aud:   'https://oauth2.googleapis.com/token',
+      iat:   now,
+      exp:   now + 3600,
+      scope: 'https://www.googleapis.com/auth/cloud-platform'
+    }))
+
+    const sigInput  = `${header}.${claim}`
+    const signature = Utilities.base64EncodeWebSafe(
+      Utilities.computeRsaSha256Signature(sigInput, PRIVATE_KEY)
+    )
+    const jwt = `${sigInput}.${signature}`
+
+    const tokenResponse = UrlFetchApp.fetch('https://oauth2.googleapis.com/token', {
+      method:             'POST',
+      contentType:        'application/x-www-form-urlencoded',
+      payload:            `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`,
+      muteHttpExceptions: true
+    })
+
+    const tokenResult = JSON.parse(tokenResponse.getContentText())
+    if (!tokenResult.access_token) {
+      throw new Error('Failed to get access token: ' + JSON.stringify(tokenResult))
+    }
+
+    return tokenResult.access_token
   }
 
   // ── CREATE a new Firebase Auth user ──
@@ -32,20 +65,18 @@ const FirebaseAuthService = (() => {
     const token = getAdminToken()
     const url   = `${ADMIN_BASE}/accounts`
 
-    const payload = {
-      email:           email,
-      password:        password,
-      displayName:     displayName || email.split('@')[0],
-      emailVerified:   false,
-      disabled:        false
-    }
-
     try {
       const response = UrlFetchApp.fetch(url, {
         method:             'POST',
         contentType:        'application/json',
         headers:            { Authorization: 'Bearer ' + token },
-        payload:            JSON.stringify(payload),
+        payload:            JSON.stringify({
+          email,
+          password,
+          displayName: displayName || email.split('@')[0],
+          emailVerified: false,
+          disabled:      false
+        }),
         muteHttpExceptions: true
       })
 
@@ -57,7 +88,6 @@ const FirebaseAuthService = (() => {
         return { success: true, uid: result.localId, email: result.email }
       } else if (result.error?.message === 'EMAIL_EXISTS') {
         Logger.log('ℹ️ Firebase user already exists: ' + email)
-        // Get existing user's UID
         const existing = getUserByEmail(email)
         return { success: true, uid: existing?.localId || '', email, alreadyExisted: true }
       } else {
@@ -73,26 +103,18 @@ const FirebaseAuthService = (() => {
   // ── UPDATE password for existing user ──
   function updatePassword(uid, newPassword) {
     const token = getAdminToken()
-    const url   = `${ADMIN_BASE}/accounts`
-
-    const payload = {
-      localId:  uid,
-      password: newPassword
-    }
 
     try {
-      const response = UrlFetchApp.fetch(url + ':update', {
+      const response = UrlFetchApp.fetch(`${ADMIN_BASE}/accounts:update`, {
         method:             'POST',
         contentType:        'application/json',
         headers:            { Authorization: 'Bearer ' + token },
-        payload:            JSON.stringify(payload),
+        payload:            JSON.stringify({ localId: uid, password: newPassword }),
         muteHttpExceptions: true
       })
 
       const result = JSON.parse(response.getContentText())
-      const code   = response.getResponseCode()
-
-      if (code === 200) {
+      if (response.getResponseCode() === 200) {
         Logger.log('✅ Firebase password updated for UID: ' + uid)
         return { success: true }
       } else {
@@ -107,16 +129,13 @@ const FirebaseAuthService = (() => {
   // ── DISABLE a Firebase user ──
   function disableUser(uid) {
     const token = getAdminToken()
-    const url   = `${ADMIN_BASE}/accounts:update`
-
-    const payload = { localId: uid, disableUser: true }
 
     try {
-      const response = UrlFetchApp.fetch(url, {
+      const response = UrlFetchApp.fetch(`${ADMIN_BASE}/accounts:update`, {
         method:             'POST',
         contentType:        'application/json',
         headers:            { Authorization: 'Bearer ' + token },
-        payload:            JSON.stringify(payload),
+        payload:            JSON.stringify({ localId: uid, disableUser: true }),
         muteHttpExceptions: true
       })
 
@@ -136,16 +155,13 @@ const FirebaseAuthService = (() => {
   // ── ENABLE a Firebase user ──
   function enableUser(uid) {
     const token = getAdminToken()
-    const url   = `${ADMIN_BASE}/accounts:update`
-
-    const payload = { localId: uid, disableUser: false }
 
     try {
-      const response = UrlFetchApp.fetch(url, {
+      const response = UrlFetchApp.fetch(`${ADMIN_BASE}/accounts:update`, {
         method:             'POST',
         contentType:        'application/json',
         headers:            { Authorization: 'Bearer ' + token },
-        payload:            JSON.stringify(payload),
+        payload:            JSON.stringify({ localId: uid, disableUser: false }),
         muteHttpExceptions: true
       })
 
@@ -165,10 +181,9 @@ const FirebaseAuthService = (() => {
   // ── GET user by email ──
   function getUserByEmail(email) {
     const token = getAdminToken()
-    const url   = `${ADMIN_BASE}/accounts:lookup`
 
     try {
-      const response = UrlFetchApp.fetch(url, {
+      const response = UrlFetchApp.fetch(`${ADMIN_BASE}/accounts:lookup`, {
         method:             'POST',
         contentType:        'application/json',
         headers:            { Authorization: 'Bearer ' + token },
@@ -190,10 +205,9 @@ const FirebaseAuthService = (() => {
   // ── UPDATE display name ──
   function updateDisplayName(uid, displayName) {
     const token = getAdminToken()
-    const url   = `${ADMIN_BASE}/accounts:update`
 
     try {
-      const response = UrlFetchApp.fetch(url, {
+      const response = UrlFetchApp.fetch(`${ADMIN_BASE}/accounts:update`, {
         method:             'POST',
         contentType:        'application/json',
         headers:            { Authorization: 'Bearer ' + token },
@@ -210,27 +224,26 @@ const FirebaseAuthService = (() => {
     }
   }
 
-  // ── TEST function — run this to verify setup ──
+  // ── TEST function ──
   function testSetup() {
-    Logger.log('Testing Firebase Admin API access...')
-    Logger.log('Project ID: ' + PROJECT_ID)
+    Logger.log('Testing Firebase Service Account access...')
+    Logger.log('Project ID:    ' + PROJECT_ID)
+    Logger.log('Client Email:  ' + (CLIENT_EMAIL || '❌ NOT SET'))
+    Logger.log('Private Key:   ' + (PRIVATE_KEY ? '✅ set (' + PRIVATE_KEY.length + ' chars)' : '❌ NOT SET'))
 
-    const token = getAdminToken()
-    if (!token) {
-      Logger.log('❌ No OAuth token — authorize the script first')
-      return
-    }
-    Logger.log('✅ OAuth token obtained (length: ' + token.length + ')')
+    try {
+      const token = getAdminToken()
+      Logger.log('✅ Access token obtained (length: ' + token.length + ')')
 
-    // Try to look up the admin user
-    const admin = getUserByEmail('jrbcancino@dswd.gov.ph')
-    if (admin) {
-      Logger.log('✅ Firebase Admin API working! Found user: ' + admin.email)
-      Logger.log('   UID: ' + admin.localId)
-      Logger.log('   Disabled: ' + (admin.disabled || false))
-    } else {
-      Logger.log('❌ Could not find admin user — check API permissions')
-      Logger.log('   Make sure "Identity Toolkit API" is enabled in Google Cloud Console')
+      const admin = getUserByEmail('jrbcancino@dswd.gov.ph')
+      if (admin) {
+        Logger.log('✅ Firebase Admin API working! Found user: ' + admin.email)
+        Logger.log('   UID: ' + admin.localId)
+      } else {
+        Logger.log('⚠️ API works but user not found — check the email address')
+      }
+    } catch (e) {
+      Logger.log('❌ Error: ' + e.message)
     }
   }
 
@@ -244,3 +257,8 @@ const FirebaseAuthService = (() => {
     testSetup
   }
 })()
+
+// ── Callable wrapper for testing ──
+function testFirebaseSetup() {
+  FirebaseAuthService.testSetup()
+}

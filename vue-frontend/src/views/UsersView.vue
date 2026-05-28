@@ -324,6 +324,8 @@ function mapUser(row) {
     uid: row.uid || '',
     initials: name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase(),
     name,
+    firstName: row.firstName || '',
+    lastName:  row.lastName  || '',
     email: row.email || '',
     role: row.role || 'Staff',
     division: row.divisionName || row.divisionId || '',
@@ -399,8 +401,8 @@ function openAddModal() {
 function openEditModal(user) {
   editingUser.value = user
   form.value = {
-    firstName: user.name.split(' ')[0],
-    lastName: user.name.split(' ').slice(1).join(' '),
+    firstName: user.firstName || user.name.split(' ')[0] || '',
+    lastName:  user.lastName  || user.name.split(' ').slice(1).join(' ') || '',
     email: user.email,
     role: user.role,
     division: user.division,

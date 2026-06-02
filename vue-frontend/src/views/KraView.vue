@@ -250,7 +250,7 @@
                       </td>
                       <td class="td-mov">
                         <div v-if="entry.meansOfVerification" class="mov-hint" :title="entry.meansOfVerification">
-                          📎 {{ entry.meansOfVerification.substring(0, 30) }}...
+                          {{ entry.meansOfVerification.substring(0, 30) }}...
                         </div>
                       </td>
                       <!-- Rating columns for DC -->
@@ -327,7 +327,11 @@
                       </td>
                       <td class="td-period"><span class="period-badge">{{ entry.applicableRatingPeriod }}</span></td>
                       <td class="td-weight"><span class="weight-badge">{{ entry.weight }}%</span></td>
-                      <td class="td-mov"></td>
+                      <td class="td-mov">
+                        <div v-if="entry.meansOfVerification" class="mov-hint" :title="entry.meansOfVerification">
+                          {{ entry.meansOfVerification.substring(0, 30) }}...
+                        </div>
+                      </td>
                       <template v-if="canRate">
                         <td class="td-rating">
                           <select v-model="entry.ratingEfficiency" class="rating-select" @change="saveRating(entry)">

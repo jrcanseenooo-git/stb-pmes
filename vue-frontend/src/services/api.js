@@ -87,7 +87,8 @@ export const usersApi = {
   updateProfile: (id, data) => gasWrite("PUT", `users/${id}/profile`, data),
   activate: (id) => gasWrite("PATCH", `users/${id}/activate`),
   deactivate: (id) => gasWrite("PATCH", `users/${id}/deactivate`),
-  resetPassword: (id, tempPassword) => gasWrite('POST', `users/${id}/reset-password`, { tempPassword }),
+  resetPassword: (id, tempPassword) =>
+    gasWrite("POST", `users/${id}/reset-password`, { tempPassword }),
 };
 
 export const kraApi = {
@@ -171,42 +172,43 @@ function fileToBase64(file) {
 }
 
 export const ipcrf = {
-  list:         (p = {})     => gasGet('ipcrf',                         p),
-  get:          (id)         => gasGet(`ipcrf/${id}`),
-  create:       (data)       => gasWrite('POST',  'ipcrf',               data),
-  update:       (id, data)   => gasWrite('PUT',   `ipcrf/${id}`,         data),
-  submit:       (id)         => gasWrite('POST',  `ipcrf/${id}/submit`),
-  approve:      (id, data)   => gasWrite('POST',  `ipcrf/${id}/approve`, data || {}),
-  submitForRating: (id)      => gasWrite('POST',  `ipcrf/${id}/for-rating`),
-  computeScore: (id)         => gasWrite('POST',  `ipcrf/${id}/compute`),
+  list: (p = {}) => gasGet("ipcrf", p),
+  get: (id) => gasGet(`ipcrf/${id}`),
+  create: (data) => gasWrite("POST", "ipcrf", data),
+  update: (id, data) => gasWrite("PUT", `ipcrf/${id}`, data),
+  submit: (id) => gasWrite("POST", `ipcrf/${id}/submit`),
+  approve: (id, data) => gasWrite("POST", `ipcrf/${id}/approve`, data || {}),
+  submitForRating: (id) => gasWrite("POST", `ipcrf/${id}/for-rating`),
+  computeScore: (id) => gasWrite("POST", `ipcrf/${id}/compute`),
 
-  getEntries:   (formId)     => gasGet(`ipcrf/${formId}/entries`),
-  addEntry:     (formId, d)  => gasWrite('POST',  `ipcrf/${formId}/entries`, d),
-  updateEntry:  (id, data)   => gasWrite('PUT',   `form-entries/${id}`,  data),
-  deleteEntry:  (id)         => gasWrite('DELETE', `form-entries/${id}`),
-  rateEntry:    (id, data)   => gasWrite('POST',   `form-entries/${id}/rate`, data),
-}
+  getEntries: (formId) => gasGet(`ipcrf/${formId}/entries`),
+  addEntry: (formId, d) => gasWrite("POST", `ipcrf/${formId}/entries`, d),
+  updateEntry: (id, data) => gasWrite("PUT", `form-entries/${id}`, data),
+  deleteEntry: (id) => gasWrite("DELETE", `form-entries/${id}`),
+  rateEntry: (id, data) => gasWrite("POST", `form-entries/${id}/rate`, data),
+};
 
 export const kraLibrary = {
-  list: (p = {}) => gasGet('kra-library', p),
-}
+  list: (p = {}) => gasGet("kra-library", p),
+};
 
 export const jrb = {
-  items:        ()           => gasGet('jrb/items'),
-  submitRating: (data)       => gasWrite('POST', 'jrb', data),
-  getFormRatings: (formId)   => gasGet(`jrb/${formId}/ratings`),
-  assignPeers:  (userId, d)  => gasWrite('POST', `jrb/${userId}/assign-peers`, d),
-  getAssignment:(userId, p)  => gasGet(`jrb/${userId}/assignment`, p),
-  myPeerForms:  (p = {})    => gasGet('jrb/my-peer-forms', p),
-}
+  items: () => gasGet("jrb/items"),
+  submitRating: (data) => gasWrite("POST", "jrb", data),
+  getFormRatings: (formId) => gasGet(`jrb/${formId}/ratings`),
+  assignPeers: (userId, d) => gasWrite("POST", `jrb/${userId}/assign-peers`, d),
+  getAssignment: (userId, p) => gasGet(`jrb/${userId}/assignment`, p),
+  myPeerForms: (p = {}) => gasGet("jrb/my-peer-forms", p),
+};
 
 export const attendance = {
-  list:           (p = {})   => gasGet('attendance',              p),
-  logRecord:      (data)     => gasWrite('POST', 'attendance',    data),
-  computeRating:  (uid, d)   => gasWrite('POST', `attendance/${uid}/compute-rating`, d),
-  getRating:      (uid, p)   => gasGet(`attendance/${uid}/rating`, p),
-  getDivisionStaff: (p = {}) => gasGet('attendance/staff',        p),
-}
+  list: (p = {}) => gasGet("attendance", p),
+  logRecord: (data) => gasWrite("POST", "attendance", data),
+  computeRating: (uid, d) =>
+    gasWrite("POST", `attendance/${uid}/compute-rating`, d),
+  getRating: (uid, p) => gasGet(`attendance/${uid}/rating`, p),
+  getDivisionStaff: (p = {}) => gasGet("attendance/staff", p),
+};
 
 export default {
   authApi,

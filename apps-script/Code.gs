@@ -1,117 +1,75 @@
-/**
- * PMES – Google Apps Script API Entry Point  (Fixed)
- * =====================================================
- * All requests: GET or POST to the Web App URL
- * Token passed as: ?token=FIREBASE_ID_TOKEN
- * Route passed as: ?route=resource/sub
- * HTTP method override: body._method or ?_method= (PUT, PATCH, DELETE)
- */
-
+// ── Sheet name constants ──
 const SHEET = {
-  USERS:           'Users',
-  DIVISIONS:       'Divisions',
-  KRAS:            'KRAs',
-  INDICATORS:      'SuccessIndicators',
-  ACCOMPLISHMENTS: 'Accomplishments',
-  MOV:             'MOVFiles',
-  EVALUATIONS:     'Evaluations',
-  NOTIFICATIONS:   'Notifications',
-  AUDIT:           'AuditLog',
-  REPORTS:         'Reports',
-  DEADLINES:       'Deadlines',
-  REVISIONS:       'Revisions'
+  USERS:               'Users',
+  DIVISIONS:           'Divisions',
+  KRAS:                'KRAs',
+  INDICATORS:          'SuccessIndicators',
+  ACCOMPLISHMENTS:     'Accomplishments',
+  MOV:                 'MOVFiles',
+  EVALUATIONS:         'Evaluations',
+  NOTIFICATIONS:       'Notifications',
+  AUDIT:               'AuditLog',
+  REPORTS:             'Reports',
+  DEADLINES:           'Deadlines',
+  REVISIONS:           'Revisions',
+  // ── IPCRF / CCEF ──
+  IPCRF_FORMS:         'IPCRForms',
+  FORM_ENTRIES:        'FormEntries',
+  MASTER_KRA_LIBRARY:  'MasterKRALibrary'
 }
 
-// ── GET handler ──
+// ── Entry point: HTTP GET ──
 function doGet(e) {
   return handleRequest(e, 'GET')
 }
 
-// ── POST handler ──
+// ── Entry point: HTTP POST ──
 function doPost(e) {
   return handleRequest(e, 'POST')
 }
 
 // ── Main dispatcher ──
-function handleRequest(e, httpMethod) {
-  // Add CORS headers
+function handleRequest(e, method) {
   try {
-    // 1. Verify Firebase token
+    // 1. Authenticate every request
     const user = AuthService.verifyToken(e)
-    if (!user) {
-      return respond(401, false, null, 'Unauthorized – invalid or missing token')
-    }
+    if (!user) return respond(401, false, null, 'Unauthorized – invalid or missing token')
 
-    // 2. Parse body
-    const body = parseBody(e)
+    // 2. Override method from payload (GAS only supports GET/POST natively)
+    const body       = parseBody(e)
+    const httpMethod = body?._method?.toUpperCase() || method
 
-    // 3. Method override (GAS only does GET/POST natively)
-    const method = body?._method?.toUpperCase() ||
-                   e.parameter?._method?.toUpperCase() ||
-                   httpMethod
+    // 3. Route
+    const route  = (e.parameter?.route || '').replace(/^\/|\/$/g, '')
+    const result = Router.dispatch(route, httpMethod, e.parameter, body, user)
 
-    // 4. Get route
-    const route = (e.parameter?.route || '').replace(/^\/|\/$/g, '')
-
-    // 5. Special case: auth/me — get profile and update last login
-    if (route === 'auth/me') {
-      const profile = AuthService.getProfile(user)
-      AuthService.updateLastLogin(profile.id)
-      AuditService.log('LOGIN', 'Auth', 'User logged in via Firebase', user)
-      return respond(200, true, profile)
-    }
-
-    // 6. auth/log
-    if (route === 'auth/log') {
-      return respond(200, true, AuditService.log(body.action, body.module, body.details, user))
-    }
-
-    // 7. Dispatch to router
-    const result = Router.dispatch(route, method, e.parameter, body, user)
     return respond(200, true, result)
 
   } catch (err) {
-    Logger.log('PMES Error: ' + err.message + '\n' + (err.stack || ''))
+    Logger.log('PMES Error: ' + err.message + '\n' + err.stack)
     const code = err.statusCode || 500
-    return respond(code, false, null, err.message || 'Internal server error')
+    return respond(code, false, null, err.message)
   }
 }
 
 // ── Helpers ──
 function parseBody(e) {
-  // 1. Try real POST body first (future-proof)
   try {
-    if (e.postData?.contents) return JSON.parse(e.postData.contents)
-  } catch (err) {
-    Logger.log('Body parse error: ' + err.message)
+    return e.postData?.contents ? JSON.parse(e.postData.contents) : {}
+  } catch {
+    return {}
   }
-  // 2. Fall back to URL params — gasWrite() sends writes as GET with flattenParams()
-  //    Strip system keys so only payload fields reach the service layer
-  const SYSTEM_KEYS = new Set(['route', '_method', 'token'])
-  const body = {}
-  Object.entries(e.parameter || {}).forEach(([k, v]) => {
-    if (!SYSTEM_KEYS.has(k)) body[k] = v
-  })
-  return body
 }
 
 function respond(status, success, data, message) {
-  const payload = JSON.stringify({
-    success: success,
-    data:    data    ?? null,
-    message: message ?? null,
-    status:  status
-  })
-
-  const output = ContentService
+  const payload = JSON.stringify({ success, data: data ?? null, message: message ?? null })
+  return ContentService
     .createTextOutput(payload)
     .setMimeType(ContentService.MimeType.JSON)
-
-  return output
 }
 
 function HttpError(message, code) {
-  const e      = new Error(message)
+  const e    = new Error(message)
   e.statusCode = code || 400
   return e
 }

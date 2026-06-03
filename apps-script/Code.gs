@@ -4,6 +4,7 @@ const SHEET = {
   DIVISIONS:       'Divisions',
   KRAS:            'KRAs',
   INDICATORS:      'SuccessIndicators',
+  MASTER_KRAS:     'MasterKRAs',
   ACCOMPLISHMENTS: 'Accomplishments',
   MOV:             'MOVFiles',
   EVALUATIONS:     'Evaluations',
@@ -11,7 +12,9 @@ const SHEET = {
   AUDIT:           'AuditLog',
   REPORTS:         'Reports',
   DEADLINES:       'Deadlines',
-  REVISIONS:       'Revisions'
+  REVISIONS:       'Revisions',
+  IPCRF_FORMS:     'IPCRForms',
+  FORM_ENTRIES:    'FormEntries'
 }
 
 // ── Entry point: HTTP GET ──
@@ -50,18 +53,6 @@ function handleRequest(e, method) {
 }
 
 // ── Helpers ──
-
-/**
- * parseBody – returns the merged request body.
- *
- * For POST requests the frontend sends a JSON string in e.postData.contents.
- * We parse that and return it.  For GET requests (reads) e.postData is absent,
- * so we fall back to an empty object.
- *
- * NOTE: We do NOT merge e.parameter into the body here because e.parameter
- * is already available separately in the dispatcher and mixing them can cause
- * the _method key to come from both places.
- */
 function parseBody(e) {
   try {
     const raw = e.postData?.contents

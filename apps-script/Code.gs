@@ -1,21 +1,17 @@
 // ── Sheet name constants ──
 const SHEET = {
-  USERS:              'Users',
-  DIVISIONS:          'Divisions',
-  KRAS:               'KRAs',
-  INDICATORS:         'SuccessIndicators',
-  ACCOMPLISHMENTS:    'Accomplishments',
-  MOV:                'MOVFiles',
-  EVALUATIONS:        'Evaluations',
-  NOTIFICATIONS:      'Notifications',
-  AUDIT:              'AuditLog',
-  REPORTS:            'Reports',
-  DEADLINES:          'Deadlines',
-  REVISIONS:          'Revisions',
-  // ── IPCRF / CCEF ──
-  IPCRF_FORMS:        'IPCRForms',
-  FORM_ENTRIES:       'FormEntries',
-  MASTER_KRA_LIBRARY: 'MasterKRALibrary'
+  USERS:           'Users',
+  DIVISIONS:       'Divisions',
+  KRAS:            'KRAs',
+  INDICATORS:      'SuccessIndicators',
+  ACCOMPLISHMENTS: 'Accomplishments',
+  MOV:             'MOVFiles',
+  EVALUATIONS:     'Evaluations',
+  NOTIFICATIONS:   'Notifications',
+  AUDIT:           'AuditLog',
+  REPORTS:         'Reports',
+  DEADLINES:       'Deadlines',
+  REVISIONS:       'Revisions'
 }
 
 // ── Entry point: HTTP GET ──
@@ -31,13 +27,14 @@ function doPost(e) {
 // ── Main dispatcher ──
 function handleRequest(e, method) {
   try {
-    // 1. Authenticate every request
+    // 1. Authenticate every request (reads token from e.parameter.token)
     const user = AuthService.verifyToken(e)
     if (!user) return respond(401, false, null, 'Unauthorized – invalid or missing token')
 
-    // 2. Override method from payload (GAS only supports GET/POST natively)
+    // 2. Parse body: for POST requests this is e.postData.contents (JSON).
+    //    We merge it with e.parameter so the dispatcher always sees a flat body.
     const body       = parseBody(e)
-    const httpMethod = body?._method?.toUpperCase() || method
+    const httpMethod = (body._method || '').toUpperCase() || method
 
     // 3. Route
     const route  = (e.parameter?.route || '').replace(/^\/|\/$/g, '')
@@ -53,12 +50,26 @@ function handleRequest(e, method) {
 }
 
 // ── Helpers ──
+
+/**
+ * parseBody – returns the merged request body.
+ *
+ * For POST requests the frontend sends a JSON string in e.postData.contents.
+ * We parse that and return it.  For GET requests (reads) e.postData is absent,
+ * so we fall back to an empty object.
+ *
+ * NOTE: We do NOT merge e.parameter into the body here because e.parameter
+ * is already available separately in the dispatcher and mixing them can cause
+ * the _method key to come from both places.
+ */
 function parseBody(e) {
   try {
-    return e.postData?.contents ? JSON.parse(e.postData.contents) : {}
-  } catch {
-    return {}
+    const raw = e.postData?.contents
+    if (raw) return JSON.parse(raw)
+  } catch (err) {
+    Logger.log('PMES parseBody error: ' + err.message)
   }
+  return {}
 }
 
 function respond(status, success, data, message) {

@@ -154,6 +154,39 @@ export const auditApi = {
   export: (p = {}) => gasGet('audit/export', p)
 }
 
+// ── IPCRF Forms & Entries ────────────────────────────────────────────────────
+// Routes: ipcrf/forms, ipcrf/forms/:id, ipcrf/forms/:id/entries, etc.
+export const ipcrf = {
+  // Forms
+  listForms:    (p = {})         => gasGet('ipcrf/forms',                             p),
+  getForm:      (id)             => gasGet(`ipcrf/forms/${id}`),
+  createForm:   (data)           => gasWrite('POST',   'ipcrf/forms',                 data),
+  updateForm:   (id, data)       => gasWrite('PUT',    `ipcrf/forms/${id}`,           data),
+  submitForm:   (id)             => gasWrite('PATCH',  `ipcrf/forms/${id}/submit`),
+  approveForm:  (id, data)       => gasWrite('PATCH',  `ipcrf/forms/${id}/approve`,   data),
+  returnForm:   (id, data)       => gasWrite('PATCH',  `ipcrf/forms/${id}/return`,    data),
+  finalizeForm: (id, data)       => gasWrite('PATCH',  `ipcrf/forms/${id}/finalize`,  data),
+  computeScore: (id)             => gasWrite('PATCH',  `ipcrf/forms/${id}/compute`),
+  deleteForm:   (id)             => gasWrite('DELETE', `ipcrf/forms/${id}`),
+
+  // Form entries (rows inside a form)
+  listEntries:   (formId, p={})        => gasGet(`ipcrf/forms/${formId}/entries`,         p),
+  addEntry:      (formId, data)        => gasWrite('POST',   `ipcrf/forms/${formId}/entries`,         data),
+  updateEntry:   (formId, entId, data) => gasWrite('PUT',    `ipcrf/forms/${formId}/entries/${entId}`, data),
+  deleteEntry:   (formId, entId)       => gasWrite('DELETE', `ipcrf/forms/${formId}/entries/${entId}`),
+  rateEntry:     (formId, entId, data) => gasWrite('PATCH',  `ipcrf/forms/${formId}/entries/${entId}/rate`, data),
+}
+
+// ── KRA Master Library ────────────────────────────────────────────────────────
+// Routes: kra-library  (MasterKRAs sheet — read-only reference data)
+export const kraLibrary = {
+  list:   (p = {}) => gasGet('kra-library',     p),
+  get:    (id)     => gasGet(`kra-library/${id}`),
+  create: (data)   => gasWrite('POST',   'kra-library',     data),
+  update: (id, d)  => gasWrite('PUT',    `kra-library/${id}`, d),
+  remove: (id)     => gasWrite('DELETE', `kra-library/${id}`),
+}
+
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -166,5 +199,6 @@ function fileToBase64(file) {
 export default {
   authApi, dashboardApi, usersApi, kraApi,
   accomplishmentsApi, movApi, evaluationApi,
-  reportsApi, notificationsApi, auditApi
+  reportsApi, notificationsApi, auditApi,
+  ipcrf, kraLibrary
 }

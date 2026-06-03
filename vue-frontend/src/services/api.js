@@ -210,6 +210,27 @@ export const attendance = {
   getDivisionStaff: (p = {}) => gasGet("attendance/staff", p),
 };
 
+export const ipcrf = {
+  // Forms
+  listForms:   (p = {})      => gasGet('ipcrf/forms', p),
+  getForm:     (id)          => gasGet(`ipcrf/forms/${id}`),
+  createForm:  (data)        => gasWrite('POST',  'ipcrf/forms', data),
+  updateForm:  (id, data)    => gasWrite('PUT',   `ipcrf/forms/${id}`, data),
+  submitForm:  (id)          => gasWrite('PATCH', `ipcrf/forms/${id}/submit`),
+  approveForm: (id, data={}) => gasWrite('PATCH', `ipcrf/forms/${id}/approve`, data),
+  returnForm:  (id, data={}) => gasWrite('PATCH', `ipcrf/forms/${id}/return`,  data),
+  computeScore:(id)          => gasWrite('PATCH', `ipcrf/forms/${id}/score`),
+  // Entries
+  getEntries:  (formId)            => gasGet(`ipcrf/forms/${formId}/entries`),
+  addEntry:    (formId, data)      => gasWrite('POST',   `ipcrf/forms/${formId}/entries`, data),
+  updateEntry: (entryId, data)     => gasWrite('PUT',    `ipcrf/entries/${entryId}`,      data),
+  deleteEntry: (entryId)           => gasWrite('DELETE', `ipcrf/entries/${entryId}`)
+}
+ 
+export const kraLibrary = {
+  list: (p = {}) => gasGet('ipcrf/library', p)
+}
+
 export default {
   authApi,
   dashboardApi,

@@ -1,7 +1,6 @@
 const Router = (() => {
 
   function dispatch(route, method, params, body, user) {
-    // Normalise: 'users/123' → ['users', '123']
     const parts    = route.split('/')
     const resource = parts[0]
     const id       = parts[1] || null
@@ -42,7 +41,6 @@ const Router = (() => {
         if (id    && !sub && method === 'GET')    return KraService.get(id, user)
         if (id    && !sub && method === 'PUT')    return KraService.update(id, body, user)
         if (id    && !sub && method === 'DELETE') return KraService.remove(id, user)
-        // Success Indicators sub-resource
         if (id && sub === 'indicators') {
           if (!subId && method === 'GET')    return KraService.listSI(id, user)
           if (!subId && method === 'POST')   return KraService.createSI(id, body, user)
@@ -52,7 +50,6 @@ const Router = (() => {
         break
 
       // ── KRA Master Library ──
-      // Route: kra-library[/:id]
       case 'kra-library':
         if (!id && method === 'GET')    return KraLibraryService.list(params, user)
         if (!id && method === 'POST')   return KraLibraryService.create(body, user)
@@ -107,47 +104,32 @@ const Router = (() => {
 
       // ── Audit ──
       case 'audit':
-        if (!id   && method === 'GET') return AuditService.list(params, user)
-        if (sub === 'export')          return AuditService.export_(params, user)
+        if (!id   && method === 'GET')  return AuditService.list(params, user)
+        if (sub === 'export')           return AuditService.export_(params, user)
         break
 
       // ── IPCRF Forms & Entries ──
-      // Routes:
-      //   ipcrf/forms                           GET list / POST create
-      //   ipcrf/forms/:formId                   GET / PUT / DELETE
-      //   ipcrf/forms/:formId/submit            PATCH
-      //   ipcrf/forms/:formId/approve           PATCH
-      //   ipcrf/forms/:formId/return            PATCH
-      //   ipcrf/forms/:formId/finalize          PATCH
-      //   ipcrf/forms/:formId/compute           PATCH
-      //   ipcrf/forms/:formId/entries           GET list / POST add
-      //   ipcrf/forms/:formId/entries/:entId    PUT / DELETE
-      //   ipcrf/forms/:formId/entries/:entId/rate  PATCH
+      // Pattern: ipcrf/forms[/:formId[/action|entries[/:entryId[/rate]]]]
       case 'ipcrf': {
-        // parts[0]='ipcrf', parts[1]='forms', parts[2]=formId, parts[3]=action|'entries', parts[4]=entryId, parts[5]='rate'
-        const formId   = parts[2] || null
-        const action   = parts[3] || null
-        const entryId  = parts[4] || null
-        const entryAct = parts[5] || null
+        const formId   = parts[2] || null  // ipcrf/forms/:formId
+        const action   = parts[3] || null  // /submit|approve|return|finalize|compute|entries
+        const entryId  = parts[4] || null  // /entries/:entryId
+        const entryAct = parts[5] || null  // /rate
 
-        // Form list / create
         if (!formId && method === 'GET')  return IPCRFService.listForms(params, user)
         if (!formId && method === 'POST') return IPCRFService.createForm(body, user)
 
         if (formId) {
-          // Form CRUD
           if (!action && method === 'GET')    return IPCRFService.getForm(formId, user)
           if (!action && method === 'PUT')    return IPCRFService.updateForm(formId, body, user)
           if (!action && method === 'DELETE') return IPCRFService.deleteForm(formId, user)
 
-          // Form workflow actions
           if (action === 'submit')   return IPCRFService.submitForm(formId, user)
           if (action === 'approve')  return IPCRFService.approveForm(formId, body, user)
           if (action === 'return')   return IPCRFService.returnForm(formId, body, user)
           if (action === 'finalize') return IPCRFService.finalizeForm(formId, body, user)
           if (action === 'compute')  return IPCRFService.computeScore(formId, user)
 
-          // Entries sub-resource
           if (action === 'entries') {
             if (!entryId && method === 'GET')  return IPCRFService.listEntries(formId, params, user)
             if (!entryId && method === 'POST') return IPCRFService.addEntry(formId, body, user)

@@ -1,3 +1,9 @@
+/**
+ * SpreadsheetService.gs — Fixed version
+ * Added: hardDeleteRow() — physically removes the row from the sheet
+ * Fixed: updateRow() — now writes ALL changed fields correctly
+ */
+
 const SpreadsheetService = (() => {
 
   const SPREADSHEET_ID = PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID')
@@ -21,14 +27,20 @@ const SpreadsheetService = (() => {
     const headers = data[0]
     return data.slice(1).map(row => {
       const obj = {}
-      headers.forEach((h, i) => { obj[h] = row[i] })
+      headers.forEach((h, i) => {
+        // Normalize booleans stored as strings
+        const val = row[i]
+        if (val === 'TRUE'  || val === true)  obj[h] = true
+        else if (val === 'FALSE' || val === false) obj[h] = false
+        else obj[h] = val
+      })
       return obj
     }).filter(r => r.id) // skip blank rows
   }
 
   // ── Get a single row by id ──
   function getRow(sheet, id) {
-    return getAllRows(sheet).find(r => String(r.id) === String(id)) || null
+    return getAllRows(sheet).find(r => r.id === id) || null
   }
 
   // ── Append a new row ──
@@ -36,15 +48,14 @@ const SpreadsheetService = (() => {
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
     const row     = headers.map(h => {
       const val = data[h]
-      if (val === null || val === undefined) return ''
-      if (typeof val === 'boolean') return val
+      if (val === undefined || val === null) return ''
       return val
     })
     sheet.appendRow(row)
     return data
   }
 
-  // ── Update a row by id ──
+  // ── Update a row by id — writes ALL provided fields ──
   function updateRow(sheet, id, updates) {
     const data    = sheet.getDataRange().getValues()
     const headers = data[0]
@@ -52,26 +63,28 @@ const SpreadsheetService = (() => {
 
     for (let i = 1; i < data.length; i++) {
       if (String(data[i][idIdx]) === String(id)) {
-        headers.forEach((h, colIdx) => {
-          if (Object.prototype.hasOwnProperty.call(updates, h)) {
-            const val = updates[h]
-            sheet.getRange(i + 1, colIdx + 1).setValue(
-              val === null || val === undefined ? '' : val
-            )
+        // Write each updated field individually
+        Object.entries(updates).forEach(([key, value]) => {
+          const colIdx = headers.indexOf(key)
+          if (colIdx >= 0) {
+            // Convert value to proper type for Sheets
+            let cellVal = value
+            if (cellVal === null || cellVal === undefined) cellVal = ''
+            if (typeof cellVal === 'boolean') cellVal = cellVal  // keep boolean
+            sheet.getRange(i + 1, colIdx + 1).setValue(cellVal)
           }
         })
-        return { ...rowToObj(headers, data[i]), ...updates }
+        // Return merged object
+        const merged = {}
+        headers.forEach((h, idx) => { merged[h] = data[i][idx] })
+        Object.assign(merged, updates)
+        return merged
       }
     }
     throw HttpError(`Row with id "${id}" not found`, 404)
   }
 
-  // ── Soft-delete a row by id (sets deleted flag) ──
-  function softDelete(sheet, id) {
-    updateRow(sheet, id, { deleted: true, deletedAt: new Date().toISOString() })
-  }
-
-  // ── Hard-delete a row by id (physically removes the row from the sheet) ──
+  // ── HARD DELETE — physically removes the row from the sheet ──
   function hardDeleteRow(sheet, id) {
     const data   = sheet.getDataRange().getValues()
     const headers = data[0]
@@ -79,11 +92,20 @@ const SpreadsheetService = (() => {
 
     for (let i = 1; i < data.length; i++) {
       if (String(data[i][idIdx]) === String(id)) {
-        sheet.deleteRow(i + 1) // +1 because sheet rows are 1-indexed and row 1 is headers
-        return { deleted: true, id }
+        sheet.deleteRow(i + 1)  // +1 because sheet rows are 1-indexed, and data[0] is header
+        Logger.log('Hard deleted row with id: ' + id + ' from row ' + (i + 1))
+        return { success: true, deletedId: id }
       }
     }
-    throw HttpError(`Row with id "${id}" not found`, 404)
+    throw HttpError(`Row with id "${id}" not found for deletion`, 404)
+  }
+
+  // ── Soft delete — keeps row but marks as deleted ──
+  function softDelete(sheet, id) {
+    return updateRow(sheet, id, {
+      deleted:   true,
+      deletedAt: new Date().toISOString()
+    })
   }
 
   // ── Generate a unique ID ──
@@ -92,33 +114,29 @@ const SpreadsheetService = (() => {
   }
 
   // ── Pagination helper ──
-  function paginate(rows, page = 1, pageSize = 20) {
+  function paginate(rows, page = 1, pageSize = 50) {
+    page     = Math.max(1, parseInt(page)     || 1)
+    pageSize = Math.max(1, parseInt(pageSize) || 50)
     const total = rows.length
-    const start = (Number(page) - 1) * Number(pageSize)
-    const items = rows.slice(start, start + Number(pageSize))
-    return { items, total, page: Number(page), pageSize: Number(pageSize) }
+    const start = (page - 1) * pageSize
+    const items = rows.slice(start, start + pageSize)
+    return { items, total, page, pageSize, totalPages: Math.ceil(total / pageSize) }
   }
 
   // ── Filter helper ──
   function filterRows(rows, filters) {
-    return rows.filter(row => {
-      return Object.entries(filters).every(([key, val]) => {
+    return rows.filter(row =>
+      Object.entries(filters).every(([key, val]) => {
         if (!val) return true
-        return String(row[key]).toLowerCase().includes(String(val).toLowerCase())
+        return String(row[key] || '').toLowerCase().includes(String(val).toLowerCase())
       })
-    })
-  }
-
-  // ── Internal ──
-  function rowToObj(headers, row) {
-    const obj = {}
-    headers.forEach((h, i) => { obj[h] = row[i] })
-    return obj
+    )
   }
 
   return {
-    getSheet, getAllRows, getRow, appendRow, updateRow,
-    softDelete, hardDeleteRow,
+    getSheet, getAllRows, getRow,
+    appendRow, updateRow,
+    hardDeleteRow, softDelete,
     generateId, paginate, filterRows
   }
 })()

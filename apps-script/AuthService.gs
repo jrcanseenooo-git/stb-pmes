@@ -1,155 +1,73 @@
-/**
- * AuthService.gs  — Fixed version
- *
- * Firebase ID tokens are JWT strings: header.payload.signature
- * GAS cannot do RSA verification, so we decode the payload claims
- * and validate: expiry, audience, issuer, and email domain.
- *
- * For production, deploy Firebase Admin SDK on a Cloud Function
- * and call that for full signature verification.
- */
+// ── Sheet name constants ──
+const SHEET = {
+  USERS:           'Users',
+  DIVISIONS:       'Divisions',
+  KRAS:            'KRAs',
+  INDICATORS:      'SuccessIndicators',
+  ACCOMPLISHMENTS: 'Accomplishments',
+  MOV:             'MOVFiles',
+  EVALUATIONS:     'Evaluations',
+  NOTIFICATIONS:   'Notifications',
+  AUDIT:           'AuditLog',
+  REPORTS:         'Reports',
+  DEADLINES:       'Deadlines',
+  REVISIONS:       'Revisions',
+  IPCRF_FORMS:     'IPCRForms',
+  FORM_ENTRIES:    'FormEntries',
+  MASTER_KRAS:     'MasterKRALibrary'
+}
 
-const AuthService = (() => {
+// ── Entry point: HTTP GET ──
+function doGet(e) {
+  return handleRequest(e, 'GET')
+}
 
-  const PROPS = PropertiesService.getScriptProperties()
-  const FIREBASE_PROJECT_ID = PROPS.getProperty('FIREBASE_PROJECT_ID') || 'pmes-1cb6d'
-  const ALLOWED_DOMAIN = PROPS.getProperty('ALLOWED_EMAIL_DOMAIN') || 'dswd.gov.ph'
+// ── Entry point: HTTP POST ──
+function doPost(e) {
+  return handleRequest(e, 'POST')
+}
 
-  // ── Verify Firebase ID token from request ──
-  function verifyToken(e) {
-    // Token comes as query param ?token=...
-    const token = e.parameter?.token || ''
-    if (!token || token === 'test' || token.length < 100) return null
+// ── Main dispatcher ──
+function handleRequest(e, method) {
+  try {
+    const user = AuthService.verifyToken(e)
+    if (!user) return respond(401, false, null, 'Unauthorized – invalid or missing token')
 
-    try {
-      const parts = token.split('.')
-      if (parts.length !== 3) return null
+    const body       = parseBody(e)
+    const httpMethod = (body._method || '').toUpperCase() || method
 
-      // Base64url decode the payload
-      let b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
-      // Pad to multiple of 4
-      while (b64.length % 4 !== 0) b64 += '='
+    const route  = (e.parameter?.route || '').replace(/^\/|\/$/g, '')
+    const result = Router.dispatch(route, httpMethod, e.parameter, body, user)
 
-      const payloadStr = Utilities.newBlob(
-        Utilities.base64Decode(b64)
-      ).getDataAsString()
+    return respond(200, true, result)
 
-      const payload = JSON.parse(payloadStr)
-      const now = Math.floor(Date.now() / 1000)
-
-      // Validate standard JWT claims
-      if (!payload.sub) return null
-      if (payload.exp && payload.exp < now) {
-        Logger.log('Token expired')
-        return null
-      }
-      if (payload.aud && payload.aud !== FIREBASE_PROJECT_ID) {
-        Logger.log('Wrong audience: ' + payload.aud)
-        return null
-      }
-
-      const email = payload.email || ''
-
-      // Domain restriction — skip in dev if no domain set
-      if (ALLOWED_DOMAIN && email && !email.endsWith('@' + ALLOWED_DOMAIN)) {
-        // Allow gmail during development
-        if (!email.endsWith('@gmail.com')) {
-          Logger.log('Domain not allowed: ' + email)
-          return null
-        }
-      }
-
-      return {
-        uid: payload.sub,
-        email: payload.email || '',
-        name: payload.name || ''
-      }
-
-    } catch (err) {
-      Logger.log('Token parse error: ' + err.message)
-      return null
-    }
+  } catch (err) {
+    Logger.log('PMES Error: ' + err.message + '\n' + err.stack)
+    const code = err.statusCode || 500
+    return respond(code, false, null, err.message)
   }
+}
 
-  // ── Get or auto-create PMES profile ──
-  function getProfile(user) {
-    const sheet = SpreadsheetService.getSheet(SHEET.USERS)
-    const rows = SpreadsheetService.getAllRows(sheet)
-
-    // Find by uid or email
-    let row = rows.find(r => r.uid === user.uid) ||
-      rows.find(r => r.email === user.email)
-
-    if (!row) {
-      // Auto-create a basic profile for new users
-      row = autoCreateUser(user, sheet)
-    }
-
-    // Return safe profile (no sensitive fields)
-    return {
-      id: row.id,
-      uid: row.uid,
-      email: row.email,
-      fullName: row.fullName || row.email?.split('@')[0] || 'User',
-      firstName: row.firstName || '',
-      lastName: row.lastName || '',
-      role: row.role || 'Staff',
-      divisionId: row.divisionId || '',
-      divisionName: row.divisionName || '',
-      position: row.position || '',
-      employeeNo: row.employeeNo || '',
-      type: row.type || 'Regular',
-      active: row.active !== false
-    }
+// ── parseBody: reads JSON from POST body; falls back to empty object ──
+function parseBody(e) {
+  try {
+    const raw = e.postData?.contents
+    if (raw) return JSON.parse(raw)
+  } catch (err) {
+    Logger.log('parseBody error: ' + err.message)
   }
+  return {}
+}
 
-  // ── Auto-create user on first login ──
-  function autoCreateUser(user, sheet) {
-    const now = new Date().toISOString()
-    const nameParts = (user.name || '').split(' ')
-    const newUser = {
-      id: SpreadsheetService.generateId('USR-'),
-      uid: user.uid,
-      email: user.email,
-      fullName: user.name || user.email.split('@')[0],
-      firstName: nameParts[0] || '',
-      lastName: nameParts.slice(1).join(' ') || '',
-      role: 'Staff',
-      divisionId: '',
-      divisionName: '',
-      position: '',
-      employeeNo: '',
-      type: 'Regular',
-      active: true,
-      createdAt: now,
-      updatedAt: now,
-      lastLoginAt: now
-    }
-    SpreadsheetService.appendRow(sheet, newUser)
-    Logger.log('Auto-created user: ' + user.email)
-    return newUser
-  }
+function respond(status, success, data, message) {
+  const payload = JSON.stringify({ success, data: data ?? null, message: message ?? null })
+  return ContentService
+    .createTextOutput(payload)
+    .setMimeType(ContentService.MimeType.JSON)
+}
 
-  // ── Update last login timestamp ──
-  function updateLastLogin(userId) {
-    try {
-      const sheet = SpreadsheetService.getSheet(SHEET.USERS)
-      SpreadsheetService.updateRow(sheet, userId, {
-        lastLoginAt: new Date().toISOString()
-      })
-    } catch (e) {
-      // Non-critical
-    }
-  }
-
-  // ── Role guard ──
-  function requireRole(user, ...allowedRoles) {
-    const profile = AuthService.getProfile(user)
-    if (!allowedRoles.includes(profile.role)) {
-      throw HttpError('Insufficient permissions for this action', 403)
-    }
-    return profile
-  }
-
-  return { verifyToken, getProfile, requireRole, updateLastLogin }
-})()
+function HttpError(message, code) {
+  const e    = new Error(message)
+  e.statusCode = code || 400
+  return e
+}

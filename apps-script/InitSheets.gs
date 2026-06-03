@@ -1,287 +1,101 @@
-/**
- * InitSheets.gs v2 — PMES Complete Database Setup
- *
- * Run this ONCE to create/verify ALL required sheets.
- * Safe to re-run — skips sheets that already exist.
- *
- * How to run:
- *   1. Open Apps Script editor
- *   2. Select "initializeAllSheets" in the dropdown
- *   3. Click ► Run → Authorize when prompted
- */
+function patchUsersSheet() {
+  const ss    = SpreadsheetApp.getActiveSpreadsheet()
+  const sheet = ss.getSheetByName('Users')
+  if (!sheet) { Logger.log('Users sheet not found'); return }
 
-function initializeAllSheets() {
-  const ss = SpreadsheetApp.openById(
-    PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID')
-  )
+  const headers     = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
+  const newCols     = ['positionLevel', 'sgLevel']
+  let   addedCount  = 0
 
-  const SHEETS = {
-
-    // ── CORE TABLES ──────────────────────────────────────────
-    Users: [
-      'id', 'uid', 'email', 'fullName', 'firstName', 'lastName',
-      'role', 'positionLevel',  // positionLevel: II / III / IV
-      'divisionId', 'divisionName', 'position', 'employeeNo',
-      'type',                  // Regular / Co-terminal / Casual / CoS
-      'tempPassword', 'mustChangePassword',
-      'active', 'createdAt', 'updatedAt', 'lastLoginAt'
-    ],
-
-    Divisions: [
-      'id', 'name', 'code', 'chiefId', 'chiefName',
-      'adminId', 'adminName',   // Division Admin (attendance monitor)
-      'parentId', 'color', 'active', 'createdAt'
-    ],
-
-    // ── MASTER KRA LIBRARY (from Enhanced STB Protocol) ──────
-    MasterKRALibrary: [
-      'id', 'phase', 'kraName', 'classification',
-      'performanceIndicator',
-      'weightII', 'weightIII', 'weightIV',
-      'efficiencyGuide', 'qualityGuide', 'timelinessGuide',
-      'meansOfVerification',
-      'applicableTo',          // IPCRF / CCEF / BOTH
-      'functionType',          // Core / Strategic / Support
-      'remarks', 'active'
-    ],
-
-    // ── IPCRF / CCEF FORMS ───────────────────────────────────
-    IPCRForms: [
-      'id',
-      'type',                  // IPCRF / CCEF
-      'userId', 'employeeName',
-      'position', 'positionLevel',
-      'divisionId', 'divisionName',
-      'semester', 'year',
-      'status',                // DRAFT / SUBMITTED / APPROVED / ONGOING / FOR_RATING / RATED / FINALIZED
-      'coreFunctionWeight',    // 70
-      'supportFunctionWeight', // 30
-      'finalNumericalRating',
-      'adjectivalRating',
-      'immediateSupervisor', 'supervisorPosition',
-      'approvingAuthority', 'authorityPosition',
-      'dateSignedRatee', 'dateSignedSupervisor', 'dateSignedAuthority',
-      'feedbackStrengths', 'feedbackAreasForImprovement',
-      'feedbackComments', 'feedbackRecommendations',
-      'submittedAt', 'approvedAt', 'ratedAt', 'finalizedAt',
-      'createdAt', 'updatedAt'
-    ],
-
-    // ── FORM ENTRIES (rows inside IPCRF/CCEF) ────────────────
-    FormEntries: [
-      'id', 'formId',
-      'masterKRAId',           // null if custom
-      'functionType',          // Core / Strategic / Support
-      'kraName',
-      'successIndicator',
-      'applicableRatingPeriod',// 1st Semester / 2nd Semester / Both semesters
-      'weight',
-      'classification',        // Simple / Complex / Highly Technical / Exempted
-      'efficiencyGuide', 'qualityGuide', 'timelinessGuide',
-      'meansOfVerification',
-      'accomplishment',
-      'ratingEfficiency', 'ratingQuality', 'ratingTimeliness', 'ratingAverage',
-      'movReferences',         // comma-separated reference codes
-      'remarks',
-      'isCustom',              // true if staff-added, not from library
-      'order',                 // display order
-      'createdAt', 'updatedAt'
-    ],
-
-    // ── JRB RATINGS ──────────────────────────────────────────
-    JRBRatings: [
-      'id', 'formId',
-      'userId',                // ratee ID
-      'raterType',             // SUPERVISOR / PEER1 / PEER2
-      'raterId', 'raterName',
-      'domain',                // 1-4 (Quality, Interpersonal, Work Habits, Personal Dev)
-      'domainName',
-      'itemNumber',            // 1-20
-      'itemText',
-      'rating',                // 1-4
-      'semester', 'year',
-      'createdAt', 'updatedAt'
-    ],
-
-    // ── PEER ASSIGNMENTS ─────────────────────────────────────
-    PeerAssignments: [
-      'id',
-      'userId', 'userName',     // ratee
-      'divisionId',
-      'peer1Id', 'peer1Name', 'peer1DivisionId',  // same division
-      'peer2Id', 'peer2Name', 'peer2DivisionId',  // different division
-      'semester', 'year',
-      'peer1Completed', 'peer2Completed',
-      'peer1CompletedAt', 'peer2CompletedAt',
-      'assignedAt', 'assignedBy'
-    ],
-
-    // ── ATTENDANCE RECORDS (monthly, per Division Admin) ─────
-    AttendanceRecords: [
-      'id', 'userId', 'userName',
-      'divisionId', 'divisionName',
-      'month', 'year',
-      'tardinessCount', 'undertimeCount',
-      'absenceCount', 'approvedLeaveCount',
-      'recordedBy', 'recordedByName',
-      'remarks',
-      'createdAt', 'updatedAt'
-    ],
-
-    // ── ATTENDANCE RATINGS (semester summary) ────────────────
-    AttendanceRatings: [
-      'id', 'formId', 'userId',
-      'semester', 'year',
-      'tardinessTotal', 'undertimeTotal',
-      'absenceTotal', 'approvedLeaveTotal',
-      'rating',                // 1-5
-      'label',                 // Outstanding/Very Satisfactory/etc
-      'computedBy', 'computedAt',
-      'createdAt'
-    ],
-
-    // ── ACCOMPLISHMENTS (from old schema, kept for reference) ─
-    Accomplishments: [
-      'id', 'type', 'semester', 'year',
-      'userId', 'employeeName',
-      'divisionId', 'division',
-      'kraId', 'kraTitle',
-      'siId', 'target', 'targetQty', 'targetUnit',
-      'accomplished', 'progressPct',
-      'status', 'deadline',
-      'submittedAt', 'approvedAt', 'approvedBy',
-      'remarks', 'revisions', 'movCount',
-      'createdBy', 'createdAt', 'updatedAt',
-      'deleted', 'deletedAt'
-    ],
-
-    // ── REVISIONS ────────────────────────────────────────────
-    Revisions: [
-      'id', 'accomplishmentId', 'fromStatus', 'toStatus',
-      'remarks', 'changedBy', 'changedByName', 'changedAt'
-    ],
-
-    // ── MOV FILES ────────────────────────────────────────────
-    MOVFiles: [
-      'id', 'driveFileId', 'driveUrl', 'fileName', 'mimeType', 'sizeBytes',
-      'description', 'accomplishmentId', 'formEntryId',
-      'kraId', 'siId', 'divisionId',
-      'uploadedBy', 'uploadedByName', 'uploadedAt',
-      'verified', 'verifiedBy', 'verifiedAt',
-      'deleted', 'deletedAt'
-    ],
-
-    // ── EVALUATIONS (Final computed scores) ──────────────────
-    Evaluations: [
-      'id', 'formId', 'userId', 'employeeName',
-      'divisionId', 'semester', 'year',
-      'spmsScore',             // IPCRF/CCEF final score (out of 5)
-      'jrbSupervisorScore',    // Out of 4
-      'jrbPeer1Score',         // Out of 4
-      'jrbPeer2Score',         // Out of 4
-      'attendanceScore',       // Out of 5
-      'overallPercentage',     // Final computed %
-      'overallRating',         // 1-5 scale
-      'adjectivalRating',
-      'manuallyAdjusted', 'adjustedBy', 'adjustedAt',
-      'evaluatorRemarks',
-      'computedBy', 'computedAt',
-      'finalizedAt'
-    ],
-
-    // ── NOTIFICATIONS ────────────────────────────────────────
-    Notifications: [
-      'id', 'recipientId', 'type',
-      'message', 'relatedId', 'module',
-      'read', 'readAt', 'createdAt'
-    ],
-
-    // ── AUDIT LOG ────────────────────────────────────────────
-    AuditLog: [
-      'id', 'timestamp',
-      'userId', 'userEmail', 'userName', 'role',
-      'action', 'module', 'details', 'ipAddress'
-    ],
-
-    // ── REPORTS ──────────────────────────────────────────────
-    Reports: [
-      'id', 'name', 'type',
-      'divisionId', 'semester', 'year',
-      'format', 'driveFileId', 'driveUrl',
-      'generatedBy', 'generatedAt'
-    ],
-
-    // ── DEADLINES ────────────────────────────────────────────
-    Deadlines: [
-      'id', 'name', 'type',
-      'semester', 'year',
-      'startDate', 'endDate',
-      'active', 'createdBy', 'createdAt'
-    ]
-  }
-
-  let created = 0
-  let skipped = 0
-
-  Object.entries(SHEETS).forEach(([name, headers]) => {
-    const existing = ss.getSheetByName(name)
-    if (existing) {
-      Logger.log('  → Skipped (exists): ' + name)
-      skipped++
-    } else {
-      const sheet = ss.insertSheet(name)
-      sheet.getRange(1, 1, 1, headers.length).setValues([headers])
-      // Style header row
-      const headerRange = sheet.getRange(1, 1, 1, headers.length)
-      headerRange.setFontWeight('bold')
-        .setBackground('#1A3A5C')
+  newCols.forEach(col => {
+    if (!headers.includes(col)) {
+      const nextCol = sheet.getLastColumn() + 1
+      sheet.getRange(1, nextCol).setValue(col)
+      // Style to match existing header row
+      sheet.getRange(1, nextCol)
+        .setBackground('#0D2137')
         .setFontColor('#FFFFFF')
+        .setFontWeight('bold')
         .setFontSize(10)
-      sheet.setFrozenRows(1)
-      sheet.setColumnWidth(1, 180) // ID column
-      Logger.log('  ✅ Created: ' + name + ' (' + headers.length + ' columns)')
-      created++
+      Logger.log('Added column: ' + col)
+      addedCount++
+    } else {
+      Logger.log('Column already exists, skipped: ' + col)
     }
   })
 
-  // ── Seed Divisions if empty ──────────────────────────────
-  seedDivisions(ss)
+  // Auto-populate positionLevel for existing users from their position field
+  const data    = sheet.getDataRange().getValues()
+  const hdr     = data[0]
+  const posIdx  = hdr.indexOf('position')
+  const lvlIdx  = hdr.indexOf('positionLevel')
 
-  Logger.log('\n════════════════════════════════')
-  Logger.log('✅ PMES Sheets initialization complete')
-  Logger.log('   Created: ' + created + ' new sheets')
-  Logger.log('   Skipped: ' + skipped + ' existing sheets')
-  Logger.log('\nNext: Run initMasterKRALibrary() to seed the KRA indicator library')
-  Logger.log('════════════════════════════════')
+  if (posIdx >= 0 && lvlIdx >= 0) {
+    let updated = 0
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i]
+      if (!row[posIdx]) continue          // no position set
+      if (row[lvlIdx])  continue          // positionLevel already filled
+
+      const level = _resolveLevel(String(row[posIdx]))
+      sheet.getRange(i + 1, lvlIdx + 1).setValue(level)
+      updated++
+    }
+    Logger.log('Back-filled positionLevel for ' + updated + ' existing user(s)')
+  }
+
+  SpreadsheetApp.getUi().alert(
+    '✅ Users sheet patched!\n' +
+    'New columns added: ' + addedCount + '\n' +
+    'Check logs for details.'
+  )
 }
 
-function seedDivisions(ss) {
-  // ss might be undefined if called incorrectly — get it fresh
-  if (!ss) {
-    ss = SpreadsheetApp.openById(
-      PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID')
-    )
-  }
+function createMasterKRALibrarySheet() {
+  const ss    = SpreadsheetApp.getActiveSpreadsheet()
+  let   sheet = ss.getSheetByName('MasterKRALibrary')
 
-  const sheet = ss.getSheetByName('Divisions')
-  if (!sheet) {
-    Logger.log('  → Divisions sheet not found, skipping seed')
+  if (sheet) {
+    Logger.log('MasterKRALibrary already exists — skipping creation')
+    SpreadsheetApp.getUi().alert('MasterKRALibrary sheet already exists.')
     return
   }
 
-  const rows = sheet.getLastRow()
-  if (rows > 1) {
-    Logger.log('  → Divisions already seeded')
-    return
-  }
+  sheet = ss.insertSheet('MasterKRALibrary')
 
-  const now = new Date().toISOString()
-  const divisions = [
-    ['admin-pool', 'Admin Pool', 'AP', '', '', '', '', '', 'blue', true, now],
-    ['dfd', 'Design Formulation Division', 'DFD', '', '', '', '', '', 'green', true, now],
-    ['pid', 'Pilot Implementation Division', 'PID', '', '', '', '', '', 'amber', true, now],
-    ['staed', 'Social Technology Analysis and Evaluation Division', 'STAED', '', '', '', '', '', 'red', true, now]
+  const headers = [
+    'id', 'phase', 'kraName', 'classification', 'performanceIndicator',
+    'weightII', 'weightIII', 'weightIV',
+    'efficiencyGuide', 'qualityGuide', 'timelinessGuide',
+    'meansOfVerification', 'applicableTo', 'functionType',
+    'remarks', 'active'
   ]
-  divisions.forEach(row => sheet.appendRow(row))
-  Logger.log('  ✅ Seeded 4 divisions')
+
+  const headerRange = sheet.getRange(1, 1, 1, headers.length)
+  headerRange.setValues([headers])
+  headerRange
+    .setBackground('#0D2137')
+    .setFontColor('#FFFFFF')
+    .setFontWeight('bold')
+    .setFontSize(10)
+
+  sheet.setFrozenRows(1)
+  sheet.autoResizeColumns(1, headers.length)
+
+  Logger.log('Created MasterKRALibrary sheet')
+  SpreadsheetApp.getUi().alert(
+    '✅ MasterKRALibrary sheet created!\n' +
+    'You can now seed it from the Enhanced STB protocol spreadsheet.'
+  )
+}
+
+// ── Shared level resolver (mirrors PositionHelper.resolveLevel) ──
+function _resolveLevel(position) {
+  if (!position) return 'III'
+  const match = String(position).trim().match(/\b(VII|VI|V|IV|III|II|I)\b(?:\s*\/.*)?$/)
+  if (!match) return 'IV'
+  const roman = match[1].toUpperCase()
+  if (roman === 'I' || roman === 'II') return 'II'
+  if (roman === 'III')                 return 'III'
+  return 'IV'
 }

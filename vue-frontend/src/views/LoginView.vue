@@ -1,32 +1,69 @@
 <template>
   <div class="login-root">
 
-    <!-- Left panel -->
+    <!-- ── LEFT PANEL ── -->
     <div class="login-left">
       <div class="left-inner">
 
+        <!-- Brand -->
         <div class="brand-mark">
-          <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-            <rect width="48" height="48" rx="12" fill="white" fill-opacity="0.15"/>
-            <path d="M12 16h24M12 24h16M12 32h20" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
-            <circle cx="36" cy="32" r="6" fill="#60A5FA" fill-opacity="0.9"/>
-            <path d="M33 32l2 2 4-4" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
+          <div class="brand-icon">
+            <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+              <path d="M3 5h16M3 11h10M3 17h13" stroke="white" stroke-width="2" stroke-linecap="round"/>
+              <circle cx="17" cy="17" r="4" fill="#60A5FA"/>
+              <path d="M15.2 17l1.3 1.3 2.5-2.5" stroke="white" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
           <span class="brand-name">PMES</span>
         </div>
 
+        <!-- Hero -->
         <div class="hero-text">
-          <h1>Performance<br/>Monitoring &amp;<br/>Evaluation<br/>System</h1>
-          <p>DSWD · Social Technology Bureau</p>
+          <div class="hero-eyebrow">
+            <span class="eyebrow-dot"></span>
+            Performance System
+          </div>
+          <h1>Monitor.<br/>Evaluate.<br/>Deliver.</h1>
+          <p class="hero-sub">DSWD · Social Technology Bureau</p>
         </div>
 
-        <div class="deco-grid">
-          <div v-for="i in 24" :key="i" class="deco-cell" :style="{ opacity: (i * 0.037) % 0.45 + 0.05 }"></div>
+        <!-- Stats -->
+        <div class="stats-row">
+          <div class="stat-item">
+            <span class="stat-num">4</span>
+            <span class="stat-lbl">Divisions</span>
+          </div>
+          <div class="stat-div"></div>
+          <div class="stat-item">
+            <span class="stat-num">2</span>
+            <span class="stat-lbl">Semesters</span>
+          </div>
+          <div class="stat-div"></div>
+          <div class="stat-item">
+            <span class="stat-num">5★</span>
+            <span class="stat-lbl">Max Rating</span>
+          </div>
         </div>
+
+        <!-- ── ANIMATED DECO GRID ── -->
+        <div class="deco-grid" aria-hidden="true">
+          <div
+            v-for="i in 36"
+            :key="i"
+            class="deco-cell"
+            :style="cellStyle(i)"
+          ></div>
+        </div>
+
+        <!-- Floating orbs for depth -->
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+
       </div>
     </div>
 
-    <!-- Right panel -->
+    <!-- ── RIGHT PANEL ── -->
     <div class="login-right">
       <div class="form-card">
 
@@ -34,36 +71,38 @@
         <div class="form-header">
           <div class="form-badge">
             <span class="badge-dot"></span>
-            Secure Government Access
+            Secure Government Portal
           </div>
-          <h2>Sign in to your account</h2>
-          <p>Access restricted to <strong>@{{ domain }}</strong> accounts</p>
+          <h2>Welcome back</h2>
+          <p>Sign in with your <strong>@{{ domain }}</strong> account</p>
         </div>
 
         <!-- Error -->
         <transition name="slide-down">
-          <div v-if="error" class="error-box">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <circle cx="8" cy="8" r="7" stroke="#EF4444" stroke-width="1.5"/>
-              <path d="M8 5v3M8 10.5v.5" stroke="#EF4444" stroke-width="1.5" stroke-linecap="round"/>
+          <div v-if="error" class="error-box" role="alert">
+            <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+              <circle cx="7.5" cy="7.5" r="6.5" stroke="#EF4444" stroke-width="1.4"/>
+              <path d="M7.5 4.5v3.5M7.5 10v.1" stroke="#EF4444" stroke-width="1.4" stroke-linecap="round"/>
             </svg>
             {{ error }}
           </div>
         </transition>
 
-        <!-- Email / Password -->
-        <form @submit.prevent="handleEmailLogin" class="form-body">
+        <!-- Email / Password form -->
+        <form @submit.prevent="handleEmailLogin" class="form-body" novalidate>
+
           <div class="field">
-            <label>Email address</label>
+            <label for="email">Email address</label>
             <div class="input-wrap">
-              <svg class="input-icon" width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <rect x="1" y="3" width="14" height="10" rx="2" stroke="#94A3B8" stroke-width="1.5"/>
-                <path d="M1 5l7 5 7-5" stroke="#94A3B8" stroke-width="1.5" stroke-linecap="round"/>
+              <svg class="input-icon" width="15" height="15" viewBox="0 0 15 15" fill="none">
+                <rect x="1.5" y="3" width="12" height="9" rx="1.5" stroke="#94A3B8" stroke-width="1.3"/>
+                <path d="M1.5 5l6 4 6-4" stroke="#94A3B8" stroke-width="1.3" stroke-linecap="round"/>
               </svg>
               <input
+                id="email"
                 v-model="email"
                 type="email"
-                placeholder="yourname@dswd.gov.ph"
+                placeholder="you@dswd.gov.ph"
                 autocomplete="email"
                 :disabled="loading"
                 required
@@ -72,39 +111,46 @@
           </div>
 
           <div class="field">
-            <label>
+            <label for="password">
               Password
-              <a href="#" class="forgot" @click.prevent="forgotPassword">Forgot password?</a>
+              <a href="#" class="forgot">Forgot password?</a>
             </label>
             <div class="input-wrap">
-              <svg class="input-icon" width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <rect x="3" y="7" width="10" height="7" rx="1.5" stroke="#94A3B8" stroke-width="1.5"/>
-                <path d="M5 7V5a3 3 0 016 0v2" stroke="#94A3B8" stroke-width="1.5" stroke-linecap="round"/>
+              <svg class="input-icon" width="15" height="15" viewBox="0 0 15 15" fill="none">
+                <rect x="2.5" y="6.5" width="10" height="7" rx="1.5" stroke="#94A3B8" stroke-width="1.3"/>
+                <path d="M5 6.5V5a2.5 2.5 0 015 0v1.5" stroke="#94A3B8" stroke-width="1.3" stroke-linecap="round"/>
               </svg>
               <input
+                id="password"
                 v-model="password"
                 :type="showPw ? 'text' : 'password'"
-                placeholder="••••••••"
+                placeholder="Enter your password"
                 autocomplete="current-password"
                 :disabled="loading"
                 required
               />
-              <button type="button" class="pw-toggle" @click="showPw = !showPw">
-                <svg v-if="!showPw" width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="#94A3B8" stroke-width="1.5"/>
-                  <circle cx="8" cy="8" r="2" stroke="#94A3B8" stroke-width="1.5"/>
+              <button type="button" class="pw-toggle" @click="showPw = !showPw" :title="showPw ? 'Hide' : 'Show'">
+                <svg v-if="!showPw" width="15" height="15" viewBox="0 0 15 15" fill="none">
+                  <path d="M1 7.5S3.5 2.5 7.5 2.5 14 7.5 14 7.5 11.5 12.5 7.5 12.5 1 7.5 1 7.5z" stroke="#94A3B8" stroke-width="1.3"/>
+                  <circle cx="7.5" cy="7.5" r="2" stroke="#94A3B8" stroke-width="1.3"/>
                 </svg>
-                <svg v-else width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <path d="M2 2l12 12M6.5 6.6A2 2 0 0010 9.5M4.2 4.3C2.8 5.3 1.7 6.7 1 8c1.2 2.5 3.8 5 7 5a8 8 0 003.8-1M6 3.2A8 8 0 018 3c3.2 0 5.8 2.5 7 5a9.5 9.5 0 01-2 2.8" stroke="#94A3B8" stroke-width="1.5" stroke-linecap="round"/>
+                <svg v-else width="15" height="15" viewBox="0 0 15 15" fill="none">
+                  <path d="M1 7.5S3.5 2.5 7.5 2.5 14 7.5 14 7.5 11.5 12.5 7.5 12.5 1 7.5 1 7.5z" stroke="#94A3B8" stroke-width="1.3"/>
+                  <circle cx="7.5" cy="7.5" r="2" stroke="#94A3B8" stroke-width="1.3"/>
+                  <path d="M2 2l11 11" stroke="#94A3B8" stroke-width="1.3" stroke-linecap="round"/>
                 </svg>
               </button>
             </div>
           </div>
 
-          <button type="submit" class="btn-primary" :disabled="loading">
+          <button
+            type="submit"
+            class="btn-primary"
+            :disabled="loading || !email || !password"
+          >
             <span v-if="loading && loginMethod === 'email'" class="spinner"></span>
-            <svg v-else width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M3 8h10M9 4l4 4-4 4" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <svg v-else width="15" height="15" viewBox="0 0 15 15" fill="none">
+              <path d="M2 7.5h11M9.5 4l3.5 3.5L9.5 11" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
             {{ loading && loginMethod === 'email' ? 'Signing in…' : 'Sign in' }}
           </button>
@@ -116,32 +162,34 @@
         <!-- Google Sign-In -->
         <button
           class="btn-google"
-          :disabled="loading"
           @click="handleGoogleLogin"
+          :disabled="loading"
+          type="button"
         >
           <span v-if="loading && loginMethod === 'google'" class="spinner-dark"></span>
-          <svg v-else width="18" height="18" viewBox="0 0 18 18">
-            <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 01-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/>
-            <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z"/>
-            <path fill="#FBBC05" d="M3.964 10.706A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.706V4.962H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.038l3.007-2.332z"/>
-            <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.962L3.964 7.294C4.672 5.163 6.656 3.58 9 3.58z"/>
+          <svg v-else width="17" height="17" viewBox="0 0 17 17" fill="none">
+            <path d="M16.24 8.73c0-.6-.05-1.18-.14-1.73H8.5v3.27h4.34a3.72 3.72 0 01-1.61 2.44v2.03h2.6c1.52-1.4 2.4-3.47 2.4-6.01z" fill="#4285F4"/>
+            <path d="M8.5 17c2.18 0 4.01-.72 5.35-1.96l-2.6-2.03c-.72.48-1.64.77-2.75.77-2.12 0-3.91-1.43-4.55-3.35H1.27v2.09A8 8 0 008.5 17z" fill="#34A853"/>
+            <path d="M3.95 10.43A4.82 4.82 0 013.7 8.87c0-.54.1-1.07.25-1.56V5.22H1.27A8 8 0 000 8.87c0 1.29.31 2.51.86 3.6l2.09-1.63.94-.41h.06z" fill="#FBBC05"/>
+            <path d="M8.5 3.46c1.19 0 2.26.41 3.1 1.21l2.32-2.32A8 8 0 001.27 5.22l2.68 2.09c.64-1.92 2.43-3.35 4.55-3.85z" fill="#EA4335"/>
           </svg>
-          {{ loading && loginMethod === 'google' ? 'Signing in…' : 'Sign in with Google' }}
+          {{ loading && loginMethod === 'google' ? 'Connecting…' : 'Sign in with Google' }}
         </button>
 
         <!-- Info note -->
         <div class="info-note">
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
             <circle cx="6.5" cy="6.5" r="5.5" stroke="#94A3B8" stroke-width="1.2"/>
-            <path d="M6.5 6v3M6.5 4.5v.1" stroke="#94A3B8" stroke-width="1.2" stroke-linecap="round"/>
+            <path d="M6.5 5.5v4M6.5 4v.1" stroke="#94A3B8" stroke-width="1.2" stroke-linecap="round"/>
           </svg>
-          Use your <strong>@{{ domain }}</strong> Google account for seamless access.
+          Access is restricted to <strong>@{{ domain }}</strong> accounts only.
         </div>
 
         <!-- Footer -->
         <p class="form-footer">
-          DSWD &bull; Social Technology Bureau &bull; {{ new Date().getFullYear() }}
+          DSWD · STB · {{ new Date().getFullYear() }} &nbsp;·&nbsp; v2.0
         </p>
+
       </div>
     </div>
 
@@ -150,8 +198,6 @@
 
 <script setup>
 import { ref } from 'vue'
-import { sendPasswordResetEmail } from 'firebase/auth'
-import { auth } from '@/firebase'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
@@ -163,7 +209,7 @@ const email       = ref('')
 const password    = ref('')
 const showPw      = ref(false)
 const loading     = ref(false)
-const loginMethod = ref('')   // 'email' | 'google'
+const loginMethod = ref('')
 const error       = ref('')
 
 const domain   = import.meta.env.VITE_ALLOWED_EMAIL_DOMAIN || 'dswd.gov.ph'
@@ -177,15 +223,9 @@ async function handleEmailLogin() {
     await authStore.loginWithEmail(email.value, password.value)
     router.push(redirect)
   } catch (e) {
-    // Give a helpful hint if the error is invalid credentials —
-    // new accounts created in User Management need to be set up in Firebase Auth first.
-    if (e.message.includes('Invalid email or password') || e.message.includes('invalid-credential') || e.message.includes('user-not-found')) {
-      error.value = e.message + ' — If you were given a temporary password, contact your System Administrator to complete your account setup.'
-    } else {
-      error.value = e.message
-    }
+    error.value = e.message
   } finally {
-    loading.value = false
+    loading.value     = false
     loginMethod.value = ''
   }
 }
@@ -202,31 +242,33 @@ async function handleGoogleLogin() {
       error.value = e.message
     }
   } finally {
-    loading.value = false
+    loading.value     = false
     loginMethod.value = ''
   }
 }
 
-async function forgotPassword() {
-  if (!email.value) {
-    error.value = 'Enter your email address first, then click Forgot password.'
-    return
-  }
-  try {
-    await sendPasswordResetEmail(auth, email.value)
-    error.value = ''
-    alert(`Password reset email sent to ${email.value}. Check your inbox.`)
-  } catch (e) {
-    error.value = 'Could not send reset email. Make sure the email is registered.'
+// ── Grid cell style helper ──
+// Each cell gets a unique animation-delay so they ripple independently.
+function cellStyle(i) {
+  const col    = (i - 1) % 6
+  const row    = Math.floor((i - 1) / 6)
+  // Wave delay radiates from top-left corner
+  const delay  = ((col + row) * 0.12).toFixed(2)
+  // Base opacity varies to create a living texture
+  const base   = 0.06 + ((i * 0.037) % 0.18)
+  return {
+    '--delay':   `${delay}s`,
+    '--base-op': base.toFixed(3)
   }
 }
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Instrument+Serif:ital@0;1&display=swap');
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* ── Root ── */
 .login-root {
   display: flex;
   min-height: 100vh;
@@ -234,315 +276,523 @@ async function forgotPassword() {
   background: #F8FAFC;
 }
 
-/* ── LEFT PANEL ── */
+/* ══════════════════════════════════════════════
+   LEFT PANEL
+══════════════════════════════════════════════ */
 .login-left {
-  width: 420px;
+  width: 440px;
   flex-shrink: 0;
-  background: linear-gradient(145deg, #0D2137 0%, #1a3a5c 50%, #0f3460 100%);
+  background: linear-gradient(155deg, #060f1e 0%, #0d2137 45%, #0f3460 100%);
   position: relative;
   overflow: hidden;
   display: flex;
   align-items: stretch;
 }
 
-.login-left::before {
-  content: '';
-  position: absolute;
-  top: -100px; right: -100px;
-  width: 400px; height: 400px;
-  background: radial-gradient(circle, rgba(96,165,250,.15) 0%, transparent 70%);
-  pointer-events: none;
-}
-
-.login-left::after {
-  content: '';
-  position: absolute;
-  bottom: -80px; left: -80px;
-  width: 300px; height: 300px;
-  background: radial-gradient(circle, rgba(139,92,246,.12) 0%, transparent 70%);
-  pointer-events: none;
-}
-
 .left-inner {
-  position: relative; z-index: 2;
-  padding: 48px 40px;
-  display: flex; flex-direction: column;
-  gap: 40px; width: 100%;
+  position: relative;
+  z-index: 3;
+  padding: 52px 44px;
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+  width: 100%;
 }
 
+/* ── Floating orbs (depth layer) ── */
+.orb {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 1;
+}
+.orb-1 {
+  width: 340px; height: 340px;
+  top: -100px; right: -120px;
+  background: radial-gradient(circle, rgba(96,165,250,.13) 0%, transparent 70%);
+}
+.orb-2 {
+  width: 280px; height: 280px;
+  bottom: -80px; left: -80px;
+  background: radial-gradient(circle, rgba(139,92,246,.10) 0%, transparent 70%);
+}
+.orb-3 {
+  width: 180px; height: 180px;
+  top: 42%; left: 30%;
+  background: radial-gradient(circle, rgba(34,197,94,.07) 0%, transparent 70%);
+  animation: orbPulse 8s ease-in-out infinite;
+}
+@keyframes orbPulse {
+  0%, 100% { transform: scale(1) translate(0, 0); opacity: 1; }
+  33%       { transform: scale(1.15) translate(10px, -15px); opacity: .7; }
+  66%       { transform: scale(.9) translate(-8px, 12px); opacity: .9; }
+}
+
+/* ── Brand ── */
 .brand-mark {
-  display: flex; align-items: center; gap: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+  z-index: 3;
 }
-
+.brand-icon {
+  width: 42px; height: 42px;
+  border-radius: 10px;
+  background: rgba(255,255,255,.12);
+  border: 1px solid rgba(255,255,255,.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(8px);
+}
 .brand-name {
-  font-size: 22px; font-weight: 800;
-  color: white; letter-spacing: -0.5px;
+  font-size: 20px;
+  font-weight: 800;
+  color: white;
+  letter-spacing: -0.3px;
 }
 
+/* ── Eyebrow + Hero ── */
+.hero-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255,255,255,.45);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 14px;
+}
+.eyebrow-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #60A5FA;
+  animation: pulse 2.5s ease-in-out infinite;
+  flex-shrink: 0;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: .5; transform: scale(.75); }
+}
+
+.hero-text {
+  position: relative;
+  z-index: 3;
+}
 .hero-text h1 {
   font-family: 'Instrument Serif', Georgia, serif;
-  font-size: 42px; font-weight: 400;
-  color: white; line-height: 1.15;
-  letter-spacing: -1px; margin-bottom: 16px;
+  font-size: 46px;
+  font-weight: 400;
+  color: white;
+  line-height: 1.1;
+  letter-spacing: -1.5px;
+  margin-bottom: 14px;
+}
+.hero-sub {
+  font-size: 12px;
+  color: rgba(255,255,255,.38);
+  letter-spacing: .6px;
+  text-transform: uppercase;
+  font-weight: 500;
 }
 
-.hero-text p {
-  font-size: 13px; color: rgba(255,255,255,.45);
-  letter-spacing: .5px; text-transform: uppercase; font-weight: 500;
-}
-
+/* ── Stats Row ── */
 .stats-row {
-  display: flex; align-items: center; gap: 20px;
-  padding: 20px;
-  background: rgba(255,255,255,.07);
-  border: 1px solid rgba(255,255,255,.1);
-  border-radius: 12px;
-  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 18px 20px;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 14px;
+  backdrop-filter: blur(12px);
+  position: relative;
+  z-index: 3;
 }
-
 .stat-item {
-  display: flex; flex-direction: column;
-  align-items: center; flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  gap: 3px;
 }
-
 .stat-num {
-  font-size: 28px; font-weight: 800;
-  color: #60A5FA; line-height: 1;
   font-family: 'Instrument Serif', serif;
+  font-size: 26px;
+  color: #93C5FD;
+  line-height: 1;
 }
-
 .stat-lbl {
-  font-size: 10px; color: rgba(255,255,255,.45);
-  text-transform: uppercase; letter-spacing: .5px;
-  margin-top: 4px; font-weight: 500;
+  font-size: 9.5px;
+  color: rgba(255,255,255,.38);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  font-weight: 600;
 }
-
 .stat-div {
-  width: 1px; height: 32px;
-  background: rgba(255,255,255,.12);
+  width: 1px;
+  height: 30px;
+  background: rgba(255,255,255,.1);
 }
 
+/* ══════════════════════════════════════════════
+   ANIMATED DECO GRID
+   FIX: Uses @keyframes deco-float with CSS custom
+   properties per cell so each cell animates at a
+   unique phase, creating a flowing ripple effect.
+══════════════════════════════════════════════ */
 .deco-grid {
   position: absolute;
-  bottom: 0; right: 0;
-  width: 200px; height: 200px;
+  bottom: 0;
+  right: 0;
+  width: 216px;
+  height: 216px;
   display: grid;
   grid-template-columns: repeat(6, 1fr);
-  gap: 4px; padding: 16px;
+  gap: 5px;
+  padding: 20px;
   pointer-events: none;
+  z-index: 2;
 }
 
 .deco-cell {
   aspect-ratio: 1;
-  background: white;
-  border-radius: 2px;
+  border-radius: 3px;
+  /* THE FIX: each cell independently animates opacity + scale */
+  animation: decoFloat 3.6s ease-in-out infinite var(--delay, 0s);
+  /* Baseline opacity from the JS style binding */
+  opacity: var(--base-op, 0.08);
 }
 
-/* ── RIGHT PANEL ── */
+@keyframes decoFloat {
+  0%, 100% {
+    opacity: var(--base-op, 0.08);
+    transform: scale(1);
+    background: rgba(255, 255, 255, 0.9);
+  }
+  40% {
+    opacity: calc(var(--base-op, 0.08) * 3.5);
+    transform: scale(1.15);
+    background: rgba(96, 165, 250, 0.95);
+  }
+  70% {
+    opacity: calc(var(--base-op, 0.08) * 1.8);
+    transform: scale(1.05);
+    background: rgba(139, 92, 246, 0.8);
+  }
+}
+
+/* ══════════════════════════════════════════════
+   RIGHT PANEL
+══════════════════════════════════════════════ */
 .login-right {
   flex: 1;
-  display: flex; align-items: center; justify-content: center;
-  padding: 40px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 28px;
   background: #F8FAFC;
+  position: relative;
+}
+
+/* Subtle grid texture on the right side */
+.login-right::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(148,163,184,.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148,163,184,.06) 1px, transparent 1px);
+  background-size: 32px 32px;
+  pointer-events: none;
 }
 
 .form-card {
-  width: 100%; max-width: 420px;
+  width: 100%;
+  max-width: 400px;
+  position: relative;
+  z-index: 1;
 }
 
-/* Header */
-.form-header { margin-bottom: 32px; }
-
+/* ── Form Header ── */
+.form-header {
+  margin-bottom: 30px;
+}
 .form-badge {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 4px 10px;
-  background: #EFF6FF; border: 1px solid #BFDBFE;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 11px;
+  background: #EFF6FF;
+  border: 1px solid #BFDBFE;
   border-radius: 20px;
-  font-size: 11px; font-weight: 600; color: #2563EB;
-  text-transform: uppercase; letter-spacing: .5px;
-  margin-bottom: 16px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #1D4ED8;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  margin-bottom: 18px;
 }
-
 .badge-dot {
-  width: 6px; height: 6px;
-  background: #2563EB; border-radius: 50%;
+  width: 5px; height: 5px;
+  background: #3B82F6;
+  border-radius: 50%;
   animation: pulse 2s infinite;
 }
-
-@keyframes pulse {
-  0%,100% { opacity:1; transform:scale(1); }
-  50%      { opacity:.5; transform:scale(.8); }
-}
-
 .form-header h2 {
-  font-size: 26px; font-weight: 700;
-  color: #0F172A; letter-spacing: -.5px; margin-bottom: 6px;
+  font-size: 28px;
+  font-weight: 800;
+  color: #0F172A;
+  letter-spacing: -.7px;
+  margin-bottom: 7px;
+}
+.form-header p {
+  font-size: 13.5px;
+  color: #64748B;
+  line-height: 1.5;
+}
+.form-header strong {
+  color: #1D4ED8;
+  font-weight: 700;
 }
 
-.form-header p { font-size: 13px; color: #64748B; }
-.form-header strong { color: #2563EB; font-weight: 600; }
-
-/* Error */
+/* ── Error Box ── */
 .error-box {
-  display: flex; align-items: center; gap: 8px;
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
   padding: 12px 14px;
-  background: #FEF2F2; border: 1px solid #FECACA;
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
   border-radius: 10px;
-  font-size: 13px; color: #B91C1C;
+  font-size: 13px;
+  color: #B91C1C;
   margin-bottom: 20px;
+  line-height: 1.4;
 }
+.slide-down-enter-active,
+.slide-down-leave-active { transition: all .2s ease; }
+.slide-down-enter-from,
+.slide-down-leave-to     { opacity: 0; transform: translateY(-8px); }
 
-.slide-down-enter-active, .slide-down-leave-active {
-  transition: all .2s ease;
-}
-.slide-down-enter-from, .slide-down-leave-to {
-  opacity: 0; transform: translateY(-8px);
-}
-
-/* Form */
+/* ── Form Body ── */
 .form-body {
-  display: flex; flex-direction: column; gap: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
-.field { display: flex; flex-direction: column; gap: 6px; }
-
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
 .field label {
-  display: flex; align-items: center; justify-content: space-between;
-  font-size: 13px; font-weight: 600; color: #374151;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
 }
-
 .forgot {
-  font-size: 12px; font-weight: 500;
-  color: #2563EB; text-decoration: none;
+  font-size: 12px;
+  font-weight: 500;
+  color: #2563EB;
+  text-decoration: none;
+  transition: color .15s;
 }
-.forgot:hover { text-decoration: underline; }
+.forgot:hover { color: #1D4ED8; text-decoration: underline; }
 
-.input-wrap { position: relative; display: flex; align-items: center; }
-
+.input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
 .input-icon {
-  position: absolute; left: 12px;
-  flex-shrink: 0; pointer-events: none;
+  position: absolute;
+  left: 12px;
+  pointer-events: none;
+  flex-shrink: 0;
 }
-
 .input-wrap input {
   width: 100%;
-  padding: 11px 40px;
+  padding: 12px 42px;
   border: 1.5px solid #E2E8F0;
-  border-radius: 10px;
+  border-radius: 11px;
   font-size: 14px;
   font-family: 'Plus Jakarta Sans', sans-serif;
-  color: #0F172A; background: white;
+  color: #0F172A;
+  background: white;
   outline: none;
-  transition: border-color .15s, box-shadow .15s;
+  transition: border-color .15s, box-shadow .15s, background .15s;
 }
-
 .input-wrap input:focus {
   border-color: #2563EB;
   box-shadow: 0 0 0 3px rgba(37,99,235,.1);
 }
-
-.input-wrap input:disabled { background: #F8FAFC; cursor: not-allowed; }
+.input-wrap input:disabled {
+  background: #F8FAFC;
+  cursor: not-allowed;
+  color: #94A3B8;
+}
 .input-wrap input::placeholder { color: #CBD5E1; }
 
 .pw-toggle {
-  position: absolute; right: 12px;
-  background: none; border: none; cursor: pointer;
-  padding: 2px; display: flex; align-items: center;
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  color: #94A3B8;
+  transition: color .15s;
+  border-radius: 4px;
 }
+.pw-toggle:hover { color: #64748B; }
 
-/* Primary button */
+/* ── Primary Button ── */
 .btn-primary {
-  display: flex; align-items: center; justify-content: center; gap: 8px;
-  width: 100%; padding: 13px;
-  background: linear-gradient(135deg, #1D4ED8, #2563EB);
-  color: white; border: none; border-radius: 10px;
-  font-size: 14px; font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 13px;
+  background: linear-gradient(135deg, #1E40AF, #2563EB 60%, #3B82F6);
+  color: white;
+  border: none;
+  border-radius: 11px;
+  font-size: 14.5px;
+  font-weight: 700;
   font-family: 'Plus Jakarta Sans', sans-serif;
   cursor: pointer;
-  transition: all .15s;
-  box-shadow: 0 4px 14px rgba(37,99,235,.35);
+  transition: all .18s ease;
+  box-shadow: 0 4px 16px rgba(37,99,235,.32), 0 1px 3px rgba(37,99,235,.2);
   margin-top: 4px;
+  letter-spacing: .1px;
 }
-
 .btn-primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, #1e40af, #1D4ED8);
-  box-shadow: 0 6px 20px rgba(37,99,235,.4);
+  background: linear-gradient(135deg, #1e3a8a, #1D4ED8 60%, #2563EB);
+  box-shadow: 0 6px 24px rgba(37,99,235,.4), 0 2px 4px rgba(37,99,235,.25);
   transform: translateY(-1px);
 }
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(37,99,235,.3);
+}
+.btn-primary:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+  transform: none;
+}
 
-.btn-primary:disabled { opacity: .6; cursor: not-allowed; transform: none; }
-
-/* Spinner */
+/* ── Spinner ── */
 .spinner {
-  width: 16px; height: 16px;
+  width: 15px; height: 15px;
   border: 2px solid rgba(255,255,255,.3);
-  border-top-color: white; border-radius: 50%;
+  border-top-color: white;
+  border-radius: 50%;
   animation: spin .6s linear infinite;
 }
-
 .spinner-dark {
-  width: 16px; height: 16px;
+  width: 15px; height: 15px;
   border: 2px solid #E2E8F0;
-  border-top-color: #374151; border-radius: 50%;
+  border-top-color: #374151;
+  border-radius: 50%;
   animation: spin .6s linear infinite;
 }
-
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* Divider */
+/* ── Divider ── */
 .divider {
-  display: flex; align-items: center; gap: 12px;
-  margin: 24px 0;
-  color: #94A3B8; font-size: 12px; font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 22px 0;
+  color: #94A3B8;
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #E2E8F0;
 }
 
-.divider::before, .divider::after {
-  content: ''; flex: 1; height: 1px; background: #E2E8F0;
-}
-
-/* Google button */
+/* ── Google Button ── */
 .btn-google {
-  display: flex; align-items: center; justify-content: center; gap: 10px;
-  width: 100%; padding: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12.5px;
   background: white;
   border: 1.5px solid #E2E8F0;
-  border-radius: 10px;
-  font-size: 14px; font-weight: 600;
+  border-radius: 11px;
+  font-size: 14px;
+  font-weight: 600;
   font-family: 'Plus Jakarta Sans', sans-serif;
-  color: #374151; cursor: pointer;
-  transition: all .15s;
+  color: #374151;
+  cursor: pointer;
+  transition: all .15s ease;
   box-shadow: 0 1px 3px rgba(0,0,0,.06);
 }
-
 .btn-google:hover:not(:disabled) {
   background: #F8FAFC;
   border-color: #CBD5E1;
-  box-shadow: 0 4px 12px rgba(0,0,0,.08);
+  box-shadow: 0 4px 14px rgba(0,0,0,.08);
   transform: translateY(-1px);
 }
+.btn-google:active:not(:disabled) {
+  transform: translateY(0);
+}
+.btn-google:disabled {
+  opacity: .6;
+  cursor: not-allowed;
+}
 
-.btn-google:disabled { opacity: .6; cursor: not-allowed; }
-
-/* Info note */
+/* ── Info Note ── */
 .info-note {
-  display: flex; align-items: flex-start; gap: 7px;
-  margin-top: 16px; padding: 10px 12px;
-  background: #F8FAFC; border: 1px solid #E2E8F0;
-  border-radius: 8px;
-  font-size: 12px; color: #64748B; line-height: 1.5;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 10px 13px;
+  background: #F8FAFC;
+  border: 1px solid #E8EEF6;
+  border-radius: 9px;
+  font-size: 12px;
+  color: #64748B;
+  line-height: 1.5;
 }
+.info-note svg { flex-shrink: 0; margin-top: 1px; }
+.info-note strong { color: #374151; font-weight: 600; }
 
-.info-note strong { color: #374151; }
-
-/* Footer */
+/* ── Footer ── */
 .form-footer {
-  margin-top: 28px; text-align: center;
-  font-size: 11px; color: #94A3B8; letter-spacing: .3px;
+  margin-top: 28px;
+  text-align: center;
+  font-size: 11px;
+  color: #94A3B8;
+  letter-spacing: .3px;
 }
 
-/* Responsive */
+/* ── Responsive ── */
 @media (max-width: 768px) {
   .login-left { display: none; }
-  .login-right { padding: 24px 16px; }
+  .login-right { padding: 32px 20px; }
+}
+@media (max-width: 420px) {
+  .form-header h2 { font-size: 24px; }
 }
 </style>

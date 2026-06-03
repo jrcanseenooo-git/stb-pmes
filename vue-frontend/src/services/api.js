@@ -12,7 +12,7 @@ async function getToken() {
   }
 }
 
-// GET request (reads)
+// ── GET request (reads) ──────────────────────────────────────────────────────
 async function gasGet(route, params = {}) {
   const token = await getToken()
   const qs = new URLSearchParams({
@@ -27,22 +27,32 @@ async function gasGet(route, params = {}) {
   return data.data
 }
 
-// All writes sent as GET to avoid CORS preflight
+// ── WRITE request (POST with JSON body) ──────────────────────────────────────
+// Route + token stay in the query-string (always tiny).
+// The real payload goes in the POST body as JSON – no URL-length limit.
+// GAS receives: e.parameter.route, e.parameter.token,
+//               e.postData.contents (JSON with _method + body fields)
 async function gasWrite(method, route, body = {}) {
   const token = await getToken()
-  const qs = new URLSearchParams({
-    route,
-    _method: method,
-    token:   token || '',
-    ...flattenParams(body)
-  }).toString()
 
-  const res  = await fetch(`${BASE_URL}?${qs}`)
+  // Small routing params go in the URL
+  const qs = new URLSearchParams({ route, token: token || '' }).toString()
+
+  // Full payload (including _method override) goes in the POST body
+  const payload = JSON.stringify({ _method: method, ...body })
+
+  const res = await fetch(`${BASE_URL}?${qs}`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    payload
+  })
+
   const data = await res.json()
   if (!data.success) throw new Error(data.message || 'API error')
   return data.data
 }
 
+// ── Flatten nested objects for GET params only ───────────────────────────────
 function flattenParams(obj, prefix = '') {
   const result = {}
   for (const [k, v] of Object.entries(obj || {})) {
@@ -55,6 +65,8 @@ function flattenParams(obj, prefix = '') {
   }
   return result
 }
+
+// ── API surface (unchanged) ──────────────────────────────────────────────────
 
 export const authApi = {
   me:        ()                        => gasGet('auth/me'),
@@ -78,15 +90,15 @@ export const usersApi = {
 }
 
 export const kraApi = {
-  list:        (p = {})            => gasGet('kras',                              p),
-  get:         (id)                => gasGet(`kras/${id}`),
-  create:      (data)              => gasWrite('POST',   'kras',                  data),
-  update:      (id, data)          => gasWrite('PUT',    `kras/${id}`,            data),
-  delete:      (id)                => gasWrite('DELETE', `kras/${id}`),
-  listSI:      (kraId)             => gasGet(`kras/${kraId}/indicators`),
-  createSI:    (kraId, data)       => gasWrite('POST',   `kras/${kraId}/indicators`,         data),
-  updateSI:    (kraId, siId, data) => gasWrite('PUT',    `kras/${kraId}/indicators/${siId}`, data),
-  deleteSI:    (kraId, siId)       => gasWrite('DELETE', `kras/${kraId}/indicators/${siId}`)
+  list:     (p = {})            => gasGet('kras',                             p),
+  get:      (id)                => gasGet(`kras/${id}`),
+  create:   (data)              => gasWrite('POST',   'kras',                 data),
+  update:   (id, data)          => gasWrite('PUT',    `kras/${id}`,           data),
+  delete:   (id)                => gasWrite('DELETE', `kras/${id}`),
+  listSI:   (kraId)             => gasGet(`kras/${kraId}/indicators`),
+  createSI: (kraId, data)       => gasWrite('POST',   `kras/${kraId}/indicators`,         data),
+  updateSI: (kraId, siId, data) => gasWrite('PUT',    `kras/${kraId}/indicators/${siId}`, data),
+  deleteSI: (kraId, siId)       => gasWrite('DELETE', `kras/${kraId}/indicators/${siId}`)
 }
 
 export const accomplishmentsApi = {
@@ -101,23 +113,27 @@ export const accomplishmentsApi = {
 }
 
 export const movApi = {
-  list:    (p = {}) => gasGet('mov',              p),
+  list:    (p = {}) => gasGet('mov',        p),
   get:     (id)     => gasGet(`mov/${id}`),
   preview: (id)     => gasGet(`mov/${id}/preview`),
   delete:  (id)     => gasWrite('DELETE', `mov/${id}`),
   upload: async (file, meta = {}) => {
     const base64 = await fileToBase64(file)
     return gasWrite('POST', 'mov/upload', {
-      fileName: file.name, mimeType: file.type, size: file.size, base64, ...meta
+      fileName: file.name,
+      mimeType: file.type,
+      size:     file.size,
+      base64,
+      ...meta
     })
   }
 }
 
 export const evaluationApi = {
-  list:    (p = {})         => gasGet('evaluations',                   p),
+  list:    (p = {})         => gasGet('evaluations',                    p),
   get:     (id)             => gasGet(`evaluations/${id}`),
-  compute: (userId, period) => gasWrite('POST', 'evaluations/compute', { userId, period }),
-  update:  (id, data)       => gasWrite('PUT',  `evaluations/${id}`,   data),
+  compute: (userId, period) => gasWrite('POST', 'evaluations/compute',  { userId, period }),
+  update:  (id, data)       => gasWrite('PUT',  `evaluations/${id}`,    data),
   history: (userId)         => gasGet(`evaluations/history/${userId}`)
 }
 
@@ -138,29 +154,6 @@ export const auditApi = {
   export: (p = {}) => gasGet('audit/export', p)
 }
 
-// ── IPCRF / CCEF Forms ──
-export const ipcrf = {
-  // Forms
-  listForms:   (p = {})       => gasGet('ipcrf/forms',                         p),
-  getForm:     (id)           => gasGet(`ipcrf/forms/${id}`),
-  createForm:  (data)         => gasWrite('POST',  'ipcrf/forms',               data),
-  updateForm:  (id, data)     => gasWrite('PUT',   `ipcrf/forms/${id}`,         data),
-  submitForm:  (id)           => gasWrite('PATCH', `ipcrf/forms/${id}/submit`),
-  approveForm: (id, data = {}) => gasWrite('PATCH', `ipcrf/forms/${id}/approve`, data),
-  returnForm:  (id, data = {}) => gasWrite('PATCH', `ipcrf/forms/${id}/return`,  data),
-  computeScore:(id)           => gasWrite('PATCH', `ipcrf/forms/${id}/score`),
-  // Entries
-  getEntries:  (formId)       => gasGet(`ipcrf/forms/${formId}/entries`),
-  addEntry:    (formId, data) => gasWrite('POST',   `ipcrf/forms/${formId}/entries`, data),
-  updateEntry: (id, data)     => gasWrite('PUT',    `ipcrf/entries/${id}`,           data),
-  deleteEntry: (id)           => gasWrite('DELETE', `ipcrf/entries/${id}`)
-}
-
-// ── KRA Master Library ──
-export const kraLibrary = {
-  list: (p = {}) => gasGet('ipcrf/library', p)
-}
-
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -173,6 +166,5 @@ function fileToBase64(file) {
 export default {
   authApi, dashboardApi, usersApi, kraApi,
   accomplishmentsApi, movApi, evaluationApi,
-  reportsApi, notificationsApi, auditApi,
-  ipcrf, kraLibrary
+  reportsApi, notificationsApi, auditApi
 }

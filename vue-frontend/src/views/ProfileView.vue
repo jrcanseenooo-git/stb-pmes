@@ -258,7 +258,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { usersApi, dashboardApi, auditApi } from '@/services/api'
@@ -333,12 +333,16 @@ const settings = [
 
 // ── Lifecycle ──
 onMounted(async () => {
+  // Retry fetchProfile if the store only has fallback data (no employeeNo = API failed at login)
+  if (!authStore.employeeNo || authStore.employeeNo === '—') {
+    try { await authStore.fetchProfile() } catch (e) { console.warn("[Profile] fetchProfile retry:", e.message) }
+  }
   populateForm()
-  await Promise.all([
-    fetchPerfStats(),
-    fetchActivity()
-  ])
+  await Promise.all([fetchPerfStats(), fetchActivity()])
 })
+
+// Re-populate form whenever profile updates (fetchProfile may complete after mount)
+watch(() => authStore.profile, () => { populateForm() }, { deep: true })
 
 function populateForm() {
   form.value = {

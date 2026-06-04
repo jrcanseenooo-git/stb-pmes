@@ -94,6 +94,12 @@
                 <div class="info-val">{{ divisionName }}</div>
               </div>
 
+              <!-- Role (read-only always) -->
+              <div class="info-item">
+                <label class="info-label">Role</label>
+                <div class="info-val">{{ role }}</div>
+              </div>
+
               <!-- Employment Type -->
               <div class="info-item">
                 <label class="info-label">Employment Type</label>
@@ -105,10 +111,10 @@
                 </select>
               </div>
 
-              <!-- Role (read-only always) -->
+              <!-- Date Joined -->
               <div class="info-item">
-                <label class="info-label">Role</label>
-                <div class="info-val">{{ role }}</div>
+                <label class="info-label">Date Joined</label>
+                <div class="info-val">{{ formatDate(form.createdAt) }}</div>
               </div>
             </div>
 
@@ -511,9 +517,9 @@ function handleSetting(label) {
 /* Info grid */
 .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 20px;}
 @media(max-width:600px){.info-grid{grid-template-columns:1fr;}}
-.info-item{}
+.info-item{display:flex;flex-direction:column;justify-content:flex-start;min-height:40px;}
 .info-label{font-size:10px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:3px;}
-.info-val{font-size:13px;color:#0F172A;font-weight:500;}
+.info-val{font-size:13px;color:#0F172A;font-weight:500;line-height:1.5;word-break:break-word;}
 .field-input{width:100%;padding:6px 10px;border:1px solid #E2E8F0;border-radius:7px;font-size:13px;color:#0F172A;font-family:inherit;background:#F8FAFC;outline:none;transition:border-color .15s;}
 .field-input:focus{border-color:#2F80ED;background:#fff;}
 .save-row{display:flex;gap:8px;margin-top:16px;}

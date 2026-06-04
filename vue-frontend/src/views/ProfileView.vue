@@ -56,29 +56,30 @@
             </div>
 
             <div v-else class="info-grid">
+
               <!-- Full Name -->
-              <div class="info-item">
-                <label class="info-label">First Name</label>
-                <div v-if="!editMode" class="info-val">{{ form.firstName || '—' }}</div>
-                <input v-else v-model="form.firstName" class="field-input" placeholder="First name"/>
-              </div>
-              <div class="info-item">
-                <label class="info-label">Last Name</label>
-                <div v-if="!editMode" class="info-val">{{ form.lastName || '—' }}</div>
-                <input v-else v-model="form.lastName" class="field-input" placeholder="Last name"/>
+               <div class="info-item">
+                <label class="info-label">Full Name</label>
+                <div v-if="!editMode" class="info-val">{{ form.fullName || '—' }}</div>
+                <input v-else v-model="form.fullName" class="field-input" placeholder="Full name"/>
               </div>
 
               <!-- Employee No. -->
               <div class="info-item">
                 <label class="info-label">Employee No.</label>
                 <div v-if="!editMode" class="info-val">{{ form.employeeNo || '—' }}</div>
-                <input v-else v-model="form.employeeNo" class="field-input" placeholder="e.g. DSWD-2024-0001"/>
+                <input v-else v-model="form.employeeNo" class="field-input" placeholder="e.g. 24-0247"/>
               </div>
 
-              <!-- Email -->
+              <!-- Employment Type -->
               <div class="info-item">
-                <label class="info-label">Email Address</label>
-                <div class="info-val">{{ userEmail }}</div>
+                <label class="info-label">Employment Type</label>
+                <div v-if="!editMode" class="info-val">{{ employmentTypeLabel(form.employmentType) }}</div>
+                <select v-else v-model="form.employmentType" class="field-input">
+                  <option value="Regular">Regular</option>
+                  <option value="COS">Contractor of Service (COS)</option>
+                  <option value="Co-Term">Co-Term</option>
+                </select>
               </div>
 
               <!-- Position -->
@@ -88,24 +89,19 @@
                 <input v-else v-model="form.position" class="field-input" placeholder="e.g. Social Welfare Officer II"/>
               </div>
 
-              <!-- Division -->
+              <!-- Division (read-only) -->
               <div class="info-item">
                 <label class="info-label">Division</label>
                 <div class="info-val">{{ divisionName }}</div>
               </div>
 
-              <!-- Employment Type -->
+              <!-- Email -->
               <div class="info-item">
-                <label class="info-label">Employment Type</label>
-                <div v-if="!editMode" class="info-val">{{ form.employmentType || '—' }}</div>
-                <select v-else v-model="form.employmentType" class="field-input">
-                  <option>Regular</option>
-                  <option>Contract of Service (COS)</option>
-                  <option>Co-Term</option>
-                </select>
+                <label class="info-label">Email Address</label>
+                <div class="info-val">{{ userEmail }}</div>
               </div>
 
-              <!-- Role (read-only always) -->
+              <!-- Role (read-only) -->
               <div class="info-item">
                 <label class="info-label">Role</label>
                 <div class="info-val">{{ role }}</div>
@@ -280,12 +276,10 @@ const position    = computed(() => authStore.position)
 
 // ── Editable form (mirrors DB fields) ──
 const form = ref({
-  firstName:      '',
-  lastName:       '',
+  fullName:       '',
   employeeNo:     '',
   position:       '',
-  employmentType: '',
-  createdAt:      ''
+  employmentType: ''
 })
 
 // ── Performance stats (live from dashboard API) ──
@@ -336,14 +330,26 @@ onMounted(async () => {
 // Re-populate form whenever profile updates (fetchProfile may complete after mount)
 watch(() => authStore.profile, () => { populateForm() }, { deep: true })
 
+function normalizeEmploymentType(raw) {
+  if (!raw) return 'Regular'
+  const r = raw.toString().toLowerCase()
+  if (r === 'cos' || r.includes('contractor') || r.includes('contract of service')) return 'COS'
+  if (r === 'co-term' || r === 'coterm') return 'Co-Term'
+  return 'Regular'
+}
+
+function employmentTypeLabel(val) {
+  if (val === 'COS') return 'Contractor of Service (COS)'
+  if (val === 'Co-Term') return 'Co-Term'
+  return 'Regular'
+}
+
 function populateForm() {
   form.value = {
-    firstName:      authStore.firstName      || '',
-    lastName:       authStore.lastName       || '',
-    employeeNo:     authStore.employeeNo     !== '—' ? authStore.employeeNo  : '',
-    position:       authStore.position       !== '—' ? authStore.position    : '',
-    employmentType: authStore.employmentType || 'Regular',
-    createdAt:      authStore.createdAt      || ''
+    fullName:       authStore.fullName       || '',
+    employeeNo:     authStore.employeeNo     !== '—' ? authStore.employeeNo : '',
+    position:       authStore.position       !== '—' ? authStore.position   : '',
+    employmentType: normalizeEmploymentType(authStore.employmentType)
   }
 }
 
@@ -401,28 +407,31 @@ function toggleEdit() {
 }
 
 async function saveProfile() {
-  saving.value   = true
+  saving.value    = true
   saveError.value = ''
   try {
-    const fullName = `${form.value.firstName} ${form.value.lastName}`.trim()
-    const updated  = await usersApi.update(authStore.profileId, {
-      firstName:  form.value.firstName,
-      lastName:   form.value.lastName,
+    const fullName  = form.value.fullName.trim()
+    const nameParts = fullName.split(/\s+/)
+    const firstName = nameParts[0] || ''
+    const lastName  = nameParts.slice(1).join(' ') || ''
+
+    // Map display value back to what the DB stores in the `type` column
+    const typeMap = { Regular: 'Regular', COS: 'Contractor of Service (COS)', 'Co-Term': 'Co-Term' }
+    const typeVal  = typeMap[form.value.employmentType] || form.value.employmentType
+
+    await usersApi.update(authStore.profileId, {
       fullName,
+      firstName,
+      lastName,
       position:   form.value.position,
       employeeNo: form.value.employeeNo,
-      type:       form.value.employmentType
+      type:       typeVal
     })
-    // Patch the local store so UI updates immediately
-    authStore.patchProfile({
-      firstName:  form.value.firstName,
-      lastName:   form.value.lastName,
-      fullName,
-      position:   form.value.position,
-      employeeNo: form.value.employeeNo,
-      type:       form.value.employmentType
-    })
-    editMode.value  = false
+
+    // Patch the local store immediately so header + tags update
+    authStore.patchProfile({ fullName, firstName, lastName, position: form.value.position, employeeNo: form.value.employeeNo, type: typeVal })
+
+    editMode.value    = false
     saveSuccess.value = true
     setTimeout(() => { saveSuccess.value = false }, 3000)
   } catch (e) {
@@ -512,6 +521,7 @@ function handleSetting(label) {
 .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 20px;}
 @media(max-width:600px){.info-grid{grid-template-columns:1fr;}}
 .info-item{display:flex;flex-direction:column;justify-content:flex-start;min-height:40px;}
+.info-item--full{grid-column:1 / -1;}
 .info-label{font-size:10px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:3px;}
 .info-val{font-size:13px;color:#0F172A;font-weight:500;line-height:1.5;word-break:break-word;}
 .field-input{width:100%;padding:6px 10px;border:1px solid #E2E8F0;border-radius:7px;font-size:13px;color:#0F172A;font-family:inherit;background:#F8FAFC;outline:none;transition:border-color .15s;}

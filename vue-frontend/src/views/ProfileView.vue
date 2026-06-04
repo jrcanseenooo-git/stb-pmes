@@ -111,12 +111,6 @@
                   <option>Co-Term</option>
                 </select>
               </div>
-
-              <!-- Date Joined -->
-              <div class="info-item">
-                <label class="info-label">Date Joined</label>
-                <div class="info-val">{{ formatDate(form.createdAt) }}</div>
-              </div>
             </div>
 
             <div v-if="editMode && !profileLoading" class="save-row">

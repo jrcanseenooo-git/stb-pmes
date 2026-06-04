@@ -175,7 +175,7 @@
                 <label class="field-label">Employment Type</label>
                 <select v-model="form.type" class="field-select">
                   <option>Regular</option>
-                  <option>Contractor of Service (COS)</option>
+                  <option>Contract of Service (COS)</option>
                   <option>Co-Term</option>
                 </select>
               </div>

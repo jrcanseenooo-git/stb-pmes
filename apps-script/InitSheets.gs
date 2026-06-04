@@ -6,8 +6,7 @@ function initializeSheets() {
     Users: [
       'id', 'uid', 'email', 'fullName', 'firstName', 'lastName',
       'role', 'divisionId', 'divisionName', 'position', 'employeeNo',
-      'type', 'active', 'createdAt', 'updatedAt', 'lastLoginAt',
-      'positionLevel', 'sgLevel'                               // ← FIX: was missing
+      'type', 'positionLevel', 'sgLevel', 'active', 'createdAt', 'updatedAt', 'lastLoginAt'
     ],
     Divisions: [
       'id', 'name', 'code', 'chiefId', 'chiefName', 'parentId', 'color', 'active', 'createdAt'

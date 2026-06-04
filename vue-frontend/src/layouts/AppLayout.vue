@@ -129,7 +129,7 @@
                   stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
               </svg>
             </div>
-            <transition name="fade"><span v-if="!collapsed" class="nav-label-text">Settings</span></transition>
+            <transition name="fade"><span v-if="!collapsed" class="nav-label-text">Profile Settings</span></transition>
           </RouterLink>
         </div>
       </nav>

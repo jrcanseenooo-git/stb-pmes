@@ -1,81 +1,105 @@
 const AuthService = (() => {
 
-  const PROPS      = PropertiesService.getScriptProperties()
-  const PROJECT_ID = PROPS.getProperty('FIREBASE_PROJECT_ID') || 'pmes-1cb6d'
+  const FIREBASE_PROJECT_ID  = PropertiesService.getScriptProperties().getProperty('FIREBASE_PROJECT_ID')
+  const ALLOWED_EMAIL_DOMAIN = PropertiesService.getScriptProperties().getProperty('ALLOWED_EMAIL_DOMAIN') || 'dswd.gov.ph'
 
-  // ── Verify Firebase ID token sent in e.parameter.token ──
+  // ── Token verification ──────────────────────────────────────────────────
   function verifyToken(e) {
-    const idToken = (e.parameter && e.parameter.token) || ''
-    if (!idToken) return null
+    const token = (e.parameter?.token || '').trim()
+    if (!token) {
+      Logger.log('[Auth] No token provided')
+      return null
+    }
 
     try {
-      // Call Firebase REST API to verify the token
-      const url      = `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${PROPS.getProperty('FIREBASE_API_KEY') || ''}`
-      const response = UrlFetchApp.fetch(url, {
-        method:             'POST',
-        contentType:        'application/json',
-        payload:            JSON.stringify({ idToken }),
-        muteHttpExceptions: true
-      })
-
-      const result = JSON.parse(response.getContentText())
-      if (response.getResponseCode() !== 200 || !result.users || !result.users[0]) {
-        Logger.log('Token verification failed: ' + response.getContentText())
+      const parts = token.split('.')
+      if (parts.length !== 3) {
+        Logger.log('[Auth] Malformed token (parts: ' + parts.length + ')')
         return null
       }
 
-      const firebaseUser = result.users[0]
-      return {
-        uid:   firebaseUser.localId,
-        email: firebaseUser.email,
-        name:  firebaseUser.displayName || firebaseUser.email
+      // Pad base64url segment to a multiple of 4 before decoding
+      const padded  = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+      const padding = (4 - (padded.length % 4)) % 4
+      const b64     = padded + '='.repeat(padding)
+
+      const payload = JSON.parse(
+        Utilities.newBlob(Utilities.base64Decode(b64)).getDataAsString()
+      )
+
+      // ── Time checks ──
+      const now = Math.floor(Date.now() / 1000)
+      if (payload.exp && payload.exp < now) {
+        Logger.log('[Auth] Token expired (exp: ' + payload.exp + ', now: ' + now + ')')
+        return null
       }
+      if (payload.iat && payload.iat > now + 60) {
+        Logger.log('[Auth] Token issued in future')
+        return null
+      }
+
+      // ── Audience / issuer checks ──
+      if (FIREBASE_PROJECT_ID) {
+        if (payload.aud !== FIREBASE_PROJECT_ID) {
+          Logger.log('[Auth] Wrong audience: ' + payload.aud)
+          return null
+        }
+        if (payload.iss !== 'https://securetoken.google.com/' + FIREBASE_PROJECT_ID) {
+          Logger.log('[Auth] Wrong issuer: ' + payload.iss)
+          return null
+        }
+      }
+
+      // ── Domain check ──
+      const email = payload.email || ''
+      if (ALLOWED_EMAIL_DOMAIN && !email.endsWith('@' + ALLOWED_EMAIL_DOMAIN)) {
+        Logger.log('[Auth] Domain not allowed: ' + email)
+        return null
+      }
+
+      return {
+        uid:   payload.sub  || '',
+        email: payload.email || '',
+        name:  payload.name  || ''
+      }
+
     } catch (err) {
-      Logger.log('verifyToken error: ' + err.message)
+      Logger.log('[Auth] Token decode error: ' + err.message)
       return null
     }
   }
 
-  // ── Load PMES profile from Sheets by Firebase UID or email ──
+  // ── Profile lookup ──────────────────────────────────────────────────────
   function getProfile(user) {
-    if (!user) throw HttpError('No authenticated user', 401)
-
     const sheet = SpreadsheetService.getSheet(SHEET.USERS)
     const rows  = SpreadsheetService.getAllRows(sheet)
 
-    // Match by uid first, then fall back to email
-    let profile = rows.find(r => r.uid === user.uid)
-    if (!profile) profile = rows.find(r => r.email === user.email)
+    // Match by uid first, fall back to email (covers legacy rows without uid)
+    const row = rows.find(r =>
+      (user.uid  && String(r.uid).trim()   === String(user.uid).trim())  ||
+      (user.email && String(r.email).trim().toLowerCase() === String(user.email).trim().toLowerCase())
+    )
 
-    if (!profile) {
-      // Return a minimal profile so the app doesn't crash — admin can register this user
-      Logger.log('Profile not found for: ' + user.email + ' — returning guest profile')
-      return {
-        id:          '',
-        uid:         user.uid,
-        email:       user.email,
-        fullName:    user.name || user.email,
-        role:        'Staff',
-        divisionId:  '',
-        divisionName:'',
-        position:    '',
-        type:        'Regular',
-        active:      true
-      }
+    if (!row) {
+      Logger.log('[Auth] Profile not found for uid=' + user.uid + ' email=' + user.email)
+      Logger.log('[Auth] Available users: ' + rows.map(r => r.email).join(', '))
+      throw HttpError('User profile not found in PMES. Please contact your administrator.', 404)
     }
 
-    if (profile.active === false || profile.active === 'false') {
-      throw HttpError('Your account has been deactivated. Contact your administrator.', 403)
-    }
-
-    return profile
+    // Return all fields except the password hash
+    const { passwordHash, tempPassword, mustChangePassword, ...safe } = row
+    return safe
   }
 
-  // ── Role guard helper ──
-  function requireRole(user, ...roles) {
+  // ── Role guard ─────────────────────────────────────────────────────────
+  function requireRole(user, ...allowedRoles) {
     const profile = getProfile(user)
-    if (!roles.includes(profile.role)) {
-      throw HttpError(`Access denied. Required role: ${roles.join(' or ')}`, 403)
+    if (!allowedRoles.includes(profile.role)) {
+      throw HttpError(
+        'Insufficient permissions. Required: ' + allowedRoles.join(' / ') +
+        '. Your role: ' + profile.role,
+        403
+      )
     }
     return profile
   }

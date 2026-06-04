@@ -82,9 +82,6 @@ const AuthService = (() => {
 
   // ─────────────────────────────────────────────────────────────
   // PROFILE LOOKUP
-  // Returns the full Users row (minus password fields) so the
-  // frontend gets EVERY column: firstName, lastName, position,
-  // employeeNo, divisionName, positionLevel, sgLevel, etc.
   // ─────────────────────────────────────────────────────────────
   function getProfile(user) {
     const sheet = SpreadsheetService.getSheet(SHEET.USERS)

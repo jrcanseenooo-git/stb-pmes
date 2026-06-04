@@ -1,6 +1,7 @@
 const Router = (() => {
 
   function dispatch(route, method, params, body, user) {
+    // Normalise: 'users/123' → ['users', '123']
     const parts    = route.split('/')
     const resource = parts[0]
     const id       = parts[1] || null
@@ -29,15 +30,15 @@ const Router = (() => {
         if (!id && method === 'POST') return UsersService.create(body, user)
         if (id  && method === 'GET')  return UsersService.get(id, user)
         if (id  && method === 'PUT')  return UsersService.update(id, body, user)
-        if (id  && sub === 'deactivate')     return UsersService.deactivate(id, user)
-        if (id  && sub === 'activate')       return UsersService.activate(id, user)
-        if (id  && sub === 'reset-password') return UsersService.resetPassword(id, user)
+        if (id && sub === 'deactivate')    return UsersService.deactivate(id, user)
+        if (id && sub === 'activate')      return UsersService.activate(id, user)
+        if (id && sub === 'reset-password') return UsersService.resetPassword(id, user)
         break
 
       // ── KRAs ──
       case 'kras':
-        if (!id   && method === 'GET')  return KraService.list(params, user)
-        if (!id   && method === 'POST') return KraService.create(body, user)
+        if (!id   && method === 'GET')    return KraService.list(params, user)
+        if (!id   && method === 'POST')   return KraService.create(body, user)
         if (id    && !sub && method === 'GET')    return KraService.get(id, user)
         if (id    && !sub && method === 'PUT')    return KraService.update(id, body, user)
         if (id    && !sub && method === 'DELETE') return KraService.remove(id, user)
@@ -47,15 +48,6 @@ const Router = (() => {
           if (subId  && method === 'PUT')    return KraService.updateSI(id, subId, body, user)
           if (subId  && method === 'DELETE') return KraService.removeSI(id, subId, user)
         }
-        break
-
-      // ── KRA Master Library ──
-      case 'kra-library':
-        if (!id && method === 'GET')    return KraLibraryService.list(params, user)
-        if (!id && method === 'POST')   return KraLibraryService.create(body, user)
-        if (id  && method === 'GET')    return KraLibraryService.get(id, user)
-        if (id  && method === 'PUT')    return KraLibraryService.update(id, body, user)
-        if (id  && method === 'DELETE') return KraLibraryService.remove(id, user)
         break
 
       // ── Accomplishments ──
@@ -72,11 +64,11 @@ const Router = (() => {
 
       // ── MOV ──
       case 'mov':
-        if (!id   && method === 'GET')    return MovService.list(params, user)
-        if (sub === 'upload')             return MovService.upload(body, user)
-        if (id    && method === 'GET')    return MovService.get(id, user)
+        if (!id   && method === 'GET')  return MovService.list(params, user)
+        if (sub === 'upload')           return MovService.upload(body, user)
+        if (id    && method === 'GET')  return MovService.get(id, user)
         if (id    && method === 'DELETE') return MovService.remove(id, user)
-        if (id && sub === 'preview')      return MovService.preview(id, user)
+        if (id && sub === 'preview')    return MovService.preview(id, user)
         break
 
       // ── Evaluations ──
@@ -97,9 +89,9 @@ const Router = (() => {
 
       // ── Notifications ──
       case 'notifications':
-        if (!id   && method === 'GET')   return NotificationsService.list(user)
-        if (id    && sub === 'read')     return NotificationsService.markRead(id, user)
-        if (sub === 'read-all')          return NotificationsService.markAllRead(user)
+        if (!id   && method === 'GET')  return NotificationsService.list(user)
+        if (id    && sub === 'read')    return NotificationsService.markRead(id, user)
+        if (sub === 'read-all')         return NotificationsService.markAllRead(user)
         break
 
       // ── Audit ──
@@ -108,40 +100,58 @@ const Router = (() => {
         if (sub === 'export')           return AuditService.export_(params, user)
         break
 
-      // ── IPCRF Forms & Entries ──
-      // Pattern: ipcrf/forms[/:formId[/action|entries[/:entryId[/rate]]]]
-      case 'ipcrf': {
-        const formId   = parts[2] || null  // ipcrf/forms/:formId
-        const action   = parts[3] || null  // /submit|approve|return|finalize|compute|entries
-        const entryId  = parts[4] || null  // /entries/:entryId
-        const entryAct = parts[5] || null  // /rate
+      // ── Deadlines (previously missing route) ──
+      case 'deadlines':
+        if (!id && method === 'GET')  return DeadlinesService.list(params, user)
+        if (!id && method === 'POST') return DeadlinesService.create(body, user)
+        if (id  && method === 'GET')  return DeadlinesService.get(id, user)
+        if (id  && method === 'PUT')  return DeadlinesService.update(id, body, user)
+        if (id  && method === 'DELETE') return DeadlinesService.remove(id, user)
+        break
 
-        if (!formId && method === 'GET')  return IPCRFService.listForms(params, user)
-        if (!formId && method === 'POST') return IPCRFService.createForm(body, user)
-
-        if (formId) {
-          if (!action && method === 'GET')    return IPCRFService.getForm(formId, user)
-          if (!action && method === 'PUT')    return IPCRFService.updateForm(formId, body, user)
-          if (!action && method === 'DELETE') return IPCRFService.deleteForm(formId, user)
-
-          if (action === 'submit')   return IPCRFService.submitForm(formId, user)
-          if (action === 'approve')  return IPCRFService.approveForm(formId, body, user)
-          if (action === 'return')   return IPCRFService.returnForm(formId, body, user)
-          if (action === 'finalize') return IPCRFService.finalizeForm(formId, body, user)
-          if (action === 'compute')  return IPCRFService.computeScore(formId, user)
-
-          if (action === 'entries') {
-            if (!entryId && method === 'GET')  return IPCRFService.listEntries(formId, params, user)
-            if (!entryId && method === 'POST') return IPCRFService.addEntry(formId, body, user)
-            if (entryId) {
-              if (!entryAct && method === 'PUT')    return IPCRFService.updateEntry(formId, entryId, body, user)
-              if (!entryAct && method === 'DELETE') return IPCRFService.deleteEntry(formId, entryId, user)
-              if (entryAct === 'rate')              return IPCRFService.rateEntry(formId, entryId, body, user)
-            }
-          }
+      // ── IPCRF Forms (previously missing route) ──
+      case 'ipcrf':
+        if (!id && method === 'GET')  return IpcrfService.list(params, user)
+        if (!id && method === 'POST') return IpcrfService.create(body, user)
+        if (id  && method === 'GET')  return IpcrfService.get(id, user)
+        if (id  && method === 'PUT')  return IpcrfService.update(id, body, user)
+        if (id && sub === 'submit')   return IpcrfService.submit(id, body, user)
+        if (id && sub === 'approve')  return IpcrfService.approve(id, body, user)
+        if (id && sub === 'return')   return IpcrfService.return_(id, body, user)
+        if (id && sub === 'rate')     return IpcrfService.rate(id, body, user)
+        if (id && sub === 'finalize') return IpcrfService.finalize(id, body, user)
+        if (id && sub === 'compute-score') return IpcrfService.computeScore(id, user)
+        // Form entries sub-resource
+        if (id && sub === 'entries') {
+          if (!subId && method === 'GET')    return IpcrfService.listEntries(id, user)
+          if (!subId && method === 'POST')   return IpcrfService.addEntry(id, body, user)
+          if (subId  && method === 'PUT')    return IpcrfService.updateEntry(id, subId, body, user)
+          if (subId  && method === 'DELETE') return IpcrfService.deleteEntry(id, subId, user)
+        }
+        // JRB Ratings sub-resource
+        if (id && sub === 'jrb') {
+          if (!subId && method === 'GET')  return IpcrfService.listJrbRatings(id, user)
+          if (!subId && method === 'POST') return IpcrfService.saveJrbRatings(id, body, user)
         }
         break
-      }
+
+      // ── Peer Assignments (previously missing route) ──
+      case 'peer-assignments':
+        if (!id && method === 'GET')  return PeerAssignmentService.list(params, user)
+        if (!id && method === 'POST') return PeerAssignmentService.assign(body, user)
+        if (id  && method === 'GET')  return PeerAssignmentService.get(id, user)
+        if (id && sub === 'complete') return PeerAssignmentService.markComplete(id, body, user)
+        break
+
+      // ── Attendance (previously missing route) ──
+      case 'attendance':
+        if (!id && method === 'GET')  return AttendanceService.list(params, user)
+        if (!id && method === 'POST') return AttendanceService.record(body, user)
+        if (id  && method === 'GET')  return AttendanceService.get(id, user)
+        if (id  && method === 'PUT')  return AttendanceService.update(id, body, user)
+        if (sub === 'compute-rating') return AttendanceService.computeRating(body, user)
+        if (sub === 'ratings')        return AttendanceService.listRatings(params, user)
+        break
 
       default:
         throw HttpError('Route not found: ' + route, 404)

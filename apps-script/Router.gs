@@ -50,6 +50,15 @@ const Router = (() => {
         }
         break
 
+      // ── KRA Library (MasterKRALibrary sheet) ──
+      case 'kra-library':
+        if (!id && method === 'GET')  return KraLibraryService.list(params, user)
+        if (id  && method === 'GET')  return KraLibraryService.get(id, user)
+        if (!id && method === 'POST') return KraLibraryService.create(body, user)
+        if (id  && method === 'PUT')  return KraLibraryService.update(id, body, user)
+        if (id  && method === 'DELETE') return KraLibraryService.remove(id, user)
+        break
+
       // ── Accomplishments ──
       case 'accomplishments':
         if (!id   && method === 'GET')  return AccomplishmentsService.list(params, user)

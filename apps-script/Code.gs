@@ -13,12 +13,14 @@ const SHEET = {
   DEADLINES:          'Deadlines',
   REVISIONS:          'Revisions',
 
+  // ── Previously missing – now added ──
   IPCRF_FORMS:        'IPCRForms',
   FORM_ENTRIES:       'FormEntries',
   JRB_RATINGS:        'JRBRatings',
   PEER_ASSIGNMENTS:   'PeerAssignments',
   ATTENDANCE_RECORDS: 'AttendanceRecords',
-  ATTENDANCE_RATINGS: 'AttendanceRatings'
+  ATTENDANCE_RATINGS: 'AttendanceRatings',
+  MASTER_KRA_LIBRARY: 'MasterKRALibrary'         // ← FIX: was missing
 }
 
 // ── Entry point: HTTP GET ──

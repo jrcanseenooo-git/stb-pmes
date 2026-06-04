@@ -206,7 +206,18 @@ export const ipcrfApi = {
   updateEntry:  (formId, entryId, data)=> gasWrite('PUT',    `ipcrf/${formId}/entries/${entryId}`, data),
   deleteEntry:  (formId, entryId)      => gasWrite('DELETE', `ipcrf/${formId}/entries/${entryId}`),
   listJrbRatings: (formId)             => gasGet(`ipcrf/${formId}/jrb`),
-  saveJrbRatings: (formId, data)       => gasWrite('POST',  `ipcrf/${formId}/jrb`,    data)
+  saveJrbRatings: (formId, data)       => gasWrite('POST',  `ipcrf/${formId}/jrb`,    data),
+
+  // ── Aliases for views that use alternate method names ──
+  listForms:    (p = {})               => gasGet('ipcrf',                             p),
+  createForm:   (data)                 => gasWrite('POST',  'ipcrf',                   data),
+  getForm:      (id)                   => gasGet(`ipcrf/${id}`),
+  updateForm:   (id, data)             => gasWrite('PUT',   `ipcrf/${id}`,             data),
+  submitForm:   (id, data = {})        => gasWrite('PATCH', `ipcrf/${id}/submit`,      data),
+  approveForm:  (id, data = {})        => gasWrite('PATCH', `ipcrf/${id}/approve`,     data),
+  returnForm:   (id, data = {})        => gasWrite('PATCH', `ipcrf/${id}/return`,      data),
+  rateForm:     (id, data)             => gasWrite('PATCH', `ipcrf/${id}/rate`,        data),
+  finalizeForm: (id, data = {})        => gasWrite('PATCH', `ipcrf/${id}/finalize`,    data),
 }
 
 // ── Attendance ─────────────────────────────────

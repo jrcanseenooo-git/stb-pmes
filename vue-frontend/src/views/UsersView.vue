@@ -382,9 +382,11 @@ function mapUser(row) {
   const name   = row.fullName || `${row.firstName || ''} ${row.lastName || ''}`.trim() || row.email
   return {
     id:           row.id,
-    uid:          row.uid || '',
+    uid:          row.uid       || '',
     initials:     name.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase(),
     name,
+    firstName:    row.firstName || '',   // ← keep raw fields for the edit modal
+    lastName:     row.lastName  || '',
     email:        row.email        || '',
     role:         row.role         || 'Staff',
     division:     row.divisionName || row.divisionId || '',
@@ -448,14 +450,14 @@ function closeModal()    { showModal.value = false }
 function openEditModal(user) {
   editingUser.value = user
   form.value = {
-    firstName:  user.name.split(' ')[0],
-    lastName:   user.name.split(' ').slice(1).join(' '),
-    email:      user.email,
-    role:       user.role,
-    division:   user.division,
-    position:   user.position    || '',
-    employeeNo: user.employeeNo  || '',
-    type:       user.type        || 'Regular',
+    firstName:    user.firstName || user.name.split(' ')[0],
+    lastName:     user.lastName  || user.name.split(' ').slice(1).join(' '),
+    email:        user.email,
+    role:         user.role,
+    division:     user.division,
+    position:     user.position    || '',
+    employeeNo:   user.employeeNo  || '',
+    type:         user.type        || 'Regular',
     tempPassword: ''
   }
   showModal.value = true

@@ -1,7 +1,6 @@
-/**
- * AuditService.gs
- * Every write action in the system creates an audit log entry.
- */
+// ═══════════════════════════════════════════════════════════════
+// AUDIT SERVICE
+// ═══════════════════════════════════════════════════════════════
 
 const AuditService = (() => {
 
@@ -24,11 +23,25 @@ const AuditService = (() => {
   }
 
   function list(params, user) {
-    AuthService.requireRole(user, 'System Administrator', 'Bureau Director')
+    const profile = AuthService.getProfile(user)
+    const isAdmin = ['System Administrator', 'Bureau Director'].includes(profile.role)
+
+    // FIX: Staff can read their OWN records (needed for Profile → Recent Activity).
+    // Admins can read everything (with optional filters).
+    if (!isAdmin && params.userId && params.userId !== profile.id) {
+      throw HttpError('Insufficient permissions to view other users\' audit logs', 403)
+    }
+
     const sheet = SpreadsheetService.getSheet(SHEET.AUDIT)
     let rows    = SpreadsheetService.getAllRows(sheet)
       .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
 
+    // Non-admins are always scoped to their own records
+    if (!isAdmin) {
+      rows = rows.filter(r => r.userId === profile.id)
+    }
+
+    // Filters (admins only for cross-user queries)
     if (params.userId) rows = rows.filter(r => r.userId === params.userId)
     if (params.module) rows = rows.filter(r => r.module === params.module)
     if (params.action) rows = rows.filter(r => r.action === params.action)
@@ -41,7 +54,6 @@ const AuditService = (() => {
   function export_(params, user) {
     AuthService.requireRole(user, 'System Administrator', 'Bureau Director')
     const { items } = list({ ...params, pageSize: 9999 }, user)
-    // Return as CSV string
     const headers = ['timestamp','userEmail','userName','role','action','module','details']
     const lines   = [headers.join(',')]
     items.forEach(r => {
@@ -54,9 +66,9 @@ const AuditService = (() => {
 })()
 
 
-/**
- * NotificationsService.gs
- */
+// ═══════════════════════════════════════════════════════════════
+// NOTIFICATIONS SERVICE
+// ═══════════════════════════════════════════════════════════════
 
 const NotificationsService = (() => {
 
@@ -83,7 +95,7 @@ const NotificationsService = (() => {
     return { updated: rows.length }
   }
 
-  /** Called internally when status changes */
+  /** Called internally when accomplishment status changes */
   function createForStatusChange(accomplishment, newStatus, actorProfile) {
     const sheet = SpreadsheetService.getSheet(SHEET.NOTIFICATIONS)
     const messages = {
@@ -108,12 +120,12 @@ const NotificationsService = (() => {
 
   /** Scheduled: create deadline reminder notifications */
   function createDeadlineReminders() {
-    const accSheet    = SpreadsheetService.getSheet(SHEET.ACCOMPLISHMENTS)
-    const notifSheet  = SpreadsheetService.getSheet(SHEET.NOTIFICATIONS)
-    const rows        = SpreadsheetService.getAllRows(accSheet)
-      .filter(r => !r.deleted && !['Completed','Approved'].includes(r.status))
-    const now         = new Date()
-    const twoDaysOut  = new Date(now.getTime() + 2 * 86400000)
+    const accSheet   = SpreadsheetService.getSheet(SHEET.ACCOMPLISHMENTS)
+    const notifSheet = SpreadsheetService.getSheet(SHEET.NOTIFICATIONS)
+    const rows       = SpreadsheetService.getAllRows(accSheet)
+      .filter(r => !r.deleted && !['Completed', 'Approved'].includes(r.status))
+    const now        = new Date()
+    const twoDaysOut = new Date(now.getTime() + 2 * 86400000)
 
     rows.forEach(r => {
       if (!r.deadline) return

@@ -170,7 +170,7 @@ export const auditApi = {
 }
 
 // ──────────────────────────────────────────────
-// Deadlines  ← FIX: was entirely missing
+// Deadlines
 // ──────────────────────────────────────────────
 export const deadlinesApi = {
   list:   (p = {})         => gasGet('deadlines',          p),
@@ -181,7 +181,7 @@ export const deadlinesApi = {
 }
 
 // ──────────────────────────────────────────────
-// IPCRF / CCEF Forms  ← FIX: was entirely missing
+// IPCRF / CCEF Forms
 // ──────────────────────────────────────────────
 export const ipcrfApi = {
   // Forms
@@ -208,7 +208,7 @@ export const ipcrfApi = {
 }
 
 // ──────────────────────────────────────────────
-// Attendance  ← FIX: was entirely missing
+// Attendance
 // ──────────────────────────────────────────────
 export const attendanceApi = {
   list:          (p = {})         => gasGet('attendance',                        p),
@@ -220,7 +220,7 @@ export const attendanceApi = {
 }
 
 // ──────────────────────────────────────────────
-// Peer Assignments  ← FIX: was entirely missing
+// Peer Assignments
 // ──────────────────────────────────────────────
 export const peerAssignmentsApi = {
   list:         (p = {})         => gasGet('peer-assignments',                     p),
@@ -241,9 +241,33 @@ function fileToBase64(file) {
   })
 }
 
+export const kraLibraryApi = {
+  list:   (p = {})   => gasGet('kra-library',        p),
+  get:    (id)       => gasGet(`kra-library/${id}`),
+  create: (data)     => gasWrite('POST',   'kra-library',       data),
+  update: (id, data) => gasWrite('PUT',    `kra-library/${id}`, data),
+  delete: (id)       => gasWrite('DELETE', `kra-library/${id}`)
+}
+
+export { ipcrfApi as ipcrf }
+export { kraLibraryApi as kraLibrary }
+
+// ──────────────────────────────────────────────
+// Helpers
+// ──────────────────────────────────────────────
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload  = (e) => resolve(e.target.result.split(',')[1])
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
 export default {
   authApi, dashboardApi, usersApi, kraApi,
   accomplishmentsApi, movApi, evaluationApi,
   reportsApi, notificationsApi, auditApi,
-  deadlinesApi, ipcrfApi, attendanceApi, peerAssignmentsApi
+  deadlinesApi, ipcrfApi, kraLibraryApi,
+  attendanceApi, peerAssignmentsApi
 }

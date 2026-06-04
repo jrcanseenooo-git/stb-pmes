@@ -105,11 +105,10 @@
                 </select>
               </div>
 
-              <!-- Position Level -->
-              <div class="info-item" v-if="form.positionLevel || editMode">
-                <label class="info-label">Position Level (SG)</label>
-                <div v-if="!editMode" class="info-val">{{ form.positionLevel || '—' }}</div>
-                <input v-else v-model="form.positionLevel" class="field-input" placeholder="e.g. II, III, IV"/>
+              <!-- Role (read-only always) -->
+              <div class="info-item">
+                <label class="info-label">Role</label>
+                <div class="info-val">{{ role }}</div>
               </div>
             </div>
 
@@ -285,7 +284,6 @@ const form = ref({
   lastName:       '',
   employeeNo:     '',
   position:       '',
-  positionLevel:  '',
   employmentType: '',
   createdAt:      ''
 })
@@ -342,9 +340,8 @@ function populateForm() {
   form.value = {
     firstName:      authStore.firstName      || '',
     lastName:       authStore.lastName       || '',
-    employeeNo:     authStore.employeeNo     !== '—' ? authStore.employeeNo     : '',
-    position:       authStore.position       !== '—' ? authStore.position       : '',
-    positionLevel:  authStore.positionLevel  || '',
+    employeeNo:     authStore.employeeNo     !== '—' ? authStore.employeeNo  : '',
+    position:       authStore.position       !== '—' ? authStore.position    : '',
     employmentType: authStore.employmentType || 'Regular',
     createdAt:      authStore.createdAt      || ''
   }
@@ -409,23 +406,21 @@ async function saveProfile() {
   try {
     const fullName = `${form.value.firstName} ${form.value.lastName}`.trim()
     const updated  = await usersApi.update(authStore.profileId, {
-      firstName:     form.value.firstName,
-      lastName:      form.value.lastName,
+      firstName:  form.value.firstName,
+      lastName:   form.value.lastName,
       fullName,
-      position:      form.value.position,
-      positionLevel: form.value.positionLevel,
-      employeeNo:    form.value.employeeNo,
-      type:          form.value.employmentType
+      position:   form.value.position,
+      employeeNo: form.value.employeeNo,
+      type:       form.value.employmentType
     })
     // Patch the local store so UI updates immediately
     authStore.patchProfile({
-      firstName:     form.value.firstName,
-      lastName:      form.value.lastName,
+      firstName:  form.value.firstName,
+      lastName:   form.value.lastName,
       fullName,
-      position:      form.value.position,
-      positionLevel: form.value.positionLevel,
-      employeeNo:    form.value.employeeNo,
-      type:          form.value.employmentType
+      position:   form.value.position,
+      employeeNo: form.value.employeeNo,
+      type:       form.value.employmentType
     })
     editMode.value  = false
     saveSuccess.value = true

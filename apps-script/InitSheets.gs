@@ -1,287 +1,200 @@
-/**
- * InitSheets.gs v2 — PMES Complete Database Setup
- *
- * Run this ONCE to create/verify ALL required sheets.
- * Safe to re-run — skips sheets that already exist.
- *
- * How to run:
- *   1. Open Apps Script editor
- *   2. Select "initializeAllSheets" in the dropdown
- *   3. Click ► Run → Authorize when prompted
- */
-
-function initializeAllSheets() {
-  const ss = SpreadsheetApp.openById(
-    PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID')
-  )
+function initializeSheets() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet()
 
   const SHEETS = {
-
-    // ── CORE TABLES ──────────────────────────────────────────
+    // ── Core ──
     Users: [
-      'id', 'uid', 'email', 'fullName', 'firstName', 'lastName',
-      'role', 'positionLevel',  // positionLevel: II / III / IV
-      'divisionId', 'divisionName', 'position', 'employeeNo',
-      'type',                  // Regular / Co-terminal / Casual / CoS
-      'tempPassword', 'mustChangePassword',
-      'active', 'createdAt', 'updatedAt', 'lastLoginAt'
+      'id','uid','email','fullName','firstName','lastName',
+      'role','divisionId','divisionName','position','employeeNo',
+      'type','active','createdAt','updatedAt','lastLoginAt',
+      'positionLevel','sgLevel'                               // ← FIX: was missing
     ],
-
     Divisions: [
-      'id', 'name', 'code', 'chiefId', 'chiefName',
-      'adminId', 'adminName',   // Division Admin (attendance monitor)
-      'parentId', 'color', 'active', 'createdAt'
+      'id','name','code','chiefId','chiefName','parentId','color','active','createdAt'
     ],
-
-    // ── MASTER KRA LIBRARY (from Enhanced STB Protocol) ──────
-    MasterKRALibrary: [
-      'id', 'phase', 'kraName', 'classification',
-      'performanceIndicator',
-      'weightII', 'weightIII', 'weightIV',
-      'efficiencyGuide', 'qualityGuide', 'timelinessGuide',
-      'meansOfVerification',
-      'applicableTo',          // IPCRF / CCEF / BOTH
-      'functionType',          // Core / Strategic / Support
-      'remarks', 'active'
+    KRAs: [
+      'id','title','description','functionType','applicableTo',
+      'semester','year','weight','active','createdAt','updatedAt'
     ],
-
-    // ── IPCRF / CCEF FORMS ───────────────────────────────────
-    IPCRForms: [
-      'id',
-      'type',                  // IPCRF / CCEF
-      'userId', 'employeeName',
-      'position', 'positionLevel',
-      'divisionId', 'divisionName',
-      'semester', 'year',
-      'status',                // DRAFT / SUBMITTED / APPROVED / ONGOING / FOR_RATING / RATED / FINALIZED
-      'coreFunctionWeight',    // 70
-      'supportFunctionWeight', // 30
-      'finalNumericalRating',
-      'adjectivalRating',
-      'immediateSupervisor', 'supervisorPosition',
-      'approvingAuthority', 'authorityPosition',
-      'dateSignedRatee', 'dateSignedSupervisor', 'dateSignedAuthority',
-      'feedbackStrengths', 'feedbackAreasForImprovement',
-      'feedbackComments', 'feedbackRecommendations',
-      'submittedAt', 'approvedAt', 'ratedAt', 'finalizedAt',
-      'createdAt', 'updatedAt'
+    SuccessIndicators: [
+      'id','kraId','title','targetQty','targetUnit',
+      'efficiencyGuide','qualityGuide','timelinessGuide',
+      'meansOfVerification','deadline','semester','year',
+      'active','createdAt','updatedAt'
     ],
-
-    // ── FORM ENTRIES (rows inside IPCRF/CCEF) ────────────────
-    FormEntries: [
-      'id', 'formId',
-      'masterKRAId',           // null if custom
-      'functionType',          // Core / Strategic / Support
-      'kraName',
-      'successIndicator',
-      'applicableRatingPeriod',// 1st Semester / 2nd Semester / Both semesters
-      'weight',
-      'classification',        // Simple / Complex / Highly Technical / Exempted
-      'efficiencyGuide', 'qualityGuide', 'timelinessGuide',
-      'meansOfVerification',
-      'accomplishment',
-      'ratingEfficiency', 'ratingQuality', 'ratingTimeliness', 'ratingAverage',
-      'movReferences',         // comma-separated reference codes
-      'remarks',
-      'isCustom',              // true if staff-added, not from library
-      'order',                 // display order
-      'createdAt', 'updatedAt'
-    ],
-
-    // ── JRB RATINGS ──────────────────────────────────────────
-    JRBRatings: [
-      'id', 'formId',
-      'userId',                // ratee ID
-      'raterType',             // SUPERVISOR / PEER1 / PEER2
-      'raterId', 'raterName',
-      'domain',                // 1-4 (Quality, Interpersonal, Work Habits, Personal Dev)
-      'domainName',
-      'itemNumber',            // 1-20
-      'itemText',
-      'rating',                // 1-4
-      'semester', 'year',
-      'createdAt', 'updatedAt'
-    ],
-
-    // ── PEER ASSIGNMENTS ─────────────────────────────────────
-    PeerAssignments: [
-      'id',
-      'userId', 'userName',     // ratee
-      'divisionId',
-      'peer1Id', 'peer1Name', 'peer1DivisionId',  // same division
-      'peer2Id', 'peer2Name', 'peer2DivisionId',  // different division
-      'semester', 'year',
-      'peer1Completed', 'peer2Completed',
-      'peer1CompletedAt', 'peer2CompletedAt',
-      'assignedAt', 'assignedBy'
-    ],
-
-    // ── ATTENDANCE RECORDS (monthly, per Division Admin) ─────
-    AttendanceRecords: [
-      'id', 'userId', 'userName',
-      'divisionId', 'divisionName',
-      'month', 'year',
-      'tardinessCount', 'undertimeCount',
-      'absenceCount', 'approvedLeaveCount',
-      'recordedBy', 'recordedByName',
-      'remarks',
-      'createdAt', 'updatedAt'
-    ],
-
-    // ── ATTENDANCE RATINGS (semester summary) ────────────────
-    AttendanceRatings: [
-      'id', 'formId', 'userId',
-      'semester', 'year',
-      'tardinessTotal', 'undertimeTotal',
-      'absenceTotal', 'approvedLeaveTotal',
-      'rating',                // 1-5
-      'label',                 // Outstanding/Very Satisfactory/etc
-      'computedBy', 'computedAt',
-      'createdAt'
-    ],
-
-    // ── ACCOMPLISHMENTS (from old schema, kept for reference) ─
     Accomplishments: [
-      'id', 'type', 'semester', 'year',
-      'userId', 'employeeName',
-      'divisionId', 'division',
-      'kraId', 'kraTitle',
-      'siId', 'target', 'targetQty', 'targetUnit',
-      'accomplished', 'progressPct',
-      'status', 'deadline',
-      'submittedAt', 'approvedAt', 'approvedBy',
-      'remarks', 'revisions', 'movCount',
-      'createdBy', 'createdAt', 'updatedAt',
-      'deleted', 'deletedAt'
+      'id','type','semester','year',
+      'userId','employeeName','divisionId','division',
+      'kraId','kraTitle','siId','target','targetQty','targetUnit',
+      'accomplished','progressPct','status','deadline',
+      'submittedAt','approvedAt','approvedBy',
+      'remarks','revisions','movCount',
+      'createdBy','createdAt','updatedAt','deleted','deletedAt'
     ],
-
-    // ── REVISIONS ────────────────────────────────────────────
     Revisions: [
-      'id', 'accomplishmentId', 'fromStatus', 'toStatus',
-      'remarks', 'changedBy', 'changedByName', 'changedAt'
+      'id','accomplishmentId','fromStatus','toStatus',
+      'remarks','changedBy','changedByName','changedAt'
     ],
-
-    // ── MOV FILES ────────────────────────────────────────────
     MOVFiles: [
-      'id', 'driveFileId', 'driveUrl', 'fileName', 'mimeType', 'sizeBytes',
-      'description', 'accomplishmentId', 'formEntryId',
-      'kraId', 'siId', 'divisionId',
-      'uploadedBy', 'uploadedByName', 'uploadedAt',
-      'verified', 'verifiedBy', 'verifiedAt',
-      'deleted', 'deletedAt'
+      'id','driveFileId','driveUrl','fileName','mimeType','sizeBytes',
+      'description','accomplishmentId','kraId','siId','divisionId',
+      'uploadedBy','uploadedByName','uploadedAt',
+      'verified','verifiedBy','verifiedAt','deleted','deletedAt'
     ],
-
-    // ── EVALUATIONS (Final computed scores) ──────────────────
     Evaluations: [
-      'id', 'formId', 'userId', 'employeeName',
-      'divisionId', 'semester', 'year',
-      'spmsScore',             // IPCRF/CCEF final score (out of 5)
-      'jrbSupervisorScore',    // Out of 4
-      'jrbPeer1Score',         // Out of 4
-      'jrbPeer2Score',         // Out of 4
-      'attendanceScore',       // Out of 5
-      'overallPercentage',     // Final computed %
-      'overallRating',         // 1-5 scale
-      'adjectivalRating',
-      'manuallyAdjusted', 'adjustedBy', 'adjustedAt',
-      'evaluatorRemarks',
-      'computedBy', 'computedAt',
-      'finalizedAt'
+      'id','userId','employeeName','divisionId','semester','year',
+      'efficiency','quality','timeliness','overall','label',
+      'targetCount','manuallyAdjusted','adjustedBy','adjustedAt',
+      'evaluatorRemarks','computedBy','computedAt'
     ],
-
-    // ── NOTIFICATIONS ────────────────────────────────────────
     Notifications: [
-      'id', 'recipientId', 'type',
-      'message', 'relatedId', 'module',
-      'read', 'readAt', 'createdAt'
+      'id','recipientId','type','message','relatedId','module',
+      'read','readAt','createdAt'
     ],
-
-    // ── AUDIT LOG ────────────────────────────────────────────
     AuditLog: [
-      'id', 'timestamp',
-      'userId', 'userEmail', 'userName', 'role',
-      'action', 'module', 'details', 'ipAddress'
+      'id','timestamp','userId','userEmail','userName','role',
+      'action','module','details','ipAddress'
     ],
-
-    // ── REPORTS ──────────────────────────────────────────────
     Reports: [
-      'id', 'name', 'type',
-      'divisionId', 'semester', 'year',
-      'format', 'driveFileId', 'driveUrl',
-      'generatedBy', 'generatedAt'
+      'id','name','type','divisionId','semester','year',
+      'format','driveFileId','driveUrl','generatedBy','generatedAt'
+    ],
+    Deadlines: [
+      'id','name','type','semester','year',
+      'startDate','endDate','active','createdBy','createdAt'
     ],
 
-    // ── DEADLINES ────────────────────────────────────────────
-    Deadlines: [
-      'id', 'name', 'type',
-      'semester', 'year',
-      'startDate', 'endDate',
-      'active', 'createdBy', 'createdAt'
+    // ── IPCRF / CCEF Form sheets (previously missing) ──
+    IPCRForms: [
+      'id','type','userId','employeeName','position','positionLevel',
+      'divisionId','divisionName','semester','year','status',
+      'coreFunctionWeight','supportFunctionWeight',
+      'finalNumericalRating','adjectivalRating',
+      'immediateSupervisor','supervisorPosition',
+      'approvingAuthority','authorityPosition',
+      'dateSignedRatee','dateSignedSupervisor','dateSignedAuthority',
+      'feedbackStrengths','feedbackAreasForImprovement',
+      'feedbackComments','feedbackRecommendations',
+      'submittedAt','approvedAt','ratedAt','finalizedAt',
+      'createdAt','updatedAt'
+    ],
+    FormEntries: [
+      'id','formId','masterKRAId','functionType','kraName',
+      'successIndicator','applicableRatingPeriod','weight','classification',
+      'efficiencyGuide','qualityGuide','timelinessGuide','meansOfVerification',
+      'accomplishment',
+      'ratingEfficiency','ratingQuality','ratingTimeliness','ratingAverage',
+      'movReferences','remarks','isCustom','order',
+      'createdAt','updatedAt'
+    ],
+    JRBRatings: [
+      'id','formId','userId','raterType','raterId','raterName',
+      'domain','domainName','itemNumber','itemText','rating',
+      'semester','year','createdAt','updatedAt'
+    ],
+    PeerAssignments: [
+      'id','userId','userName','divisionId',
+      'peer1Id','peer1Name','peer1DivisionId',
+      'peer2Id','peer2Name','peer2DivisionId',
+      'semester','year',
+      'peer1Completed','peer2Completed',
+      'peer1CompletedAt','peer2CompletedAt',
+      'assignedAt','assignedBy'
+    ],
+    AttendanceRecords: [
+      'id','userId','userName','divisionId','divisionName',
+      'month','year',
+      'tardinessCount','undertimeCount','absenceCount','approvedLeaveCount',
+      'recordedBy','recordedByName','remarks',
+      'createdAt','updatedAt'
+    ],
+    AttendanceRatings: [
+      'id','formId','userId','semester','year',
+      'tardinessTotal','undertimeTotal','absenceTotal','approvedLeaveTotal',
+      'rating','label',
+      'computedBy','computedAt','createdAt'
     ]
   }
 
-  let created = 0
-  let skipped = 0
-
   Object.entries(SHEETS).forEach(([name, headers]) => {
-    const existing = ss.getSheetByName(name)
-    if (existing) {
-      Logger.log('  → Skipped (exists): ' + name)
-      skipped++
+    let sheet = ss.getSheetByName(name)
+    if (!sheet) {
+      sheet = ss.insertSheet(name)
+      Logger.log('Created sheet: ' + name)
     } else {
-      const sheet = ss.insertSheet(name)
-      sheet.getRange(1, 1, 1, headers.length).setValues([headers])
-      // Style header row
+      Logger.log('Sheet already exists: ' + name)
+    }
+
+    // Add any missing columns to existing sheets without wiping data
+    if (sheet.getLastRow() === 0) {
+      // Brand new sheet – write headers fresh
       const headerRange = sheet.getRange(1, 1, 1, headers.length)
-      headerRange.setFontWeight('bold')
-        .setBackground('#1A3A5C')
+      headerRange.setValues([headers])
+      headerRange
+        .setBackground('#0D2137')
         .setFontColor('#FFFFFF')
+        .setFontWeight('bold')
         .setFontSize(10)
       sheet.setFrozenRows(1)
-      sheet.setColumnWidth(1, 180) // ID column
-      Logger.log('  ✅ Created: ' + name + ' (' + headers.length + ' columns)')
-      created++
+      sheet.autoResizeColumns(1, headers.length)
+    } else {
+      // Existing sheet – only append NEW columns (don't touch existing data)
+      const existingHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
+      const existingSet = new Set(existingHeaders.map(h => String(h).trim()))
+      const missingCols = headers.filter(h => !existingSet.has(h))
+
+      if (missingCols.length > 0) {
+        const startCol = sheet.getLastColumn() + 1
+        missingCols.forEach((col, idx) => {
+          const cell = sheet.getRange(1, startCol + idx)
+          cell.setValue(col)
+          cell.setBackground('#0D2137').setFontColor('#FFFFFF').setFontWeight('bold').setFontSize(10)
+        })
+        Logger.log(`  Added missing columns to ${name}: ${missingCols.join(', ')}`)
+      }
     }
   })
 
-  // ── Seed Divisions if empty ──────────────────────────────
+  // ── Seed Divisions (only if empty) ──
   seedDivisions(ss)
 
-  Logger.log('\n════════════════════════════════')
-  Logger.log('✅ PMES Sheets initialization complete')
-  Logger.log('   Created: ' + created + ' new sheets')
-  Logger.log('   Skipped: ' + skipped + ' existing sheets')
-  Logger.log('\nNext: Run initMasterKRALibrary() to seed the KRA indicator library')
-  Logger.log('════════════════════════════════')
+  Logger.log('✅ PMES sheets initialized successfully.')
+  SpreadsheetApp.getUi().alert(
+    '✅ PMES sheets initialized successfully!\n\n' +
+    'Sheets managed: ' + Object.keys(SHEETS).join(', ')
+  )
 }
 
 function seedDivisions(ss) {
-  // ss might be undefined if called incorrectly — get it fresh
-  if (!ss) {
-    ss = SpreadsheetApp.openById(
-      PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID')
-    )
-  }
-
   const sheet = ss.getSheetByName('Divisions')
-  if (!sheet) {
-    Logger.log('  → Divisions sheet not found, skipping seed')
-    return
-  }
-
-  const rows = sheet.getLastRow()
-  if (rows > 1) {
-    Logger.log('  → Divisions already seeded')
-    return
-  }
+  if (!sheet || sheet.getLastRow() > 1) return  // already seeded
 
   const now = new Date().toISOString()
-  const divisions = [
-    ['admin-pool', 'Admin Pool', 'AP', '', '', '', '', '', 'blue', true, now],
-    ['dfd', 'Design Formulation Division', 'DFD', '', '', '', '', '', 'green', true, now],
-    ['pid', 'Pilot Implementation Division', 'PID', '', '', '', '', '', 'amber', true, now],
-    ['staed', 'Social Technology Analysis and Evaluation Division', 'STAED', '', '', '', '', '', 'red', true, now]
+  const divs = [
+    ['admin-pool',           'Admin Pool',                                'AP',   '', '', null, 'blue',  true, now],
+    ['dfd',                  'Design Formulation Division',               'DFD',  '', '', null, 'green', true, now],
+    ['pid',                  'Pilot Implementation Division',             'PID',  '', '', null, 'gold',  true, now],
+    ['staed',                'Social Technology Analysis and Evaluation Division', 'STAED', '', '', null, 'red', true, now]
   ]
-  divisions.forEach(row => sheet.appendRow(row))
-  Logger.log('  ✅ Seeded 4 divisions')
+  sheet.getRange(2, 1, divs.length, divs[0].length).setValues(divs)
+  Logger.log('Seeded Divisions.')
+}
+
+// ── Utility: clear all data rows (keep headers) – use with caution ──
+function clearAllData_DANGER() {
+  const ui = SpreadsheetApp.getUi()
+  const result = ui.alert(
+    '⚠️ DANGER',
+    'This will DELETE ALL DATA from every sheet (headers kept). Continue?',
+    ui.ButtonSet.YES_NO
+  )
+  if (result !== ui.Button.YES) return
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet()
+  ss.getSheets().forEach(sheet => {
+    if (sheet.getLastRow() > 1) {
+      sheet.deleteRows(2, sheet.getLastRow() - 1)
+    }
+  })
+  Logger.log('All data cleared.')
 }

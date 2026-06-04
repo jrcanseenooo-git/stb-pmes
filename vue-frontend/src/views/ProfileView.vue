@@ -94,12 +94,6 @@
                 <div class="info-val">{{ divisionName }}</div>
               </div>
 
-              <!-- Role (read-only always) -->
-              <div class="info-item">
-                <label class="info-label">Role</label>
-                <div class="info-val">{{ role }}</div>
-              </div>
-
               <!-- Employment Type -->
               <div class="info-item">
                 <label class="info-label">Employment Type</label>
@@ -111,10 +105,10 @@
                 </select>
               </div>
 
-              <!-- Date Joined -->
+              <!-- Role (read-only always) -->
               <div class="info-item">
-                <label class="info-label">Date Joined</label>
-                <div class="info-val">{{ formatDate(form.createdAt) }}</div>
+                <label class="info-label">Role</label>
+                <div class="info-val">{{ role }}</div>
               </div>
             </div>
 

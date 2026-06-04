@@ -100,7 +100,7 @@
                 <div v-if="!editMode" class="info-val">{{ form.employmentType || '—' }}</div>
                 <select v-else v-model="form.employmentType" class="field-input">
                   <option>Regular</option>
-                  <option>Contractor of Service (COS)</option>
+                  <option>Contract of Service (COS)</option>
                   <option>Co-Term</option>
                 </select>
               </div>

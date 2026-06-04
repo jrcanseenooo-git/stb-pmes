@@ -1,73 +1,84 @@
-// ── Sheet name constants ──
-const SHEET = {
-  USERS:           'Users',
-  DIVISIONS:       'Divisions',
-  KRAS:            'KRAs',
-  INDICATORS:      'SuccessIndicators',
-  ACCOMPLISHMENTS: 'Accomplishments',
-  MOV:             'MOVFiles',
-  EVALUATIONS:     'Evaluations',
-  NOTIFICATIONS:   'Notifications',
-  AUDIT:           'AuditLog',
-  REPORTS:         'Reports',
-  DEADLINES:       'Deadlines',
-  REVISIONS:       'Revisions',
-  IPCRF_FORMS:     'IPCRForms',
-  FORM_ENTRIES:    'FormEntries',
-  MASTER_KRAS:     'MasterKRALibrary'
-}
+const AuthService = (() => {
 
-// ── Entry point: HTTP GET ──
-function doGet(e) {
-  return handleRequest(e, 'GET')
-}
+  const PROPS      = PropertiesService.getScriptProperties()
+  const PROJECT_ID = PROPS.getProperty('FIREBASE_PROJECT_ID') || 'pmes-1cb6d'
 
-// ── Entry point: HTTP POST ──
-function doPost(e) {
-  return handleRequest(e, 'POST')
-}
+  // ── Verify Firebase ID token sent in e.parameter.token ──
+  function verifyToken(e) {
+    const idToken = (e.parameter && e.parameter.token) || ''
+    if (!idToken) return null
 
-// ── Main dispatcher ──
-function handleRequest(e, method) {
-  try {
-    const user = AuthService.verifyToken(e)
-    if (!user) return respond(401, false, null, 'Unauthorized – invalid or missing token')
+    try {
+      // Call Firebase REST API to verify the token
+      const url      = `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${PROPS.getProperty('FIREBASE_API_KEY') || ''}`
+      const response = UrlFetchApp.fetch(url, {
+        method:             'POST',
+        contentType:        'application/json',
+        payload:            JSON.stringify({ idToken }),
+        muteHttpExceptions: true
+      })
 
-    const body       = parseBody(e)
-    const httpMethod = (body._method || '').toUpperCase() || method
+      const result = JSON.parse(response.getContentText())
+      if (response.getResponseCode() !== 200 || !result.users || !result.users[0]) {
+        Logger.log('Token verification failed: ' + response.getContentText())
+        return null
+      }
 
-    const route  = (e.parameter?.route || '').replace(/^\/|\/$/g, '')
-    const result = Router.dispatch(route, httpMethod, e.parameter, body, user)
-
-    return respond(200, true, result)
-
-  } catch (err) {
-    Logger.log('PMES Error: ' + err.message + '\n' + err.stack)
-    const code = err.statusCode || 500
-    return respond(code, false, null, err.message)
+      const firebaseUser = result.users[0]
+      return {
+        uid:   firebaseUser.localId,
+        email: firebaseUser.email,
+        name:  firebaseUser.displayName || firebaseUser.email
+      }
+    } catch (err) {
+      Logger.log('verifyToken error: ' + err.message)
+      return null
+    }
   }
-}
 
-// ── parseBody: reads JSON from POST body; falls back to empty object ──
-function parseBody(e) {
-  try {
-    const raw = e.postData?.contents
-    if (raw) return JSON.parse(raw)
-  } catch (err) {
-    Logger.log('parseBody error: ' + err.message)
+  // ── Load PMES profile from Sheets by Firebase UID or email ──
+  function getProfile(user) {
+    if (!user) throw HttpError('No authenticated user', 401)
+
+    const sheet = SpreadsheetService.getSheet(SHEET.USERS)
+    const rows  = SpreadsheetService.getAllRows(sheet)
+
+    // Match by uid first, then fall back to email
+    let profile = rows.find(r => r.uid === user.uid)
+    if (!profile) profile = rows.find(r => r.email === user.email)
+
+    if (!profile) {
+      // Return a minimal profile so the app doesn't crash — admin can register this user
+      Logger.log('Profile not found for: ' + user.email + ' — returning guest profile')
+      return {
+        id:          '',
+        uid:         user.uid,
+        email:       user.email,
+        fullName:    user.name || user.email,
+        role:        'Staff',
+        divisionId:  '',
+        divisionName:'',
+        position:    '',
+        type:        'Regular',
+        active:      true
+      }
+    }
+
+    if (profile.active === false || profile.active === 'false') {
+      throw HttpError('Your account has been deactivated. Contact your administrator.', 403)
+    }
+
+    return profile
   }
-  return {}
-}
 
-function respond(status, success, data, message) {
-  const payload = JSON.stringify({ success, data: data ?? null, message: message ?? null })
-  return ContentService
-    .createTextOutput(payload)
-    .setMimeType(ContentService.MimeType.JSON)
-}
+  // ── Role guard helper ──
+  function requireRole(user, ...roles) {
+    const profile = getProfile(user)
+    if (!roles.includes(profile.role)) {
+      throw HttpError(`Access denied. Required role: ${roles.join(' or ')}`, 403)
+    }
+    return profile
+  }
 
-function HttpError(message, code) {
-  const e    = new Error(message)
-  e.statusCode = code || 400
-  return e
-}
+  return { verifyToken, getProfile, requireRole }
+})()

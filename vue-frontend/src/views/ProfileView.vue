@@ -94,13 +94,6 @@
                 <div class="info-val">{{ divisionName }}</div>
               </div>
 
-              <!-- Position Level -->
-              <div class="info-item" v-if="form.positionLevel || editMode">
-                <label class="info-label">Position Level (SG)</label>
-                <div v-if="!editMode" class="info-val">{{ form.positionLevel || '—' }}</div>
-                <input v-else v-model="form.positionLevel" class="field-input" placeholder="e.g. II, III, IV"/>
-              </div>
-
               <!-- Employment Type -->
               <div class="info-item">
                 <label class="info-label">Employment Type</label>
@@ -110,6 +103,13 @@
                   <option>Contractor of Service (COS)</option>
                   <option>Co-Term</option>
                 </select>
+              </div>
+
+              <!-- Position Level -->
+              <div class="info-item" v-if="form.positionLevel || editMode">
+                <label class="info-label">Position Level (SG)</label>
+                <div v-if="!editMode" class="info-val">{{ form.positionLevel || '—' }}</div>
+                <input v-else v-model="form.positionLevel" class="field-input" placeholder="e.g. II, III, IV"/>
               </div>
             </div>
 

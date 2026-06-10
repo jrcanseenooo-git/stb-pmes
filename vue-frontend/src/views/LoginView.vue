@@ -20,29 +20,10 @@
         <!-- Hero -->
         <div class="hero-text">
           <div class="hero-eyebrow">
-            <span class="eyebrow-dot"></span>
-            Performance System
+            Performance Monitoring & Evaluation System
           </div>
           <h1>Monitor.<br/>Evaluate.<br/>Deliver.</h1>
           <p class="hero-sub">DSWD · Social Technology Bureau</p>
-        </div>
-
-        <!-- Stats -->
-        <div class="stats-row">
-          <div class="stat-item">
-            <span class="stat-num">4</span>
-            <span class="stat-lbl">Divisions</span>
-          </div>
-          <div class="stat-div"></div>
-          <div class="stat-item">
-            <span class="stat-num">2</span>
-            <span class="stat-lbl">Semesters</span>
-          </div>
-          <div class="stat-div"></div>
-          <div class="stat-item">
-            <span class="stat-num">5★</span>
-            <span class="stat-lbl">Max Rating</span>
-          </div>
         </div>
 
         <!-- ── ANIMATED DECO GRID ── -->
@@ -70,11 +51,10 @@
         <!-- Header -->
         <div class="form-header">
           <div class="form-badge">
-            <span class="badge-dot"></span>
-            Secure Government Portal
+            SIGN IN TO CONTINUE
           </div>
           <h2>Welcome back</h2>
-          <p>Sign in with your <strong>@{{ domain }}</strong> account</p>
+          <p>Use your <strong>{{ domain }}</strong> account</p>
         </div>
 
         <!-- Error -->
@@ -87,6 +67,26 @@
             {{ error }}
           </div>
         </transition>
+
+        <!-- Google Sign-In -->
+        <button
+          class="btn-google"
+          @click="handleGoogleLogin"
+          :disabled="loading"
+          type="button"
+        >
+          <span v-if="loading && loginMethod === 'google'" class="spinner-dark"></span>
+          <svg v-else width="17" height="17" viewBox="0 0 17 17" fill="none">
+            <path d="M16.24 8.73c0-.6-.05-1.18-.14-1.73H8.5v3.27h4.34a3.72 3.72 0 01-1.61 2.44v2.03h2.6c1.52-1.4 2.4-3.47 2.4-6.01z" fill="#4285F4"/>
+            <path d="M8.5 17c2.18 0 4.01-.72 5.35-1.96l-2.6-2.03c-.72.48-1.64.77-2.75.77-2.12 0-3.91-1.43-4.55-3.35H1.27v2.09A8 8 0 008.5 17z" fill="#34A853"/>
+            <path d="M3.95 10.43A4.82 4.82 0 013.7 8.87c0-.54.1-1.07.25-1.56V5.22H1.27A8 8 0 000 8.87c0 1.29.31 2.51.86 3.6l2.09-1.63.94-.41h.06z" fill="#FBBC05"/>
+            <path d="M8.5 3.46c1.19 0 2.26.41 3.1 1.21l2.32-2.32A8 8 0 001.27 5.22l2.68 2.09c.64-1.92 2.43-3.35 4.55-3.85z" fill="#EA4335"/>
+          </svg>
+          {{ loading && loginMethod === 'google' ? 'Connecting…' : 'Continue with Google' }}
+        </button>
+
+        <!-- Divider -->
+        <div class="divider"><span>or</span></div>
 
         <!-- Email / Password form -->
         <form @submit.prevent="handleEmailLogin" class="form-body" novalidate>
@@ -156,33 +156,13 @@
           </button>
         </form>
 
-        <!-- Divider -->
-        <div class="divider"><span>or continue with</span></div>
-
-        <!-- Google Sign-In -->
-        <button
-          class="btn-google"
-          @click="handleGoogleLogin"
-          :disabled="loading"
-          type="button"
-        >
-          <span v-if="loading && loginMethod === 'google'" class="spinner-dark"></span>
-          <svg v-else width="17" height="17" viewBox="0 0 17 17" fill="none">
-            <path d="M16.24 8.73c0-.6-.05-1.18-.14-1.73H8.5v3.27h4.34a3.72 3.72 0 01-1.61 2.44v2.03h2.6c1.52-1.4 2.4-3.47 2.4-6.01z" fill="#4285F4"/>
-            <path d="M8.5 17c2.18 0 4.01-.72 5.35-1.96l-2.6-2.03c-.72.48-1.64.77-2.75.77-2.12 0-3.91-1.43-4.55-3.35H1.27v2.09A8 8 0 008.5 17z" fill="#34A853"/>
-            <path d="M3.95 10.43A4.82 4.82 0 013.7 8.87c0-.54.1-1.07.25-1.56V5.22H1.27A8 8 0 000 8.87c0 1.29.31 2.51.86 3.6l2.09-1.63.94-.41h.06z" fill="#FBBC05"/>
-            <path d="M8.5 3.46c1.19 0 2.26.41 3.1 1.21l2.32-2.32A8 8 0 001.27 5.22l2.68 2.09c.64-1.92 2.43-3.35 4.55-3.85z" fill="#EA4335"/>
-          </svg>
-          {{ loading && loginMethod === 'google' ? 'Connecting…' : 'Sign in with Google' }}
-        </button>
-
         <!-- Info note -->
         <div class="info-note">
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
             <circle cx="6.5" cy="6.5" r="5.5" stroke="#94A3B8" stroke-width="1.2"/>
             <path d="M6.5 5.5v4M6.5 4v.1" stroke="#94A3B8" stroke-width="1.2" stroke-linecap="round"/>
           </svg>
-          Access is restricted to <strong>@{{ domain }}</strong> accounts only.
+          Access is restricted to authorized accounts only.
         </div>
 
         <!-- Footer -->

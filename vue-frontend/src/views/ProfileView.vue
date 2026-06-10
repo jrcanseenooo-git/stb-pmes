@@ -64,11 +64,23 @@
                 <input v-else v-model="form.fullName" class="field-input" placeholder="Full name"/>
               </div>
 
+              <!-- Division (read-only) -->
+              <div class="info-item">
+                <label class="info-label">Division</label>
+                <div class="info-val">{{ divisionName }}</div>
+              </div>
+
               <!-- Employee No. -->
               <div class="info-item">
                 <label class="info-label">Employee No.</label>
                 <div v-if="!editMode" class="info-val">{{ form.employeeNo || '—' }}</div>
                 <input v-else v-model="form.employeeNo" class="field-input" placeholder="e.g. 24-0247"/>
+              </div>
+
+              <!-- Email -->
+              <div class="info-item">
+                <label class="info-label">Email Address</label>
+                <div class="info-val">{{ userEmail }}</div>
               </div>
 
               <!-- Employment Type -->
@@ -80,25 +92,6 @@
                   <option value="COS">Contractor of Service (COS)</option>
                   <option value="Co-Term">Co-Term</option>
                 </select>
-              </div>
-
-              <!-- Position -->
-              <div class="info-item">
-                <label class="info-label">Position / Title</label>
-                <div v-if="!editMode" class="info-val">{{ form.position || '—' }}</div>
-                <input v-else v-model="form.position" class="field-input" placeholder="e.g. Social Welfare Officer II"/>
-              </div>
-
-              <!-- Division (read-only) -->
-              <div class="info-item">
-                <label class="info-label">Division</label>
-                <div class="info-val">{{ divisionName }}</div>
-              </div>
-
-              <!-- Email -->
-              <div class="info-item">
-                <label class="info-label">Email Address</label>
-                <div class="info-val">{{ userEmail }}</div>
               </div>
 
               <!-- Role (read-only) -->

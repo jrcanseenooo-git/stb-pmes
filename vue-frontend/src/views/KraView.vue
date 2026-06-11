@@ -989,7 +989,7 @@ function _sync(u) {
 }
 </script>
 
-<style scoped>
+<style>
 * {
   box-sizing: border-box;
 }

@@ -1,6 +1,6 @@
 const KraLibraryService = (() => {
 
-  const SHEET_NAME = 'MasterKRAs'
+  const SHEET_NAME = 'MasterKRALibrary'
 
   // ── LIST – returns all active KRAs, optional filters ──
   function list(params, user) {

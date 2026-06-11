@@ -418,7 +418,6 @@
             <div class="fsec">Basic Info</div>
             <div class="fgrid">
               <div class="field"><label class="fl">Form Type</label><select v-model="newForm.type" class="fi"><option>IPCRF</option><option>CCEF</option></select></div>
-              <div class="field"><label class="fl">Position Level</label><select v-model="newForm.positionLevel" class="fi"><option value="II">Level II</option><option value="III">Level III</option><option value="IV">Level IV</option></select></div>
               <div class="field"><label class="fl">Semester</label><select v-model="newForm.semester" class="fi"><option value="1">1st Semester</option><option value="2">2nd Semester</option></select></div>
               <div class="field"><label class="fl">Year</label><input v-model.number="newForm.year" type="number" class="fi"/></div>
             </div>

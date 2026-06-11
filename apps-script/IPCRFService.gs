@@ -65,20 +65,25 @@ const IpcrfService = (() => {
     )
     if (existing) throw HttpError(`An ${body.type || 'IPCRF'} form already exists for this period`, 409)
 
+    // ── Derive position level and weights from user's position title ──
+    // Never trust frontend input for these — always compute server-side.
+    const _level   = PositionHelper.resolveLevel(profile.position || '')
+    const _weights = PositionHelper.resolveWeights(profile)
+
     const form = {
       id:                   SpreadsheetService.generateId('FORM-'),
       type:                 body.type              || 'IPCRF',
       userId:               body.userId            || profile.id,
       employeeName:         body.employeeName      || profile.fullName,
-      position:             body.position          || profile.position          || '',
-      positionLevel:        body.positionLevel     || profile.positionLevel     || '',
-      divisionId:           body.divisionId        || profile.divisionId        || '',
-      divisionName:         body.divisionName      || profile.divisionName      || '',
+      position:             profile.position       || '',
+      positionLevel:        _level,
+      divisionId:           profile.divisionId     || '',
+      divisionName:         profile.divisionName   || '',
       semester:             body.semester          || '',
       year:                 body.year              || new Date().getFullYear(),
       status:               'Draft',
-      coreFunctionWeight:   body.coreFunctionWeight   || 70,
-      supportFunctionWeight: body.supportFunctionWeight || 30,
+      coreFunctionWeight:   _weights.core,
+      supportFunctionWeight: _weights.support,
       finalNumericalRating: '',
       adjectivalRating:     '',
       immediateSupervisor:  body.immediateSupervisor  || '',
@@ -256,7 +261,7 @@ const IpcrfService = (() => {
     const coreEntries    = entries.filter(e => e.functionType === 'Core')
     const supportEntries = entries.filter(e => e.functionType === 'Support')
 
-    const coreWeight    = Number(form.coreFunctionWeight)   || 70
+    const coreWeight    = Number(form.coreFunctionWeight)    || 70
     const supportWeight = Number(form.supportFunctionWeight) || 30
 
     const avgRating = (list) => {
@@ -516,7 +521,6 @@ const IpcrfService = (() => {
   }
 
   function _notifyReviewers(form, submitterProfile) {
-    // Notify Division Chief (simplified – real impl would look up chief from Divisions sheet)
     _notifyUser(
       'division-chief-' + form.divisionId,
       'submission',

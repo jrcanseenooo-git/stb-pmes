@@ -784,7 +784,8 @@ async function loadForms() {
   loading.value = true
   try {
     const r = await ipcrfApi.listForms()
-    forms.value = Array.isArray(r) ? r : (r?.items || [])
+    // paginate() always returns { items, total, page }
+    forms.value = r?.items || (Array.isArray(r) ? r : [])
   } catch (e) {
     showToast(`Could not load forms: ${e.message}`, 'error')
   } finally {

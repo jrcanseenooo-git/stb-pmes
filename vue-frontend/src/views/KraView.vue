@@ -235,14 +235,14 @@
             </div>
 
             <!-- Workflow -->
-            <div v-if="['DRAFT', 'RETURNED'].includes(activeForm?.status)" class="wf-bar">
+            <div v-if="['Draft', 'Returned'].includes(activeForm?.status)" class="wf-bar">
               <span class="wf-info"><svg width="13" height="13" viewBox="0 0 13 13" fill="none">
                   <circle cx="6.5" cy="6.5" r="5.5" stroke="#64748b" stroke-width="1.2" />
                   <path d="M6.5 6v3M6.5 4v.5" stroke="#64748b" stroke-width="1.2" stroke-linecap="round" />
                 </svg>{{ allEntries.length }} indicator{{ allEntries.length !== 1 ? 's' : '' }}</span>
               <button class="btn btn-primary btn-sm" @click="doSubmit">Submit for Review</button>
             </div>
-            <div v-else-if="activeForm?.status === 'SUBMITTED'" class="wf-bar">
+            <div v-else-if="activeForm?.status === 'Submitted'" class="wf-bar">
               <span class="wf-info">Pending DC review</span>
               <div style="display:flex;gap:8px">
                 <button class="btn btn-success btn-sm" @click="doApprove">Approve</button>
@@ -938,7 +938,7 @@ async function saveEntry() {
   savingEntry.value = true
   try {
     if (editingEntry.value) {
-      const u = await ipcrfApi.updateEntry(editingEntry.value.id, {
+      const u = await ipcrfApi.updateEntry(activeForm.value.id, editingEntry.value.id, {
         ...entryForm.value, ratingAverage: computedAvg.value || entryForm.value.ratingAverage || ''
       })
       const i = allEntries.value.findIndex(e => e.id === editingEntry.value.id)
@@ -964,7 +964,7 @@ function askDelete(entry) { confirmDel.value = { show: true, entryId: entry.id, 
 async function doDelete() {
   deletingEntry.value = true
   try {
-    await ipcrfApi.deleteEntry(confirmDel.value.entryId)
+    await ipcrfApi.deleteEntry(activeForm.value.id, confirmDel.value.entryId)
     allEntries.value = allEntries.value.filter(e => e.id !== confirmDel.value.entryId)
     showToast('Indicator removed')
     confirmDel.value.show = false

@@ -12,11 +12,12 @@
  *   Roman numeral IV+ → Level IV   (e.g. SWO IV, PDO IV, Division Chief)
  *   No numeral        → Level IV   (e.g. Bureau Director, Assistant BD)
  *
- * WEIGHT SPLIT (Reference sheet):
- * ─────────────────────────────────
- *   Level II  → 78% core / 22% support  (SG ≤15)
- *   Level III → 66% core / 34% support  (SG 18)
- *   Level IV  → 70% core / 30% support  (SG 22+ / standard DSPMS)
+ * WEIGHT SPLIT:
+ * ─────────────
+ *   All positions → 70% core / 30% support (standard STB protocol)
+ *
+ *   The positionLevel (II / III / IV) only determines which weight COLUMN
+ *   to use from the MasterKRALibrary (weightII / weightIII / weightIV).
  */
 
 const PositionHelper = (() => {
@@ -29,7 +30,6 @@ const PositionHelper = (() => {
     if (!position) return 'III'
 
     const str   = String(position).trim()
-    // Match the LAST Roman numeral word in the title
     const match = str.match(/\b(VII|VI|V|IV|III|II|I)\b(?:\s*\/.*)?$/)
     if (!match) return 'IV' // no numeral → senior / director tier
 
@@ -43,22 +43,10 @@ const PositionHelper = (() => {
 
   /**
    * resolveWeights(profile)
-   * Returns { core: <number>, support: <number> } as whole-number percentages.
+   * Returns { core: 70, support: 30 } for all positions — STB standard.
    */
   function resolveWeights(profile) {
-    // 1. Explicit sgLevel field wins (admin-set, most reliable)
-    const sg = Number(profile.sgLevel || profile.salaryGrade || 0)
-    if (sg) {
-      if (sg <= 15) return { core: 78, support: 22 }
-      if (sg <= 18) return { core: 66, support: 34 }
-      return         { core: 70, support: 30 }
-    }
-
-    // 2. Derive from position title
-    const level = resolveLevel(profile.position)
-    if (level === 'II')  return { core: 78, support: 22 }
-    if (level === 'III') return { core: 66, support: 34 }
-    return               { core: 70, support: 30 }  // Level IV default
+    return { core: 70, support: 30 }
   }
 
   /**

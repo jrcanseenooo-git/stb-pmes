@@ -29,12 +29,13 @@ async function gasGet(route, params = {}) {
 
 async function gasWrite(method, route, body = {}) {
   const token = await getToken()
-  const qs = new URLSearchParams({ route, _method: method, token: token || '' }).toString()
-  const res = await fetch(`${BASE_URL}?${qs}`, {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify(body)
-  })
+  const qs = new URLSearchParams({
+    route,
+    _method: method,
+    token:   token || '',
+    ...flattenParams(body)
+  }).toString()
+  const res  = await fetch(`${BASE_URL}?${qs}`)
   const data = await res.json()
   if (!data.success) throw new Error(data.message || 'API error')
   return data.data

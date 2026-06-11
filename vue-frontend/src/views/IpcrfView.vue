@@ -844,7 +844,7 @@ async function openFormModal(form) {
   if (!libraryItems.value.length) {
     libLoading.value = true
     kraLibraryApi.list()
-      .then(l => { libraryItems.value = Array.isArray(l) ? l : [] })
+      .then(l => { libraryItems.value = l?.items || (Array.isArray(l) ? l : []) })
       .catch(() => {})
       .finally(() => { libLoading.value = false })
   }

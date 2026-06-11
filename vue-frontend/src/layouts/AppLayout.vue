@@ -35,7 +35,7 @@
             </div>
             <transition name="fade"><span v-if="!collapsed" class="nav-label-text">Dashboard</span></transition>
           </RouterLink>
-          <RouterLink to="/kra" class="nav-item" active-class="active" :title="collapsed ? 'KRA & Targets' : ''">
+          <RouterLink to="/ipcrf" class="nav-item" active-class="active" :title="collapsed ? 'KRA & Targets' : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.4" />
@@ -264,7 +264,8 @@ const showPwPrompt = ref(false)
 
 const titleMap = {
   '/dashboard': { title: 'Dashboard', sub: 'Bureau Overview' },
-  '/kra': { title: 'IPCRF / CCEF Forms', sub: 'Performance Commitments' },
+  '/ipcrf': { title: 'IPCRF / CCEF Forms', sub: 'Performance Commitments' },
+  '/kra':   { title: 'KRA Library',        sub: 'Master KRA & SI List'    },
   '/accomplishments': { title: 'Accomplishments', sub: 'Q1 2025' },
   '/mov': { title: 'MOV Files', sub: 'Google Drive' },
   '/reports': { title: 'Reports', sub: 'Generate & Export' },

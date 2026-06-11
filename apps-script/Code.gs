@@ -60,7 +60,15 @@ function handleRequest(e, method) {
 // ── Helpers ──
 function parseBody(e) {
   try {
-    return e.postData?.contents ? JSON.parse(e.postData.contents) : {}
+    // Try JSON POST body first
+    if (e.postData?.contents) return JSON.parse(e.postData.contents)
+    // Fall back to query parameters (GET-based writes)
+    const reserved = new Set(['route', '_method', 'token'])
+    const body = {}
+    for (const [k, v] of Object.entries(e.parameter || {})) {
+      if (!reserved.has(k)) body[k] = v
+    }
+    return body
   } catch {
     return {}
   }

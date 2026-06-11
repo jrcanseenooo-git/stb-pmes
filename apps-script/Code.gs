@@ -40,9 +40,10 @@ function handleRequest(e, method) {
     const user = AuthService.verifyToken(e)
     if (!user) return respond(401, false, null, 'Unauthorized – invalid or missing token')
 
-    // 2. Override method from payload (GAS only supports GET/POST natively)
+    // 2. Read _method from query params FIRST (before parseBody strips it)
+    //    then parse the rest of the body
+    const httpMethod = (e.parameter?._method || method).toUpperCase()
     const body       = parseBody(e)
-    const httpMethod = body?._method?.toUpperCase() || method
 
     // 3. Route
     const route  = (e.parameter?.route || '').replace(/^\/|\/$/g, '')
@@ -61,21 +62,21 @@ function handleRequest(e, method) {
 function parseBody(e) {
   try {
     // Try JSON POST body first
-    if (e.postData?.contents) return JSON.parse(e.postData.contents)
+    if (e.postData && e.postData.contents) return JSON.parse(e.postData.contents)
     // Fall back to query parameters (GET-based writes)
     const reserved = new Set(['route', '_method', 'token'])
     const body = {}
-    for (const [k, v] of Object.entries(e.parameter || {})) {
-      if (!reserved.has(k)) body[k] = v
+    for (const key in (e.parameter || {})) {
+      if (!reserved.has(key)) body[key] = e.parameter[key]
     }
     return body
-  } catch {
+  } catch (err) {
     return {}
   }
 }
 
 function respond(status, success, data, message) {
-  const payload = JSON.stringify({ success, data: data ?? null, message: message ?? null })
+  const payload = JSON.stringify({ success: success, data: data !== undefined ? data : null, message: message || null })
   return ContentService
     .createTextOutput(payload)
     .setMimeType(ContentService.MimeType.JSON)

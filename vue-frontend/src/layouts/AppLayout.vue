@@ -111,6 +111,15 @@
         <div class="nav-group">
           <div v-if="!collapsed" class="nav-label">Administration</div>
           <div v-else class="nav-divider"></div>
+          <RouterLink v-if="canManageUsers" to="/kra" class="nav-item" active-class="active" :title="collapsed ? 'KRA Library' : ''">
+            <div class="nav-icon">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.4"/>
+                <path d="M5 5h6M5 8h6M5 11h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <transition name="fade"><span v-if="!collapsed" class="nav-label-text">KRA Library</span></transition>
+          </RouterLink>
           <RouterLink v-if="canManageUsers" to="/users" class="nav-item" active-class="active" :title="collapsed ? 'User Management' : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">

@@ -978,7 +978,7 @@ function _sync(u) {
 
 <style>
 *{box-sizing:border-box;}
-.content{padding:20px 24px 32px;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;font-size:13px;color:#1A2332;background:#EEF2F7;min-height:100%;}
+.content { padding: 24px 32px 40px; font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;font-size:13px;color:#1A2332;background: transparent; min-height: 100%; }
 .muted-text{color:#94A3B8;}
 .req{color:#EF4444;font-size:11px;}
 .ml6{margin-left:6px;}
@@ -1000,7 +1000,7 @@ function _sync(u) {
 .filter-select:focus{border-color:#3B82F6;}
 
 /* Grid */
-.forms-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;}
+.forms-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
 
 /* Form card */
 .form-card{background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:16px;cursor:pointer;transition:all .15s;box-shadow:0 1px 3px rgba(0,0,0,.04);}

@@ -20,19 +20,19 @@
       <div class="domain-item d-cbc">
         <div class="domain-pct">30%</div>
         <div class="domain-label">Core Behavioral Competencies</div>
-        <div class="domain-sub">5 HEARTWORK Values · 4-pt Likert Scale</div>
+        <div class="domain-sub">5 HEARTWORK Values</div>
       </div>
       <div class="domain-sep">+</div>
       <div class="domain-item d-fpo">
         <div class="domain-pct">55%</div>
         <div class="domain-label">Functional Performance Output</div>
-        <div class="domain-sub">IPCRF/DPCR Score</div>
+        <div class="domain-sub">IPCRF/CCEF Score</div>
       </div>
       <div class="domain-sep">+</div>
       <div class="domain-item d-jf">
         <div class="domain-pct">15%</div>
         <div class="domain-label">Job Fitness</div>
-        <div class="domain-sub">7 Alignment Indicators · Self + Supervisor</div>
+        <div class="domain-sub">7 Alignment Indicators</div>
       </div>
       <div class="domain-sep">=</div>
       <div class="domain-item d-overall">

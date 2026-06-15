@@ -523,11 +523,6 @@ function cellStyle(i) {
   position: absolute;
   top: 0; left: 0; right: 0;
   height: 4px;
-  background: linear-gradient(90deg,
-    #0038A8 0%, #0038A8 33.3%,
-    #CE1126 33.3%, #CE1126 66.6%,
-    #FCD116 66.6%, #FCD116 100%
-  );
   border-radius: 22px 22px 0 0;
 }
 

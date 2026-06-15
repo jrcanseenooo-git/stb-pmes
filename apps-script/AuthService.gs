@@ -19,13 +19,7 @@ const AuthService = (() => {
         Logger.log('[Auth] Token does not have 3 parts, got: ' + parts.length)
         return null
       }
-
-      // ── CRITICAL FIX: base64url → standard base64 before decoding ──
-      // Firebase tokens use base64URL which uses '-' and '_'.
-      // Utilities.base64Decode (and base64DecodeWebSafe) require standard base64
-      // with '+' and '/', so we must convert first.
-      // We also compute the EXACT padding needed (not blindly add '=='
-      // which corrupts payloads whose length % 4 != 2).
+      
       const b64url  = parts[1]
       const b64std  = b64url.replace(/-/g, '+').replace(/_/g, '/')
       const padLen  = (4 - (b64std.length % 4)) % 4   // 0, 1, 2, or 3
@@ -109,6 +103,25 @@ const AuthService = (() => {
       SpreadsheetService.updateRow(sheet, row.id, { lastLoginAt: new Date().toISOString() })
     } catch(e) {
       Logger.log('[Auth] Could not update lastLoginAt: ' + e.message)
+    }
+
+    // Auto-resolve divisionId from divisionName if missing
+    if (!row.divisionId && row.divisionName) {
+      try {
+        const divSheet = SpreadsheetService.getSheet(SHEET.DIVISIONS)
+        const divRows  = SpreadsheetService.getAllRows(divSheet)
+        const div = divRows.find(d =>
+          (d.name || '').toLowerCase().trim() === (row.divisionName || '').toLowerCase().trim()
+        )
+        if (div) {
+          row.divisionId = div.id
+          // Persist so we don't have to look it up every time
+          SpreadsheetService.updateRow(sheet, row.id, { divisionId: div.id })
+          Logger.log('[Auth] Auto-resolved divisionId=' + div.id + ' for ' + row.email)
+        }
+      } catch(e) {
+        Logger.log('[Auth] Could not resolve divisionId: ' + e.message)
+      }
     }
 
     // Return all fields except sensitive ones

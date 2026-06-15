@@ -359,11 +359,11 @@ async function fetchPerfStats() {
     ]
     // Try fetching the user's evaluation rating
     try {
-      const { authApi, evaluationApi } = await import('@/services/api')
-      const evals = await evaluationApi.list({ userId: authStore.profileId, semester, year: now.getFullYear() })
-      const myEval = (evals?.items ?? evals ?? []).find(e => e.userId === authStore.profileId)
-      if (myEval?.overall) {
-        perfStats.value[3].value = String(myEval.overall)
+      const { ipatApi } = await import('@/services/api')
+      const ipatRecords = await ipatApi.list({ rateeId: authStore.profileId, semester, year: now.getFullYear() })
+      const myIPAT = (ipatRecords?.items ?? ipatRecords ?? []).find(r => r.rateeId === authStore.profileId)
+      if (myIPAT?.overallScore) {
+        perfStats.value[3].value = String(myIPAT.overallScore)
       }
     } catch { /* rating optional */ }
   } catch (e) {

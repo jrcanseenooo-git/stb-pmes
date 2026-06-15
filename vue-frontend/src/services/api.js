@@ -166,11 +166,11 @@ export const ipatApi = {
   updateStatus: (id, status)    => gasWrite('PATCH', `ipat/${id}/status`, { status }),
 
   // Core Behavioral Competencies
-  saveCBCRatings: (id, ratings) => gasWrite('POST',  `ipat/${id}/cbc`,         { ratings }),
+  saveCBCRatings: (id, ratings) => gasWrite('POST',  `ipat/${id}/cbc`,         { ratings: JSON.stringify(ratings) }),
   computeCBC:     (id)          => gasWrite('POST',  `ipat/${id}/cbc/compute`),
 
   // Job Fitness
-  saveJFRatings:  (id, ratings) => gasWrite('POST',  `ipat/${id}/jf`,          { ratings }),
+  saveJFRatings:  (id, ratings) => gasWrite('POST',  `ipat/${id}/jf`,          { ratings: JSON.stringify(ratings) }),
   computeJF:      (id)          => gasWrite('POST',  `ipat/${id}/jf/compute`),
 
   // Overall
@@ -232,6 +232,8 @@ export const ipcrfApi = {
   addEntry:     (formId, data)         => gasWrite('POST',   `ipcrf/${formId}/entries`,            data),
   updateEntry:  (formId, entryId, data)=> gasWrite('PUT',    `ipcrf/${formId}/entries/${entryId}`, data),
   deleteEntry:  (formId, entryId)      => gasWrite('DELETE', `ipcrf/${formId}/entries/${entryId}`),
+  listJrbRatings: (formId)             => gasGet(`ipcrf/${formId}/jrb`),
+  saveJrbRatings: (formId, data)       => gasWrite('POST',  `ipcrf/${formId}/jrb`,    data),
 
   // ── Aliases for views that use alternate method names ──
   listForms:    (p = {})               => gasGet('ipcrf',                             p),
@@ -243,6 +245,26 @@ export const ipcrfApi = {
   returnForm:   (id, data = {})        => gasWrite('PATCH', `ipcrf/${id}/return`,      data),
   rateForm:     (id, data)             => gasWrite('PATCH', `ipcrf/${id}/rate`,        data),
   finalizeForm: (id, data = {})        => gasWrite('PATCH', `ipcrf/${id}/finalize`,    data),
+}
+
+// ── Attendance ─────────────────────────────────
+
+export const attendanceApi = {
+  list:          (p = {})   => gasGet('attendance',                          p),
+  get:           (id)       => gasGet(`attendance/${id}`),
+  record:        (data)     => gasWrite('POST', 'attendance',                 data),
+  update:        (id, data) => gasWrite('PUT',  `attendance/${id}`,           data),
+  computeRating: (data)     => gasWrite('POST', 'attendance/compute-rating',  data),
+  listRatings:   (p = {})   => gasGet('attendance/ratings',                  p)
+}
+
+// ── Peer Assignments ───────────────────────────
+
+export const peerAssignmentsApi = {
+  list:         (p = {})        => gasGet('peer-assignments',                          p),
+  get:          (id)            => gasGet(`peer-assignments/${id}`),
+  assign:       (data)          => gasWrite('POST',  'peer-assignments',                data),
+  markComplete: (id, data = {}) => gasWrite('PATCH', `peer-assignments/${id}/complete`, data)
 }
 
 // ── Named aliases for views that import with aliases ──
@@ -265,5 +287,7 @@ export default {
   notificationsApi,
   auditApi,
   deadlinesApi,
-  ipcrfApi
+  ipcrfApi,
+  attendanceApi,
+  peerAssignmentsApi
 }

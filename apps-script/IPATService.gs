@@ -218,7 +218,10 @@ const IPATService = (() => {
     const record  = _getRecord(ipatId)
     const sheet   = SpreadsheetService.getSheet(SHEET.IPAT_CBC_RATINGS)
     const now     = new Date().toISOString()
-    const ratings = body.ratings || []
+    // gasWrite sends body as flattened params — ratings may arrive as JSON string
+    let ratings = body.ratings || []
+    if (typeof ratings === 'string') { try { ratings = JSON.parse(ratings) } catch(e) { ratings = [] } }
+    if (!Array.isArray(ratings)) ratings = []
 
     ratings.forEach(r => {
       const existing = SpreadsheetService.getAllRows(sheet).find(row =>
@@ -328,7 +331,9 @@ const IPATService = (() => {
     const record  = _getRecord(ipatId)
     const sheet   = SpreadsheetService.getSheet(SHEET.IPAT_JF_RATINGS)
     const now     = new Date().toISOString()
-    const ratings = body.ratings || []
+    let ratings = body.ratings || []
+    if (typeof ratings === 'string') { try { ratings = JSON.parse(ratings) } catch(e) { ratings = [] } }
+    if (!Array.isArray(ratings)) ratings = []
 
     ratings.forEach(r => {
       const existing = SpreadsheetService.getAllRows(sheet).find(row =>

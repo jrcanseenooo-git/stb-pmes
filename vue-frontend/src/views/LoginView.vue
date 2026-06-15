@@ -5,18 +5,17 @@
     <aside class="left-panel">
       <div class="left-inner">
 
-        <!-- Top: Org identity -->
+        <!-- Org identity -->
         <div class="org-header">
           <div class="seal-wrap">
-            <!-- Philippine Sun rays -->
             <div class="sun-rays" aria-hidden="true">
               <span v-for="i in 8" :key="i" class="ray" :style="`--r:${i}`"></span>
             </div>
             <div class="seal-circle">
-              <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-                <path d="M4 7h20M4 14h13M4 21h16" stroke="white" stroke-width="2.2" stroke-linecap="round"/>
-                <circle cx="21" cy="20" r="5" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.4)" stroke-width="1.5"/>
-                <path d="M19.2 20l1.6 1.6 3-3" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+              <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
+                <path d="M4 6h18M4 13h12M4 20h15" stroke="white" stroke-width="2.1" stroke-linecap="round"/>
+                <circle cx="20" cy="19" r="5" fill="rgba(255,255,255,.12)" stroke="rgba(255,255,255,.35)" stroke-width="1.4"/>
+                <path d="M18.3 19l1.5 1.5 2.8-2.8" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
             </div>
           </div>
@@ -26,7 +25,7 @@
           </div>
         </div>
 
-        <!-- Center: Hero -->
+        <!-- Hero -->
         <div class="hero-block">
           <div class="system-tag">
             <span class="tag-dot"></span>
@@ -40,25 +39,56 @@
           </p>
         </div>
 
-        <!-- Bottom: Metrics strip -->
-        <div class="metrics-strip">
-          <div class="metric">
-            <span class="metric-num">IPCRF</span>
-            <span class="metric-lbl">Target Tracking</span>
+        <!-- Feature strip -->
+        <div class="feature-strip">
+          <div class="feature-item">
+            <div class="feature-icon">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <rect x="2" y="2" width="5" height="5" rx="1.2" fill="rgba(255,255,255,.7)"/>
+                <rect x="9" y="2" width="5" height="5" rx="1.2" fill="rgba(255,255,255,.35)"/>
+                <rect x="2" y="9" width="5" height="5" rx="1.2" fill="rgba(255,255,255,.35)"/>
+                <rect x="9" y="9" width="5" height="5" rx="1.2" fill="rgba(255,255,255,.35)"/>
+              </svg>
+            </div>
+            <div>
+              <div class="feature-label">IPCRF</div>
+              <div class="feature-desc">Target Tracking</div>
+            </div>
           </div>
-          <div class="metric-div"></div>
-          <div class="metric">
-            <span class="metric-num">IPAT</span>
-            <span class="metric-lbl">Innovation Tool</span>
+          <div class="feature-divider"></div>
+          <div class="feature-item">
+            <div class="feature-icon">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M8 2l1.6 3.3 3.6.5-2.6 2.5.6 3.6L8 10.3l-3.2 1.6.6-3.6L2.8 5.8l3.6-.5L8 2z" fill="rgba(255,255,255,.7)"/>
+              </svg>
+            </div>
+            <div>
+              <div class="feature-label">IPAT</div>
+              <div class="feature-desc">Innovation Tool</div>
+            </div>
           </div>
-          <div class="metric-div"></div>
-          <div class="metric">
-            <span class="metric-num">MOV</span>
-            <span class="metric-lbl">Evidence Files</span>
+          <div class="feature-divider"></div>
+          <div class="feature-item">
+            <div class="feature-icon">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M13 5H3a1 1 0 00-1 1v7a1 1 0 001 1h10a1 1 0 001-1V6a1 1 0 00-1-1z" stroke="rgba(255,255,255,.7)" stroke-width="1.4"/>
+                <path d="M5 5V4a3 3 0 016 0v1" stroke="rgba(255,255,255,.7)" stroke-width="1.4" stroke-linecap="round"/>
+                <circle cx="8" cy="10" r="1.5" fill="rgba(255,255,255,.7)"/>
+              </svg>
+            </div>
+            <div>
+              <div class="feature-label">MOV</div>
+              <div class="feature-desc">Evidence Files</div>
+            </div>
           </div>
         </div>
 
-        <!-- Flag accent bar at bottom -->
+        <!-- Animated deco grid (bottom-right corner) -->
+        <div class="deco-grid" aria-hidden="true">
+          <div v-for="i in 36" :key="i" class="deco-cell" :style="cellStyle(i)"></div>
+        </div>
+
+        <!-- Flag bar -->
         <div class="flag-bar">
           <div class="flag-seg flag-blue"></div>
           <div class="flag-seg flag-red"></div>
@@ -70,15 +100,13 @@
 
     <!-- ══ RIGHT PANEL ══ -->
     <main class="right-panel">
-
-      <!-- Noise texture overlay -->
-      <div class="right-texture" aria-hidden="true"></div>
+      <div class="right-bg" aria-hidden="true"></div>
 
       <div class="form-shell">
 
         <!-- Status chip -->
         <div class="status-chip">
-          <span class="chip-pulse"></span>
+          <span class="chip-dot"></span>
           Secure Access Portal
         </div>
 
@@ -88,12 +116,12 @@
           <p>Sign in with your <strong>{{ domain }}</strong> account to continue</p>
         </div>
 
-        <!-- Error alert -->
+        <!-- Error -->
         <transition name="alert-in">
           <div v-if="error" class="alert-error" role="alert">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <circle cx="8" cy="8" r="7" stroke="#DC2626" stroke-width="1.4"/>
-              <path d="M8 4.5v4M8 10.5v.5" stroke="#DC2626" stroke-width="1.5" stroke-linecap="round"/>
+            <svg width="15" height="15" viewBox="0 0 15 15" fill="none" style="flex-shrink:0;margin-top:1px">
+              <circle cx="7.5" cy="7.5" r="6.5" stroke="#DC2626" stroke-width="1.4"/>
+              <path d="M7.5 4.5v3.5M7.5 10v.1" stroke="#DC2626" stroke-width="1.5" stroke-linecap="round"/>
             </svg>
             <span>{{ error }}</span>
           </div>
@@ -131,7 +159,6 @@
                 placeholder="you@dswd.gov.ph"
                 autocomplete="email"
                 :disabled="loading"
-                :class="{ 'has-value': email }"
                 required
               />
             </div>
@@ -140,7 +167,7 @@
           <div class="field-group">
             <label for="password" class="field-label">
               Password
-              <a href="#" class="forgot-link">Forgot password?</a>
+              <a href="#" class="forgot-link" @click.prevent>Forgot password?</a>
             </label>
             <div class="input-wrap">
               <svg class="input-icon" width="15" height="15" viewBox="0 0 15 15" fill="none">
@@ -170,26 +197,22 @@
             </div>
           </div>
 
-          <button
-            type="submit"
-            class="btn-primary"
-            :disabled="loading || !email || !password"
-          >
+          <button type="submit" class="btn-primary" :disabled="loading || !email || !password">
             <span v-if="loading && loginMethod === 'email'" class="spin"></span>
             <template v-else>
               Sign in
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path d="M3 8h10M9.5 4.5L13 8l-3.5 3.5" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+              <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+                <path d="M2.5 7.5h10M9 4l3.5 3.5L9 11" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
             </template>
-            <span v-if="loading && loginMethod === 'email'" style="margin-left:6px">Signing in…</span>
+            <span v-if="loading && loginMethod === 'email'" class="btn-loading-text">Signing in…</span>
           </button>
 
         </form>
 
-        <!-- Footer note -->
+        <!-- Security note -->
         <div class="access-note">
-          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style="flex-shrink:0;margin-top:1px">
             <path d="M6.5 1.5L2 3.5V6.5c0 2.76 2 5.15 4.5 5.5C9 11.65 11 9.26 11 6.5V3.5L6.5 1.5z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
             <path d="M4.5 6.5l1.5 1.5 2.5-2.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
@@ -255,6 +278,14 @@ async function handleGoogleLogin() {
     loginMethod.value = ''
   }
 }
+
+function cellStyle(i) {
+  const col   = (i - 1) % 6
+  const row   = Math.floor((i - 1) / 6)
+  const delay = ((col + row) * 0.12).toFixed(2)
+  const base  = 0.05 + ((i * 0.037) % 0.16)
+  return { '--delay': `${delay}s`, '--base-op': base.toFixed(3) }
+}
 </script>
 
 <style scoped>
@@ -262,27 +293,47 @@ async function handleGoogleLogin() {
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* ══ ROOT ══ */
+/* Kill any scroll on the host page while login is mounted */
+:global(html), :global(body) {
+  overflow: hidden;
+  height: 100%;
+}
+
+/* ══ ROOT — true full-bleed split, zero overflow ══ */
 .login-root {
   display: flex;
-  min-height: 100vh;
+  position: fixed;   /* covers the full viewport regardless of body/html state */
+  inset: 0;          /* top:0 right:0 bottom:0 left:0 */
   font-family: 'Inter', system-ui, sans-serif;
+  overflow: hidden;
 }
 
 /* ══════════════════════════════════
-   LEFT PANEL
+   LEFT PANEL  (50% width)
 ══════════════════════════════════ */
 .left-panel {
-  width: 420px;
+  width: 50%;
   flex-shrink: 0;
   background:
-    radial-gradient(ellipse at 20% 10%, rgba(0,56,168,.55) 0%, transparent 55%),
-    radial-gradient(ellipse at 80% 85%, rgba(206,17,38,.25) 0%, transparent 50%),
-    linear-gradient(165deg, #050d1e 0%, #0a1a35 40%, #0d2448 100%);
+    radial-gradient(ellipse at 18% 8%,  rgba(0,56,168,.60) 0%, transparent 52%),
+    radial-gradient(ellipse at 85% 88%, rgba(206,17,38,.28) 0%, transparent 48%),
+    radial-gradient(ellipse at 60% 40%, rgba(0,30,100,.40)  0%, transparent 60%),
+    linear-gradient(162deg, #040c1c 0%, #081830 35%, #0c2040 65%, #0e2850 100%);
   position: relative;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+/* Dot-grid texture overlay */
+.left-panel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(255,255,255,.035) 1px, transparent 1px);
+  background-size: 22px 22px;
+  pointer-events: none;
+  z-index: 1;
 }
 
 .left-inner {
@@ -291,79 +342,74 @@ async function handleGoogleLogin() {
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 44px 40px 0;
-  gap: 0;
+  padding: 36px 44px 0;
+  min-height: 0;   /* allow flex children to shrink below content size */
 }
 
 /* ── Org header ── */
 .org-header {
   display: flex;
   align-items: center;
-  gap: 14px;
-  margin-bottom: 56px;
+  gap: 16px;
+  margin-bottom: 0;
+  flex-shrink: 0;
 }
 
 .seal-wrap {
   position: relative;
-  width: 52px;
-  height: 52px;
+  width: 54px;
+  height: 54px;
   flex-shrink: 0;
 }
 
-/* Animated sun rays */
 .sun-rays {
   position: absolute;
   inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  animation: rotateSun 24s linear infinite;
+  animation: rotateSun 30s linear infinite;
 }
 @keyframes rotateSun { to { transform: rotate(360deg); } }
 
 .ray {
   position: absolute;
   width: 2px;
-  height: 20px;
-  background: linear-gradient(to bottom, rgba(252,209,22,.7), transparent);
+  height: 18px;
+  background: linear-gradient(to bottom, rgba(252,209,22,.65), transparent);
   border-radius: 1px;
-  top: 50%;
-  left: 50%;
+  top: 50%; left: 50%;
   transform-origin: 50% 0;
   transform: translateX(-50%) translateY(-100%) rotate(calc((var(--r) - 1) * 45deg));
 }
 
 .seal-circle {
   position: absolute;
-  inset: 6px;
+  inset: 7px;
   background: rgba(255,255,255,.1);
-  border: 1.5px solid rgba(255,255,255,.2);
+  border: 1.5px solid rgba(255,255,255,.18);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  backdrop-filter: blur(6px);
+  backdrop-filter: blur(8px);
 }
 
-.org-text {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
+.org-text { display: flex; flex-direction: column; gap: 4px; }
 
 .org-abbr {
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 700;
-  color: rgba(252,209,22,.75);
-  letter-spacing: 2px;
+  color: rgba(252,209,22,.8);
+  letter-spacing: 2.2px;
   text-transform: uppercase;
 }
 
 .org-full {
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 400;
-  color: rgba(255,255,255,.45);
-  line-height: 1.4;
+  color: rgba(255,255,255,.38);
+  line-height: 1.45;
 }
 
 /* ── Hero block ── */
@@ -372,45 +418,44 @@ async function handleGoogleLogin() {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding-bottom: 32px;
+  padding: 20px 0 16px;
+  min-height: 0;
 }
 
 .system-tag {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  font-size: 10.5px;
+  gap: 9px;
+  font-size: 10px;
   font-weight: 600;
-  color: rgba(255,255,255,.4);
+  color: rgba(255,255,255,.38);
   text-transform: uppercase;
-  letter-spacing: 1.2px;
-  margin-bottom: 22px;
+  letter-spacing: 1.5px;
+  margin-bottom: 24px;
 }
 
 .tag-dot {
-  width: 7px;
-  height: 7px;
+  width: 7px; height: 7px;
   border-radius: 50%;
   background: #0038A8;
-  box-shadow: 0 0 0 3px rgba(0,56,168,.3);
-  animation: tagPulse 2.5s ease-in-out infinite;
+  box-shadow: 0 0 0 3px rgba(0,56,168,.28);
+  animation: tagPulse 2.8s ease-in-out infinite;
   flex-shrink: 0;
 }
 @keyframes tagPulse {
-  0%, 100% { box-shadow: 0 0 0 3px rgba(0,56,168,.3); }
-  50%       { box-shadow: 0 0 0 6px rgba(0,56,168,.12); }
+  0%, 100% { box-shadow: 0 0 0 3px rgba(0,56,168,.28); }
+  50%       { box-shadow: 0 0 0 7px rgba(0,56,168,.1); }
 }
 
 .hero-headline {
   font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 52px;
+  font-size: clamp(44px, 4.5vw, 64px);
   font-weight: 800;
   color: #ffffff;
-  line-height: 1.05;
-  letter-spacing: -2px;
-  margin-bottom: 20px;
-  /* Subtle gradient on text */
-  background: linear-gradient(140deg, #ffffff 50%, rgba(255,255,255,.55));
+  line-height: 1.0;
+  letter-spacing: -2.5px;
+  margin-bottom: 22px;
+  background: linear-gradient(145deg, #ffffff 45%, rgba(255,255,255,.5));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -418,187 +463,217 @@ async function handleGoogleLogin() {
 
 .hero-body {
   font-size: 13.5px;
-  color: rgba(255,255,255,.38);
-  line-height: 1.65;
-  max-width: 300px;
+  color: rgba(255,255,255,.36);
+  line-height: 1.7;
+  max-width: 340px;
   font-weight: 400;
 }
 
-/* ── Metrics strip ── */
-.metrics-strip {
+/* ── Feature strip ── */
+.feature-strip {
   display: flex;
   align-items: center;
-  background: rgba(255,255,255,.05);
-  border: 1px solid rgba(255,255,255,.08);
-  border-radius: 14px;
-  padding: 16px 20px;
+  background: rgba(255,255,255,.045);
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 16px;
+  padding: 18px 24px;
+  backdrop-filter: blur(12px);
+  flex-shrink: 0;
   margin-bottom: 0;
-  backdrop-filter: blur(10px);
 }
 
-.metric {
+.feature-item {
   flex: 1;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 12px;
 }
 
-.metric-num {
-  font-size: 13px;
-  font-weight: 800;
-  color: rgba(255,255,255,.85);
-  letter-spacing: .5px;
+.feature-icon {
+  width: 34px; height: 34px;
+  background: rgba(255,255,255,.07);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.feature-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(255,255,255,.82);
   font-family: 'Plus Jakarta Sans', sans-serif;
+  letter-spacing: .3px;
 }
 
-.metric-lbl {
-  font-size: 9.5px;
+.feature-desc {
+  font-size: 10px;
   font-weight: 500;
   color: rgba(255,255,255,.3);
   text-transform: uppercase;
   letter-spacing: .5px;
+  margin-top: 2px;
 }
 
-.metric-div {
+.feature-divider {
   width: 1px;
-  height: 28px;
-  background: rgba(255,255,255,.1);
+  height: 32px;
+  background: rgba(255,255,255,.09);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+/* ── Deco grid ── */
+.deco-grid {
+  position: absolute;
+  bottom: 36px;
+  right: 0;
+  width: 200px;
+  height: 200px;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 5px;
+  padding: 18px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.deco-cell {
+  aspect-ratio: 1;
+  border-radius: 3px;
+  animation: decoFloat 3.8s ease-in-out infinite var(--delay, 0s);
+  opacity: var(--base-op, 0.07);
+}
+@keyframes decoFloat {
+  0%, 100% { opacity: var(--base-op,.07); transform: scale(1);    background: rgba(255,255,255,.9); }
+  40%       { opacity: calc(var(--base-op,.07) * 4); transform: scale(1.18); background: rgba(0,120,255,.9); }
+  70%       { opacity: calc(var(--base-op,.07) * 2); transform: scale(1.06); background: rgba(100,60,220,.8); }
 }
 
 /* ── Flag bar ── */
 .flag-bar {
   display: flex;
-  margin: 20px -40px 0;
-  height: 4px;
+  margin: 20px -44px 0;
+  height: 5px;
+  flex-shrink: 0;
 }
-.flag-seg {
-  flex: 1;
-}
-.flag-blue  { background: #0038A8; }
-.flag-red   { background: #CE1126; }
-.flag-gold  { background: #FCD116; }
-
-/* Left panel background pixel grid (subtle) */
-.left-panel::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image:
-    radial-gradient(rgba(255,255,255,.04) 1px, transparent 1px);
-  background-size: 24px 24px;
-  pointer-events: none;
-  z-index: 1;
-}
+.flag-seg { flex: 1; }
+.flag-blue { background: #0038A8; }
+.flag-red  { background: #CE1126; }
+.flag-gold { background: #FCD116; }
 
 /* ══════════════════════════════════
-   RIGHT PANEL
+   RIGHT PANEL  (50% width, full bleed)
 ══════════════════════════════════ */
 .right-panel {
-  flex: 1;
-  background: #F0F4FA;
+  width: 50%;
+  flex-shrink: 0;
+  background: #EDF1F9;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 48px 40px;
+  padding: 24px 40px;
   position: relative;
-  overflow: hidden;
+  overflow: hidden;   /* hard clip — card must fit */
 }
 
-/* Geometric background shapes */
-.right-texture {
+/* Subtle background texture */
+.right-bg {
   position: absolute;
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(circle at 75% 15%, rgba(0,56,168,.06) 0%, transparent 40%),
-    radial-gradient(circle at 20% 90%, rgba(206,17,38,.04) 0%, transparent 35%);
+    radial-gradient(circle at 78% 12%, rgba(0,56,168,.06) 0%, transparent 42%),
+    radial-gradient(circle at 18% 88%, rgba(206,17,38,.04) 0%, transparent 36%);
 }
-.right-texture::before {
+.right-bg::before {
   content: '';
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(148,163,184,.07) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148,163,184,.07) 1px, transparent 1px);
+    linear-gradient(rgba(148,163,184,.065) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148,163,184,.065) 1px, transparent 1px);
   background-size: 40px 40px;
 }
 
-/* ── Form shell card ── */
+/* ── Form shell ── */
 .form-shell {
   width: 100%;
   max-width: 420px;
   background: #ffffff;
   border-radius: 20px;
-  padding: 40px 38px;
+  padding: 32px 36px 28px;
   box-shadow:
     0 1px 2px rgba(0,0,0,.04),
-    0 4px 16px rgba(0,0,0,.06),
-    0 20px 60px rgba(0,56,168,.07);
+    0 4px 18px rgba(0,0,0,.06),
+    0 24px 64px rgba(0,56,168,.08);
   position: relative;
   z-index: 1;
-  border: 1px solid rgba(0,0,0,.055);
+  border: 1px solid rgba(0,0,0,.05);
 }
 
-/* Top accent stripe on card */
+/* Filipino flag accent stripe on card top */
 .form-shell::before {
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, #0038A8 0%, #CE1126 50%, #FCD116 100%);
-  border-radius: 20px 20px 0 0;
+  height: 4px;
+  background: linear-gradient(90deg,
+    #0038A8 0%, #0038A8 33.3%,
+    #CE1126 33.3%, #CE1126 66.6%,
+    #FCD116 66.6%, #FCD116 100%
+  );
+  border-radius: 22px 22px 0 0;
 }
 
 /* ── Status chip ── */
 .status-chip {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 5px 12px;
+  gap: 8px;
+  padding: 4px 11px;
   background: #EEF4FF;
   border: 1px solid #C7D9FF;
   border-radius: 20px;
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 700;
   color: #1749C5;
   text-transform: uppercase;
-  letter-spacing: .7px;
-  margin-bottom: 22px;
+  letter-spacing: .8px;
+  margin-bottom: 16px;
 }
 
-.chip-pulse {
-  width: 6px;
-  height: 6px;
+.chip-dot {
+  width: 6px; height: 6px;
   background: #0038A8;
   border-radius: 50%;
-  animation: chipPulse 2s ease-in-out infinite;
+  animation: chipPulse 2.2s ease-in-out infinite;
 }
 @keyframes chipPulse {
   0%, 100% { opacity: 1; transform: scale(1); }
-  50%       { opacity: .55; transform: scale(.75); }
+  50%       { opacity: .5; transform: scale(.7); }
 }
 
 /* ── Form heading ── */
 .form-heading {
-  margin-bottom: 28px;
+  margin-bottom: 20px;
 }
-
 .form-heading h2 {
   font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 26px;
+  font-size: 24px;
   font-weight: 800;
   color: #0A1628;
   letter-spacing: -.6px;
-  margin-bottom: 7px;
+  margin-bottom: 6px;
+  line-height: 1.15;
 }
-
 .form-heading p {
-  font-size: 13.5px;
+  font-size: 13px;
   color: #64748B;
   line-height: 1.5;
 }
-
 .form-heading strong {
   color: #0038A8;
   font-weight: 700;
@@ -612,14 +687,12 @@ async function handleGoogleLogin() {
   padding: 12px 14px;
   background: #FEF2F2;
   border: 1px solid #FECACA;
-  border-radius: 10px;
+  border-radius: 11px;
   font-size: 13px;
   color: #991B1B;
-  margin-bottom: 18px;
+  margin-bottom: 20px;
   line-height: 1.45;
 }
-.alert-error svg { flex-shrink: 0; margin-top: 1px; }
-
 .alert-in-enter-active, .alert-in-leave-active { transition: all .2s ease; }
 .alert-in-enter-from, .alert-in-leave-to { opacity: 0; transform: translateY(-6px); }
 
@@ -630,7 +703,7 @@ async function handleGoogleLogin() {
   justify-content: center;
   gap: 10px;
   width: 100%;
-  padding: 13px 16px;
+  padding: 13.5px 16px;
   background: #fff;
   border: 1.5px solid #E2E8F0;
   border-radius: 12px;
@@ -643,9 +716,9 @@ async function handleGoogleLogin() {
   box-shadow: 0 1px 3px rgba(0,0,0,.05);
 }
 .btn-google:hover:not(:disabled) {
-  background: #F8FAFF;
-  border-color: #B8CCF0;
-  box-shadow: 0 3px 12px rgba(0,56,168,.08);
+  background: #F7FAFF;
+  border-color: #AABFE0;
+  box-shadow: 0 3px 14px rgba(0,56,168,.09);
   transform: translateY(-1px);
 }
 .btn-google:active:not(:disabled) { transform: none; }
@@ -655,27 +728,26 @@ async function handleGoogleLogin() {
 .or-divider {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin: 20px 0;
-  font-size: 11.5px;
+  gap: 11px;
+  margin: 16px 0;
+  font-size: 11px;
   font-weight: 600;
   color: #94A3B8;
   text-transform: uppercase;
-  letter-spacing: .5px;
+  letter-spacing: .6px;
 }
-.or-divider::before,
-.or-divider::after {
+.or-divider::before, .or-divider::after {
   content: '';
   flex: 1;
   height: 1px;
-  background: #EEF2F8;
+  background: #EDF2F8;
 }
 
 /* ── Email form ── */
 .email-form {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 13px;
 }
 
 .field-group {
@@ -719,23 +791,22 @@ async function handleGoogleLogin() {
 
 .input-wrap input {
   width: 100%;
-  padding: 12px 40px;
+  padding: 12.5px 42px;
   border: 1.5px solid #E5EAF2;
   border-radius: 11px;
   font-size: 14px;
   font-family: 'Inter', sans-serif;
   color: #0F172A;
-  background: #FAFBFD;
+  background: #FAFBFE;
   outline: none;
   transition: border-color .15s, box-shadow .15s, background .15s;
 }
-.input-wrap input:hover { border-color: #C5D2E8; }
+.input-wrap input:hover { border-color: #C2CEE8; }
 .input-wrap input:focus {
   border-color: #0038A8;
   box-shadow: 0 0 0 3px rgba(0,56,168,.1);
   background: #fff;
 }
-.input-wrap input:focus + .input-icon,
 .input-wrap:focus-within .input-icon { color: #0038A8; }
 .input-wrap input:disabled {
   background: #F5F7FA;
@@ -766,8 +837,8 @@ async function handleGoogleLogin() {
   justify-content: center;
   gap: 8px;
   width: 100%;
-  padding: 14px;
-  background: linear-gradient(135deg, #002d8a 0%, #0038A8 50%, #1a56db 100%);
+  padding: 14.5px;
+  background: linear-gradient(135deg, #002880 0%, #0038A8 50%, #1a52d4 100%);
   color: white;
   border: none;
   border-radius: 12px;
@@ -776,7 +847,7 @@ async function handleGoogleLogin() {
   font-family: 'Inter', sans-serif;
   cursor: pointer;
   transition: all .15s ease;
-  box-shadow: 0 4px 16px rgba(0,56,168,.3), 0 1px 3px rgba(0,56,168,.2);
+  box-shadow: 0 4px 18px rgba(0,56,168,.32), 0 1px 3px rgba(0,56,168,.18);
   margin-top: 4px;
   letter-spacing: .1px;
   position: relative;
@@ -786,23 +857,17 @@ async function handleGoogleLogin() {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(255,255,255,.08) 0%, transparent 60%);
+  background: linear-gradient(135deg, rgba(255,255,255,.1) 0%, transparent 55%);
   pointer-events: none;
 }
 .btn-primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, #00256e 0%, #002d8a 50%, #0038A8 100%);
-  box-shadow: 0 6px 24px rgba(0,56,168,.4);
+  background: linear-gradient(135deg, #001f6a 0%, #002880 50%, #0038A8 100%);
+  box-shadow: 0 6px 26px rgba(0,56,168,.42);
   transform: translateY(-1px);
 }
-.btn-primary:active:not(:disabled) {
-  transform: none;
-  box-shadow: 0 2px 8px rgba(0,56,168,.25);
-}
-.btn-primary:disabled {
-  opacity: .5;
-  cursor: not-allowed;
-  transform: none;
-}
+.btn-primary:active:not(:disabled) { transform: none; box-shadow: 0 2px 8px rgba(0,56,168,.25); }
+.btn-primary:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+.btn-loading-text { margin-left: 4px; }
 
 /* ── Spinners ── */
 .spin {
@@ -827,34 +892,42 @@ async function handleGoogleLogin() {
 .access-note {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
-  margin-top: 18px;
-  padding: 10px 13px;
-  background: #F6F9FF;
-  border: 1px solid #DDE8F8;
-  border-radius: 9px;
-  font-size: 11.5px;
-  color: #64748B;
+  gap: 9px;
+  margin-top: 14px;
+  padding: 9px 12px;
+  background: #F4F7FF;
+  border: 1px solid #D8E4F8;
+  border-radius: 10px;
+  font-size: 11px;
   line-height: 1.5;
+  color: #4A6FA5;
 }
-.access-note svg { flex-shrink: 0; margin-top: 1px; color: #0038A8; }
+.access-note svg { color: #0038A8; }
 
 /* ── Footer ── */
 .form-footer {
-  margin-top: 22px;
+  margin-top: 14px;
   text-align: center;
-  font-size: 11px;
+  font-size: 10.5px;
   color: #B0BAC8;
   letter-spacing: .3px;
 }
 
 /* ══ RESPONSIVE ══ */
-@media (max-width: 840px) {
-  .left-panel { display: none; }
-  .right-panel { padding: 32px 20px; background: #F0F4FA; }
+@media (max-width: 900px) {
+  :global(html), :global(body) { overflow: auto; height: auto; }
+  .login-root { position: static; flex-direction: column; height: auto; min-height: 100vh; overflow: auto; }
+  .left-panel  { width: 100%; height: auto; }
+  .left-inner  { padding: 28px 28px 0; }
+  .hero-block  { padding: 16px 0 14px; }
+  .right-panel { width: 100%; padding: 32px 20px 40px; overflow: visible; }
+  .flag-bar    { margin: 16px -28px 0; }
 }
+
 @media (max-width: 480px) {
-  .form-shell { padding: 32px 24px; border-radius: 16px; }
-  .hero-headline { font-size: 40px; }
+  .left-inner  { padding: 24px 20px 0; }
+  .form-shell  { padding: 28px 20px 24px; border-radius: 16px; }
+  .flag-bar    { margin: 16px -20px 0; }
+  .hero-headline { font-size: 36px; letter-spacing: -1.5px; }
 }
 </style>

@@ -196,6 +196,21 @@ const Router = (() => {
         if (id && sub === 'complete') return PeerAssignmentService.markComplete(id, body, user)
         break
 
+      // IPAT
+      case 'ipat':
+        if (!id && method === 'GET')  return IPATService.list(params, user)
+        if (!id && method === 'POST') return IPATService.create(body, user)
+        if (id && !sub && method === 'GET') return IPATService.get(id, user)
+        if (id && sub === 'status')         return IPATService.updateStatus(id, body, user)
+        if (id && sub === 'cbc' && !subId && method === 'POST')  return IPATService.saveCBCRatings(id, body, user)
+        if (id && sub === 'cbc' && subId === 'compute')          return IPATService.computeCBC(id, user)
+        if (id && sub === 'jf' && !subId && method === 'POST')   return IPATService.saveJFRatings(id, body, user)
+        if (id && sub === 'jf' && subId === 'compute')           return IPATService.computeJF(id, user)
+        if (id && sub === 'compute')                             return IPATService.computeOverall(id, user)
+        if (id === 'themes')        return IPATService.getThemes(params, user)
+        if (id === 'jf-indicators') return IPATService.getJFIndicators(params, user)
+        break
+
       default:
         throw HttpError('Route not found: ' + route, 404)
     }

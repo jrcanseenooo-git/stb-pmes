@@ -20,7 +20,12 @@ const SHEET = {
   PEER_ASSIGNMENTS:   'PeerAssignments',
   ATTENDANCE_RECORDS: 'AttendanceRecords',
   ATTENDANCE_RATINGS: 'AttendanceRatings',
-  MASTER_KRA_LIBRARY: 'MasterKRALibrary'
+  MASTER_KRA_LIBRARY: 'MasterKRALibrary',
+
+  // ── IPAT (Innovations Performance Assessment Tool) ──
+  IPAT_RECORDS:     'IPATRecords',
+  IPAT_CBC_RATINGS: 'IPATCBCRatings',
+  IPAT_JF_RATINGS:  'IPATJFRatings'
 }
 
 // ── Entry point: HTTP GET ──

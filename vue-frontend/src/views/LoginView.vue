@@ -28,7 +28,6 @@
         <!-- Hero -->
         <div class="hero-block">
           <div class="system-tag">
-            <span class="tag-dot"></span>
             Performance Monitoring &amp; Evaluation System
           </div>
           <h1 class="hero-headline">
@@ -37,62 +36,6 @@
           <p class="hero-body">
             Unified performance tracking for the Social Technology Bureau — from KRA targets to accomplishment records, all in one place.
           </p>
-        </div>
-
-        <!-- Feature strip -->
-        <div class="feature-strip">
-          <div class="feature-item">
-            <div class="feature-icon">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <rect x="2" y="2" width="5" height="5" rx="1.2" fill="rgba(255,255,255,.7)"/>
-                <rect x="9" y="2" width="5" height="5" rx="1.2" fill="rgba(255,255,255,.35)"/>
-                <rect x="2" y="9" width="5" height="5" rx="1.2" fill="rgba(255,255,255,.35)"/>
-                <rect x="9" y="9" width="5" height="5" rx="1.2" fill="rgba(255,255,255,.35)"/>
-              </svg>
-            </div>
-            <div>
-              <div class="feature-label">IPCRF</div>
-              <div class="feature-desc">Target Tracking</div>
-            </div>
-          </div>
-          <div class="feature-divider"></div>
-          <div class="feature-item">
-            <div class="feature-icon">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path d="M8 2l1.6 3.3 3.6.5-2.6 2.5.6 3.6L8 10.3l-3.2 1.6.6-3.6L2.8 5.8l3.6-.5L8 2z" fill="rgba(255,255,255,.7)"/>
-              </svg>
-            </div>
-            <div>
-              <div class="feature-label">IPAT</div>
-              <div class="feature-desc">Innovation Tool</div>
-            </div>
-          </div>
-          <div class="feature-divider"></div>
-          <div class="feature-item">
-            <div class="feature-icon">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path d="M13 5H3a1 1 0 00-1 1v7a1 1 0 001 1h10a1 1 0 001-1V6a1 1 0 00-1-1z" stroke="rgba(255,255,255,.7)" stroke-width="1.4"/>
-                <path d="M5 5V4a3 3 0 016 0v1" stroke="rgba(255,255,255,.7)" stroke-width="1.4" stroke-linecap="round"/>
-                <circle cx="8" cy="10" r="1.5" fill="rgba(255,255,255,.7)"/>
-              </svg>
-            </div>
-            <div>
-              <div class="feature-label">MOV</div>
-              <div class="feature-desc">Evidence Files</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Animated deco grid (bottom-right corner) -->
-        <div class="deco-grid" aria-hidden="true">
-          <div v-for="i in 36" :key="i" class="deco-cell" :style="cellStyle(i)"></div>
-        </div>
-
-        <!-- Flag bar -->
-        <div class="flag-bar">
-          <div class="flag-seg flag-blue"></div>
-          <div class="flag-seg flag-red"></div>
-          <div class="flag-seg flag-gold"></div>
         </div>
 
       </div>
@@ -434,19 +377,6 @@ function cellStyle(i) {
   margin-bottom: 24px;
 }
 
-.tag-dot {
-  width: 7px; height: 7px;
-  border-radius: 50%;
-  background: #0038A8;
-  box-shadow: 0 0 0 3px rgba(0,56,168,.28);
-  animation: tagPulse 2.8s ease-in-out infinite;
-  flex-shrink: 0;
-}
-@keyframes tagPulse {
-  0%, 100% { box-shadow: 0 0 0 3px rgba(0,56,168,.28); }
-  50%       { box-shadow: 0 0 0 7px rgba(0,56,168,.1); }
-}
-
 .hero-headline {
   font-family: 'Plus Jakarta Sans', sans-serif;
   font-size: clamp(44px, 4.5vw, 64px);
@@ -523,33 +453,6 @@ function cellStyle(i) {
   background: rgba(255,255,255,.09);
   margin: 0 4px;
   flex-shrink: 0;
-}
-
-/* ── Deco grid ── */
-.deco-grid {
-  position: absolute;
-  bottom: 36px;
-  right: 0;
-  width: 200px;
-  height: 200px;
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 5px;
-  padding: 18px;
-  pointer-events: none;
-  z-index: 1;
-}
-
-.deco-cell {
-  aspect-ratio: 1;
-  border-radius: 3px;
-  animation: decoFloat 3.8s ease-in-out infinite var(--delay, 0s);
-  opacity: var(--base-op, 0.07);
-}
-@keyframes decoFloat {
-  0%, 100% { opacity: var(--base-op,.07); transform: scale(1);    background: rgba(255,255,255,.9); }
-  40%       { opacity: calc(var(--base-op,.07) * 4); transform: scale(1.18); background: rgba(0,120,255,.9); }
-  70%       { opacity: calc(var(--base-op,.07) * 2); transform: scale(1.06); background: rgba(100,60,220,.8); }
 }
 
 /* ── Flag bar ── */

@@ -34,7 +34,7 @@
             Monitor.<br>Evaluate.<br>Deliver.
           </h1>
           <p class="hero-body">
-            Unified performance tracking for the Social Technology Bureau — from KRA targets to accomplishment records, all in one place.
+            Data-informed decisions for stronger delivery.
           </p>
         </div>
 

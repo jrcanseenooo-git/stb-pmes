@@ -27,12 +27,12 @@ const IpcrfService = (() => {
       }
     }
 
-    if (params.userId)    rows = rows.filter(r => r.userId    === params.userId)
-    if (params.semester)  rows = rows.filter(r => r.semester  === params.semester)
-    if (params.year)      rows = rows.filter(r => String(r.year) === String(params.year))
-    if (params.status)    rows = rows.filter(r => r.status    === params.status)
+    if (params.userId)     rows = rows.filter(r => r.userId     === params.userId)
+    if (params.semester)   rows = rows.filter(r => r.semester   === params.semester)
+    if (params.year)       rows = rows.filter(r => String(r.year) === String(params.year))
+    if (params.status)     rows = rows.filter(r => r.status     === params.status)
     if (params.divisionId) rows = rows.filter(r => r.divisionId === params.divisionId)
-    if (params.type)      rows = rows.filter(r => r.type      === params.type)
+    if (params.type)       rows = rows.filter(r => r.type       === params.type)
 
     rows.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
     return SpreadsheetService.paginate(rows, params.page, params.pageSize)
@@ -45,9 +45,8 @@ const IpcrfService = (() => {
     if (!row) throw HttpError('IPCRF form not found', 404)
     _guardAccess(row, profile)
 
-    // Attach form entries and JRB ratings
-    row.entries    = _getEntries(id)
-    row.jrbRatings = _getJrbRatings(id)
+    // Attach form entries
+    row.entries = _getEntries(id)
     return row
   }
 
@@ -58,7 +57,7 @@ const IpcrfService = (() => {
     // Prevent duplicate form per user per semester/year/type
     const sheet    = SpreadsheetService.getSheet(SHEET.IPCRF_FORMS)
     const existing = SpreadsheetService.getAllRows(sheet).find(r =>
-      r.userId === (body.userId || profile.id) &&
+      r.userId   === (body.userId || profile.id) &&
       r.semester === body.semester &&
       String(r.year) === String(body.year) &&
       r.type === (body.type || 'IPCRF')
@@ -71,32 +70,32 @@ const IpcrfService = (() => {
     const _weights = PositionHelper.resolveWeights(profile)
 
     const form = {
-      id:                   SpreadsheetService.generateId('FORM-'),
-      type:                 body.type              || 'IPCRF',
-      userId:               body.userId            || profile.id,
-      employeeName:         body.employeeName      || profile.fullName,
-      position:             profile.position       || '',
-      positionLevel:        _level,
-      divisionId:           profile.divisionId     || '',
-      divisionName:         profile.divisionName   || '',
-      semester:             body.semester          || '',
-      year:                 body.year              || new Date().getFullYear(),
-      status:               'Draft',
-      coreFunctionWeight:   _weights.core,
+      id:                    SpreadsheetService.generateId('FORM-'),
+      type:                  body.type             || 'IPCRF',
+      userId:                body.userId           || profile.id,
+      employeeName:          body.employeeName     || profile.fullName,
+      position:              profile.position      || '',
+      positionLevel:         _level,
+      divisionId:            profile.divisionId    || '',
+      divisionName:          profile.divisionName  || '',
+      semester:              body.semester         || '',
+      year:                  body.year             || new Date().getFullYear(),
+      status:                'Draft',
+      coreFunctionWeight:    _weights.core,
       supportFunctionWeight: _weights.support,
-      finalNumericalRating: '',
-      adjectivalRating:     '',
-      immediateSupervisor:  body.immediateSupervisor  || '',
-      supervisorPosition:   body.supervisorPosition   || '',
-      approvingAuthority:   body.approvingAuthority   || '',
-      authorityPosition:    body.authorityPosition    || '',
-      dateSignedRatee:      '',
-      dateSignedSupervisor: '',
-      dateSignedAuthority:  '',
-      feedbackStrengths:            '',
-      feedbackAreasForImprovement:  '',
-      feedbackComments:             '',
-      feedbackRecommendations:      '',
+      finalNumericalRating:  '',
+      adjectivalRating:      '',
+      immediateSupervisor:   body.immediateSupervisor  || '',
+      supervisorPosition:    body.supervisorPosition   || '',
+      approvingAuthority:    body.approvingAuthority   || '',
+      authorityPosition:     body.authorityPosition    || '',
+      dateSignedRatee:       '',
+      dateSignedSupervisor:  '',
+      dateSignedAuthority:   '',
+      feedbackStrengths:           '',
+      feedbackAreasForImprovement: '',
+      feedbackComments:            '',
+      feedbackRecommendations:     '',
       submittedAt:  '',
       approvedAt:   '',
       ratedAt:      '',
@@ -186,8 +185,6 @@ const IpcrfService = (() => {
       updatedAt: new Date().toISOString()
     })
     AuditService.log('RETURN', 'IPCRF', `Returned form ${id}: ${body.remarks || ''}`, user)
-
-    // Notify the ratee
     _notifyUser(row.userId, 'revision',
       `Your ${row.type} form was returned for revision. ${body.remarks || ''}`,
       id, 'IPCRF'
@@ -209,10 +206,10 @@ const IpcrfService = (() => {
       status:               'Rated',
       finalNumericalRating: body.finalNumericalRating || '',
       adjectivalRating:     body.adjectivalRating     || '',
-      feedbackStrengths:            body.feedbackStrengths           || '',
-      feedbackAreasForImprovement:  body.feedbackAreasForImprovement || '',
-      feedbackComments:             body.feedbackComments            || '',
-      feedbackRecommendations:      body.feedbackRecommendations     || '',
+      feedbackStrengths:           body.feedbackStrengths           || '',
+      feedbackAreasForImprovement: body.feedbackAreasForImprovement || '',
+      feedbackComments:            body.feedbackComments            || '',
+      feedbackRecommendations:     body.feedbackRecommendations     || '',
       ratedAt:   new Date().toISOString(),
       updatedAt: new Date().toISOString()
     })
@@ -247,8 +244,8 @@ const IpcrfService = (() => {
 
   // ── Compute Score ──
   function computeScore(id, user) {
-    const sheet   = SpreadsheetService.getSheet(SHEET.IPCRF_FORMS)
-    const form    = SpreadsheetService.getRow(sheet, id)
+    const sheet = SpreadsheetService.getSheet(SHEET.IPCRF_FORMS)
+    const form  = SpreadsheetService.getRow(sheet, id)
     if (!form) throw HttpError('Form not found', 404)
 
     const entries = _getEntries(id)
@@ -321,30 +318,30 @@ const IpcrfService = (() => {
     const now   = new Date().toISOString()
     const sheet = SpreadsheetService.getSheet(SHEET.FORM_ENTRIES)
     const entry = {
-      id:                    SpreadsheetService.generateId('FE-'),
+      id:                     SpreadsheetService.generateId('FE-'),
       formId,
-      masterKRAId:           body.masterKRAId           || '',
-      functionType:          body.functionType          || 'Core',
-      kraName:               body.kraName               || '',
-      successIndicator:      body.successIndicator      || '',
+      masterKRAId:            body.masterKRAId            || '',
+      functionType:           body.functionType           || 'Core',
+      kraName:                body.kraName                || '',
+      successIndicator:       body.successIndicator       || '',
       applicableRatingPeriod: body.applicableRatingPeriod || '',
-      weight:                body.weight                || '',
-      classification:        body.classification        || '',
-      efficiencyGuide:       body.efficiencyGuide       || '',
-      qualityGuide:          body.qualityGuide          || '',
-      timelinessGuide:       body.timelinessGuide       || '',
-      meansOfVerification:   body.meansOfVerification   || '',
-      accomplishment:        body.accomplishment        || '',
-      ratingEfficiency:      body.ratingEfficiency      || '',
-      ratingQuality:         body.ratingQuality         || '',
-      ratingTimeliness:      body.ratingTimeliness      || '',
-      ratingAverage:         body.ratingAverage         || '',
-      movReferences:         body.movReferences         || '',
-      remarks:               body.remarks               || '',
-      isCustom:              body.isCustom !== undefined ? body.isCustom : false,
-      order:                 body.order                 || 0,
-      createdAt:             now,
-      updatedAt:             now
+      weight:                 body.weight                 || '',
+      classification:         body.classification         || '',
+      efficiencyGuide:        body.efficiencyGuide        || '',
+      qualityGuide:           body.qualityGuide           || '',
+      timelinessGuide:        body.timelinessGuide        || '',
+      meansOfVerification:    body.meansOfVerification    || '',
+      accomplishment:         body.accomplishment         || '',
+      ratingEfficiency:       body.ratingEfficiency       || '',
+      ratingQuality:          body.ratingQuality          || '',
+      ratingTimeliness:       body.ratingTimeliness       || '',
+      ratingAverage:          body.ratingAverage          || '',
+      movReferences:          body.movReferences          || '',
+      remarks:                body.remarks                || '',
+      isCustom:               body.isCustom !== undefined ? body.isCustom : false,
+      order:                  body.order                  || 0,
+      createdAt:              now,
+      updatedAt:              now
     }
 
     SpreadsheetService.appendRow(sheet, entry)
@@ -383,7 +380,7 @@ const IpcrfService = (() => {
     const row   = SpreadsheetService.getRow(sheet, entryId)
     if (!row || row.formId !== formId) throw HttpError('Entry not found', 404)
 
-    // Hard-delete form entries (they are owned by the form)
+    // Hard-delete the row
     const data    = sheet.getDataRange().getValues()
     const headers = data[0]
     const idIdx   = headers.indexOf('id')
@@ -395,64 +392,6 @@ const IpcrfService = (() => {
     }
     AuditService.log('DELETE_ENTRY', 'IPCRF', `Deleted entry ${entryId}`, user)
     return { deleted: true }
-  }
-
-  // ─────────────────────────────────────────────
-  // JRB RATINGS
-  // ─────────────────────────────────────────────
-
-  function listJrbRatings(formId, user) {
-    const profile = AuthService.getProfile(user)
-    const form    = _getForm(formId)
-    _guardAccess(form, profile)
-    return _getJrbRatings(formId)
-  }
-
-  function saveJrbRatings(formId, body, user) {
-    const profile = AuthService.getProfile(user)
-    const form    = _getForm(formId)
-
-    const sheet   = SpreadsheetService.getSheet(SHEET.JRB_RATINGS)
-    const now     = new Date().toISOString()
-    const ratings = body.ratings || []
-
-    ratings.forEach(r => {
-      const existing = SpreadsheetService.getAllRows(sheet).find(row =>
-        row.formId === formId &&
-        row.raterId === (r.raterId || profile.id) &&
-        row.domain === r.domain &&
-        row.itemNumber === r.itemNumber
-      )
-
-      const ratingRow = {
-        formId,
-        userId:     form.userId,
-        raterType:  r.raterType  || 'Supervisor',
-        raterId:    r.raterId    || profile.id,
-        raterName:  r.raterName  || profile.fullName,
-        domain:     r.domain     || '',
-        domainName: r.domainName || '',
-        itemNumber: r.itemNumber || 0,
-        itemText:   r.itemText   || '',
-        rating:     r.rating     || 0,
-        semester:   form.semester,
-        year:       form.year,
-        updatedAt:  now
-      }
-
-      if (existing) {
-        SpreadsheetService.updateRow(sheet, existing.id, ratingRow)
-      } else {
-        SpreadsheetService.appendRow(sheet, {
-          id: SpreadsheetService.generateId('JRB-'),
-          ...ratingRow,
-          createdAt: now
-        })
-      }
-    })
-
-    AuditService.log('SAVE_JRB', 'IPCRF', `Saved ${ratings.length} JRB ratings for form ${formId}`, user)
-    return { saved: ratings.length }
   }
 
   // ─────────────────────────────────────────────
@@ -471,11 +410,6 @@ const IpcrfService = (() => {
     return SpreadsheetService.getAllRows(sheet)
       .filter(r => r.formId === formId)
       .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0))
-  }
-
-  function _getJrbRatings(formId) {
-    const sheet = SpreadsheetService.getSheet(SHEET.JRB_RATINGS)
-    return SpreadsheetService.getAllRows(sheet).filter(r => r.formId === formId)
   }
 
   function _guardAccess(form, profile) {
@@ -533,7 +467,6 @@ const IpcrfService = (() => {
   return {
     list, get, create, update,
     submit, approve, return_, rate, finalize, computeScore,
-    listEntries, addEntry, updateEntry, deleteEntry,
-    listJrbRatings, saveJrbRatings
+    listEntries, addEntry, updateEntry, deleteEntry
   }
 })()

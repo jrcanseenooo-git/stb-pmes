@@ -1,131 +1,439 @@
 <template>
-  <div class="content">
-    <div class="flex-row jc-sb mb-12">
-      <div class="pill-tabs">
-        <div v-for="d in divTabs" :key="d" :class="['pill', activeDiv===d&&'active']" @click="activeDiv=d">{{ d }}</div>
+  <div class="acc-page">
+
+    <div class="page-hd">
+      <div>
+        <h2 class="page-title">Accomplishments</h2>
+        <p class="page-sub">Individual Performance Commitment and Review Entries</p>
       </div>
-      <button class="btn btn-primary">
-        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v11M1 6.5h11" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+      <button class="btn btn-primary" @click="openAddModal">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+          <path d="M6.5 1v11M1 6.5h11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
         New Entry
       </button>
     </div>
 
-    <div class="card">
-      <div class="card-hd">
-        <span class="card-title">Accomplishment Tracker — Q1 2025</span>
-        <div class="flex-row gap-6">
-          <button class="btn btn-sm">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 3h10M3 6h6M5 9h2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-            Status
-          </button>
-          <button class="btn btn-sm">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 4l4-3 4 3M2 8l4 3 4-3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            Sort
-          </button>
-        </div>
+    <!-- Filters -->
+    <div class="filter-bar">
+      <div class="status-tabs">
+        <button v-for="t in statusTabs" :key="t.value"
+          :class="['status-tab', activeStatus === t.value && 'active']"
+          @click="activeStatus = t.value">
+          {{ t.label }}
+          <span v-if="t.value !== 'All' && countByStatus(t.value)" class="tab-badge">{{ countByStatus(t.value) }}</span>
+        </button>
       </div>
-
-      <div class="table-wrap">
-        <table class="tbl">
-          <thead>
-            <tr>
-              <th>Employee</th><th>Division</th><th>KRA</th><th>Target / SI</th>
-              <th>Progress</th><th>Status</th><th>Deadline</th><th>MOV</th><th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(row, i) in rows" :key="i" :class="i%2===1?'stripe':''">
-              <td>
-                <div class="flex-row gap-6">
-                  <div class="av" :style="{ background: row.avatarColor }">{{ row.initials }}</div>
-                  <span>{{ row.name }}</span>
-                </div>
-              </td>
-              <td><span class="chip">{{ row.division }}</span></td>
-              <td class="text-xs muted">{{ row.kra }}</td>
-              <td class="text-xs">{{ row.target }}</td>
-              <td>
-                <div class="flex-row gap-6">
-                  <div class="prog-track"><div class="prog-fill" :style="{ width: row.pct+'%', background: row.progColor }"></div></div>
-                  <span class="text-xs">{{ row.progress }}</span>
-                </div>
-              </td>
-              <td><span :class="['status-badge', row.statusClass]">{{ row.status }}</span></td>
-              <td :class="['text-xs', row.overdue?'overdue':'muted']">{{ row.deadline }}{{ row.overdue?' ⚠':''}}</td>
-              <td><span :class="['badge', row.movClass]">{{ row.mov }}</span></td>
-              <td>
-                <button :class="['btn btn-xs', row.actionDanger?'danger':'']" @click="handleAction(row)">
-                  {{ row.action }}
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <div class="srch-wrap">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" class="srch-icon">
+          <circle cx="5" cy="5" r="4" stroke="#94A3B8" stroke-width="1.2"/>
+          <path d="M8.5 8.5l2 2" stroke="#94A3B8" stroke-width="1.2" stroke-linecap="round"/>
+        </svg>
+        <input v-model="search" type="text" class="srch-inp" placeholder="Search KRA, target, employee…"/>
       </div>
     </div>
+
+    <!-- Skeleton -->
+    <div v-if="loading" class="acc-table">
+      <div class="table-hd">
+        <div class="th" style="flex:1.2">Employee</div>
+        <div class="th" style="flex:1">KRA</div>
+        <div class="th" style="flex:1.5">Target / SI</div>
+        <div class="th" style="width:80px">Progress</div>
+        <div class="th" style="width:90px">Status</div>
+        <div class="th" style="width:80px">Deadline</div>
+        <div class="th" style="width:80px">Actions</div>
+      </div>
+      <div v-for="i in 5" :key="i" class="table-row">
+        <div class="td" style="flex:1.2"><div class="sk-line" style="width:80%"></div></div>
+        <div class="td" style="flex:1"><div class="sk-line" style="width:70%"></div></div>
+        <div class="td" style="flex:1.5"><div class="sk-line" style="width:90%"></div></div>
+        <div class="td" style="width:80px"><div class="sk-line" style="width:50px"></div></div>
+        <div class="td" style="width:90px"><div class="sk-line" style="width:70px"></div></div>
+        <div class="td" style="width:80px"><div class="sk-line" style="width:60px"></div></div>
+        <div class="td" style="width:80px"><div class="sk-line" style="width:50px"></div></div>
+      </div>
+    </div>
+
+    <!-- Empty -->
+    <div v-else-if="!filteredRows.length" class="empty-state">
+      <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+        <rect x="8" y="6" width="32" height="36" rx="3" stroke="#E2E8F0" stroke-width="2"/>
+        <path d="M16 16h16M16 22h16M16 28h10" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <p class="empty-title">{{ rows.length === 0 ? 'No entries yet' : 'No matching entries' }}</p>
+      <p class="empty-sub">{{ rows.length === 0 ? 'Click New Entry to add your first accomplishment.' : 'Try adjusting your filters.' }}</p>
+    </div>
+
+    <!-- Table -->
+    <div v-else class="acc-table">
+      <div class="table-hd">
+        <div class="th th-emp">Employee</div>
+        <div class="th th-kra">KRA</div>
+        <div class="th th-target">Target / SI</div>
+        <div class="th th-prog">Progress</div>
+        <div class="th th-status">Status</div>
+        <div class="th th-dl">Deadline</div>
+        <div class="th th-act">Actions</div>
+      </div>
+      <div v-for="row in filteredRows" :key="row.id" class="table-row" @click="openViewModal(row)">
+        <div class="td th-emp">
+          <div class="emp-cell">
+            <div class="av" :style="{ background: avatarColor(row.employeeName) }">{{ initials(row.employeeName) }}</div>
+            <div>
+              <div class="emp-name">{{ row.employeeName }}</div>
+              <div class="emp-div">{{ row.divisionName || '—' }}</div>
+            </div>
+          </div>
+        </div>
+        <div class="td th-kra text-muted">{{ row.kraName || '—' }}</div>
+        <div class="td th-target">{{ row.successIndicator || row.target || '—' }}</div>
+        <div class="td th-prog">
+          <div class="prog-wrap">
+            <div class="prog-track"><div class="prog-fill" :style="{ width: (row.progressPct || 0) + '%', background: progColor(row.progressPct) }"></div></div>
+            <span class="prog-label">{{ row.progressPct || 0 }}%</span>
+          </div>
+        </div>
+        <div class="td th-status">
+          <span :class="['status-badge', statusClass(row.status)]">{{ row.status }}</span>
+        </div>
+        <div class="td th-dl" :class="isOverdue(row.deadline) ? 'overdue' : 'text-muted'">
+          {{ fmtDate(row.deadline) }}{{ isOverdue(row.deadline) ? ' ⚠' : '' }}
+        </div>
+        <div class="td th-act" @click.stop>
+          <button v-if="canApprove && row.status === 'For Review'" class="btn btn-xs btn-success" @click="doApprove(row)">Approve</button>
+          <button v-if="canApprove && row.status === 'For Review'" class="btn btn-xs btn-warn" @click="openRevisionModal(row)">Revise</button>
+          <button class="btn btn-xs" @click="openEditModal(row)">Edit</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW MODAL -->
+    <teleport to="body">
+      <div v-if="showViewModal" class="modal-overlay" @click.self="showViewModal = false">
+        <div class="modal modal-view">
+          <div class="modal-hd">
+            <div>
+              <div style="display:flex;gap:6px;margin-bottom:6px">
+                <span :class="['status-badge', statusClass(viewItem?.status)]">{{ viewItem?.status }}</span>
+              </div>
+              <h3 class="modal-title">{{ viewItem?.kraName }}</h3>
+              <p class="modal-sub">{{ viewItem?.employeeName }} · {{ viewItem?.divisionName }}</p>
+            </div>
+            <button class="modal-close" @click="showViewModal = false">
+              <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M2 2l11 11M13 2L2 13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+            </button>
+          </div>
+          <div class="modal-body" v-if="viewItem">
+            <div class="view-section"><div class="view-label">Target / Success Indicator</div><div class="view-text">{{ viewItem.successIndicator || '—' }}</div></div>
+            <div class="view-section"><div class="view-label">Accomplishment</div><div class="view-text">{{ viewItem.accomplishment || '—' }}</div></div>
+            <div class="view-2col">
+              <div class="view-section"><div class="view-label">Progress</div><div class="view-text">{{ viewItem.progressPct || 0 }}%</div></div>
+              <div class="view-section"><div class="view-label">Deadline</div><div class="view-text">{{ fmtDate(viewItem.deadline) || '—' }}</div></div>
+            </div>
+            <div v-if="viewItem.remarks" class="view-section"><div class="view-label">Remarks</div><div class="view-text">{{ viewItem.remarks }}</div></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn" @click="showViewModal = false">Close</button>
+            <button class="btn btn-primary" @click="openEditModal(viewItem); showViewModal = false">Edit</button>
+          </div>
+        </div>
+      </div>
+    </teleport>
+
+    <!-- ADD / EDIT MODAL -->
+    <teleport to="body">
+      <div v-if="showFormModal" class="modal-overlay" @click.self="closeFormModal">
+        <div class="modal modal-form">
+          <div class="modal-hd">
+            <div class="modal-icon">
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="3" y="2" width="12" height="14" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M6 7h6M6 10h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+            </div>
+            <div>
+              <h3 class="modal-title">{{ editingItem ? 'Edit Entry' : 'New Accomplishment Entry' }}</h3>
+              <p class="modal-sub">Performance tracker</p>
+            </div>
+            <button class="modal-close" @click="closeFormModal">
+              <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M2 2l11 11M13 2L2 13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+            </button>
+          </div>
+          <div class="modal-body">
+            <div class="form-grid">
+              <div class="field full"><label class="field-label">KRA Name <span class="req">*</span></label><input v-model="form.kraName" type="text" class="field-input" placeholder="e.g. Research & Documentation"/></div>
+              <div class="field full"><label class="field-label">Success Indicator / Target <span class="req">*</span></label><textarea v-model="form.successIndicator" class="field-input" rows="2" placeholder="Specific target or output…"></textarea></div>
+              <div class="field full"><label class="field-label">Accomplishment</label><textarea v-model="form.accomplishment" class="field-input" rows="2" placeholder="What was actually accomplished…"></textarea></div>
+              <div class="field"><label class="field-label">Progress (%)</label><input v-model.number="form.progressPct" type="number" class="field-input" min="0" max="100"/></div>
+              <div class="field"><label class="field-label">Deadline</label><input v-model="form.deadline" type="date" class="field-input"/></div>
+              <div class="field"><label class="field-label">Status</label>
+                <select v-model="form.status" class="field-input">
+                  <option value="Not Started">Not Started</option>
+                  <option value="Ongoing">Ongoing</option>
+                  <option value="For Review">For Review</option>
+                  <option value="Completed">Completed</option>
+                  <option value="Delayed">Delayed</option>
+                </select>
+              </div>
+              <div class="field full"><label class="field-label">Remarks</label><input v-model="form.remarks" type="text" class="field-input" placeholder="Optional notes…"/></div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn" @click="closeFormModal">Cancel</button>
+            <button class="btn btn-primary" :disabled="saving" @click="saveEntry">
+              <span v-if="saving" class="spinner-sm"></span>
+              {{ saving ? 'Saving…' : (editingItem ? 'Save Changes' : 'Add Entry') }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </teleport>
+
+    <!-- REVISION MODAL -->
+    <teleport to="body">
+      <div v-if="showRevisionModal" class="modal-overlay" @click.self="showRevisionModal = false">
+        <div class="modal" style="max-width:420px">
+          <div class="modal-hd">
+            <div><h3 class="modal-title">Request Revision</h3><p class="modal-sub">{{ revisionItem?.kraName }}</p></div>
+            <button class="modal-close" @click="showRevisionModal = false"><svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M2 2l11 11M13 2L2 13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+          </div>
+          <div class="modal-body">
+            <div class="field"><label class="field-label">Remarks / Reason <span class="req">*</span></label><textarea v-model="revisionRemarks" class="field-input" rows="3" placeholder="Explain what needs to be revised…"></textarea></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn" @click="showRevisionModal = false">Cancel</button>
+            <button class="btn btn-warn" :disabled="saving" @click="doRevision">
+              {{ saving ? 'Sending…' : 'Request Revision' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </teleport>
+
+    <!-- Toast -->
+    <teleport to="body">
+      <transition name="toast-slide">
+        <div v-if="toast.show" :class="['toast', `toast-${toast.type}`]">{{ toast.msg }}</div>
+      </transition>
+    </teleport>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { accomplishmentsApi } from '@/services/api'
+import { useAuthStore } from '@/stores/auth'
 
-const activeDiv = ref('All Divisions')
-const divTabs = ['All Divisions','Admin Pool','Design Formulation','Pilot Implementation']
+const authStore = useAuthStore()
 
-const rows = [
-  { initials:'MS', name:'M. Santos',    avatarColor:'#2F80ED', division:'Admin Pool',  kra:'Admin Support',   target:'Conduct 4 staff trainings',    pct:100, progress:'4/4', progColor:'#27AE60', status:'Completed',    statusClass:'s-green',  deadline:'May 30', overdue:false, mov:'3 files', movClass:'badge-blue',   action:'View',   actionDanger:false },
-  { initials:'JC', name:'J. Cruz',      avatarColor:'#27AE60', division:'Design Form.', kra:'Program Planning',target:'Submit draft M&E framework',   pct:60,  progress:'60%', progColor:'#2F80ED', status:'For Revision', statusClass:'s-orange', deadline:'Jun 15', overdue:false, mov:'1 file',  movClass:'badge-gray',   action:'Review', actionDanger:false },
-  { initials:'RD', name:'R. Dela Cruz', avatarColor:'#E9A840', division:'Pilot Impl.', kra:'Pilot Monitoring', target:'Pilot test 2 barangays',        pct:50,  progress:'1/2', progColor:'#E9A840', status:'Ongoing',      statusClass:'s-blue',   deadline:'Jun 30', overdue:false, mov:'2 files', movClass:'badge-gray',   action:'View',   actionDanger:false },
-  { initials:'AL', name:'A. Lim',       avatarColor:'#EB5757', division:'STAE Div.',   kra:'Research & Docs', target:'Finalize evaluation report',    pct:20,  progress:'20%', progColor:'#EB5757', status:'Delayed',      statusClass:'s-red',    deadline:'Apr 30', overdue:true,  mov:'0 files', movClass:'badge-gray',   action:'Flag',   actionDanger:true  },
-  { initials:'PG', name:'P. Garcia',    avatarColor:'#9B59B6', division:'Admin Pool',  kra:'Admin Support',   target:'Update operations manual',      pct:0,   progress:'0%',  progColor:'#E2E8F0', status:'Not Started',  statusClass:'s-gray',   deadline:'Jul 15', overdue:false, mov:'0 files', movClass:'badge-gray',   action:'Start',  actionDanger:false }
+const rows         = ref([])
+const loading      = ref(false)
+const saving       = ref(false)
+const search       = ref('')
+const activeStatus = ref('All')
+const showViewModal     = ref(false)
+const showFormModal     = ref(false)
+const showRevisionModal = ref(false)
+const viewItem     = ref(null)
+const editingItem  = ref(null)
+const revisionItem = ref(null)
+const revisionRemarks = ref('')
+const toast = ref({ show: false, msg: '', type: 'success' })
+
+const form = ref({
+  kraName: '', successIndicator: '', accomplishment: '',
+  progressPct: 0, deadline: '', status: 'Not Started', remarks: ''
+})
+
+const statusTabs = [
+  { label: 'All',         value: 'All'         },
+  { label: 'Not Started', value: 'Not Started' },
+  { label: 'Ongoing',     value: 'Ongoing'     },
+  { label: 'For Review',  value: 'For Review'  },
+  { label: 'Completed',   value: 'Completed'   },
+  { label: 'Delayed',     value: 'Delayed'     }
 ]
 
-function handleAction(row) { console.log('Action:', row.action, row.name) }
+const canApprove = computed(() =>
+  ['System Administrator', 'Bureau Director', 'Assistant Bureau Director', 'Division Chief'].includes(authStore.role)
+)
+
+const filteredRows = computed(() => {
+  let r = rows.value
+  if (activeStatus.value !== 'All') r = r.filter(x => x.status === activeStatus.value)
+  if (search.value) {
+    const q = search.value.toLowerCase()
+    r = r.filter(x =>
+      (x.kraName || '').toLowerCase().includes(q) ||
+      (x.successIndicator || '').toLowerCase().includes(q) ||
+      (x.employeeName || '').toLowerCase().includes(q)
+    )
+  }
+  return r
+})
+
+function countByStatus(s) { return rows.value.filter(r => r.status === s).length }
+function initials(name) { return (name || '').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() }
+function avatarColor(name) { const colors = ['#2F80ED','#27AE60','#E9A840','#9B59B6','#EB5757','#1A56B0']; return colors[name?.length % colors.length] || '#2F80ED' }
+function progColor(pct) { if (pct >= 100) return '#27AE60'; if (pct >= 60) return '#2F80ED'; if (pct >= 30) return '#E9A840'; return '#EB5757' }
+function isOverdue(d) { return d && new Date(d) < new Date() }
+function fmtDate(iso) { return iso ? new Date(iso).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' }) : '' }
+function showToast(msg, type = 'success') { toast.value = { show: true, msg, type }; setTimeout(() => { toast.value.show = false }, 3500) }
+
+function statusClass(s) {
+  const m = { 'Completed': 'st-green', 'Ongoing': 'st-blue', 'For Review': 'st-orange', 'Delayed': 'st-red', 'Approved': 'st-green', 'For Revision': 'st-orange' }
+  return m[s] || 'st-gray'
+}
+
+function openAddModal() { editingItem.value = null; form.value = { kraName: '', successIndicator: '', accomplishment: '', progressPct: 0, deadline: '', status: 'Not Started', remarks: '' }; showFormModal.value = true }
+function openEditModal(item) { editingItem.value = item; form.value = { kraName: item.kraName || '', successIndicator: item.successIndicator || '', accomplishment: item.accomplishment || '', progressPct: Number(item.progressPct) || 0, deadline: item.deadline ? item.deadline.split('T')[0] : '', status: item.status || 'Not Started', remarks: item.remarks || '' }; showFormModal.value = true }
+function openViewModal(item) { viewItem.value = item; showViewModal.value = true }
+function openRevisionModal(item) { revisionItem.value = item; revisionRemarks.value = ''; showRevisionModal.value = true }
+function closeFormModal() { showFormModal.value = false; editingItem.value = null }
+
+onMounted(loadRows)
+
+async function loadRows() {
+  loading.value = true
+  try {
+    const r = await accomplishmentsApi.list()
+    rows.value = r?.items || (Array.isArray(r) ? r : [])
+  } catch (e) { showToast(`Could not load: ${e.message}`, 'error') }
+  finally { loading.value = false }
+}
+
+async function saveEntry() {
+  if (!form.value.kraName || !form.value.successIndicator) { showToast('KRA name and target are required', 'error'); return }
+  saving.value = true
+  try {
+    if (editingItem.value) {
+      const u = await accomplishmentsApi.update(editingItem.value.id, form.value)
+      const i = rows.value.findIndex(r => r.id === editingItem.value.id)
+      if (i !== -1) rows.value[i] = { ...rows.value[i], ...u }
+      showToast('Entry updated')
+    } else {
+      const created = await accomplishmentsApi.create(form.value)
+      rows.value.unshift(created)
+      showToast('Entry added')
+    }
+    closeFormModal()
+  } catch (e) { showToast(e.message, 'error') }
+  finally { saving.value = false }
+}
+
+async function doApprove(row) {
+  try {
+    const u = await accomplishmentsApi.approve(row.id, '')
+    const i = rows.value.findIndex(r => r.id === row.id)
+    if (i !== -1) rows.value[i] = { ...rows.value[i], ...u }
+    showToast('Entry approved')
+  } catch (e) { showToast(e.message, 'error') }
+}
+
+async function doRevision() {
+  if (!revisionRemarks.value) { showToast('Please enter revision remarks', 'error'); return }
+  saving.value = true
+  try {
+    const u = await accomplishmentsApi.requestRevision(revisionItem.value.id, revisionRemarks.value)
+    const i = rows.value.findIndex(r => r.id === revisionItem.value.id)
+    if (i !== -1) rows.value[i] = { ...rows.value[i], ...u }
+    showRevisionModal.value = false
+    showToast('Revision requested')
+  } catch (e) { showToast(e.message, 'error') }
+  finally { saving.value = false }
+}
 </script>
 
-<style scoped>
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
-*{box-sizing:border-box;}
-.content{padding:16px 20px 20px;font-family:'DM Sans',sans-serif;font-size:13px;color:#1A2332;}
-.flex-row{display:flex;align-items:center;}
-.jc-sb{justify-content:space-between;}
-.gap-6{gap:6px;}
-.mb-12{margin-bottom:12px;}
-.pill-tabs{display:flex;gap:4px;flex-wrap:wrap;}
-.pill{padding:4px 12px;border-radius:20px;font-size:11px;cursor:pointer;border:1px solid #E2E8F0;color:#718096;transition:all .15s;}
-.pill.active{background:#2F80ED;color:#fff;border-color:#2F80ED;}
-.btn{display:inline-flex;align-items:center;gap:5px;padding:6px 11px;border-radius:6px;font-size:11px;cursor:pointer;border:1px solid #E2E8F0;background:#fff;color:#4A5568;transition:all .15s;font-family:'DM Sans',sans-serif;}
-.btn:hover{background:#F7FAFC;border-color:#2F80ED;color:#2F80ED;}
-.btn-primary{background:#2F80ED;color:#fff;border-color:#2F80ED;}
-.btn-primary:hover{background:#1a6cd4;color:#fff;}
-.btn-sm{padding:3px 8px;font-size:10px;}
-.btn-xs{padding:2px 8px;font-size:10px;}
-.btn-xs.danger{border-color:#EB5757;color:#EB5757;}
-.card{background:#fff;border:1px solid #E2E8F0;border-radius:12px;overflow:hidden;}
-.card-hd{padding:12px 14px;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;justify-content:space-between;}
-.card-title{font-size:12px;font-weight:600;color:#1A2332;}
-.table-wrap{overflow-x:auto;}
-.tbl{width:100%;border-collapse:collapse;font-size:11px;}
-.tbl th{padding:8px 10px;text-align:left;color:#718096;font-weight:500;border-bottom:1px solid #E2E8F0;white-space:nowrap;font-size:10px;text-transform:uppercase;letter-spacing:.3px;background:#F7FAFC;}
-.tbl td{padding:9px 10px;border-bottom:1px solid #E2E8F0;color:#4A5568;vertical-align:middle;}
-.tbl tr:last-child td{border-bottom:none;}
-.tbl tr:hover td{background:#F7FAFC;}
-.stripe td{background:rgba(47,128,237,.03);}
-.av{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:#fff;flex-shrink:0;}
-.chip{display:inline-flex;padding:2px 7px;border-radius:4px;font-size:9px;font-weight:500;background:#F7FAFC;border:1px solid #E2E8F0;color:#718096;}
-.text-xs{font-size:10px;}
-.muted{color:#718096;}
-.overdue{color:#EB5757;font-weight:500;}
-.prog-track{width:60px;height:6px;background:#EDF2F7;border-radius:4px;overflow:hidden;flex-shrink:0;}
-.prog-fill{height:100%;border-radius:4px;transition:width .5s;}
-.badge{display:inline-flex;padding:2px 7px;border-radius:20px;font-size:10px;font-weight:500;}
-.badge-blue{background:#EBF4FF;color:#1A56B0;}
-.badge-gray{background:#F0F4F8;color:#4A5568;}
-/* Status badges */
-.status-badge{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:20px;font-size:10px;font-weight:500;}
-.s-green {background:#E6F4EA;color:#1E7E34;}
-.s-blue  {background:#EBF4FF;color:#1A56B0;}
-.s-orange{background:#FEF3E2;color:#B35A0F;}
-.s-red   {background:#FDECEC;color:#C0392B;}
-.s-gray  {background:#F0F4F8;color:#4A5568;}
+<style>
+.acc-page { padding: 16px 20px 32px; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif; font-size: 13px; color: #1A2332; min-height: 100%; }
+.page-hd { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 16px; }
+.page-title { font-size: 20px; font-weight: 700; color: #0F172A; margin: 0 0 3px; letter-spacing: -.3px; }
+.page-sub { font-size: 12px; color: #94A3B8; margin: 0; }
+.filter-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.status-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+.status-tab { padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; border: 1px solid #E2E8F0; background: #fff; color: #64748B; cursor: pointer; transition: all .15s; font-family: inherit; }
+.status-tab:hover { border-color: #CBD5E1; }
+.status-tab.active { background: #0D2137; color: #fff; border-color: #0D2137; }
+.tab-badge { background: #3B82F6; color: #fff; border-radius: 10px; font-size: 10px; padding: 1px 5px; margin-left: 3px; }
+.srch-wrap { position: relative; }
+.srch-icon { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); pointer-events: none; }
+.srch-inp { padding: 7px 11px 7px 28px; border: 1px solid #E2E8F0; border-radius: 8px; font-size: 12px; font-family: inherit; color: #0F172A; outline: none; width: 240px; background: #fff; }
+.srch-inp:focus { border-color: #3B82F6; }
+.acc-table { background: #fff; border: 1px solid #E2E8F0; border-radius: 12px; overflow: hidden; }
+.table-hd { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: #F8FAFC; border-bottom: 1px solid #E2E8F0; }
+.th { font-size: 10px; font-weight: 700; color: #94A3B8; text-transform: uppercase; letter-spacing: .06em; flex-shrink: 0; }
+.th-emp { flex: 1.2; }
+.th-kra { flex: 0.8; }
+.th-target { flex: 1.5; }
+.th-prog { width: 100px; }
+.th-status { width: 100px; }
+.th-dl { width: 90px; }
+.th-act { width: 120px; }
+.table-row { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid #F1F5F9; cursor: pointer; transition: background .12s; }
+.table-row:last-child { border-bottom: none; }
+.table-row:hover { background: #F8FBFF; }
+.td { font-size: 12px; color: #374151; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.td.th-emp { flex: 1.2; overflow: visible; white-space: normal; }
+.td.th-kra { flex: 0.8; }
+.td.th-target { flex: 1.5; }
+.td.th-prog { width: 100px; }
+.td.th-status { width: 100px; }
+.td.th-dl { width: 90px; }
+.td.th-act { width: 120px; display: flex; gap: 4px; }
+.emp-cell { display: flex; align-items: center; gap: 8px; }
+.av { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: #fff; flex-shrink: 0; }
+.emp-name { font-size: 12px; font-weight: 600; color: #0F172A; }
+.emp-div { font-size: 10px; color: #94A3B8; }
+.text-muted { color: #94A3B8; font-size: 11px; }
+.overdue { color: #EB5757; font-weight: 500; font-size: 11px; }
+.prog-wrap { display: flex; align-items: center; gap: 6px; }
+.prog-track { flex: 1; height: 5px; background: #F1F5F9; border-radius: 4px; overflow: hidden; }
+.prog-fill { height: 100%; border-radius: 4px; transition: width .5s; }
+.prog-label { font-size: 10px; color: #64748B; flex-shrink: 0; }
+.status-badge { display: inline-flex; padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: 500; }
+.st-green  { background: #F0FDF4; color: #15803D; }
+.st-blue   { background: #EBF4FF; color: #1A56B0; }
+.st-orange { background: #FEF3E2; color: #B45309; }
+.st-red    { background: #FEF2F2; color: #B91C1C; }
+.st-gray   { background: #F8FAFC; color: #64748B; }
+.empty-state { display: flex; flex-direction: column; align-items: center; padding: 64px 0; gap: 8px; }
+.empty-title { font-size: 15px; font-weight: 600; color: #374151; margin: 4px 0 0; }
+.empty-sub { font-size: 13px; color: #94A3B8; margin: 0 0 8px; }
+@keyframes shimmer { 0% { background-position: 200% 0 } 100% { background-position: -200% 0 } }
+.sk-line { background: linear-gradient(90deg,#E2E8F0 25%,#F1F5F9 50%,#E2E8F0 75%); background-size: 200%; animation: shimmer 1.4s infinite; border-radius: 4px; height: 12px; display: block; }
+.btn { display: inline-flex; align-items: center; gap: 5px; padding: 7px 13px; border-radius: 8px; font-size: 12px; cursor: pointer; border: 1px solid #E2E8F0; background: #fff; color: #374151; transition: all .15s; font-family: inherit; font-weight: 500; }
+.btn:hover { border-color: #CBD5E1; background: #F8FAFC; }
+.btn:disabled { opacity: .55; cursor: not-allowed; }
+.btn-primary { background: #0D2137; color: #fff; border-color: #0D2137; }
+.btn-primary:hover:not(:disabled) { background: #1e3f61; }
+.btn-success { background: #F0FDF4; color: #15803D; border-color: #BBF7D0; font-size: 11px; padding: 4px 9px; }
+.btn-warn { background: #FEF3E2; color: #B45309; border-color: #FDE68A; font-size: 11px; padding: 4px 9px; }
+.btn-xs { padding: 4px 9px; font-size: 11px; }
+.req { color: #EF4444; font-size: 11px; }
+.modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.5); display: flex; align-items: center; justify-content: center; z-index: 300; padding: 16px; backdrop-filter: blur(4px); }
+.modal { background: #fff; border-radius: 16px; width: 100%; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 24px 64px rgba(0,0,0,.2); overflow: hidden; }
+.modal-view { max-width: 560px; }
+.modal-form { max-width: 560px; }
+.modal-hd { display: flex; align-items: flex-start; gap: 12px; padding: 20px 24px 16px; border-bottom: 1px solid #F1F5F9; background: #FAFBFF; flex-shrink: 0; }
+.modal-icon { width: 36px; height: 36px; border-radius: 10px; background: #EBF4FF; color: #2F80ED; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.modal-title { font-size: 15px; font-weight: 700; color: #0F172A; margin: 0 0 2px; }
+.modal-sub { font-size: 12px; color: #94A3B8; margin: 0; }
+.modal-close { margin-left: auto; background: none; border: none; cursor: pointer; padding: 6px; border-radius: 8px; color: #94A3B8; }
+.modal-close:hover { background: #F1F5F9; color: #374151; }
+.modal-body { padding: 20px 24px; overflow-y: auto; flex: 1; }
+.modal-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 24px; border-top: 1px solid #F1F5F9; background: #F8FAFC; flex-shrink: 0; }
+.view-section { margin-bottom: 16px; }
+.view-label { font-size: 10px; font-weight: 700; color: #94A3B8; text-transform: uppercase; letter-spacing: .07em; margin-bottom: 5px; }
+.view-text { font-size: 13px; color: #1A2332; line-height: 1.6; }
+.view-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.field { display: flex; flex-direction: column; gap: 5px; }
+.full { grid-column: span 2; }
+.field-label { font-size: 11px; font-weight: 600; color: #374151; }
+.field-input { padding: 9px 12px; border: 1.5px solid #E2E8F0; border-radius: 9px; font-size: 13px; font-family: inherit; color: #0F172A; background: #fff; outline: none; transition: border-color .15s; resize: vertical; }
+.field-input:focus { border-color: #3B82F6; box-shadow: 0 0 0 3px rgba(59,130,246,.1); }
+.spinner-sm { display: inline-block; width: 11px; height: 11px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .6s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg) } }
+.toast { position: fixed; bottom: 24px; right: 24px; background: #0F172A; color: #fff; padding: 10px 16px; border-radius: 10px; font-size: 13px; box-shadow: 0 8px 24px rgba(0,0,0,.2); z-index: 9999; pointer-events: none; }
+.toast-error { background: #EB5757; }
+.toast-slide-enter-active, .toast-slide-leave-active { transition: all .25s; }
+.toast-slide-enter-from, .toast-slide-leave-to { opacity: 0; transform: translateY(8px); }
 </style>

@@ -96,19 +96,6 @@ const Router = (() => {
         break
 
       // ─────────────────────────────────────────
-      // Evaluations
-      // evaluations/compute and evaluations/history are action routes (id = action)
-      // evaluations/:id is a real-id route
-      // ─────────────────────────────────────────
-      case 'evaluations':
-        if (!id && method === 'GET') return EvaluationService.list(params, user)
-        if (id === 'compute') return EvaluationService.compute(body.userId, body.period, user)
-        if (id === 'history' && sub) return EvaluationService.history(sub, user)   // evaluations/history/:userId
-        if (id && !sub && method === 'GET') return EvaluationService.get(id, user)
-        if (id && !sub && method === 'PUT') return EvaluationService.update(id, body, user)
-        break
-
-      // ─────────────────────────────────────────
       // Reports
       // ─────────────────────────────────────────
       case 'reports':
@@ -167,33 +154,6 @@ const Router = (() => {
           if (subId && method === 'PUT') return IpcrfService.updateEntry(id, subId, body, user)
           if (subId && method === 'DELETE') return IpcrfService.deleteEntry(id, subId, user)
         }
-        if (id && sub === 'jrb') {
-          if (method === 'GET') return IpcrfService.listJrbRatings(id, user)
-          if (method === 'POST') return IpcrfService.saveJrbRatings(id, body, user)
-        }
-        break
-
-      // ─────────────────────────────────────────
-      // Attendance
-      // attendance/compute-rating and attendance/ratings are action routes
-      // ─────────────────────────────────────────
-      case 'attendance':
-        if (!id && method === 'GET') return AttendanceService.list(params, user)
-        if (!id && method === 'POST') return AttendanceService.record(body, user)
-        if (id === 'compute-rating') return AttendanceService.computeRating(body, user)
-        if (id === 'ratings') return AttendanceService.listRatings(params, user)
-        if (id && method === 'GET') return AttendanceService.get(id, user)
-        if (id && method === 'PUT') return AttendanceService.update(id, body, user)
-        break
-
-      // ─────────────────────────────────────────
-      // Peer Assignments
-      // ─────────────────────────────────────────
-      case 'peer-assignments':
-        if (!id && method === 'GET') return PeerAssignmentService.list(params, user)
-        if (!id && method === 'POST') return PeerAssignmentService.assign(body, user)
-        if (id && method === 'GET') return PeerAssignmentService.get(id, user)
-        if (id && sub === 'complete') return PeerAssignmentService.markComplete(id, body, user)
         break
 
       // IPAT

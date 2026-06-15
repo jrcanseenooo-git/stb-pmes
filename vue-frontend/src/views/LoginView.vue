@@ -20,16 +20,13 @@
             </div>
           </div>
           <div class="org-text">
-            <div class="org-abbr">DSWD · STB</div>
-            <div class="org-full">Department of Social Welfare<br>and Development</div>
+            <div class="org-abbr">Performance Monitoring &amp; Evaluation System</div>
+            <div class="org-full">Department of Social Welfare and Development</div>
           </div>
         </div>
 
         <!-- Hero -->
         <div class="hero-block">
-          <div class="system-tag">
-            Performance Monitoring &amp; Evaluation System
-          </div>
           <h1 class="hero-headline">
             Monitor.<br>Evaluate.<br>Deliver.
           </h1>
@@ -46,12 +43,6 @@
       <div class="right-bg" aria-hidden="true"></div>
 
       <div class="form-shell">
-
-        <!-- Status chip -->
-        <div class="status-chip">
-          <span class="chip-dot"></span>
-          Secure Access Portal
-        </div>
 
         <!-- Heading -->
         <div class="form-heading">
@@ -159,7 +150,7 @@
             <path d="M6.5 1.5L2 3.5V6.5c0 2.76 2 5.15 4.5 5.5C9 11.65 11 9.26 11 6.5V3.5L6.5 1.5z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
             <path d="M4.5 6.5l1.5 1.5 2.5-2.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
-          Access is restricted to authorized DSWD–STB personnel only.
+          Access is restricted to DSWD STB personnel only.
         </div>
 
         <p class="form-footer">DSWD · Social Technology Bureau · {{ currentYear }} · v2.0</p>
@@ -365,18 +356,6 @@ function cellStyle(i) {
   min-height: 0;
 }
 
-.system-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  font-size: 10px;
-  font-weight: 600;
-  color: rgba(255,255,255,.38);
-  text-transform: uppercase;
-  letter-spacing: 1.5px;
-  margin-bottom: 24px;
-}
-
 .hero-headline {
   font-family: 'Plus Jakarta Sans', sans-serif;
   font-size: clamp(44px, 4.5vw, 64px);
@@ -524,34 +503,6 @@ function cellStyle(i) {
   top: 0; left: 0; right: 0;
   height: 4px;
   border-radius: 22px 22px 0 0;
-}
-
-/* ── Status chip ── */
-.status-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 11px;
-  background: #EEF4FF;
-  border: 1px solid #C7D9FF;
-  border-radius: 20px;
-  font-size: 10px;
-  font-weight: 700;
-  color: #1749C5;
-  text-transform: uppercase;
-  letter-spacing: .8px;
-  margin-bottom: 16px;
-}
-
-.chip-dot {
-  width: 6px; height: 6px;
-  background: #0038A8;
-  border-radius: 50%;
-  animation: chipPulse 2.2s ease-in-out infinite;
-}
-@keyframes chipPulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50%       { opacity: .5; transform: scale(.7); }
 }
 
 /* ── Form heading ── */

@@ -154,6 +154,33 @@ export const evaluationApi = {
   history: (userId)         => gasGet(`evaluations/history/${userId}`)
 }
 
+
+// ── IPAT ────────────────────────────────────────
+// Innovations Performance Assessment Tool
+
+export const ipatApi = {
+  // Records
+  list:         (p = {})       => gasGet('ipat', p),
+  get:          (id)            => gasGet(`ipat/${id}`),
+  create:       (data)          => gasWrite('POST',  'ipat', data),
+  updateStatus: (id, status)    => gasWrite('PATCH', `ipat/${id}/status`, { status }),
+
+  // Core Behavioral Competencies
+  saveCBCRatings: (id, ratings) => gasWrite('POST',  `ipat/${id}/cbc`,         { ratings }),
+  computeCBC:     (id)          => gasWrite('POST',  `ipat/${id}/cbc/compute`),
+
+  // Job Fitness
+  saveJFRatings:  (id, ratings) => gasWrite('POST',  `ipat/${id}/jf`,          { ratings }),
+  computeJF:      (id)          => gasWrite('POST',  `ipat/${id}/jf/compute`),
+
+  // Overall
+  computeOverall: (id)          => gasWrite('POST',  `ipat/${id}/compute`),
+
+  // Meta
+  getThemes:        ()          => gasGet('ipat/themes'),
+  getJFIndicators:  ()          => gasGet('ipat/jf-indicators')
+}
+
 // ── Reports ────────────────────────────────────
 
 export const reportsApi = {

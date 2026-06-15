@@ -663,10 +663,11 @@ function _syncRecord(updated) {
 async function saveCBCRatings() {
   const ratings = []
   HEARTWORK_THEMES.forEach(theme => {
-    theme.indicators.forEach((indicator, idx) => {
+    theme.indicators.forEach((_, idx) => {
       const rating = getCBCRating(theme.id, idx)
       if (rating !== null) {
-        ratings.push({ themeId: theme.id, themeName: theme.label, indicator, indicatorIdx: idx, rating, raterType: cbcRaterType.value })
+        // Only send minimal fields — full indicator text causes URL to exceed GAS limits
+        ratings.push({ themeId: theme.id, themeName: theme.label, indicatorIdx: idx, rating, raterType: cbcRaterType.value })
       }
     })
   })
@@ -703,12 +704,13 @@ async function saveFPO() {
 
 // ── JF ──
 async function saveJFRatings() {
-  const ratings = JF_INDICATORS.map((ind, idx) => ({
-    indicator: ind, indicatorIdx: idx,
+  const ratings = JF_INDICATORS.map((_, idx) => ({
+    // Only send minimal fields — full indicator text causes URL to exceed GAS limits
+    indicatorIdx: idx,
     rating: getJFRating(idx) || 1,
     evidence: jfEvidence.value[idx] || '',
     raterType: jfRaterType.value
-  })).filter(r => getJFRating(r.indicatorIdx) !== null)
+  })).filter((_, idx) => getJFRating(idx) !== null)
   if (!ratings.length) { showToast('Please rate at least one indicator', 'error'); return }
   savingJF.value = true
   try {

@@ -16,10 +16,6 @@ const SHEET = {
   // ── Previously missing – now added ──
   IPCRF_FORMS:        'IPCRForms',
   FORM_ENTRIES:       'FormEntries',
-  JRB_RATINGS:        'JRBRatings',
-  PEER_ASSIGNMENTS:   'PeerAssignments',
-  ATTENDANCE_RECORDS: 'AttendanceRecords',
-  ATTENDANCE_RATINGS: 'AttendanceRatings',
   MASTER_KRA_LIBRARY: 'MasterKRALibrary',
 
   // ── IPAT (Innovations Performance Assessment Tool) ──

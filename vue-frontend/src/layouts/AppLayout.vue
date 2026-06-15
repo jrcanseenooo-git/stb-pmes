@@ -35,6 +35,29 @@
             </div>
             <transition name="fade"><span v-if="!collapsed" class="nav-label-text">Dashboard</span></transition>
           </RouterLink>
+          <RouterLink v-if="canManageUsers" to="/kra" class="nav-item" active-class="active" :title="collapsed ? 'KRA Library' : ''">
+            <div class="nav-icon">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.4"/>
+                <path d="M5 5h6M5 8h6M5 11h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <transition name="fade"><span v-if="!collapsed" class="nav-label-text">KRA Library</span></transition>
+          </RouterLink>
+          <RouterLink to="/evaluation" class="nav-item" active-class="active" :title="collapsed ? 'Evaluation' : ''">
+            <div class="nav-icon">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M8 1.5l1.8 3.5 3.9.6-2.85 2.75.67 3.9L8 10.4l-3.52 1.85.67-3.9L2.3 5.6l3.9-.6L8 1.5z"
+                  stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" />
+              </svg>
+            </div>
+            <transition name="fade"><span v-if="!collapsed" class="nav-label-text">Evaluation</span></transition>
+          </RouterLink>
+        </div>
+
+        <div class="nav-group">
+          <div v-if="!collapsed" class="nav-label">Monitoring</div>
+          <div v-else class="nav-divider"></div>
           <RouterLink to="/ipcrf" class="nav-item" active-class="active" :title="collapsed ? 'KRA & Targets' : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -75,7 +98,7 @@
         </div>
 
         <div class="nav-group">
-          <div v-if="!collapsed" class="nav-label">Monitoring</div>
+          <div v-if="!collapsed" class="nav-label">Administration</div>
           <div v-else class="nav-divider"></div>
           <RouterLink to="/reports" class="nav-item" active-class="active" :title="collapsed ? 'Reports' : ''">
             <div class="nav-icon">
@@ -85,15 +108,6 @@
               </svg>
             </div>
             <transition name="fade"><span v-if="!collapsed" class="nav-label-text">Reports</span></transition>
-          </RouterLink>
-          <RouterLink to="/evaluation" class="nav-item" active-class="active" :title="collapsed ? 'Evaluation' : ''">
-            <div class="nav-icon">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path d="M8 1.5l1.8 3.5 3.9.6-2.85 2.75.67 3.9L8 10.4l-3.52 1.85.67-3.9L2.3 5.6l3.9-.6L8 1.5z"
-                  stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" />
-              </svg>
-            </div>
-            <transition name="fade"><span v-if="!collapsed" class="nav-label-text">Evaluation</span></transition>
           </RouterLink>
           <RouterLink to="/audit" class="nav-item" active-class="active" :title="collapsed ? 'Audit Trail' : ''">
             <div class="nav-icon">
@@ -105,20 +119,6 @@
               </svg>
             </div>
             <transition name="fade"><span v-if="!collapsed" class="nav-label-text">Audit Trail</span></transition>
-          </RouterLink>
-        </div>
-
-        <div class="nav-group">
-          <div v-if="!collapsed" class="nav-label">Administration</div>
-          <div v-else class="nav-divider"></div>
-          <RouterLink v-if="canManageUsers" to="/kra" class="nav-item" active-class="active" :title="collapsed ? 'KRA Library' : ''">
-            <div class="nav-icon">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.4"/>
-                <path d="M5 5h6M5 8h6M5 11h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-              </svg>
-            </div>
-            <transition name="fade"><span v-if="!collapsed" class="nav-label-text">KRA Library</span></transition>
           </RouterLink>
           <RouterLink v-if="canManageUsers" to="/users" class="nav-item" active-class="active" :title="collapsed ? 'User Management' : ''">
             <div class="nav-icon">

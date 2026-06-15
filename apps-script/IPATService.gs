@@ -2,108 +2,109 @@
  * IPATService.gs
  * ─────────────────────────────────────────────────────────────────────────────
  * Innovations Performance Assessment Tool (IPAT)
- * Supplemental evaluation system per AO No. 11 s. 2025 (DSPMS)
+ * Per AO No. 11 s. 2025 — DSWD DSPMS / Innovations Cluster
  *
  * THREE DOMAINS:
- *   A. Core Behavioral Competencies (CBC) — 30%  — 5 HEARTWORK values, 5 indicators each
- *   B. Functional Performance Output  (FPO) — 55%  — IPCRF/DPCR score (from IPCRFService)
- *   C. Job Fitness                    (JF)  — 15%  — 7 alignment indicators
+ *   A. Core Behavioral Competencies (CBC) — 30%
+ *      5 HEARTWORK values · 5 indicators each · 1–4 Likert
+ *      Multi-rater: Self(15%) + Peer(15%) + Sub(15%) + Supervisor(30%) + Skip(25%)
+ *      If no subordinate: Peer becomes 30%
  *
- * FINAL FORMULA:
- *   Overall = (CBCI × 0.30) + (FPOI × 0.55) + (JFI × 0.15)
+ *   B. Functional Performance Output (FPO) — 55%
+ *      IPCRF/DPCR final numerical rating (1–5 scale, converted to 1–4)
  *
- * CBC MULTI-RATER WEIGHTS:
- *   Self: 15% | Peer: 15% (or 30% if no subordinate) | Subordinate: 15%
- *   Immediate Supervisor: 30% | Skip Supervisor: 25%
+ *   C. Job Fitness (JF) — 15%
+ *      7 indicators · Self + Immediate Supervisor + Skip Supervisor ÷ 3
  *
- * RATING SCALE (CBC & JF):  1-4 Likert
- *   1 = Rarely/Never | 2 = Sometimes | 3 = Most of the Time | 4 = Always
+ * FORMULA: Overall = (CBCI × 0.30) + (FPOI × 0.55) + (JFI × 0.15)
  *
- * QUALITATIVE DESCRIPTORS:
- *   3.50–4.00 = Excellent Alignment
- *   2.50–3.49 = Satisfactory Alignment
- *   1.50–2.49 = Needs Development
- *   1.00–1.49 = Requires Immediate Intervention
+ * DESCRIPTORS:
+ *   3.50–4.00 → Excellent Alignment
+ *   2.50–3.49 → Satisfactory Alignment
+ *   1.50–2.49 → Needs Development
+ *   1.00–1.49 → Requires Immediate Intervention
  */
 
 const IPATService = (() => {
 
-  // ── HEARTWORK competency themes and their indicators ──
+  // ── HEARTWORK Competency Themes ──────────────────────────────────────────
+  // Exact indicators per the Innovations Unified Performance Audit Tool document
   const HEARTWORK_THEMES = [
     {
       id: 'makatao',
       label: 'Makatao',
-      description: 'Human worth, dignity, inclusivity, equity, and human rights',
+      description: 'Human worth, dignity, inclusivity, equity, and human rights in social work and public service',
       indicators: [
-        'Champions equality and social justice in program designs and practices',
-        'Integrates HRBA, GEDSI, and cultural inclusivity into work outputs',
-        'Centers the needs of marginalized and vulnerable groups in decision-making',
-        'Advocates for evidence and rights-based solutions that empower communities',
-        'Demonstrates sensitivity to diverse identities, cultures, and lived experiences'
+        'Championing Equality and Social Justice: actively leads efforts to embed equity and social justice principles into program designs and practices, ensuring that every output serves as a meaningful protection and empowerment mechanism for the most vulnerable sectors',
+        'Embodying Compassion and Respect: consistently models and promotes a culture of compassion and respect in all professional interactions and outputs; actively ensures that program designs and workplace practices honor the diverse identities, backgrounds, and lived experiences of clients and colleagues',
+        'Promoting Cultural Competence: demonstrates awareness, understanding, and respect for diverse cultural identities, beliefs, values, and practices; integrates culturally responsive approaches in communication, service delivery, and decision-making',
+        'Driving Inclusive Practices: actively promotes and integrates inclusive principles into programs, policies, services, and workplace practices; ensures equitable access to opportunities, resources, and participation for individuals of diverse backgrounds',
+        'Empowering Communities: consistently places community well-being and voice at the center of all program development and innovation work; designs and champions meaningful participation mechanisms that position communities as active decision-makers'
       ]
     },
     {
       id: 'mapagpalaya',
       label: 'Mapagpalaya',
-      description: 'Empowerment, advocacy, liberation, and transformative social work',
+      description: 'Empowerment, advocacy, liberation, and transformative social work through innovative programs',
       indicators: [
-        'Facilitates participatory approaches that empower communities and stakeholders',
-        'Advocates for policies and programs that address root causes of social issues',
-        'Supports individuals and groups in exercising their rights and capabilities',
-        'Challenges systemic barriers and structures that perpetuate inequality',
-        'Demonstrates a strengths-based and empowerment-oriented approach in work'
+        'Foster Client Autonomy: promotes client self-determination by ensuring that programs, services, and interventions respect individual choice, encourage informed decision-making, and reduce dependency; creates opportunities for beneficiaries to actively participate in shaping solutions',
+        'Build Resilience and Independence: strengthens the capacity of individuals, families, and communities to overcome challenges, adapt to changing circumstances, and sustain positive outcomes beyond program support',
+        'Collaborate for Change: encourages meaningful partnerships with clients, communities, stakeholders, and colleagues in the design, implementation, and improvement of programs; fosters inclusive participation to drive sustainable social transformation',
+        'Advocate for Freedom from Oppression: promotes the identification and removal of systemic, institutional, and social barriers that hinder equity, inclusion, and access to opportunities; challenges discriminatory practices and advances social justice',
+        'Promote Sustainable Empowerment: ensures that interventions build lasting capacities, local ownership, and self-sustaining systems that continue to generate positive impact over time'
       ]
     },
     {
       id: 'marangal',
       label: 'Marangal',
-      description: 'Integrity, professionalism, accountability, and ethical conduct',
+      description: 'Ethical excellence, accountability, integrity, and continuous professional development',
       indicators: [
-        'Upholds integrity, transparency, and ethical standards in all work activities',
-        'Takes responsibility for decisions, actions, and their outcomes',
-        'Maintains professional conduct and respects institutional policies and protocols',
-        'Demonstrates accountability by fulfilling commitments and meeting obligations',
-        'Models professionalism through punctuality, reliability, and quality of work'
+        'Demonstrates honesty, integrity, and fairness in all official transactions and work-related dealings including but not limited to accomplishment of Daily Time Records (DTR), accomplishment reports, and feedback reports',
+        'Practices established policies, guidelines, procedures, and ethical standards in tasks, decisions, outputs, and individual actions that enhance personnel credibility in pursuit of ethical excellence and integrity',
+        'Proper usage of government resources and information; performs effectively during work hours; and uses authority responsibly and only for official purposes',
+        'Demonstrates professionalism and accountability in all interactions with colleagues, clients, and stakeholders by maintaining respectful, ethical, and confidential relationships, promoting transparency, and strengthening public trust',
+        'Demonstrates a commitment to continuous learning and professional growth by actively seeking opportunities to develop knowledge, skills, and competencies'
       ]
     },
     {
       id: 'marunong',
       label: 'Marunong',
-      description: 'Competence, continuous learning, knowledge sharing, and adaptability',
+      description: 'Technical knowledge, critical thinking, continuous learning, and innovation in performance of duties',
       indicators: [
-        'Applies relevant technical knowledge and skills effectively to assigned tasks',
-        'Continuously updates skills and knowledge through learning and development',
-        'Shares expertise and information to support team and organizational learning',
-        'Adapts approaches and methods in response to evolving challenges and contexts',
-        'Demonstrates critical thinking and sound judgment in work decisions'
+        'Demonstrates technical mastery and functional expertise essential to the office\'s mandates',
+        'Delivers high-quality outputs characterized by precision, thoroughness, and adherence to technical standards',
+        'Exhibits adaptability and openness to emerging methodologies and evolving organizational needs',
+        'Proactively identifies operational bottlenecks and proposes creative, viable solutions within their scope of authority',
+        'Navigates uncertainty with composure, adapting quickly to risks with a solution-oriented mindset'
       ]
     },
     {
       id: 'mapagpabago',
       label: 'Mapagpabago',
-      description: 'Transformational leadership, innovation, and systemic change',
+      description: 'Transformational leadership, innovation, and pursuit of systemic change for sustainable social development',
       indicators: [
-        'Demonstrates visionary and purpose-driven leadership aligned with org mission',
-        'Champions systemic and sustainable reforms to address root causes',
-        'Empowers and inspires others toward shared organizational goals',
-        'Integrates inclusive and sustainable development principles in work',
-        'Initiates and supports innovation and continuous improvement'
+        'Demonstrates Visionary and Purpose-Driven Leadership: aligns actions, decisions, and work outputs with the organization\'s mission, long-term goals, and the broader objective of sustainable social development',
+        'Champions Systemic and Sustainable Reforms: proactively identifies opportunities for improvement and advocates for policies, programs, or practices that address root causes and promote lasting positive change',
+        'Empowers and Inspires Others toward Shared Goals: encourages and motivates colleagues, partners, stakeholders, and communities to actively participate, collaborate, and contribute toward common organizational and development objectives',
+        'Integrates Inclusive and Sustainable Development Principles in Work: promotes inclusive, client-centered, equitable, and sustainable approaches in planning, decision-making, and service delivery, ensuring that no one is left behind',
+        'Initiates and Supports Innovation and Continuous Improvement: demonstrates openness to new ideas and technologies, proposes innovative solutions, and actively supports continuous learning and organizational improvement'
       ]
     }
   ]
 
-  // ── Job Fitness indicators ──
+  // ── Job Fitness Indicators (7) ───────────────────────────────────────────
+  // Raters: Self + Immediate Supervisor + Skip Supervisor (÷3)
   const JOB_FITNESS_INDICATORS = [
-    'Educational Qualification Fit',
-    'Relevant Work Experience Alignment',
-    'Training and Skills Applicability',
-    'Workplace Conduct Suitability',
-    'Attendance and Punctuality Compliance',
-    'Commitment to Organizational Objectives',
-    'Physical and Cognitive Work Capacity'
+    'Educational Qualification Fit: possesses academic qualifications that meet or exceed the minimum requirements of the position and are relevant to assigned functions',
+    'Relevant Work Experience Alignment: demonstrates prior experience that directly supports the competencies and technical requirements of the current role',
+    'Training and Skills Applicability: has completed relevant training or learning interventions that are directly applicable to job tasks and improve work performance',
+    'Workplace Conduct Suitability: demonstrates behavior consistent with organizational standards, including respect for policies, colleagues, and institutional protocols',
+    'Attendance and Punctuality Compliance: maintains regular attendance and adheres to prescribed work schedules, with minimal unexcused absences or tardiness',
+    'Commitment to Organizational Objectives: demonstrates alignment with program goals through consistent work engagement and support for organizational priorities',
+    'Physical and Cognitive Work Capacity: maintains sufficient physical stamina and mental focus to perform job duties consistently and safely under normal work conditions'
   ]
 
-  // ── Qualitative descriptor lookup ──
+  // ── Qualitative Descriptors ──────────────────────────────────────────────
   function qualitativeDescriptor(score) {
     const s = Number(score)
     if (s >= 3.50) return 'Excellent Alignment'
@@ -131,10 +132,10 @@ const IPATService = (() => {
       }
     }
 
-    if (params.rateeId)   rows = rows.filter(r => r.rateeId   === params.rateeId)
-    if (params.semester)  rows = rows.filter(r => r.semester  === params.semester)
-    if (params.year)      rows = rows.filter(r => String(r.year) === String(params.year))
-    if (params.status)    rows = rows.filter(r => r.status    === params.status)
+    if (params.rateeId)    rows = rows.filter(r => r.rateeId    === params.rateeId)
+    if (params.semester)   rows = rows.filter(r => r.semester   === params.semester)
+    if (params.year)       rows = rows.filter(r => String(r.year) === String(params.year))
+    if (params.status)     rows = rows.filter(r => r.status     === params.status)
     if (params.divisionId) rows = rows.filter(r => r.divisionId === params.divisionId)
 
     rows.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
@@ -142,12 +143,9 @@ const IPATService = (() => {
   }
 
   function get(id, user) {
-    const profile = AuthService.getProfile(user)
-    const sheet   = SpreadsheetService.getSheet(SHEET.IPAT_RECORDS)
-    const row     = SpreadsheetService.getRow(sheet, id)
+    const sheet = SpreadsheetService.getSheet(SHEET.IPAT_RECORDS)
+    const row   = SpreadsheetService.getRow(sheet, id)
     if (!row) throw HttpError('IPAT record not found', 404)
-
-    // Attach CBC ratings, JF ratings
     row.cbcRatings = getCBCRatings(id)
     row.jfRatings  = getJFRatings(id)
     return row
@@ -158,36 +156,33 @@ const IPATService = (() => {
     const now     = new Date().toISOString()
     const sheet   = SpreadsheetService.getSheet(SHEET.IPAT_RECORDS)
 
-    // Prevent duplicate per ratee per semester/year
     const existing = SpreadsheetService.getAllRows(sheet).find(r =>
-      r.rateeId === (body.rateeId || profile.id) &&
+      r.rateeId  === (body.rateeId || profile.id) &&
       r.semester === body.semester &&
       String(r.year) === String(body.year)
     )
     if (existing) throw HttpError('An IPAT record already exists for this ratee and period', 409)
 
     const record = {
-      id:           SpreadsheetService.generateId('IPAT-'),
-      rateeId:      body.rateeId      || profile.id,
-      rateeName:    body.rateeName    || profile.fullName,
-      divisionId:   body.divisionId   || profile.divisionId || '',
-      divisionName: body.divisionName || profile.divisionName || '',
-      position:     body.position     || profile.position || '',
-      positionLevel: PositionHelper.resolveLevel(profile.position || ''),
-      semester:     body.semester     || '',
-      year:         body.year         || new Date().getFullYear(),
+      id:             SpreadsheetService.generateId('IPAT-'),
+      rateeId:        body.rateeId      || profile.id,
+      rateeName:      body.rateeName    || profile.fullName,
+      divisionId:     body.divisionId   || profile.divisionId  || '',
+      divisionName:   body.divisionName || profile.divisionName || '',
+      position:       body.position     || profile.position     || '',
+      positionLevel:  PositionHelper.resolveLevel(profile.position || ''),
+      semester:       body.semester     || '',
+      year:           body.year         || new Date().getFullYear(),
       hasSubordinate: body.hasSubordinate === true || body.hasSubordinate === 'true' || false,
-      status:       'Draft',
-      // Domain scores (computed)
-      cbcScore:     '',
-      fpoScore:     body.fpoScore     || '',  // pulled from IPCRF
-      jfScore:      '',
-      overallScore: '',
-      descriptor:   '',
-      // Linked IPCRF form
-      ipcrfFormId:  body.ipcrfFormId  || '',
-      createdAt:    now,
-      updatedAt:    now
+      status:         'Draft',
+      cbcScore:       '',
+      fpoScore:       body.fpoScore     || '',
+      jfScore:        '',
+      overallScore:   '',
+      descriptor:     '',
+      ipcrfFormId:    body.ipcrfFormId  || '',
+      createdAt:      now,
+      updatedAt:      now
     }
 
     SpreadsheetService.appendRow(sheet, record)
@@ -195,17 +190,27 @@ const IPATService = (() => {
     return record
   }
 
+  function updateRecord(id, body, user) {
+    const sheet   = SpreadsheetService.getSheet(SHEET.IPAT_RECORDS)
+    const updated = SpreadsheetService.updateRow(sheet, id, { ...body, updatedAt: new Date().toISOString() })
+    AuditService.log('UPDATE', 'IPAT', `Updated record ${id}`, user)
+    return updated
+  }
+
   function updateStatus(id, body, user) {
-    const sheet = SpreadsheetService.getSheet(SHEET.IPAT_RECORDS)
-    const row   = SpreadsheetService.getRow(sheet, id)
-    if (!row) throw HttpError('IPAT record not found', 404)
-    const updated = SpreadsheetService.updateRow(sheet, id, { status: body.status, updatedAt: new Date().toISOString() })
-    AuditService.log('UPDATE_STATUS', 'IPAT', `Status changed to ${body.status} for ${id}`, user)
+    const sheet   = SpreadsheetService.getSheet(SHEET.IPAT_RECORDS)
+    const updated = SpreadsheetService.updateRow(sheet, id, {
+      status: body.status || body,
+      ...(body.fpoScore !== undefined ? { fpoScore: body.fpoScore } : {}),
+      updatedAt: new Date().toISOString()
+    })
+    AuditService.log('UPDATE_STATUS', 'IPAT', `Status/data updated for ${id}`, user)
     return updated
   }
 
   // ─────────────────────────────────────────────
-  // CBC RATINGS — save & compute
+  // CBC RATINGS
+  // Multi-rater: Self(15%) + Peer(15% or 30%) + Sub(15%) + Supervisor(30%) + Skip(25%)
   // ─────────────────────────────────────────────
 
   function saveCBCRatings(ipatId, body, user) {
@@ -217,10 +222,10 @@ const IPATService = (() => {
 
     ratings.forEach(r => {
       const existing = SpreadsheetService.getAllRows(sheet).find(row =>
-        row.ipatId    === ipatId &&
-        row.raterId   === (r.raterId || profile.id) &&
-        row.themeId   === r.themeId &&
-        row.indicator === r.indicator
+        row.ipatId        === ipatId &&
+        row.raterId       === (r.raterId || profile.id) &&
+        row.themeId       === r.themeId &&
+        String(row.indicatorIdx) === String(r.indicatorIdx)
       )
 
       const ratingRow = {
@@ -228,12 +233,12 @@ const IPATService = (() => {
         rateeId:      record.rateeId,
         raterId:      r.raterId      || profile.id,
         raterName:    r.raterName    || profile.fullName,
-        raterType:    r.raterType    || 'Self',   // Self | Peer | Subordinate | Supervisor | SkipSupervisor
+        raterType:    r.raterType    || 'Self',
         themeId:      r.themeId,
         themeName:    r.themeName    || '',
-        indicator:    r.indicator,
-        indicatorIdx: r.indicatorIdx || 0,
-        rating:       Number(r.rating) || 1,     // 1–4
+        indicator:    r.indicator    || '',
+        indicatorIdx: Number(r.indicatorIdx) || 0,
+        rating:       Number(r.rating)       || 1,
         semester:     record.semester,
         year:         record.year,
         updatedAt:    now
@@ -250,74 +255,72 @@ const IPATService = (() => {
       }
     })
 
-    AuditService.log('SAVE_CBC', 'IPAT', `Saved ${ratings.length} CBC ratings for IPAT ${ipatId}`, user)
+    AuditService.log('SAVE_CBC', 'IPAT', `Saved ${ratings.length} CBC ratings for ${ipatId}`, user)
     return { saved: ratings.length }
   }
 
   function computeCBC(ipatId, user) {
-    const record  = _getRecord(ipatId)
-    const ratings = getCBCRatings(ipatId)
+    const record      = _getRecord(ipatId)
+    const ratings     = getCBCRatings(ipatId)
     const hasSubordinate = record.hasSubordinate === true || record.hasSubordinate === 'true'
 
     if (!ratings.length) throw HttpError('No CBC ratings found for this record', 400)
 
-    // Group by theme, then by indicator
-    // Compute indicator score per theme, then average across themes
     const themeScores = HEARTWORK_THEMES.map(theme => {
       const themeRatings = ratings.filter(r => r.themeId === theme.id)
 
       const indicatorScores = theme.indicators.map((_, idx) => {
-        const indRatings = themeRatings.filter(r => r.indicatorIdx === idx)
+        const indRatings = themeRatings.filter(r => Number(r.indicatorIdx) === idx)
 
         const get = (type) => {
           const r = indRatings.find(r => r.raterType === type)
           return r ? Number(r.rating) : null
         }
 
-        const self       = get('Self')
-        const peer       = get('Peer')
-        const sub        = get('Subordinate')
-        const supervisor = get('Supervisor')
-        const skip       = get('SkipSupervisor')
+        const self = get('Self')
+        const peer = get('Peer')
+        const sub  = get('Subordinate')
+        const sup  = get('Supervisor')
+        const skip = get('SkipSupervisor')
 
         // Apply weights per formula
-        let score = 0
-        let totalWeight = 0
+        let score = 0, totalWeight = 0
 
-        if (self       !== null) { score += self       * 0.15; totalWeight += 0.15 }
-        if (supervisor !== null) { score += supervisor * 0.30; totalWeight += 0.30 }
-        if (skip       !== null) { score += skip       * 0.25; totalWeight += 0.25 }
+        if (self !== null) { score += self * 0.15; totalWeight += 0.15 }
+        if (sup  !== null) { score += sup  * 0.30; totalWeight += 0.30 }
+        if (skip !== null) { score += skip * 0.25; totalWeight += 0.25 }
 
         if (!hasSubordinate) {
-          // Sub weight (15%) redistributed to Peer → Peer = 30%
+          // Subordinate 15% redistributed to Peer → Peer = 30%
           if (peer !== null) { score += peer * 0.30; totalWeight += 0.30 }
         } else {
           if (peer !== null) { score += peer * 0.15; totalWeight += 0.15 }
           if (sub  !== null) { score += sub  * 0.15; totalWeight += 0.15 }
         }
 
-        // If not all raters have rated, normalize by actual weight collected
         return totalWeight > 0 ? score / totalWeight : 0
       })
 
-      const themeScore = indicatorScores.reduce((s, x) => s + x, 0) / theme.indicators.length
-      return { themeId: theme.id, themeLabel: theme.label, score: round2(themeScore), indicatorScores }
+      const themeScore = round2(
+        indicatorScores.reduce((s, x) => s + x, 0) / theme.indicators.length
+      )
+      return { themeId: theme.id, themeLabel: theme.label, score: themeScore, indicatorScores }
     })
 
     const cbcScore = round2(
       themeScores.reduce((s, t) => s + t.score, 0) / themeScores.length
     )
 
-    // Persist CBC score
     const recSheet = SpreadsheetService.getSheet(SHEET.IPAT_RECORDS)
     SpreadsheetService.updateRow(recSheet, ipatId, { cbcScore, updatedAt: new Date().toISOString() })
 
-    AuditService.log('COMPUTE_CBC', 'IPAT', `CBC score = ${cbcScore} for IPAT ${ipatId}`, user)
+    AuditService.log('COMPUTE_CBC', 'IPAT', `CBC=${cbcScore} for ${ipatId}`, user)
     return { cbcScore, themeScores }
   }
 
   // ─────────────────────────────────────────────
-  // JOB FITNESS RATINGS — save & compute
+  // JOB FITNESS RATINGS
+  // Raters: Self + Immediate Supervisor + Skip Supervisor (average of 3)
   // ─────────────────────────────────────────────
 
   function saveJFRatings(ipatId, body, user) {
@@ -329,9 +332,9 @@ const IPATService = (() => {
 
     ratings.forEach(r => {
       const existing = SpreadsheetService.getAllRows(sheet).find(row =>
-        row.ipatId    === ipatId &&
-        row.raterId   === (r.raterId || profile.id) &&
-        row.indicator === r.indicator
+        row.ipatId   === ipatId &&
+        row.raterId  === (r.raterId || profile.id) &&
+        String(row.indicatorIdx) === String(r.indicatorIdx)
       )
 
       const ratingRow = {
@@ -339,11 +342,11 @@ const IPATService = (() => {
         rateeId:      record.rateeId,
         raterId:      r.raterId   || profile.id,
         raterName:    r.raterName || profile.fullName,
-        raterType:    r.raterType || 'Self',   // Self | Supervisor
-        indicator:    r.indicator,
-        indicatorIdx: r.indicatorIdx || 0,
-        rating:       Number(r.rating) || 1,
-        evidence:     r.evidence || '',
+        raterType:    r.raterType || 'Self',   // Self | Supervisor | SkipSupervisor
+        indicator:    r.indicator || '',
+        indicatorIdx: Number(r.indicatorIdx) || 0,
+        rating:       Number(r.rating)       || 1,
+        evidence:     r.evidence  || '',
         semester:     record.semester,
         year:         record.year,
         updatedAt:    now
@@ -360,31 +363,29 @@ const IPATService = (() => {
       }
     })
 
-    AuditService.log('SAVE_JF', 'IPAT', `Saved ${ratings.length} Job Fitness ratings for IPAT ${ipatId}`, user)
+    AuditService.log('SAVE_JF', 'IPAT', `Saved ${ratings.length} JF ratings for ${ipatId}`, user)
     return { saved: ratings.length }
   }
 
   function computeJF(ipatId, user) {
-    const record  = _getRecord(ipatId)
     const ratings = getJFRatings(ipatId)
-
     if (!ratings.length) throw HttpError('No Job Fitness ratings found', 400)
 
-    // JF Indicator Score = (Self + Supervisor) / 2
-    // JF Score = Sum of Indicator Scores / 7
+    // JF Indicator Score = (Self + Supervisor + SkipSupervisor) ÷ 3
+    // JF Score = Sum of Indicator Scores ÷ 7
     const indicatorScores = JOB_FITNESS_INDICATORS.map((label, idx) => {
-      const indRatings = ratings.filter(r => r.indicatorIdx === idx)
-      const selfR = indRatings.find(r => r.raterType === 'Self')
-      const supR  = indRatings.find(r => r.raterType === 'Supervisor')
+      const indRatings = ratings.filter(r => Number(r.indicatorIdx) === idx)
 
-      const self = selfR ? Number(selfR.rating) : 0
-      const sup  = supR  ? Number(supR.rating)  : 0
-      const count = (selfR ? 1 : 0) + (supR ? 1 : 0)
+      const self = indRatings.find(r => r.raterType === 'Self')
+      const sup  = indRatings.find(r => r.raterType === 'Supervisor')
+      const skip = indRatings.find(r => r.raterType === 'SkipSupervisor')
 
-      return {
-        indicator: label,
-        score: count > 0 ? round2((self + sup) / count) : 0
-      }
+      const values = [self, sup, skip].filter(Boolean).map(r => Number(r.rating))
+      const score  = values.length > 0
+        ? round2(values.reduce((s, v) => s + v, 0) / values.length)
+        : 0
+
+      return { indicator: label, indicatorIdx: idx, score }
     })
 
     const jfScore = round2(
@@ -394,12 +395,13 @@ const IPATService = (() => {
     const recSheet = SpreadsheetService.getSheet(SHEET.IPAT_RECORDS)
     SpreadsheetService.updateRow(recSheet, ipatId, { jfScore, updatedAt: new Date().toISOString() })
 
-    AuditService.log('COMPUTE_JF', 'IPAT', `JF score = ${jfScore} for IPAT ${ipatId}`, user)
+    AuditService.log('COMPUTE_JF', 'IPAT', `JF=${jfScore} for ${ipatId}`, user)
     return { jfScore, indicatorScores }
   }
 
   // ─────────────────────────────────────────────
   // COMPUTE FINAL OVERALL SCORE
+  // Overall = (CBCI × 0.30) + (FPOI × 0.55) + (JFI × 0.15)
   // ─────────────────────────────────────────────
 
   function computeOverall(ipatId, user) {
@@ -407,19 +409,17 @@ const IPATService = (() => {
     const record   = SpreadsheetService.getRow(recSheet, ipatId)
     if (!record) throw HttpError('IPAT record not found', 404)
 
-    const cbc = Number(record.cbcScore)  || 0
-    const jf  = Number(record.jfScore)   || 0
+    const cbc = Number(record.cbcScore) || 0
+    const jf  = Number(record.jfScore)  || 0
 
-    // FPO comes from linked IPCRF form's finalNumericalRating (converted to 4-pt scale)
-    // or from a manually set fpoScore (stored as 0–100 or 0–5 range)
-    // Normalize: IPCRF score is 1–5, IPAT is 1–4 → convert: (score - 1) / 4 * 3 + 1
+    // FPO: IPCRF score is on 1–5 scale, IPAT uses 1–4
+    // Convert: ((score - 1) / 4) * 3 + 1
     let fpo = Number(record.fpoScore) || 0
     if (fpo > 4) {
-      // Convert from 5-pt IPCRF scale to 4-pt IPAT scale
       fpo = round2((fpo - 1) / 4 * 3 + 1)
     }
 
-    // Formula: Overall = (CBCI × 0.30) + (FPOI × 0.55) + (JFI × 0.15)
+    // Overall = (CBCI × 0.30) + (FPOI × 0.55) + (JFI × 0.15)
     const overall    = round2((cbc * 0.30) + (fpo * 0.55) + (jf * 0.15))
     const descriptor = qualitativeDescriptor(overall)
 
@@ -431,29 +431,17 @@ const IPATService = (() => {
     })
 
     AuditService.log('COMPUTE_OVERALL', 'IPAT',
-      `Overall = ${overall} (${descriptor}) for IPAT ${ipatId}. CBC=${cbc} FPO=${fpo} JF=${jf}`, user)
+      `Overall=${overall} (${descriptor}) CBC=${cbc} FPO=${fpo} JF=${jf} for ${ipatId}`, user)
 
-    return {
-      ipatId,
-      cbcScore:     cbc,
-      fpoScore:     fpo,
-      jfScore:      jf,
-      overallScore: overall,
-      descriptor
-    }
+    return { ipatId, cbcScore: cbc, fpoScore: fpo, jfScore: jf, overallScore: overall, descriptor }
   }
 
   // ─────────────────────────────────────────────
-  // META / HELPERS
+  // META ENDPOINTS
   // ─────────────────────────────────────────────
 
-  function getThemes(params, user) {
-    return HEARTWORK_THEMES
-  }
-
-  function getJFIndicators(params, user) {
-    return JOB_FITNESS_INDICATORS.map((label, idx) => ({ idx, label }))
-  }
+  function getThemes()       { return HEARTWORK_THEMES }
+  function getJFIndicators() { return JOB_FITNESS_INDICATORS.map((label, idx) => ({ idx, label })) }
 
   function getCBCRatings(ipatId) {
     const sheet = SpreadsheetService.getSheet(SHEET.IPAT_CBC_RATINGS)
@@ -473,11 +461,12 @@ const IPATService = (() => {
   }
 
   return {
-    list, get, create, updateStatus,
+    list, get, create, updateRecord, updateStatus,
     saveCBCRatings, computeCBC,
-    saveJFRatings, computeJF,
+    saveJFRatings,  computeJF,
     computeOverall,
-    getThemes, getJFIndicators
+    getThemes, getJFIndicators,
+    getCBCRatings, getJFRatings
   }
 
 })()

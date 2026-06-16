@@ -1,5 +1,5 @@
 <template>
-  <div class="kra-page">
+  <div class="kra-page" style="padding: 24px 32px 40px;">
 
     <!-- Header -->
     <div class="page-hd">
@@ -503,7 +503,7 @@ async function doRemove() {
 </script>
 
 <style>
-.kra-page { padding: 16px 20px 32px; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif; font-size: 13px; color: #1A2332; min-height: 100%; }
+.kra-page { padding: 24px; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif; font-size: 13px; color: #1A2332; min-height: 100%; }
 .muted-text { color: #94A3B8; }
 .req { color: #EF4444; font-size: 11px; }
 

@@ -635,7 +635,7 @@ onUnmounted(() => {
   border-bottom: 1px solid #E2E8F0;
   display: flex;
   align-items: center;
-  padding: 0 16px;
+  padding: 0 24px;
   gap: 12px;
   flex-shrink: 0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
@@ -947,7 +947,7 @@ onUnmounted(() => {
   flex-shrink: 0;
   background: #fff;
   border-bottom: 1px solid #E2E8F0;
-  padding: 6px 20px;
+  padding: 6px 24px;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -994,8 +994,10 @@ onUnmounted(() => {
 .page-body {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   scrollbar-width: thin;
   scrollbar-color: #CBD5E1 transparent;
+  min-height: 0;
 }
 
 .page-body::-webkit-scrollbar {

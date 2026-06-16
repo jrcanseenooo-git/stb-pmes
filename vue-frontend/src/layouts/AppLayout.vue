@@ -1,9 +1,6 @@
 <template>
   <div class="shell" :class="{ 'sidebar-collapsed': collapsed }">
-
-    <!-- ── Sidebar ── -->
     <aside class="sidebar">
-      <!-- Brand -->
       <div class="sb-brand">
         <div class="brand-icon">
           <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
@@ -12,6 +9,7 @@
             <rect x="2" y="13" width="12" height="2" rx="1" fill="white" />
           </svg>
         </div>
+
         <transition name="fade">
           <div v-if="!collapsed" class="brand-text">
             <div class="brand-name">PMES</div>
@@ -20,10 +18,10 @@
         </transition>
       </div>
 
-      <!-- Nav -->
       <nav class="sb-nav">
         <div class="nav-group">
           <div v-if="!collapsed" class="nav-label">Overview</div>
+
           <RouterLink to="/dashboard" class="nav-item" active-class="active" :title="collapsed ? 'Dashboard' : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -33,17 +31,23 @@
                 <rect x="9" y="9" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.4" />
               </svg>
             </div>
-            <transition name="fade"><span v-if="!collapsed" class="nav-label-text">Dashboard</span></transition>
+            <transition name="fade">
+              <span v-if="!collapsed" class="nav-label-text">Dashboard</span>
+            </transition>
           </RouterLink>
+
           <RouterLink v-if="canManageUsers" to="/kra" class="nav-item" active-class="active" :title="collapsed ? 'KRA Library' : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.4"/>
-                <path d="M5 5h6M5 8h6M5 11h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+                <rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.4" />
+                <path d="M5 5h6M5 8h6M5 11h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
               </svg>
             </div>
-            <transition name="fade"><span v-if="!collapsed" class="nav-label-text">KRA Library</span></transition>
+            <transition name="fade">
+              <span v-if="!collapsed" class="nav-label-text">KRA Library</span>
+            </transition>
           </RouterLink>
+
           <RouterLink to="/evaluation" class="nav-item" active-class="active" :title="collapsed ? 'Evaluation' : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -51,13 +55,16 @@
                   stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" />
               </svg>
             </div>
-            <transition name="fade"><span v-if="!collapsed" class="nav-label-text">Evaluation</span></transition>
+            <transition name="fade">
+              <span v-if="!collapsed" class="nav-label-text">Evaluation</span>
+            </transition>
           </RouterLink>
         </div>
 
         <div class="nav-group">
           <div v-if="!collapsed" class="nav-label">Monitoring</div>
           <div v-else class="nav-divider"></div>
+
           <RouterLink to="/ipcrf" class="nav-item" active-class="active" :title="collapsed ? 'KRA & Targets' : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -66,25 +73,29 @@
                 <circle cx="8" cy="8" r="1" fill="currentColor" />
               </svg>
             </div>
-            <transition name="fade"><span v-if="!collapsed" class="nav-label-text">IPCRF / CCEF</span></transition>
+            <transition name="fade">
+              <span v-if="!collapsed" class="nav-label-text">IPCRF / CCEF</span>
+            </transition>
           </RouterLink>
-          <RouterLink to="/accomplishments" class="nav-item" active-class="active"
-            :title="collapsed ? 'Accomplishments' : ''">
+
+          <RouterLink to="/accomplishments" class="nav-item" active-class="active" :title="collapsed ? 'Accomplishments' : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <rect x="1.5" y="1.5" width="13" height="13" rx="2" stroke="currentColor" stroke-width="1.4" />
-                <path d="M5 8l2.5 2.5L11 5.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"
-                  stroke-linejoin="round" />
+                <path d="M5 8l2.5 2.5L11 5.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
               </svg>
             </div>
+
             <transition name="fade">
               <span v-if="!collapsed" class="nav-label-text">
                 Accomplishments
                 <span class="nav-badge">3</span>
               </span>
             </transition>
+
             <span v-if="collapsed" class="nav-badge-dot"></span>
           </RouterLink>
+
           <RouterLink to="/mov" class="nav-item" active-class="active" :title="collapsed ? 'MOV Files' : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -93,13 +104,16 @@
                 <path d="M9 1.5V6H13.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
               </svg>
             </div>
-            <transition name="fade"><span v-if="!collapsed" class="nav-label-text">MOV Files</span></transition>
+            <transition name="fade">
+              <span v-if="!collapsed" class="nav-label-text">MOV Files</span>
+            </transition>
           </RouterLink>
         </div>
 
         <div class="nav-group">
           <div v-if="!collapsed" class="nav-label">Administration</div>
           <div v-else class="nav-divider"></div>
+
           <RouterLink to="/reports" class="nav-item" active-class="active" :title="collapsed ? 'Reports' : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -107,29 +121,36 @@
                 <path d="M5 6h6M5 9h4M5 12h5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
               </svg>
             </div>
-            <transition name="fade"><span v-if="!collapsed" class="nav-label-text">Reports</span></transition>
+            <transition name="fade">
+              <span v-if="!collapsed" class="nav-label-text">Reports</span>
+            </transition>
           </RouterLink>
+
           <RouterLink to="/audit" class="nav-item" active-class="active" :title="collapsed ? 'Audit Trail' : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path d="M8 1.5L2 4v4.5c0 3.5 2.5 6 6 6.5 3.5-.5 6-3 6-6.5V4L8 1.5z" stroke="currentColor"
-                  stroke-width="1.4" stroke-linejoin="round" />
-                <path d="M5.5 8l2 2 3-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"
-                  stroke-linejoin="round" />
+                <path d="M8 1.5L2 4v4.5c0 3.5 2.5 6 6 6.5 3.5-.5 6-3 6-6.5V4L8 1.5z"
+                  stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" />
+                <path d="M5.5 8l2 2 3-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
               </svg>
             </div>
-            <transition name="fade"><span v-if="!collapsed" class="nav-label-text">Audit Trail</span></transition>
+            <transition name="fade">
+              <span v-if="!collapsed" class="nav-label-text">Audit Trail</span>
+            </transition>
           </RouterLink>
+
           <RouterLink v-if="canManageUsers" to="/users" class="nav-item" active-class="active" :title="collapsed ? 'User Management' : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <circle cx="8" cy="5.5" r="2.5" stroke="currentColor" stroke-width="1.4" />
-                <path d="M2.5 14c0-3 2.5-5 5.5-5s5.5 2 5.5 5" stroke="currentColor" stroke-width="1.4"
-                  stroke-linecap="round" />
+                <path d="M2.5 14c0-3 2.5-5 5.5-5s5.5 2 5.5 5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
               </svg>
             </div>
-            <transition name="fade"><span v-if="!collapsed" class="nav-label-text">User Management</span></transition>
+            <transition name="fade">
+              <span v-if="!collapsed" class="nav-label-text">User Management</span>
+            </transition>
           </RouterLink>
+
           <RouterLink to="/profile" class="nav-item" active-class="active" :title="collapsed ? 'Settings' : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -138,26 +159,29 @@
                   stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
               </svg>
             </div>
-            <transition name="fade"><span v-if="!collapsed" class="nav-label-text">Profile Settings</span></transition>
+            <transition name="fade">
+              <span v-if="!collapsed" class="nav-label-text">Profile Settings</span>
+            </transition>
           </RouterLink>
         </div>
       </nav>
 
-      <!-- User -->
       <div class="sb-footer">
         <div class="sb-user" :class="{ centered: collapsed }" @click="$router.push('/profile')">
           <div class="user-av">{{ authStore.initials || 'U' }}</div>
+
           <transition name="fade">
             <div v-if="!collapsed" class="user-meta">
               <div class="user-name">{{ authStore.fullName || 'User' }}</div>
               <div class="user-role">{{ authStore.role || 'Staff' }}</div>
             </div>
           </transition>
+
           <transition name="fade">
             <button v-if="!collapsed" class="logout-btn" @click.stop="handleLogout" title="Sign out">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M5 1.5H2.5A1 1 0 001.5 2.5v9a1 1 0 001 1H5M10 10l3-3-3-3M13 7H5" stroke="currentColor"
-                  stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M5 1.5H2.5A1 1 0 001.5 2.5v9a1 1 0 001 1H5M10 10l3-3-3-3M13 7H5"
+                  stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
               </svg>
             </button>
           </transition>
@@ -165,13 +189,9 @@
       </div>
     </aside>
 
-    <!-- ── Main ── -->
     <div class="main">
-
-      <!-- Topbar -->
       <header class="topbar">
-        <button class="burger" @click="collapsed = !collapsed"
-          :title="collapsed ? 'Expand sidebar' : 'Collapse sidebar'">
+        <button class="burger" @click="collapsed = !collapsed" :title="collapsed ? 'Expand sidebar' : 'Collapse sidebar'">
           <span :class="['burger-line', collapsed && 'open']"></span>
           <span :class="['burger-line', collapsed && 'open']"></span>
           <span :class="['burger-line', collapsed && 'open']"></span>
@@ -205,12 +225,12 @@
             <span class="badge-dot">2</span>
           </div>
 
-          <!-- Notif dropdown -->
           <div v-if="showNotifs" class="notif-dropdown" v-click-outside="() => showNotifs = false">
             <div class="notif-hd">
               <span class="notif-title">Notifications</span>
               <span class="notif-count">5 new</span>
             </div>
+
             <div v-for="n in notifs" :key="n.msg" class="notif-row">
               <div class="notif-icon-wrap" :style="{ background: n.bg }">
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -226,8 +246,8 @@
 
           <button class="export-btn" @click="handleExport">
             <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-              <path d="M6.5 1v7M4 6l2.5 2.5L9 6M2 10v1a1 1 0 001 1h7a1 1 0 001-1v-1" stroke="currentColor"
-                stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M6.5 1v7M4 6l2.5 2.5L9 6M2 10v1a1 1 0 001 1h7a1 1 0 001-1v-1"
+                stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
             Export
           </button>
@@ -238,18 +258,14 @@
         </div>
       </header>
 
-      <!-- Page content -->
       <main class="page-body">
         <RouterView />
       </main>
     </div>
 
-    <!-- Mobile overlay -->
     <div v-if="!collapsed && isMobile" class="overlay" @click="collapsed = true"></div>
 
-    <!-- ── Password Change Prompt (first-time login) ── -->
     <PasswordChangePrompt :show="showPwPrompt" @changed="onPasswordChanged" @skip="showPwPrompt = false" />
-
   </div>
 </template>
 
@@ -274,7 +290,7 @@ const showPwPrompt = ref(false)
 const titleMap = {
   '/dashboard': { title: 'Dashboard', sub: 'Bureau Overview' },
   '/ipcrf': { title: 'IPCRF / CCEF Forms', sub: 'Performance Commitments' },
-  '/kra':   { title: 'KRA Library',        sub: 'Master KRA & SI List'    },
+  '/kra': { title: 'KRA Library', sub: 'Master KRA & SI List' },
   '/accomplishments': { title: 'Accomplishments', sub: 'Q1 2025' },
   '/mov': { title: 'MOV Files', sub: 'Google Drive' },
   '/reports': { title: 'Reports', sub: 'Generate & Export' },
@@ -294,7 +310,6 @@ const notifs = [
   { type: 'Upload', msg: 'R. Dela Cruz submitted 3 files', time: 'May 8 · 4:00 PM', bg: '#EFF6FF', color: '#3B82F6' }
 ]
 
-// ── Watch for first-login flag ──
 watch(
   () => authStore.profile,
   (profile) => {
@@ -307,8 +322,6 @@ watch(
 
 function onPasswordChanged() {
   showPwPrompt.value = false
-  // TODO: clear mustChangePassword + tempPassword in Users sheet via API
-  // usersApi.update(authStore.profile.id, { mustChangePassword: false, tempPassword: '' })
 }
 
 async function handleLogout() {
@@ -325,10 +338,11 @@ function checkMobile() {
   if (isMobile.value) collapsed.value = true
 }
 
-// v-click-outside custom directive
 const vClickOutside = {
   mounted(el, binding) {
-    el._clickOutside = (e) => { if (!el.contains(e.target)) binding.value(e) }
+    el._clickOutside = (e) => {
+      if (!el.contains(e.target)) binding.value(e)
+    }
     document.addEventListener('click', el._clickOutside)
   },
   unmounted(el) {
@@ -340,13 +354,14 @@ onMounted(() => {
   checkMobile()
   window.addEventListener('resize', checkMobile)
 })
+
 onUnmounted(() => {
   window.removeEventListener('resize', checkMobile)
 })
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 * {
   box-sizing: border-box;
@@ -355,84 +370,93 @@ onUnmounted(() => {
 }
 
 .shell {
-  display: flex;
-  height: 100vh;
-  overflow: hidden;
-  font-family: 'Inter', sans-serif;
-  font-size: 13px;
-  color: #0F172A;
-  background: #F1F5F9;
-  --sidebar-w: 220px;
-  --sidebar-collapsed-w: 60px;
+  --sidebar-w: 230px;
+  --sidebar-collapsed-w: 64px;
   --topbar-h: 56px;
-  --transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  --blue: #0038a8;
+  --blue-dark: #061b45;
+  --blue-soft: #eef4ff;
+  --bg: #f4f7fb;
+  --card: #ffffff;
+  --line: #dbe4f0;
+  --text: #0f172a;
+  --muted: #64748b;
+
+  position: fixed;
+  inset: 0;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: Inter, system-ui, sans-serif;
+  color: var(--text);
+  background: var(--bg);
 }
 
-/* ── Sidebar ── */
 .sidebar {
   width: var(--sidebar-w);
-  flex-shrink: 0;
-  background: #0F172A;
+  flex: 0 0 var(--sidebar-w);
+  height: 100%;
   display: flex;
   flex-direction: column;
-  transition: var(--transition);
   overflow: hidden;
-  z-index: 50;
-  box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
+  background: #071426;
+  border-right: 1px solid rgba(255,255,255,.08);
 }
 
 .sidebar-collapsed .sidebar {
   width: var(--sidebar-collapsed-w);
+  flex-basis: var(--sidebar-collapsed-w);
 }
 
 .sb-brand {
+  height: var(--topbar-h);
+  flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 11px;
   padding: 0 14px;
-  height: var(--topbar-h);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  flex-shrink: 0;
-  overflow: hidden;
+  border-bottom: 1px solid rgba(255,255,255,.08);
 }
 
 .brand-icon {
-  width: 32px;
-  height: 32px;
-  background: #3B82F6;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  width: 34px;
+  height: 34px;
   flex-shrink: 0;
-  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  background: var(--blue);
 }
 
 .brand-text {
+  min-width: 0;
   overflow: hidden;
-  white-space: nowrap;
 }
 
 .brand-name {
+  color: #ffffff;
   font-size: 14px;
-  font-weight: 700;
-  color: #fff;
-  letter-spacing: -0.3px;
+  font-weight: 800;
+  line-height: 1;
 }
 
 .brand-sub {
-  font-size: 9px;
-  color: rgba(255, 255, 255, 0.35);
+  margin-top: 3px;
+  color: rgba(255,255,255,.48);
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: .65px;
   text-transform: uppercase;
-  letter-spacing: 0.7px;
-  margin-top: 1px;
+  white-space: nowrap;
 }
 
 .sb-nav {
   flex: 1;
-  padding: 8px;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  padding: 10px 9px;
 }
 
 .sb-nav::-webkit-scrollbar {
@@ -440,605 +464,480 @@ onUnmounted(() => {
 }
 
 .nav-group {
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 
 .nav-label {
-  font-size: 9px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.25);
+  padding: 9px 9px 5px;
+  color: rgba(255,255,255,.32);
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: .8px;
   text-transform: uppercase;
-  letter-spacing: 0.9px;
-  padding: 10px 8px 4px;
   white-space: nowrap;
 }
 
 .nav-divider {
   height: 1px;
-  background: rgba(255, 255, 255, 0.06);
-  margin: 8px 4px;
+  margin: 9px;
+  background: rgba(255,255,255,.08);
 }
 
 .nav-item {
+  position: relative;
+  min-height: 40px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 9px 8px;
-  border-radius: 8px;
-  color: rgba(255, 255, 255, 0.5);
+  gap: 11px;
+  margin-bottom: 4px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  color: rgba(255,255,255,.72);
   text-decoration: none;
-  font-size: 13px;
-  font-weight: 450;
-  transition: var(--transition);
-  margin-bottom: 1px;
-  position: relative;
-  white-space: nowrap;
-  overflow: hidden;
+  transition: .15s ease;
 }
 
 .nav-item:hover {
-  background: rgba(255, 255, 255, 0.07);
-  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255,255,255,.08);
+  color: #ffffff;
 }
 
 .nav-item.active {
-  background: rgba(59, 130, 246, 0.15);
-  color: #fff;
-  font-weight: 500;
-}
-
-.nav-item.active::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 25%;
-  bottom: 25%;
-  width: 3px;
-  background: #3B82F6;
-  border-radius: 0 3px 3px 0;
+  background: #ffffff;
+  color: var(--blue);
+  box-shadow: 0 8px 18px rgba(0,0,0,.16);
 }
 
 .nav-icon {
-  width: 20px;
-  height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  width: 19px;
+  height: 19px;
   flex-shrink: 0;
-}
-
-.nav-item.active .nav-icon {
-  color: #60A5FA;
+  display: grid;
+  place-items: center;
 }
 
 .nav-label-text {
-  display: flex;
+  min-width: 0;
+  display: inline-flex;
   align-items: center;
   gap: 6px;
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 750;
 }
 
 .nav-badge {
-  margin-left: auto;
-  background: #EF4444;
-  color: #fff;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 5px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #ffffff;
   font-size: 9px;
-  font-weight: 700;
-  padding: 1px 5px;
-  border-radius: 10px;
+  font-weight: 800;
 }
 
 .nav-badge-dot {
   position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 6px;
-  height: 6px;
-  background: #EF4444;
+  right: 7px;
+  top: 7px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  border: 1.5px solid #0F172A;
+  background: #ef4444;
 }
 
 .sb-footer {
   flex-shrink: 0;
-  padding: 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 9px;
 }
 
 .sb-user {
+  min-width: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.05);
+  gap: 9px;
+  padding: 9px;
+  border-radius: 14px;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.07);
   cursor: pointer;
-  transition: var(--transition);
-  overflow: hidden;
-}
-
-.sb-user:hover {
-  background: rgba(255, 255, 255, 0.1);
 }
 
 .sb-user.centered {
   justify-content: center;
 }
 
-.user-av {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #3B82F6, #1D4ED8);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
+.user-av,
+.topbar-avatar {
+  width: 31px;
+  height: 31px;
   flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--blue);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 800;
 }
 
 .user-meta {
-  flex: 1;
   min-width: 0;
-  overflow: hidden;
+  flex: 1;
 }
 
 .user-name {
-  color: rgba(255, 255, 255, 0.85);
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #ffffff;
+  font-size: 11.5px;
+  font-weight: 750;
 }
 
 .user-role {
-  color: rgba(255, 255, 255, 0.35);
+  color: rgba(255,255,255,.45);
   font-size: 10px;
-  margin-top: 1px;
 }
 
 .logout-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: rgba(255, 255, 255, 0.3);
-  padding: 4px;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  transition: all 0.15s;
+  width: 26px;
+  height: 26px;
   flex-shrink: 0;
+  border: 0;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  color: rgba(255,255,255,.5);
+  cursor: pointer;
 }
 
 .logout-btn:hover {
-  color: rgba(255, 255, 255, 0.8);
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255,255,255,.08);
+  color: #ffffff;
 }
 
-/* ── Main ── */
 .main {
+  min-width: 0;
   flex: 1;
+  height: 100%;
   display: flex;
   flex-direction: column;
-  min-width: 0;
-  overflow: visible;
+  overflow: hidden;
 }
 
-/* ── Topbar ── */
 .topbar {
   height: var(--topbar-h);
-  background: #fff;
-  border-bottom: 1px solid #E2E8F0;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
-  padding: 0 24px;
   gap: 12px;
-  flex-shrink: 0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-  position: relative;
-  z-index: 40;
+  padding: 0 14px;
+  background: rgba(255,255,255,.96);
+  border-bottom: 1px solid var(--line);
+  z-index: 20;
 }
 
 .burger {
-  width: 34px;
-  height: 34px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 6px;
-  border-radius: 8px;
-  transition: background 0.15s;
+  width: 32px;
+  height: 32px;
   flex-shrink: 0;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  gap: 3px;
+  background: transparent;
+  cursor: pointer;
 }
 
 .burger:hover {
-  background: #F1F5F9;
+  background: #f1f5f9;
+  border-color: var(--line);
 }
 
 .burger-line {
-  display: block;
-  width: 16px;
-  height: 1.5px;
-  background: #64748B;
-  border-radius: 2px;
-  transition: var(--transition);
-  transform-origin: center;
-}
-
-.burger-line.open:nth-child(1) {
-  transform: rotate(45deg) translate(4px, 4px);
-}
-
-.burger-line.open:nth-child(2) {
-  opacity: 0;
-  transform: scaleX(0);
-}
-
-.burger-line.open:nth-child(3) {
-  transform: rotate(-45deg) translate(4px, -4px);
+  width: 15px;
+  height: 2px;
+  border-radius: 999px;
+  background: #475569;
 }
 
 .topbar-left {
+  min-width: 0;
   flex: 1;
   display: flex;
   align-items: center;
-  gap: 6px;
-  min-width: 0;
+  gap: 7px;
 }
 
 .topbar-title {
+  color: var(--text);
   font-size: 15px;
-  font-weight: 600;
-  color: #0F172A;
+  font-weight: 800;
+  letter-spacing: -.25px;
   white-space: nowrap;
 }
 
-.topbar-sep {
-  color: #CBD5E1;
-  font-size: 13px;
-}
-
+.topbar-sep,
 .topbar-sub {
-  font-size: 12px;
-  color: #94A3B8;
+  color: #94a3b8;
+  font-size: 11.5px;
+  font-weight: 600;
   white-space: nowrap;
 }
 
 .topbar-right {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
+  gap: 7px;
 }
 
 .sem-pill {
+  height: 30px;
   display: flex;
   align-items: center;
-  gap: 5px;
-  padding: 5px 11px;
-  background: linear-gradient(135deg, #EFF6FF, #EEF2FF);
-  border: 1px solid #BFDBFE;
-  border-radius: 20px;
-  font-size: 11px;
-  color: #1D4ED8;
-  font-weight: 600;
+  gap: 7px;
+  padding: 0 11px;
+  border-radius: 999px;
+  background: var(--blue-soft);
+  border: 1px solid #c9dcff;
+  color: var(--blue);
+  font-size: 11.5px;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 .live-dot {
   width: 6px;
   height: 6px;
-  background: #22C55E;
   border-radius: 50%;
-  animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-
-  0%,
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-
-  50% {
-    opacity: 0.4;
-    transform: scale(0.7);
-  }
+  background: #22c55e;
 }
 
 .search-wrap {
+  width: 180px;
+  height: 32px;
   display: flex;
   align-items: center;
-  gap: 6px;
-  background: #F8FAFC;
-  border: 1.5px solid #E2E8F0;
-  border-radius: 8px;
-  padding: 6px 10px;
-  transition: border-color 0.15s;
-}
-
-.search-wrap:focus-within {
-  border-color: #3B82F6;
-  background: #fff;
+  gap: 7px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #f8fafc;
 }
 
 .search-wrap input {
-  border: none;
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  outline: 0;
   background: transparent;
+  color: var(--text);
+  font: inherit;
   font-size: 12px;
-  color: #0F172A;
-  width: 150px;
-  outline: none;
-  font-family: 'Inter', sans-serif;
-}
-
-.search-wrap input::placeholder {
-  color: #CBD5E1;
 }
 
 .icon-btn {
   position: relative;
-  width: 34px;
-  height: 34px;
-  background: #F8FAFC;
-  border: 1.5px solid #E2E8F0;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #ffffff;
+  color: #475569;
   cursor: pointer;
-  color: #64748B;
-  transition: all 0.15s;
 }
 
 .icon-btn:hover {
-  background: #EFF6FF;
-  border-color: #BFDBFE;
-  color: #3B82F6;
+  background: #f8fafc;
+  color: var(--blue);
 }
 
 .badge-dot {
   position: absolute;
-  top: -4px;
+  top: -5px;
   right: -4px;
-  width: 15px;
+  min-width: 15px;
   height: 15px;
-  background: #EF4444;
-  color: #fff;
-  font-size: 8px;
-  font-weight: 700;
-  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 8.5px;
+  font-weight: 800;
+}
+
+.export-btn {
+  height: 32px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
-  justify-content: center;
-  border: 2px solid #fff;
+  gap: 6px;
+  border: 0;
+  border-radius: 10px;
+  padding: 0 12px;
+  background: var(--blue);
+  color: #ffffff;
+  font-size: 11.5px;
+  font-weight: 800;
+  cursor: pointer;
 }
 
 .notif-dropdown {
   position: absolute;
-  top: calc(var(--topbar-h) + 4px);
-  right: 80px;
+  top: 46px;
+  right: 68px;
   width: 320px;
-  background: #fff;
-  border: 1px solid #E2E8F0;
-  border-radius: 12px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
-  z-index: 100;
+  max-height: 400px;
   overflow: hidden;
+  border-radius: 15px;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  box-shadow: 0 24px 70px rgba(15,23,42,.18);
+  z-index: 60;
 }
 
 .notif-hd {
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 14px;
-  border-bottom: 1px solid #F1F5F9;
+  padding: 0 13px;
+  border-bottom: 1px solid var(--line);
 }
 
 .notif-title {
   font-size: 13px;
-  font-weight: 600;
-  color: #0F172A;
+  font-weight: 800;
 }
 
 .notif-count {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #fee2e2;
+  color: #dc2626;
   font-size: 10px;
-  background: #EF4444;
-  color: #fff;
-  padding: 1px 6px;
-  border-radius: 10px;
-  font-weight: 600;
+  font-weight: 800;
 }
 
 .notif-row {
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 10px 14px;
-  border-bottom: 1px solid #F8FAFC;
-  transition: background 0.1s;
-}
-
-.notif-row:last-child {
-  border-bottom: none;
-}
-
-.notif-row:hover {
-  background: #F8FAFC;
+  gap: 9px;
+  padding: 10px 13px;
+  border-bottom: 1px solid #eef2f7;
 }
 
 .notif-icon-wrap {
   width: 28px;
   height: 28px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
 }
 
 .notif-msg {
-  font-size: 11px;
-  color: #374151;
-  line-height: 1.4;
+  color: var(--text);
+  font-size: 12px;
 }
 
 .notif-time {
-  font-size: 9px;
-  color: #94A3B8;
-  margin-top: 2px;
+  margin-top: 3px;
+  color: #94a3b8;
+  font-size: 10px;
 }
 
-.export-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 14px;
-  background: #1D4ED8;
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 600;
-  font-family: 'Inter', sans-serif;
-  cursor: pointer;
-  box-shadow: 0 2px 8px rgba(29, 78, 216, 0.3);
-  transition: all 0.15s;
-}
-
-.export-btn:hover {
-  background: #1E40AF;
-  box-shadow: 0 4px 14px rgba(29, 78, 216, 0.4);
-  transform: translateY(-1px);
-}
-
-.topbar-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #3B82F6, #1D4ED8);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
-  cursor: pointer;
-  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
-  transition: transform 0.15s;
-  flex-shrink: 0;
-}
-
-.topbar-avatar:hover {
-  transform: scale(1.05);
-}
-
-/* ── Role bar ── */
-.role-bar {
-  flex-shrink: 0;
-  background: #fff;
-  border-bottom: 1px solid #E2E8F0;
-  padding: 6px 24px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.role-label {
-  font-size: 11px;
-  color: #94A3B8;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.role-tabs {
-  display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
-}
-
-.role-tab {
-  padding: 4px 12px;
-  border-radius: 6px;
-  border: 1px solid #E2E8F0;
-  background: #fff;
-  font-size: 11px;
-  color: #64748B;
-  cursor: pointer;
-  font-family: 'Inter', sans-serif;
-  transition: all 0.15s;
-}
-
-.role-tab:hover {
-  border-color: #3B82F6;
-  color: #3B82F6;
-}
-
-.role-tab.active {
-  background: #0F172A;
-  color: #fff;
-  border-color: #0F172A;
-  font-weight: 500;
-}
-
-/* ── Page body ── */
 .page-body {
   flex: 1;
+  min-width: 0;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  scrollbar-width: thin;
-  scrollbar-color: #CBD5E1 transparent;
-  min-height: 0;
+  padding: 16px 18px;
+  background:
+    linear-gradient(rgba(15,23,42,.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15,23,42,.025) 1px, transparent 1px),
+    #f4f7fb;
+  background-size: 34px 34px;
 }
 
-.page-body::-webkit-scrollbar {
-  width: 5px;
+.page-body :deep(> *) {
+  min-width: 0;
+  max-width: 100%;
 }
 
-.page-body::-webkit-scrollbar-thumb {
-  background: #CBD5E1;
-  border-radius: 3px;
-}
-
-/* ── Mobile overlay ── */
-.overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.4);
-  z-index: 45;
-  backdrop-filter: blur(2px);
-}
-
-/* ── Transitions ── */
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.15s, transform 0.15s;
+  transition: opacity .15s ease;
 }
 
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
-  transform: translateX(-4px);
 }
 
-.sidebar-collapsed .nav-item {
-  justify-content: center;
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15,23,42,.42);
+  z-index: 40;
 }
 
-.sidebar-collapsed .nav-item.active::before {
-  display: none;
+@media (max-width: 900px) {
+  .shell {
+    --sidebar-w: 230px;
+  }
+
+  .sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 50;
+  }
+
+  .sidebar-collapsed .sidebar {
+    transform: translateX(-100%);
+    width: var(--sidebar-w);
+    flex-basis: var(--sidebar-w);
+  }
+
+  .topbar {
+    padding: 0 10px;
+  }
+
+  .search-wrap,
+  .sem-pill {
+    display: none;
+  }
+
+  .page-body {
+    padding: 12px;
+  }
 }
 
-.sidebar-collapsed .nav-item.active {
-  border-radius: 8px;
+@media (max-width: 520px) {
+  .topbar-title {
+    font-size: 14px;
+  }
+
+  .topbar-sub,
+  .topbar-sep {
+    display: none;
+  }
+
+  .export-btn {
+    display: none;
+  }
 }
 </style>

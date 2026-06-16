@@ -1,10 +1,10 @@
 ﻿<template>
-  <div class="eval-page">
+  <div class="eval-page" style="padding: 24px 32px 40px;">
 
     <!-- Header -->
     <div class="page-hd">
       <div>
-        <h2 class="page-title">IPAT Evaluation</h2>
+        <h2 class="page-title">Evaluation</h2>
         <p class="page-sub">Innovations Performance Assessment Tool — CBC 30% · FPO 55% · JF 15%</p>
       </div>
       <button v-if="canCreate" class="btn btn-primary" @click="openCreateModal">
@@ -743,7 +743,7 @@ async function computeOverall() {
 </script>
 
 <style>
-.eval-page{padding:24px 32px 40px 24px;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;font-size:13px;color:#1A2332;min-height:100%;}
+.eval-page{padding:24px;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;font-size:13px;color:#1A2332;min-height:100%;}
 .page-hd{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;}
 .page-title{font-size:20px;font-weight:700;color:#0F172A;margin:0 0 3px;}
 .page-sub{font-size:12px;color:#94A3B8;margin:0;}

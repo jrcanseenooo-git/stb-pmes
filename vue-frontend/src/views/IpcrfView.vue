@@ -978,7 +978,7 @@ function _sync(u) {
 
 <style>
 *{box-sizing:border-box;}
-.ipcrf-page { padding: 24px 32px 40px 24px; font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;font-size:13px;color:#1A2332;background: transparent; min-height: 100%; }
+.ipcrf-page { padding: 24px; font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;font-size:13px;color:#1A2332;background: transparent; min-height: 100%; }
 .muted-text{color:#94A3B8;}
 .req{color:#EF4444;font-size:11px;}
 .ml6{margin-left:6px;}

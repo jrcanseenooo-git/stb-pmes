@@ -74,7 +74,7 @@
         </button>
 
         <!-- Divider -->
-        <div class="or-divider"><span>or sign in with email</span></div>
+        <div class="or-divider"><span>or sign in with</span></div>
 
         <!-- Email / Password -->
         <form @submit.prevent="handleEmailLogin" novalidate class="email-form">

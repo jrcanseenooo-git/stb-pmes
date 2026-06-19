@@ -162,6 +162,7 @@ const Router = (() => {
         if (!id && method === 'POST') return IPATService.create(body, user)
         if (id && !sub && method === 'GET') return IPATService.get(id, user)
         if (id && sub === 'status')         return IPATService.updateStatus(id, body, user)
+        if (id && sub === 'sync-fpo')       return IPATService.syncFPO(id, user)
         if (id && sub === 'cbc' && !subId && method === 'POST')  return IPATService.saveCBCRatings(id, body, user)
         if (id && sub === 'cbc' && subId === 'compute')          return IPATService.computeCBC(id, user)
         if (id && sub === 'jf' && !subId && method === 'POST')   return IPATService.saveJFRatings(id, body, user)

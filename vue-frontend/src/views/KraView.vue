@@ -3,11 +3,11 @@
 
     <!-- Content card -->
     <div class="content-card">
-
+      
     <!-- Header -->
     <div class="page-hd">
       <div>
-        <h2 class="page-title">Key Result Areas Library</h2>
+        <h2 class="page-title">KRA Library</h2>
         <p class="page-sub">Master KRA &amp; Success Indicator List</p>
       </div>
     </div>
@@ -24,12 +24,13 @@
       <div class="filter-selects">
         <select v-model="filterPhase" class="filter-select">
           <option value="">All Phases</option>
-          <option v-for="p in PHASES" :key="p" :value="p">{{ p }}</option>
+          <option v-for="p in PHASES" :key="p" :value="p">{{ phaseLabel(p) }}</option>
         </select>
         <select v-model="filterFnType" class="filter-select">
           <option value="">All Types</option>
           <option value="Core">Core</option>
           <option value="Support">Support</option>
+          <option value="Strategic">Strategic</option>
         </select>
         <select v-model="filterClass" class="filter-select">
           <option value="">All Classifications</option>
@@ -49,9 +50,10 @@
 
     <!-- Stats bar -->
     <div v-if="!loading" class="stats-bar">
-      <span class="stat-item"><strong>{{ filteredKRAs.length }}</strong> results</span>
-      <span class="stat-item"><strong>{{ countByFnType('Core') }}</strong> Core</span>
-      <span class="stat-item"><strong>{{ countByFnType('Support') }}</strong> Support</span>
+      <span class="stat-pill stat-pill-total">{{ filteredKRAs.length }} results</span>
+      <span class="stat-pill stat-pill-core">{{ countByFnType('Core') }} Core</span>
+      <span class="stat-pill stat-pill-support">{{ countByFnType('Support') }} Support</span>
+      <span v-if="countByFnType('Strategic')" class="stat-pill stat-pill-strategic">{{ countByFnType('Strategic') }} Strategic</span>
     </div>
 
     <!-- Skeleton -->
@@ -99,7 +101,7 @@
       </div>
       <div v-for="row in paginatedKRAs" :key="row.id" class="table-row" @click="openViewModal(row)">
         <div class="td td-phase">
-          <span class="phase-pill">{{ row.phase }}</span>
+          <span class="phase-pill">{{ phaseLabel(row.phase) }}</span>
         </div>
         <div class="td td-main">
           <div class="kra-name">{{ row.kraName }}</div>
@@ -109,7 +111,7 @@
           </div>
         </div>
         <div class="td td-type">
-          <span :class="['fn-badge', row.functionType === 'Core' ? 'fn-core' : 'fn-support']">
+          <span :class="['fn-badge', fnBadgeClass(row.functionType)]">
             {{ row.functionType }}
           </span>
         </div>
@@ -187,9 +189,9 @@
           <div class="modal-hd">
             <div>
               <div class="modal-hd-badges">
-                <span :class="['fn-badge', viewItem?.functionType === 'Core' ? 'fn-core' : 'fn-support']">{{ viewItem?.functionType }}</span>
+                <span :class="['fn-badge', fnBadgeClass(viewItem?.functionType)]">{{ viewItem?.functionType }}</span>
                 <span :class="['class-badge', classStyle(viewItem?.classification)]">{{ viewItem?.classification }}</span>
-                <span class="phase-pill">{{ viewItem?.phase }}</span>
+                <span class="phase-pill">{{ phaseLabel(viewItem?.phase) }}</span>
               </div>
               <h3 class="modal-title" style="margin-top:8px">{{ viewItem?.kraName }}</h3>
             </div>
@@ -268,7 +270,7 @@
                 <label class="field-label">Phase <span class="req">*</span></label>
                 <select v-model="form.phase" class="field-input">
                   <option value="">Select phase…</option>
-                  <option v-for="p in PHASES" :key="p" :value="p">{{ p }}</option>
+                  <option v-for="p in PHASES" :key="p" :value="p">{{ phaseLabel(p) }}</option>
                 </select>
               </div>
               <div class="field">
@@ -276,6 +278,7 @@
                 <select v-model="form.functionType" class="field-input">
                   <option value="Core">Core</option>
                   <option value="Support">Support</option>
+                  <option value="Strategic">Strategic</option>
                 </select>
               </div>
               <div class="field full">
@@ -390,7 +393,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { kraLibrary as kraLibraryApi } from '@/services/api'
 
-const PHASES = ['ANALYSIS', 'DESIGN', 'TESTING', 'PILOT IMPLEMENTATION', 'EVALUATION', 'SUPPORT', 'PROMOTION']
+const PHASES = ['ANALYSIS', 'DESIGN', 'TESTING', 'EVALUATION', 'PROMOTION', 'PORTFOLIO', 'SOCIAL_MARKETING', 'STRATEGIC', 'SUPPORT']
 
 // ── State ──
 const kras        = ref([])
@@ -480,7 +483,15 @@ function goToPage(p) {
 }
 
 // ── Helpers ──
-function countByFnType(type) { return kras.value.filter(r => r.functionType === type).length }
+function countByFnType(type) { return filteredKRAs.value.filter(r => r.functionType === type).length }
+
+function phaseLabel(p) { return (p || '').replace(/_/g, ' ') }
+
+function fnBadgeClass(type) {
+  if (type === 'Support')   return 'fn-support'
+  if (type === 'Strategic') return 'fn-strategic'
+  return 'fn-core'
+}
 
 function classStyle(c) {
   if (c === 'Simple')          return 'class-simple'
@@ -615,9 +626,12 @@ async function doRemove() {
 .btn-add-kra { margin-left: auto; }
 
 /* Stats bar */
-.stats-bar { display: flex; gap: 16px; margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid #F1F5F9; }
-.stat-item { font-size: 12px; color: #64748B; }
-.stat-item strong { color: #0F172A; }
+.stats-bar { display: flex; gap: 8px; margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid #F1F5F9; flex-wrap: wrap; }
+.stat-pill { display: inline-flex; align-items: center; padding: 5px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; line-height: 1.3; }
+.stat-pill-total { background: #F1F5F9; color: #334155; }
+.stat-pill-core { background: #EBF4FF; color: #1A56B0; }
+.stat-pill-support { background: #F3EEFF; color: #6B3FA0; }
+.stat-pill-strategic { background: #FFF4E5; color: #B45309; }
 
 /* Table */
 .kra-table { background: #fff; border: 1px solid #E2E8F0; border-radius: 10px; overflow: hidden; }
@@ -670,6 +684,7 @@ async function doRemove() {
 .fn-badge { display: inline-flex; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 700; }
 .fn-core { background: #EBF4FF; color: #1A56B0; }
 .fn-support { background: #F3EEFF; color: #6B3FA0; }
+.fn-strategic { background: #FFF4E5; color: #B45309; }
 
 /* Classification badge */
 .class-badge { display: inline-flex; padding: 2px 7px; border-radius: 6px; font-size: 10px; font-weight: 500; }

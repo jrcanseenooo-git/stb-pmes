@@ -5,7 +5,7 @@ function initializeSheets() {
     // ── Core ──
     Users: [
       'id', 'uid', 'email', 'fullName', 'firstName', 'lastName',
-      'role', 'divisionId', 'divisionName', 'position', 'employeeNo',
+      'role', 'divisionId', 'divisionName', 'section', 'position', 'employeeNo',
       'type', 'positionLevel', 'sgLevel', 'active', 'createdAt', 'updatedAt', 'lastLoginAt'
     ],
     Divisions: [

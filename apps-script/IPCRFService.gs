@@ -398,6 +398,38 @@ const IpcrfService = (() => {
   // PRIVATE HELPERS
   // ─────────────────────────────────────────────
 
+  // ─────────────────────────────────────────────
+  // CROSS-MODULE LOOKUP — used by IPATService (Evaluation/FPO domain)
+  // Finds the IPCRF or CCEF form whose Final Numerical Rating should
+  // feed the Functional Performance Output (FPO) score for a given
+  // ratee/period. Only forms that have actually been rated carry a
+  // finalNumericalRating, so unrated/draft forms never qualify.
+  // ─────────────────────────────────────────────
+
+  function getFinalRatingForUser(userId, semester, year) {
+    const sheet = SpreadsheetService.getSheet(SHEET.IPCRF_FORMS)
+    const rows  = SpreadsheetService.getAllRows(sheet).filter(r =>
+      r.userId   === userId &&
+      String(r.semester) === String(semester) &&
+      String(r.year)     === String(year) &&
+      ['Rated', 'Finalized'].includes(r.status) &&
+      r.finalNumericalRating !== '' && r.finalNumericalRating !== null && r.finalNumericalRating !== undefined
+    )
+    if (!rows.length) return null
+
+    // Prefer a Finalized form over a merely Rated one; among ties, prefer the
+    // most recently rated/finalized record (covers the IPCRF vs CCEF case).
+    rows.sort((a, b) => {
+      const rank = s => s === 'Finalized' ? 1 : 0
+      if (rank(b.status) !== rank(a.status)) return rank(b.status) - rank(a.status)
+      const aTime = new Date(a.finalizedAt || a.ratedAt || a.updatedAt || 0)
+      const bTime = new Date(b.finalizedAt || b.ratedAt || b.updatedAt || 0)
+      return bTime - aTime
+    })
+
+    return rows[0]
+  }
+
   function _getForm(id) {
     const sheet = SpreadsheetService.getSheet(SHEET.IPCRF_FORMS)
     const row   = SpreadsheetService.getRow(sheet, id)
@@ -467,6 +499,7 @@ const IpcrfService = (() => {
   return {
     list, get, create, update,
     submit, approve, return_, rate, finalize, computeScore,
-    listEntries, addEntry, updateEntry, deleteEntry
+    listEntries, addEntry, updateEntry, deleteEntry,
+    getFinalRatingForUser
   }
 })()

@@ -165,6 +165,9 @@ export const ipatApi = {
   create:       (data)          => gasWrite('POST',  'ipat', data),
   updateStatus: (id, status)    => gasWrite('PATCH', `ipat/${id}/status`, { status }),
 
+  // Functional Performance Output — pulled from the ratee's own IPCRF/CCEF
+  syncFPO:      (id)            => gasWrite('POST',  `ipat/${id}/sync-fpo`),
+
   // Core Behavioral Competencies
   saveCBCRatings: (id, ratings) => gasWrite('POST',  `ipat/${id}/cbc`,         { ratings: JSON.stringify(ratings) }),
   computeCBC:     (id)          => gasWrite('POST',  `ipat/${id}/cbc/compute`),

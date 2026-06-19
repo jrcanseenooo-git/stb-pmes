@@ -94,7 +94,7 @@
         <div class="th th-wt">Weights</div>
         <div class="th th-act">Actions</div>
       </div>
-      <div v-for="row in filteredKRAs" :key="row.id" class="table-row" @click="openViewModal(row)">
+      <div v-for="row in paginatedKRAs" :key="row.id" class="table-row" @click="openViewModal(row)">
         <div class="td td-phase">
           <span class="phase-pill">{{ row.phase }}</span>
         </div>
@@ -132,6 +132,43 @@
             </svg>
           </button>
         </div>
+      </div>
+    </div>
+
+    <!-- Pagination -->
+    <div v-if="!loading && filteredKRAs.length" class="pagination-bar">
+      <div class="pg-info">
+        <span>{{ pageRangeLabel }}</span>
+        <div class="pg-size">
+          <span>Rows per page</span>
+          <select v-model.number="pageSize" class="pg-size-select">
+            <option v-for="n in pageSizeOptions" :key="n" :value="n">{{ n }}</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="pg-controls">
+        <button class="pg-btn" :disabled="currentPage === 1" @click="goToPage(currentPage - 1)" title="Previous page">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <path d="M8 2.5L3.5 6.5 8 10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+
+        <template v-for="(p, idx) in pageNumbers" :key="idx">
+          <span v-if="p === '…'" class="pg-ellipsis">…</span>
+          <button
+            v-else
+            class="pg-num"
+            :class="{ active: p === currentPage }"
+            @click="goToPage(p)"
+          >{{ p }}</button>
+        </template>
+
+        <button class="pg-btn" :disabled="currentPage === totalPages" @click="goToPage(currentPage + 1)" title="Next page">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <path d="M5 2.5l4.5 4-4.5 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
       </div>
     </div>
 
@@ -344,7 +381,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { kraLibrary as kraLibraryApi } from '@/services/api'
 
 const PHASES = ['ANALYSIS', 'DESIGN', 'TESTING', 'PILOT IMPLEMENTATION', 'EVALUATION', 'SUPPORT', 'PROMOTION']
@@ -358,6 +395,10 @@ const search      = ref('')
 const filterPhase  = ref('')
 const filterFnType = ref('')
 const filterClass  = ref('')
+
+const currentPage = ref(1)
+const pageSize    = ref(10)
+const pageSizeOptions = [10, 25, 50, 100]
 
 const showViewModal = ref(false)
 const showFormModal = ref(false)
@@ -390,6 +431,47 @@ const filteredKRAs = computed(() => {
   if (filterClass.value)  rows = rows.filter(r => r.classification === filterClass.value)
   return rows
 })
+
+const totalPages = computed(() =>
+  Math.max(1, Math.ceil(filteredKRAs.value.length / pageSize.value))
+)
+
+const paginatedKRAs = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  return filteredKRAs.value.slice(start, start + pageSize.value)
+})
+
+const pageRangeLabel = computed(() => {
+  if (!filteredKRAs.value.length) return '0–0 of 0'
+  const start = (currentPage.value - 1) * pageSize.value + 1
+  const end   = Math.min(currentPage.value * pageSize.value, filteredKRAs.value.length)
+  return `${start}–${end} of ${filteredKRAs.value.length}`
+})
+
+const pageNumbers = computed(() => {
+  const total = totalPages.value
+  const curr  = currentPage.value
+  const range = []
+  const delta = 1
+  for (let i = 1; i <= total; i++) {
+    if (i === 1 || i === total || (i >= curr - delta && i <= curr + delta)) {
+      range.push(i)
+    } else if (range[range.length - 1] !== '…') {
+      range.push('…')
+    }
+  }
+  return range
+})
+
+// Reset to page 1 whenever filters/search/page size change
+watch([search, filterPhase, filterFnType, filterClass, pageSize], () => {
+  currentPage.value = 1
+})
+
+function goToPage(p) {
+  if (p === '…' || p < 1 || p > totalPages.value) return
+  currentPage.value = p
+}
 
 // ── Helpers ──
 function countByFnType(type) { return kras.value.filter(r => r.functionType === type).length }
@@ -514,12 +596,12 @@ async function doRemove() {
 
 /* Filters */
 .filter-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
-.srch-wrap { flex: 1; position: relative; min-width: 220px; max-width: 360px; }
+.srch-wrap { flex: 1 1 220px; position: relative; min-width: 200px; max-width: 420px; }
 .srch-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); pointer-events: none; }
-.srch-inp { width: 100%; padding: 8px 11px 8px 30px; border: 1px solid #E2E8F0; border-radius: 8px; font-size: 12px; font-family: inherit; color: #0F172A; outline: none; background: #fff; }
+.srch-inp { box-sizing: border-box; width: 100%; padding: 8px 11px 8px 30px; border: 1px solid #E2E8F0; border-radius: 8px; font-size: 12px; font-family: inherit; color: #0F172A; outline: none; background: #fff; }
 .srch-inp:focus { border-color: #3B82F6; box-shadow: 0 0 0 3px rgba(59,130,246,.1); }
-.filter-selects { display: flex; gap: 6px; }
-.filter-select { padding: 7px 10px; border: 1px solid #E2E8F0; border-radius: 7px; font-size: 12px; font-family: inherit; color: #374151; background: #fff; outline: none; cursor: pointer; }
+.filter-selects { display: flex; flex-wrap: wrap; gap: 6px; flex: 0 0 auto; }
+.filter-select { box-sizing: border-box; flex: 0 0 auto; min-width: 132px; padding: 7px 28px 7px 10px; border: 1px solid #E2E8F0; border-radius: 7px; font-size: 12px; font-family: inherit; color: #374151; background: #fff; outline: none; cursor: pointer; appearance: none; -webkit-appearance: none; -moz-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394A3B8' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; }
 .filter-select:focus { border-color: #3B82F6; }
 
 /* Stats bar */
@@ -529,6 +611,21 @@ async function doRemove() {
 
 /* Table */
 .kra-table { background: #fff; border: 1px solid #E2E8F0; border-radius: 12px; overflow: hidden; }
+
+/* ── Pagination ── */
+.pagination-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-top: 14px; padding: 10px 4px; }
+.pg-info { display: flex; align-items: center; gap: 16px; font-size: 12px; color: #64748B; }
+.pg-size { display: flex; align-items: center; gap: 6px; }
+.pg-size-select { box-sizing: border-box; padding: 5px 22px 5px 8px; border: 1px solid #E2E8F0; border-radius: 6px; font-size: 12px; font-family: inherit; color: #374151; background: #fff; outline: none; cursor: pointer; appearance: none; -webkit-appearance: none; -moz-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394A3B8' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; }
+.pg-size-select:focus { border-color: #3B82F6; }
+.pg-controls { display: flex; align-items: center; gap: 4px; }
+.pg-btn { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: 1px solid #E2E8F0; border-radius: 6px; background: #fff; color: #475569; cursor: pointer; transition: background .12s, border-color .12s; }
+.pg-btn:hover:not(:disabled) { background: #F8FAFC; border-color: #CBD5E1; }
+.pg-btn:disabled { opacity: .4; cursor: not-allowed; }
+.pg-num { min-width: 28px; height: 28px; padding: 0 6px; border: 1px solid #E2E8F0; border-radius: 6px; background: #fff; color: #374151; font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer; transition: background .12s, border-color .12s, color .12s; }
+.pg-num:hover { background: #F8FAFC; border-color: #CBD5E1; }
+.pg-num.active { background: #1E3A8A; border-color: #1E3A8A; color: #fff; }
+.pg-ellipsis { display: flex; align-items: center; justify-content: center; min-width: 24px; color: #94A3B8; font-size: 12px; }
 .table-hd { display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: #F8FAFC; border-bottom: 1px solid #E2E8F0; }
 .th { font-size: 10px; font-weight: 700; color: #94A3B8; text-transform: uppercase; letter-spacing: .06em; }
 .th-phase { width: 120px; flex-shrink: 0; }

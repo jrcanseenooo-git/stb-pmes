@@ -1,46 +1,13 @@
 <template>
   <div class="login-root">
+    <div class="bg-texture" aria-hidden="true"></div>
 
-    <!-- ══ LEFT PANEL ══ -->
-    <aside class="left-panel">
-      <div class="left-inner">
+    <!-- Center stage -->
+    <main class="stage">
 
-        <!-- Org identity -->
-        <div class="org-header">
-          <div class="seal-wrap">
-            <div class="sun-rays" aria-hidden="true">
-              <span v-for="i in 8" :key="i" class="ray" :style="`--r:${i}`"></span>
-            </div>
-            <div class="seal-circle">
-              <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
-                <path d="M4 6h18M4 13h12M4 20h15" stroke="white" stroke-width="2.1" stroke-linecap="round"/>
-                <circle cx="20" cy="19" r="5" fill="rgba(255,255,255,.12)" stroke="rgba(255,255,255,.35)" stroke-width="1.4"/>
-                <path d="M18.3 19l1.5 1.5 2.8-2.8" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </div>
-          </div>
-          <div class="org-text">
-            <div class="org-abbr">Performance Monitoring &amp; Evaluation System</div>
-            <div class="org-full">Department of Social Welfare and Development</div>
-          </div>
-        </div>
-
-        <!-- Hero -->
-        <div class="hero-block">
-          <h1 class="hero-headline">
-            Monitor.<br>Evaluate.<br>Deliver.
-          </h1>
-          <p class="hero-body">
-            Data-informed decisions for stronger delivery.
-          </p>
-        </div>
-
+      <div class="hero-block">
+        <div class="org-abbr">Performance Monitoring &amp; Evaluation System</div>
       </div>
-    </aside>
-
-    <!-- ══ RIGHT PANEL ══ -->
-    <main class="right-panel">
-      <div class="right-bg" aria-hidden="true"></div>
 
       <div class="form-shell">
 
@@ -212,87 +179,49 @@ async function handleGoogleLogin() {
     loginMethod.value = ''
   }
 }
-
-function cellStyle(i) {
-  const col   = (i - 1) % 6
-  const row   = Math.floor((i - 1) / 6)
-  const delay = ((col + row) * 0.12).toFixed(2)
-  const base  = 0.05 + ((i * 0.037) % 0.16)
-  return { '--delay': `${delay}s`, '--base-op': base.toFixed(3) }
-}
 </script>
+
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@700;800&display=swap');
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* Kill any scroll on the host page while login is mounted */
 :global(html), :global(body) {
   overflow: hidden;
   height: 100%;
 }
 
-/* ══ ROOT — true full-bleed split, zero overflow ══ */
+/* ══ ROOT — fullscreen single column, colored backdrop ══ */
 .login-root {
-  display: flex;
-  position: fixed;   /* covers the full viewport regardless of body/html state */
-  inset: 0;          /* top:0 right:0 bottom:0 left:0 */
-  font-family: 'Inter', system-ui, sans-serif;
-  overflow: hidden;
-}
-
-/* ══════════════════════════════════
-   LEFT PANEL  (50% width)
-══════════════════════════════════ */
-.left-panel {
-  width: 50%;
-  flex-shrink: 0;
-  background:
-    radial-gradient(ellipse at 18% 8%,  rgba(0,56,168,.60) 0%, transparent 52%),
-    radial-gradient(ellipse at 85% 88%, rgba(206,17,38,.28) 0%, transparent 48%),
-    radial-gradient(ellipse at 60% 40%, rgba(0,30,100,.40)  0%, transparent 60%),
-    linear-gradient(162deg, #040c1c 0%, #081830 35%, #0c2040 65%, #0e2850 100%);
-  position: relative;
-  overflow: hidden;
+  position: fixed;
+  inset: 0;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  font-family: 'Inter', system-ui, sans-serif;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 18% 8%,  rgba(0,56,168,.55) 0%, transparent 52%),
+    radial-gradient(ellipse at 85% 88%, rgba(206,17,38,.26) 0%, transparent 48%),
+    radial-gradient(ellipse at 60% 40%, rgba(0,30,100,.38)  0%, transparent 60%),
+    linear-gradient(162deg, #040c1c 0%, #081830 35%, #0c2040 65%, #0e2850 100%);
 }
 
-/* Dot-grid texture overlay */
-.left-panel::after {
-  content: '';
+/* Dot-grid texture overlay (kept — this is the colored-side texture, not the white grid) */
+.bg-texture {
   position: absolute;
   inset: 0;
   background-image: radial-gradient(rgba(255,255,255,.035) 1px, transparent 1px);
   background-size: 22px 22px;
   pointer-events: none;
-  z-index: 1;
-}
-
-.left-inner {
-  position: relative;
-  z-index: 2;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  padding: 36px 44px 0;
-  min-height: 0;   /* allow flex children to shrink below content size */
-}
-
-/* ── Org header ── */
-.org-header {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 0;
-  flex-shrink: 0;
+  z-index: 0;
 }
 
 .seal-wrap {
   position: relative;
-  width: 54px;
-  height: 54px;
+  width: 46px;
+  height: 46px;
   flex-shrink: 0;
 }
 
@@ -309,7 +238,7 @@ function cellStyle(i) {
 .ray {
   position: absolute;
   width: 2px;
-  height: 18px;
+  height: 16px;
   background: linear-gradient(to bottom, rgba(252,209,22,.65), transparent);
   border-radius: 1px;
   top: 50%; left: 50%;
@@ -319,7 +248,7 @@ function cellStyle(i) {
 
 .seal-circle {
   position: absolute;
-  inset: 7px;
+  inset: 6px;
   background: rgba(255,255,255,.1);
   border: 1.5px solid rgba(255,255,255,.18);
   border-radius: 50%;
@@ -329,158 +258,36 @@ function cellStyle(i) {
   backdrop-filter: blur(8px);
 }
 
-.org-text { display: flex; flex-direction: column; gap: 4px; }
-
 .org-abbr {
-  font-size: 10.5px;
+  font-size: 25px;
   font-weight: 700;
-  color: rgba(252,209,22,.8);
-  letter-spacing: 2.2px;
+  color: rgba(233, 230, 221, 0.699);
+  letter-spacing: 2px;
   text-transform: uppercase;
 }
 
-.org-full {
-  font-size: 11.5px;
-  font-weight: 400;
-  color: rgba(255,255,255,.38);
-  line-height: 1.45;
-}
-
-/* ── Hero block ── */
-.hero-block {
+/* ── Center stage ── */
+.stage {
+  position: relative;
+  z-index: 2;
   flex: 1;
+  width: 100%;
   display: flex;
   flex-direction: column;
+  align-items: center;
   justify-content: center;
-  padding: 20px 0 16px;
+  gap: 30px;
+  padding: 20px 24px 32px;
   min-height: 0;
+  overflow-y: auto;
 }
 
-.hero-headline {
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: clamp(44px, 4.5vw, 64px);
-  font-weight: 800;
-  color: #ffffff;
-  line-height: 1.0;
-  letter-spacing: -2.5px;
-  margin-bottom: 22px;
-  background: linear-gradient(145deg, #ffffff 45%, rgba(255,255,255,.5));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+.hero-block {
+  text-align: center;
+  max-width: 480px;
 }
 
-.hero-body {
-  font-size: 13.5px;
-  color: rgba(255,255,255,.36);
-  line-height: 1.7;
-  max-width: 340px;
-  font-weight: 400;
-}
-
-/* ── Feature strip ── */
-.feature-strip {
-  display: flex;
-  align-items: center;
-  background: rgba(255,255,255,.045);
-  border: 1px solid rgba(255,255,255,.07);
-  border-radius: 16px;
-  padding: 18px 24px;
-  backdrop-filter: blur(12px);
-  flex-shrink: 0;
-  margin-bottom: 0;
-}
-
-.feature-item {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.feature-icon {
-  width: 34px; height: 34px;
-  background: rgba(255,255,255,.07);
-  border: 1px solid rgba(255,255,255,.1);
-  border-radius: 9px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.feature-label {
-  font-size: 12px;
-  font-weight: 700;
-  color: rgba(255,255,255,.82);
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  letter-spacing: .3px;
-}
-
-.feature-desc {
-  font-size: 10px;
-  font-weight: 500;
-  color: rgba(255,255,255,.3);
-  text-transform: uppercase;
-  letter-spacing: .5px;
-  margin-top: 2px;
-}
-
-.feature-divider {
-  width: 1px;
-  height: 32px;
-  background: rgba(255,255,255,.09);
-  margin: 0 4px;
-  flex-shrink: 0;
-}
-
-/* ── Flag bar ── */
-.flag-bar {
-  display: flex;
-  margin: 20px -44px 0;
-  height: 5px;
-  flex-shrink: 0;
-}
-.flag-seg { flex: 1; }
-.flag-blue { background: #0038A8; }
-.flag-red  { background: #CE1126; }
-.flag-gold { background: #FCD116; }
-
-/* ══════════════════════════════════
-   RIGHT PANEL  (50% width, full bleed)
-══════════════════════════════════ */
-.right-panel {
-  width: 50%;
-  flex-shrink: 0;
-  background: #EDF1F9;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px 40px;
-  position: relative;
-  overflow: hidden;   /* hard clip — card must fit */
-}
-
-/* Subtle background texture */
-.right-bg {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(circle at 78% 12%, rgba(0,56,168,.06) 0%, transparent 42%),
-    radial-gradient(circle at 18% 88%, rgba(206,17,38,.04) 0%, transparent 36%);
-}
-.right-bg::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(148,163,184,.065) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148,163,184,.065) 1px, transparent 1px);
-  background-size: 40px 40px;
-}
-
-/* ── Form shell ── */
+/* ── Form shell (the card) ── */
 .form-shell {
   width: 100%;
   max-width: 420px;
@@ -488,21 +295,12 @@ function cellStyle(i) {
   border-radius: 20px;
   padding: 32px 36px 28px;
   box-shadow:
-    0 1px 2px rgba(0,0,0,.04),
-    0 4px 18px rgba(0,0,0,.06),
-    0 24px 64px rgba(0,56,168,.08);
+    0 1px 2px rgba(0,0,0,.08),
+    0 8px 24px rgba(0,0,0,.18),
+    0 32px 80px rgba(0,10,40,.35);
   position: relative;
   z-index: 1;
-  border: 1px solid rgba(0,0,0,.05);
-}
-
-/* Filipino flag accent stripe on card top */
-.form-shell::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 4px;
-  border-radius: 22px 22px 0 0;
+  border: 1px solid rgba(255,255,255,.06);
 }
 
 /* ── Form heading ── */
@@ -687,7 +485,7 @@ function cellStyle(i) {
   gap: 8px;
   width: 100%;
   padding: 14.5px;
-  background: linear-gradient(135deg, #002880 0%, #0038A8 50%, #1a52d4 100%);
+  background: #0038A8;
   color: white;
   border: none;
   border-radius: 12px;
@@ -699,18 +497,9 @@ function cellStyle(i) {
   box-shadow: 0 4px 18px rgba(0,56,168,.32), 0 1px 3px rgba(0,56,168,.18);
   margin-top: 4px;
   letter-spacing: .1px;
-  position: relative;
-  overflow: hidden;
-}
-.btn-primary::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(255,255,255,.1) 0%, transparent 55%);
-  pointer-events: none;
 }
 .btn-primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, #001f6a 0%, #002880 50%, #0038A8 100%);
+  background: #002880;
   box-shadow: 0 6px 26px rgba(0,56,168,.42);
   transform: translateY(-1px);
 }
@@ -763,20 +552,11 @@ function cellStyle(i) {
 }
 
 /* ══ RESPONSIVE ══ */
-@media (max-width: 900px) {
+@media (max-width: 600px) {
   :global(html), :global(body) { overflow: auto; height: auto; }
-  .login-root { position: static; flex-direction: column; height: auto; min-height: 100vh; overflow: auto; }
-  .left-panel  { width: 100%; height: auto; }
-  .left-inner  { padding: 28px 28px 0; }
-  .hero-block  { padding: 16px 0 14px; }
-  .right-panel { width: 100%; padding: 32px 20px 40px; overflow: visible; }
-  .flag-bar    { margin: 16px -28px 0; }
-}
-
-@media (max-width: 480px) {
-  .left-inner  { padding: 24px 20px 0; }
-  .form-shell  { padding: 28px 20px 24px; border-radius: 16px; }
-  .flag-bar    { margin: 16px -20px 0; }
-  .hero-headline { font-size: 36px; letter-spacing: -1.5px; }
+  .login-root { position: static; min-height: 100vh; height: auto; overflow: visible; }
+  .stage { padding: 16px 18px 28px; gap: 22px; }
+  .hero-headline { font-size: 24px; }
+  .form-shell { padding: 26px 22px 22px; border-radius: 16px; }
 }
 </style>

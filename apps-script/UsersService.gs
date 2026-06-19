@@ -61,6 +61,7 @@ const UsersService = (() => {
       positionLevel:      body.positionLevel || resolvePositionLevel(body.position || ''),
       divisionId:         body.divisionId   || '',
       divisionName:       body.division     || body.divisionName || '',
+      section:            body.section      || '',
       position:           body.position     || '',
       employeeNo:         body.employeeNo   || '',
       type:               body.type         || 'Regular',

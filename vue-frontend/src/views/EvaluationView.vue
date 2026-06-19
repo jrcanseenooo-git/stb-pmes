@@ -205,8 +205,10 @@
               </div>
               <div class="field full">
                 <label class="field-label">FPO Score — IPCRF Final Numerical Rating</label>
-                <input v-model.number="createForm.fpoScore" type="number" step="0.01" min="1" max="5" class="field-input" placeholder="e.g. 4.25 (1–5 IPCRF scale)"/>
-                <span style="font-size:10px;color:#94A3B8;margin-top:3px;display:block">Will be auto-converted to 4-pt IPAT scale. Leave blank to update later.</span>
+                <div class="fpo-auto-note">
+                  Pulled automatically from the ratee's own rated IPCRF/CCEF for this same period — no manual entry needed.
+                  If their IPCRF/CCEF isn't rated yet, you can sync it later from the assessment detail view.
+                </div>
               </div>
               <div class="field full">
                 <label class="field-label">Does the ratee have subordinates?</label>
@@ -345,26 +347,30 @@
               The <strong>Functional Performance Output</strong> domain uses the employee's
               <strong>IPCRF/DPCR Final Numerical Rating</strong> (1–5 scale) as the basis.
               It constitutes <strong>55%</strong> of the overall IPAT score.
+              This score is pulled directly from the employee's own rated IPCRF/CCEF for the same period — it is never entered by hand here.
             </div>
 
             <div class="fpo-panel">
               <div class="fpo-current">
-                <div class="fpo-label">Current IPCRF Score (1–5 scale)</div>
+                <div class="fpo-label">Current IPCRF/CCEF Score (1–5 scale)</div>
                 <div class="fpo-score">{{ activeRecord?.fpoScore || '—' }}</div>
                 <div v-if="activeRecord?.fpoScore" class="fpo-converted">
                   Converted to 4-pt IPAT scale: <strong>{{ convertFPO(activeRecord.fpoScore) }}</strong>
                 </div>
               </div>
               <div class="fpo-update">
-                <label class="field-label">Update IPCRF Score</label>
+                <label class="field-label">{{ activeRecord?.fpoScore ? 'Refresh from IPCRF/CCEF' : 'Pull from IPCRF/CCEF' }}</label>
                 <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
-                  <input v-model.number="fpoInput" type="number" step="0.01" min="1" max="5" class="field-input" style="width:130px" placeholder="1.00–5.00"/>
-                  <button class="btn btn-primary" :disabled="savingFPO" @click="saveFPO">
-                    {{ savingFPO ? 'Saving…' : 'Update' }}
+                  <button class="btn btn-primary" :disabled="syncingFPO" @click="syncFPOScore">
+                    <span v-if="syncingFPO" class="spinner-sm"></span>
+                    {{ syncingFPO ? 'Syncing…' : (activeRecord?.fpoScore ? 'Re-sync Score' : 'Sync Score') }}
                   </button>
                 </div>
-                <span style="font-size:10px;color:#94A3B8;margin-top:4px;display:block">
-                  Enter the IPCRF Final Numerical Rating from the DSPMS/IPCR form
+                <span v-if="fpoSource" style="font-size:10px;color:#16A34A;margin-top:6px;display:block">
+                  Pulled from {{ fpoSource.type }} ({{ fpoSource.status }}) — S{{ fpoSource.semester }} {{ fpoSource.year }}{{ fpoSource.adjectivalRating ? ' · ' + fpoSource.adjectivalRating : '' }}
+                </span>
+                <span v-else style="font-size:10px;color:#94A3B8;margin-top:4px;display:block">
+                  Requires the employee's IPCRF/CCEF for this period to be Rated or Finalized.
                 </span>
               </div>
             </div>
@@ -544,8 +550,8 @@ const cbcRatings   = ref({})
 const savingCBC    = ref(false)
 const computingCBC = ref(false)
 
-const fpoInput  = ref('')
-const savingFPO = ref(false)
+const fpoSource  = ref(null)
+const syncingFPO = ref(false)
 
 const jfRaterType = ref('Self')
 const jfRatings   = ref({})
@@ -559,7 +565,6 @@ const toast = ref({ show: false, msg: '', type: 'success' })
 const createForm = ref({
   semester: String(new Date().getMonth() < 6 ? 1 : 2),
   year: new Date().getFullYear(),
-  fpoScore: '',
   hasSubordinate: false
 })
 
@@ -624,7 +629,7 @@ async function loadRecords() {
 }
 
 function openCreateModal() {
-  createForm.value = { semester: String(new Date().getMonth() < 6 ? 1 : 2), year: new Date().getFullYear(), fpoScore: '', hasSubordinate: false }
+  createForm.value = { semester: String(new Date().getMonth() < 6 ? 1 : 2), year: new Date().getFullYear(), hasSubordinate: false }
   showCreateModal.value = true
 }
 
@@ -647,7 +652,7 @@ function openDetailModal(rec) {
   cbcRatings.value   = {}
   jfRatings.value    = {}
   jfEvidence.value   = {}
-  fpoInput.value     = rec.fpoScore || ''
+  fpoSource.value    = null
   showDetailModal.value = true
 }
 
@@ -691,15 +696,15 @@ async function computeCBC() {
 }
 
 // ── FPO ──
-async function saveFPO() {
-  if (!fpoInput.value) { showToast('Enter an FPO score', 'error'); return }
-  savingFPO.value = true
+async function syncFPOScore() {
+  syncingFPO.value = true
   try {
-    await ipatApi.updateStatus(activeRecord.value.id, { fpoScore: fpoInput.value, status: activeRecord.value.status || 'Draft' })
-    _syncRecord({ fpoScore: fpoInput.value })
-    showToast('FPO score updated')
+    const r = await ipatApi.syncFPO(activeRecord.value.id)
+    _syncRecord({ fpoScore: r.fpoScore })
+    fpoSource.value = r.source
+    showToast(`FPO score pulled from ${r.source.type}: ${r.fpoScore}`)
   } catch (e) { showToast(e.message, 'error') }
-  finally { savingFPO.value = false }
+  finally { syncingFPO.value = false }
 }
 
 // ── JF ──
@@ -891,6 +896,7 @@ async function computeOverall() {
 .fpo-score{font-size:36px;font-weight:800;color:#0F172A;line-height:1;}
 .fpo-converted{font-size:11px;color:#64748B;margin-top:6px;}
 .fpo-update{display:flex;flex-direction:column;}
+.fpo-auto-note{font-size:11px;color:#64748B;background:#F8FAFC;border:1px solid #F1F5F9;border-radius:8px;padding:10px 12px;line-height:1.5;}
 .fpo-formula{background:#F8FAFC;border:1px solid #F1F5F9;border-radius:8px;padding:12px 14px;}
 .formula-label{font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;}
 .formula-text{font-size:12px;color:#374151;font-family:'SF Mono','Fira Mono',monospace;margin-bottom:8px;}

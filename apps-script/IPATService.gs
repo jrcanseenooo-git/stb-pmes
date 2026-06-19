@@ -163,24 +163,32 @@ const IPATService = (() => {
     )
     if (existing) throw HttpError('An IPAT record already exists for this ratee and period', 409)
 
+    const rateeId  = body.rateeId  || profile.id
+    const semester = body.semester || ''
+    const year     = body.year     || new Date().getFullYear()
+
+    // FPO is never taken from client input — it always comes from the
+    // ratee's own IPCRF/CCEF Final Numerical Rating for this same period.
+    const sourceForm = IpcrfService.getFinalRatingForUser(rateeId, semester, year)
+
     const record = {
       id:             SpreadsheetService.generateId('IPAT-'),
-      rateeId:        body.rateeId      || profile.id,
+      rateeId,
       rateeName:      body.rateeName    || profile.fullName,
       divisionId:     body.divisionId   || profile.divisionId  || '',
       divisionName:   body.divisionName || profile.divisionName || '',
       position:       body.position     || profile.position     || '',
       positionLevel:  PositionHelper.resolveLevel(profile.position || ''),
-      semester:       body.semester     || '',
-      year:           body.year         || new Date().getFullYear(),
+      semester,
+      year,
       hasSubordinate: body.hasSubordinate === true || body.hasSubordinate === 'true' || false,
       status:         'Draft',
       cbcScore:       '',
-      fpoScore:       body.fpoScore     || '',
+      fpoScore:       sourceForm ? sourceForm.finalNumericalRating : '',
       jfScore:        '',
       overallScore:   '',
       descriptor:     '',
-      ipcrfFormId:    body.ipcrfFormId  || '',
+      ipcrfFormId:    sourceForm ? sourceForm.id : '',
       createdAt:      now,
       updatedAt:      now
     }
@@ -201,10 +209,9 @@ const IPATService = (() => {
     const sheet   = SpreadsheetService.getSheet(SHEET.IPAT_RECORDS)
     const updated = SpreadsheetService.updateRow(sheet, id, {
       status: body.status || body,
-      ...(body.fpoScore !== undefined ? { fpoScore: body.fpoScore } : {}),
       updatedAt: new Date().toISOString()
     })
-    AuditService.log('UPDATE_STATUS', 'IPAT', `Status/data updated for ${id}`, user)
+    AuditService.log('UPDATE_STATUS', 'IPAT', `Status updated for ${id}`, user)
     return updated
   }
 
@@ -405,6 +412,47 @@ const IPATService = (() => {
   }
 
   // ─────────────────────────────────────────────
+  // SYNC FPO FROM IPCRF/CCEF
+  // FPO is never entered manually — it is always re-pulled from the
+  // ratee's own IPCRF/CCEF Final Numerical Rating for this same period.
+  // ─────────────────────────────────────────────
+
+  function syncFPO(ipatId, user) {
+    const record = _getRecord(ipatId)
+    const sourceForm = IpcrfService.getFinalRatingForUser(record.rateeId, record.semester, record.year)
+
+    if (!sourceForm) {
+      throw HttpError(
+        'No rated or finalized IPCRF/CCEF form found for this employee for this period yet. ' +
+        'The IPCRF/CCEF must be rated before the FPO score can be pulled in.',
+        404
+      )
+    }
+
+    const recSheet = SpreadsheetService.getSheet(SHEET.IPAT_RECORDS)
+    SpreadsheetService.updateRow(recSheet, ipatId, {
+      fpoScore:    sourceForm.finalNumericalRating,
+      ipcrfFormId: sourceForm.id,
+      updatedAt:   new Date().toISOString()
+    })
+
+    AuditService.log('SYNC_FPO', 'IPAT',
+      `FPO synced from ${sourceForm.type} ${sourceForm.id} (${sourceForm.finalNumericalRating}) for ${ipatId}`, user)
+
+    return {
+      fpoScore: sourceForm.finalNumericalRating,
+      source: {
+        formId:            sourceForm.id,
+        type:               sourceForm.type,
+        status:             sourceForm.status,
+        adjectivalRating:   sourceForm.adjectivalRating,
+        semester:           sourceForm.semester,
+        year:               sourceForm.year
+      }
+    }
+  }
+
+  // ─────────────────────────────────────────────
   // COMPUTE FINAL OVERALL SCORE
   // Overall = (CBCI × 0.30) + (FPOI × 0.55) + (JFI × 0.15)
   // ─────────────────────────────────────────────
@@ -469,6 +517,7 @@ const IPATService = (() => {
     list, get, create, updateRecord, updateStatus,
     saveCBCRatings, computeCBC,
     saveJFRatings,  computeJF,
+    syncFPO,
     computeOverall,
     getThemes, getJFIndicators,
     getCBCRatings, getJFRatings

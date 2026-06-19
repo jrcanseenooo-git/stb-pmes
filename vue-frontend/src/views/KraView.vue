@@ -7,12 +7,6 @@
         <h2 class="page-title">KRA Library</h2>
         <p class="page-sub">Master KRA &amp; Success Indicator List</p>
       </div>
-      <button class="btn btn-primary" @click="openAddModal">
-        <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-          <path d="M6.5 1v11M1 6.5h11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-        </svg>
-        Add KRA
-      </button>
     </div>
 
     <!-- Filters -->
@@ -41,6 +35,12 @@
           <option value="Highly Technical">Highly Technical</option>
           <option value="Exempted">Exempted</option>
         </select>
+        <button class="btn btn-primary" @click="openAddModal">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+          <path d="M6.5 1v11M1 6.5h11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        Add KRA
+      </button>
       </div>
     </div>
 

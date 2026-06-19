@@ -266,6 +266,7 @@
     <div v-if="!collapsed && isMobile" class="overlay" @click="collapsed = true"></div>
 
     <PasswordChangePrompt :show="showPwPrompt" @changed="onPasswordChanged" @skip="showPwPrompt = false" />
+    <LogoutConfirmModal :show="showLogoutConfirm" @confirm="confirmLogout" @cancel="showLogoutConfirm = false" />
   </div>
 </template>
 
@@ -275,6 +276,7 @@ import { RouterView, RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { usePermissions } from '@/composables/usePermissions'
 import PasswordChangePrompt from '@/components/common/PasswordChangePrompt.vue'
+import LogoutConfirmModal from '@/components/common/LogoutConfirmModal.vue'
 
 const authStore = useAuthStore()
 const { canManageUsers } = usePermissions()
@@ -286,6 +288,7 @@ const search = ref('')
 const showNotifs = ref(false)
 const isMobile = ref(false)
 const showPwPrompt = ref(false)
+const showLogoutConfirm = ref(false)
 
 const titleMap = {
   '/dashboard': { title: 'Dashboard', sub: 'Bureau Overview' },
@@ -324,8 +327,13 @@ function onPasswordChanged() {
   showPwPrompt.value = false
 }
 
-async function handleLogout() {
+function handleLogout() {
+  showLogoutConfirm.value = true
+}
+
+async function confirmLogout() {
   await authStore.logout()
+  showLogoutConfirm.value = false
   router.push('/auth/login')
 }
 

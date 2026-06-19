@@ -34,6 +34,7 @@
               <th>Email</th>
               <th>Role</th>
               <th>Division</th>
+              <th>Section</th>
               <th>Temp Password</th>
               <th>Status</th>
               <th>Last Login</th>
@@ -57,6 +58,7 @@
                 <td><div class="sk-line" style="width:140px"></div></td>
                 <td><div class="sk-pill"></div></td>
                 <td><div class="sk-line" style="width:120px"></div></td>
+                <td><div class="sk-line" style="width:120px"></div></td>
                 <td><div class="sk-line" style="width:80px"></div></td>
                 <td><div class="sk-pill" style="width:55px"></div></td>
                 <td><div class="sk-line" style="width:60px"></div></td>
@@ -79,6 +81,7 @@
                 <td class="text-xs muted">{{ u.email }}</td>
                 <td><span :class="['role-badge', roleBadgeClass(u.role)]">{{ u.role }}</span></td>
                 <td class="text-xs muted">{{ u.division || '—' }}</td>
+                <td class="text-xs muted">{{ u.section || '—' }}</td>
                 <td>
                   <div class="flex-row gap-6" v-if="u.tempPassword">
                     <code class="temp-pw">{{ showPw[u.email] ? u.tempPassword : '••••••••' }}</code>
@@ -123,7 +126,7 @@
                 </td>
               </tr>
               <tr v-if="!loading && !filteredUsers.length">
-                <td colspan="8" class="empty-row">
+                <td colspan="9" class="empty-row">
                   <svg width="32" height="32" viewBox="0 0 32 32" fill="none" style="margin:0 auto 8px;display:block">
                     <circle cx="16" cy="16" r="14" stroke="#E2E8F0" stroke-width="2"/>
                     <path d="M11 16h10M16 11v10" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round"/>
@@ -218,6 +221,15 @@
                     <option>Design Formulation Division</option>
                     <option>Pilot Implementation Division</option>
                     <option>Social Technology Analysis and Evaluation Division</option>
+                  </select>
+                </div>
+                <div class="field full">
+                  <label class="field-label">Section</label>
+                  <select v-model="form.section" class="field-select">
+                    <option value="">Select section…</option>
+                    <option>Children and Youth Section</option>
+                    <option>Women, Older Persons and Persons with Disability Section</option>
+                    <option>Other Marginalized Groups Section</option>
                   </select>
                 </div>
               </div>
@@ -391,6 +403,7 @@ function mapUser(row) {
     role:         row.role         || 'Staff',
     division:     row.divisionName || row.divisionId || '',
     divisionId:   row.divisionId   || '',
+    section:      row.section      || '',
     position:     row.position     || '',
     employeeNo:   row.employeeNo   || '',
     type:         row.type         || 'Regular',
@@ -423,7 +436,7 @@ function generatePassword() {
 // ── Form ──
 const defaultForm = () => ({
   firstName:'', lastName:'', email:'',
-  role:'', division:'', position:'',
+  role:'', division:'', section:'', position:'',
   employeeNo:'', type:'Regular',
   tempPassword: generatePassword()
 })
@@ -439,7 +452,8 @@ const filteredUsers = computed(() => {
     u.name.toLowerCase().includes(q) ||
     u.email.toLowerCase().includes(q) ||
     u.role.toLowerCase().includes(q) ||
-    (u.division||'').toLowerCase().includes(q)
+    (u.division||'').toLowerCase().includes(q) ||
+    (u.section||'').toLowerCase().includes(q)
   )
 })
 
@@ -455,6 +469,7 @@ function openEditModal(user) {
     email:        user.email,
     role:         user.role,
     division:     user.division,
+    section:      user.section    || '',
     position:     user.position    || '',
     employeeNo:   user.employeeNo  || '',
     type:         user.type        || 'Regular',
@@ -477,6 +492,7 @@ async function saveUser() {
       email:       form.value.email,
       role:        form.value.role,
       divisionName: form.value.division,
+      section:     form.value.section,
       position:    form.value.position,
       employeeNo:  form.value.employeeNo,
       type:        form.value.type

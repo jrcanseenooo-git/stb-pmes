@@ -3,17 +3,13 @@
     <aside class="sidebar">
       <div class="sb-brand">
         <div class="brand-icon">
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-            <rect x="2" y="3" width="14" height="2" rx="1" fill="white" />
-            <rect x="2" y="8" width="10" height="2" rx="1" fill="white" />
-            <rect x="2" y="13" width="12" height="2" rx="1" fill="white" />
-          </svg>
+          <img src="/android-chrome-512x512.png" alt="Social Technology Bureau seal" class="brand-seal" />
         </div>
 
         <transition name="fade">
           <div v-if="!collapsed" class="brand-text">
-            <div class="brand-name">PMES</div>
-            <div class="brand-sub">Monitoring System</div>
+            <div class="brand-name">PERFORMANCE MONITORING</div>
+            <div class="brand-sub">EVALUATION SYSTEM</div>
           </div>
         </transition>
       </div>
@@ -433,8 +429,15 @@ onUnmounted(() => {
   flex-shrink: 0;
   display: grid;
   place-items: center;
-  border-radius: 11px;
-  background: var(--blue);
+  border-radius: 50%;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.brand-seal {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .brand-text {

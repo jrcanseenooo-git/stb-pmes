@@ -1,10 +1,13 @@
 <template>
-  <div class="kra-page" style="padding: 24px 32px 40px;">
+  <div class="kra-page">
+
+    <!-- Content card -->
+    <div class="content-card">
 
     <!-- Header -->
     <div class="page-hd">
       <div>
-        <h2 class="page-title">KRA Library</h2>
+        <h2 class="page-title">Key Result Areas Library</h2>
         <p class="page-sub">Master KRA &amp; Success Indicator List</p>
       </div>
     </div>
@@ -35,13 +38,13 @@
           <option value="Highly Technical">Highly Technical</option>
           <option value="Exempted">Exempted</option>
         </select>
-        <button class="btn btn-primary" @click="openAddModal">
+      </div>
+      <button class="btn btn-primary btn-add-kra" @click="openAddModal">
         <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
           <path d="M6.5 1v11M1 6.5h11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
         </svg>
         Add KRA
       </button>
-      </div>
     </div>
 
     <!-- Stats bar -->
@@ -171,6 +174,9 @@
         </button>
       </div>
     </div>
+
+    </div>
+    <!-- /Content card -->
 
     <!-- ══════════════════════════════════
          VIEW MODAL
@@ -594,8 +600,11 @@ async function doRemove() {
 .page-title { font-size: 20px; font-weight: 700; color: #0F172A; margin: 0 0 3px; letter-spacing: -.3px; }
 .page-sub { font-size: 12px; color: #94A3B8; margin: 0; }
 
+/* Content card */
+.content-card { background: #fff; border: 1px solid #E2E8F0; border-radius: 14px; padding: 20px; }
+
 /* Filters */
-.filter-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.filter-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
 .srch-wrap { flex: 1 1 220px; position: relative; min-width: 200px; max-width: 420px; }
 .srch-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); pointer-events: none; }
 .srch-inp { box-sizing: border-box; width: 100%; padding: 8px 11px 8px 30px; border: 1px solid #E2E8F0; border-radius: 8px; font-size: 12px; font-family: inherit; color: #0F172A; outline: none; background: #fff; }
@@ -603,17 +612,18 @@ async function doRemove() {
 .filter-selects { display: flex; flex-wrap: wrap; gap: 6px; flex: 0 0 auto; }
 .filter-select { box-sizing: border-box; flex: 0 0 auto; min-width: 132px; padding: 7px 28px 7px 10px; border: 1px solid #E2E8F0; border-radius: 7px; font-size: 12px; font-family: inherit; color: #374151; background: #fff; outline: none; cursor: pointer; appearance: none; -webkit-appearance: none; -moz-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394A3B8' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; }
 .filter-select:focus { border-color: #3B82F6; }
+.btn-add-kra { margin-left: auto; }
 
 /* Stats bar */
-.stats-bar { display: flex; gap: 16px; margin-bottom: 12px; }
+.stats-bar { display: flex; gap: 16px; margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid #F1F5F9; }
 .stat-item { font-size: 12px; color: #64748B; }
 .stat-item strong { color: #0F172A; }
 
 /* Table */
-.kra-table { background: #fff; border: 1px solid #E2E8F0; border-radius: 12px; overflow: hidden; }
+.kra-table { background: #fff; border: 1px solid #E2E8F0; border-radius: 10px; overflow: hidden; }
 
 /* ── Pagination ── */
-.pagination-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-top: 14px; padding: 10px 4px; }
+.pagination-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-top: 14px; padding: 14px 4px 0; border-top: 1px solid #F1F5F9; }
 .pg-info { display: flex; align-items: center; gap: 16px; font-size: 12px; color: #64748B; }
 .pg-size { display: flex; align-items: center; gap: 6px; }
 .pg-size-select { box-sizing: border-box; padding: 5px 22px 5px 8px; border: 1px solid #E2E8F0; border-radius: 6px; font-size: 12px; font-family: inherit; color: #374151; background: #fff; outline: none; cursor: pointer; appearance: none; -webkit-appearance: none; -moz-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394A3B8' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; }

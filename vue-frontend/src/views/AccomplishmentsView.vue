@@ -1,6 +1,8 @@
 <template>
   <div class="acc-page">
 
+    <div class="content-card">
+
     <div class="page-hd">
       <div>
         <h2 class="page-title">Accomplishments</h2>
@@ -36,22 +38,22 @@
     <!-- Skeleton -->
     <div v-if="loading" class="acc-table">
       <div class="table-hd">
-        <div class="th" style="flex:1.2">Employee</div>
-        <div class="th" style="flex:1">KRA</div>
-        <div class="th" style="flex:1.5">Target / SI</div>
-        <div class="th" style="width:80px">Progress</div>
-        <div class="th" style="width:90px">Status</div>
-        <div class="th" style="width:80px">Deadline</div>
-        <div class="th" style="width:80px">Actions</div>
+        <div class="th th-emp">Employee</div>
+        <div class="th th-kra">KRA</div>
+        <div class="th th-target">Target / SI</div>
+        <div class="th th-prog">Progress</div>
+        <div class="th th-status">Status</div>
+        <div class="th th-dl">Deadline</div>
+        <div class="th th-act">Actions</div>
       </div>
       <div v-for="i in 5" :key="i" class="table-row">
-        <div class="td" style="flex:1.2"><div class="sk-line" style="width:80%"></div></div>
-        <div class="td" style="flex:1"><div class="sk-line" style="width:70%"></div></div>
-        <div class="td" style="flex:1.5"><div class="sk-line" style="width:90%"></div></div>
-        <div class="td" style="width:80px"><div class="sk-line" style="width:50px"></div></div>
-        <div class="td" style="width:90px"><div class="sk-line" style="width:70px"></div></div>
-        <div class="td" style="width:80px"><div class="sk-line" style="width:60px"></div></div>
-        <div class="td" style="width:80px"><div class="sk-line" style="width:50px"></div></div>
+        <div class="td td-emp"><div class="sk-line" style="width:80%"></div></div>
+        <div class="td td-kra"><div class="sk-line" style="width:70%"></div></div>
+        <div class="td td-target"><div class="sk-line" style="width:90%"></div></div>
+        <div class="td td-prog"><div class="sk-line" style="width:50px"></div></div>
+        <div class="td td-status"><div class="sk-line" style="width:70px"></div></div>
+        <div class="td td-dl"><div class="sk-line" style="width:60px"></div></div>
+        <div class="td td-act"><div class="sk-line" style="width:50px"></div></div>
       </div>
     </div>
 
@@ -77,36 +79,39 @@
         <div class="th th-act">Actions</div>
       </div>
       <div v-for="row in filteredRows" :key="row.id" class="table-row" @click="openViewModal(row)">
-        <div class="td th-emp">
+        <div class="td td-emp">
           <div class="emp-cell">
             <div class="av" :style="{ background: avatarColor(row.employeeName) }">{{ initials(row.employeeName) }}</div>
-            <div>
+            <div class="emp-meta">
               <div class="emp-name">{{ row.employeeName }}</div>
               <div class="emp-div">{{ row.divisionName || '—' }}</div>
             </div>
           </div>
         </div>
-        <div class="td th-kra text-muted">{{ row.kraName || '—' }}</div>
-        <div class="td th-target">{{ row.successIndicator || row.target || '—' }}</div>
-        <div class="td th-prog">
+        <div class="td td-kra text-muted">{{ row.kraName || '—' }}</div>
+        <div class="td td-target">{{ row.successIndicator || row.target || '—' }}</div>
+        <div class="td td-prog">
           <div class="prog-wrap">
             <div class="prog-track"><div class="prog-fill" :style="{ width: (row.progressPct || 0) + '%', background: progColor(row.progressPct) }"></div></div>
             <span class="prog-label">{{ row.progressPct || 0 }}%</span>
           </div>
         </div>
-        <div class="td th-status">
+        <div class="td td-status">
           <span :class="['status-badge', statusClass(row.status)]">{{ row.status }}</span>
         </div>
-        <div class="td th-dl" :class="isOverdue(row.deadline) ? 'overdue' : 'text-muted'">
+        <div class="td td-dl" :class="isOverdue(row.deadline) ? 'overdue' : 'text-muted'">
           {{ fmtDate(row.deadline) }}{{ isOverdue(row.deadline) ? ' ⚠' : '' }}
         </div>
-        <div class="td th-act" @click.stop>
+        <div class="td td-act" @click.stop>
           <button v-if="canApprove && row.status === 'For Review'" class="btn btn-xs btn-success" @click="doApprove(row)">Approve</button>
           <button v-if="canApprove && row.status === 'For Review'" class="btn btn-xs btn-warn" @click="openRevisionModal(row)">Revise</button>
           <button class="btn btn-xs" @click="openEditModal(row)">Edit</button>
         </div>
       </div>
     </div>
+
+    </div>
+    <!-- /Content card -->
 
     <!-- VIEW MODAL -->
     <teleport to="body">
@@ -343,7 +348,8 @@ async function doRevision() {
 </script>
 
 <style>
-.acc-page { padding: 16px 20px 32px; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif; font-size: 13px; color: #1A2332; min-height: 100%; }
+.acc-page { padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif; font-size: 13px; color: #1A2332; min-height: 100%; }
+.content-card { background: #fff; border: 1px solid #E2E8F0; border-radius: 14px; padding: 20px; }
 .page-hd { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 16px; }
 .page-title { font-size: 20px; font-weight: 700; color: #0F172A; margin: 0 0 3px; letter-spacing: -.3px; }
 .page-sub { font-size: 12px; color: #94A3B8; margin: 0; }
@@ -357,31 +363,26 @@ async function doRevision() {
 .srch-icon { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); pointer-events: none; }
 .srch-inp { padding: 7px 11px 7px 28px; border: 1px solid #E2E8F0; border-radius: 8px; font-size: 12px; font-family: inherit; color: #0F172A; outline: none; width: 240px; background: #fff; }
 .srch-inp:focus { border-color: #3B82F6; }
-.acc-table { background: #fff; border: 1px solid #E2E8F0; border-radius: 12px; overflow: hidden; }
-.table-hd { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: #F8FAFC; border-bottom: 1px solid #E2E8F0; }
-.th { font-size: 10px; font-weight: 700; color: #94A3B8; text-transform: uppercase; letter-spacing: .06em; flex-shrink: 0; }
-.th-emp { flex: 1.2; }
-.th-kra { flex: 0.8; }
-.th-target { flex: 1.5; }
-.th-prog { width: 100px; }
-.th-status { width: 100px; }
-.th-dl { width: 90px; }
-.th-act { width: 120px; }
-.table-row { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid #F1F5F9; cursor: pointer; transition: background .12s; }
+.acc-table { border: 1px solid #E2E8F0; border-radius: 12px; overflow-x: auto; }
+.table-hd, .table-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 1.3fr) minmax(90px, 0.8fr) minmax(140px, 1.4fr) minmax(80px, 0.7fr) minmax(80px, 0.7fr) minmax(70px, 0.6fr) minmax(120px, 0.9fr);
+  align-items: center;
+  column-gap: 10px;
+}
+.table-hd { padding: 10px 14px; background: #F8FAFC; border-bottom: 1px solid #E2E8F0; }
+.th { font-size: 10px; font-weight: 700; color: #94A3B8; text-transform: uppercase; letter-spacing: .06em; }
+.table-row { padding: 10px 14px; border-bottom: 1px solid #F1F5F9; cursor: pointer; transition: background .12s; }
 .table-row:last-child { border-bottom: none; }
 .table-row:hover { background: #F8FBFF; }
-.td { font-size: 12px; color: #374151; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.td.th-emp { flex: 1.2; overflow: visible; white-space: normal; }
-.td.th-kra { flex: 0.8; }
-.td.th-target { flex: 1.5; }
-.td.th-prog { width: 100px; }
-.td.th-status { width: 100px; }
-.td.th-dl { width: 90px; }
-.td.th-act { width: 120px; display: flex; gap: 4px; }
-.emp-cell { display: flex; align-items: center; gap: 8px; }
+.td { font-size: 12px; color: #374151; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.td-emp { overflow: visible; white-space: normal; }
+.td-act { display: flex; gap: 4px; flex-wrap: wrap; }
+.emp-cell { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.emp-meta { min-width: 0; }
 .av { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: #fff; flex-shrink: 0; }
-.emp-name { font-size: 12px; font-weight: 600; color: #0F172A; }
-.emp-div { font-size: 10px; color: #94A3B8; }
+.emp-name { font-size: 12px; font-weight: 600; color: #0F172A; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.emp-div { font-size: 10px; color: #94A3B8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .text-muted { color: #94A3B8; font-size: 11px; }
 .overdue { color: #EB5757; font-weight: 500; font-size: 11px; }
 .prog-wrap { display: flex; align-items: center; gap: 6px; }

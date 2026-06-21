@@ -7,7 +7,7 @@
     <!-- Header -->
     <div class="page-hd">
       <div>
-        <h2 class="page-title">Evaluation</h2>
+        <h2 class="page-title">Evaluation Results</h2>
         <p class="page-sub">Innovations Performance Assessment Tool — CBC 30% · FPO 55% · JF 15%</p>
       </div>
       <button v-if="canCreate" class="btn btn-primary" @click="openCreateModal">
@@ -754,7 +754,7 @@ async function computeOverall() {
 </script>
 
 <style>
-.eval-page{font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;font-size:13px;color:#1A2332;min-height:100%;}
+.eval-page{padding:0;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;font-size:13px;color:#1A2332;min-height:100%;}
 .page-hd{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;}
 .page-title{font-size:20px;font-weight:700;color:#0F172A;margin:0 0 3px;}
 .page-sub{font-size:12px;color:#94A3B8;margin:0;}
@@ -763,7 +763,7 @@ async function computeOverall() {
 .content-card{background:#fff;border:1px solid #E2E8F0;border-radius:14px;padding:20px;}
 
 /* Domain bar */
-.domain-bar{display:flex;align-items:center;gap:8px;background:#F8FAFC;border:1px solid #F1F5F9;border-radius:12px;padding:14px 18px;margin-bottom:16px;flex-wrap:wrap;}
+.domain-bar{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:14px 18px;margin-bottom:16px;flex-wrap:wrap;}
 .domain-item{flex:1;min-width:130px;}
 .domain-pct{font-size:22px;font-weight:800;line-height:1;}
 .domain-label{font-size:11px;font-weight:600;color:#374151;margin:3px 0 2px;}
@@ -814,13 +814,13 @@ async function computeOverall() {
 .desc-immediate{background:#FEF2F2;color:#B91C1C;}
 
 /* Scale card */
-.scale-card{background:#F8FAFC;border:1px solid #F1F5F9;border-radius:10px;padding:14px 18px;}
+.scale-card{background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:14px 18px;}
 .scale-title{font-size:11px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;}
 .scale-grid{display:flex;flex-direction:column;gap:8px;}
 .scale-row{display:flex;align-items:flex-start;gap:12px;}
 .scale-label{font-size:11px;font-weight:600;color:#374151;width:200px;flex-shrink:0;}
 .scale-items{display:flex;gap:8px;flex-wrap:wrap;}
-.scale-item{font-size:11px;color:#64748B;padding:2px 8px;background:#fff;border-radius:6px;}
+.scale-item{font-size:11px;color:#64748B;padding:2px 8px;background:#F8FAFC;border-radius:6px;}
 
 /* Empty */
 .empty-state{display:flex;flex-direction:column;align-items:center;padding:60px 0;gap:8px;}

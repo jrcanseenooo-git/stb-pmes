@@ -1,5 +1,8 @@
 ﻿<template>
   <div class="audit-page">
+
+    <div class="content-card">
+
     <div class="page-hd">
       <div>
         <h2 class="page-title">Audit Trail</h2>
@@ -38,11 +41,11 @@
         <div class="th th-details">Details</div>
       </div>
       <div v-for="i in 8" :key="i" class="table-row">
-        <div class="td th-time"><div class="sk-line" style="width:90%"></div></div>
-        <div class="td th-user"><div class="sk-line" style="width:70%"></div></div>
-        <div class="td th-action"><div class="sk-line" style="width:60px"></div></div>
-        <div class="td th-module"><div class="sk-line" style="width:60px"></div></div>
-        <div class="td th-details"><div class="sk-line" style="width:80%"></div></div>
+        <div class="td td-time"><div class="sk-line" style="width:90%"></div></div>
+        <div class="td td-user"><div class="sk-line" style="width:70%"></div></div>
+        <div class="td td-action"><div class="sk-line" style="width:60px"></div></div>
+        <div class="td td-module"><div class="sk-line" style="width:60px"></div></div>
+        <div class="td td-details"><div class="sk-line" style="width:80%"></div></div>
       </div>
     </div>
 
@@ -61,16 +64,19 @@
         <div class="th th-details">Details</div>
       </div>
       <div v-for="row in filteredRows" :key="row.id" class="table-row">
-        <div class="td th-time mono">{{ fmtDateTime(row.timestamp || row.createdAt) }}</div>
-        <div class="td th-user">{{ row.userEmail || row.userId || '—' }}</div>
-        <div class="td th-action"><span :class="['action-badge', actionClass(row.action)]">{{ row.action }}</span></div>
-        <div class="td th-module text-muted">{{ row.module }}</div>
-        <div class="td th-details text-muted">{{ row.details }}</div>
+        <div class="td td-time mono">{{ fmtDateTime(row.timestamp || row.createdAt) }}</div>
+        <div class="td td-user">{{ row.userEmail || row.userId || '—' }}</div>
+        <div class="td td-action"><span :class="['action-badge', actionClass(row.action)]">{{ row.action }}</span></div>
+        <div class="td td-module text-muted">{{ row.module }}</div>
+        <div class="td td-details text-muted">{{ row.details }}</div>
       </div>
       <div class="table-footer">
         <span class="text-muted">Showing {{ filteredRows.length }} of {{ rows.length }} entries</span>
       </div>
     </div>
+
+    </div>
+    <!-- /Content card -->
 
     <teleport to="body">
       <transition name="toast-slide">
@@ -130,7 +136,7 @@ onMounted(async () => {
 </script>
 
 <style>
-.audit-page { padding: 16px 20px 32px; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif; font-size: 13px; color: #1A2332; min-height: 100%; }
+.audit-page { padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif; font-size: 13px; color: #1A2332; min-height: 100%; }
 .page-hd { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 16px; }
 .page-title { font-size: 20px; font-weight: 700; color: #0F172A; margin: 0 0 3px; letter-spacing: -.3px; }
 .page-sub { font-size: 12px; color: #94A3B8; margin: 0; }

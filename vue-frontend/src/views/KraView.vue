@@ -7,7 +7,7 @@
     <!-- Header -->
     <div class="page-hd">
       <div>
-        <h2 class="page-title">KRA Library</h2>
+        <h2 class="page-title">Key Result Areas Library</h2>
         <p class="page-sub">Master KRA &amp; Success Indicator List</p>
       </div>
     </div>
@@ -602,7 +602,7 @@ async function doRemove() {
 </script>
 
 <style>
-.kra-page { padding: 24px; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif; font-size: 13px; color: #1A2332; min-height: 100%; }
+.kra-page { padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif; font-size: 13px; color: #1A2332; min-height: 100%; }
 .muted-text { color: #94A3B8; }
 .req { color: #EF4444; font-size: 11px; }
 

@@ -68,7 +68,7 @@ function handleFileSelect(e) { console.log('Selected files:', e.target.files) }
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap');
 *{box-sizing:border-box;}
-.content{padding:16px 20px 20px;font-family:'DM Sans',sans-serif;font-size:13px;color:#1A2332;}
+.content{padding:0;font-family:'DM Sans',sans-serif;font-size:13px;color:#1A2332;}
 .flex-row{display:flex;align-items:center;}
 .jc-sb{justify-content:space-between;}
 .gap-6{gap:6px;}.gap-8{gap:8px;}

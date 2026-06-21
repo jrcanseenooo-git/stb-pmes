@@ -1,5 +1,8 @@
 ﻿<template>
   <div class="reports-page">
+
+    <div class="content-card">
+
     <div class="page-hd">
       <div>
         <h2 class="page-title">Reports</h2>
@@ -92,6 +95,9 @@
       </div>
     </div>
 
+    </div>
+    <!-- /Content card -->
+
     <teleport to="body">
       <transition name="toast-slide">
         <div v-if="toast.show" :class="['toast', `toast-${toast.type}`]">{{ toast.msg }}</div>
@@ -160,13 +166,14 @@ function downloadReport(r) {
 </script>
 
 <style>
-.reports-page { padding: 16px 20px 32px; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif; font-size: 13px; color: #1A2332; min-height: 100%; }
+.reports-page { padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif; font-size: 13px; color: #1A2332; min-height: 100%; }
+.content-card { background: #fff; border: 1px solid #E2E8F0; border-radius: 14px; padding: 20px; }
 .page-hd { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 20px; }
 .page-title { font-size: 20px; font-weight: 700; color: #0F172A; margin: 0 0 3px; }
 .page-sub { font-size: 12px; color: #94A3B8; margin: 0; }
 .reports-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
-.panel { background: #fff; border: 1px solid #E2E8F0; border-radius: 12px; overflow: hidden; }
-.panel-hd { display: flex; align-items: center; gap: 8px; padding: 14px 18px; border-bottom: 1px solid #F1F5F9; font-size: 13px; font-weight: 600; color: #0F172A; }
+.panel { background: #F8FAFC; border: 1px solid #F1F5F9; border-radius: 12px; overflow: hidden; }
+.panel-hd { display: flex; align-items: center; gap: 8px; padding: 14px 18px; border-bottom: 1px solid #E2E8F0; font-size: 13px; font-weight: 600; color: #0F172A; }
 .panel-body { padding: 18px; display: flex; flex-direction: column; gap: 14px; }
 .panel-empty { padding: 36px 18px; text-align: center; color: #94A3B8; font-size: 12px; }
 .field { display: flex; flex-direction: column; gap: 5px; }

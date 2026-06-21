@@ -1,5 +1,8 @@
 <template>
-  <div class="ipcrf-page" style="padding: 24px 32px 40px;">
+  <div class="ipcrf-page">
+
+    <!-- Content card -->
+    <div class="content-card">
 
     <!-- Header -->
     <div class="page-hd">
@@ -40,18 +43,25 @@
     </div>
 
     <!-- Skeleton loading -->
-    <div v-if="loading" class="forms-grid">
-      <div v-for="i in 4" :key="'sk'+i" class="form-card sk-card">
-        <div class="sk-hd">
-          <div class="sk-badge"></div>
-          <div class="sk-line" style="width:60px"></div>
+    <div v-if="loading" class="forms-table">
+      <div class="table-hd">
+        <div class="th th-emp">Employee</div>
+        <div class="th th-type">Type</div>
+        <div class="th th-status">Status</div>
+        <div class="th th-rating">Rating</div>
+        <div class="th th-date">Updated</div>
+        <div class="th th-act">Actions</div>
+      </div>
+      <div v-for="i in 4" :key="'sk'+i" class="table-row">
+        <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+          <div class="sk-line" style="width:55%;height:13px"></div>
+          <div class="sk-line" style="width:35%;height:11px"></div>
         </div>
-        <div class="sk-line" style="width:80%;margin-bottom:8px"></div>
-        <div class="sk-line" style="width:55%"></div>
-        <div class="sk-footer">
-          <div class="sk-line" style="width:90px;height:10px"></div>
-          <div class="sk-btn"></div>
-        </div>
+        <div class="sk-line" style="width:50px;height:18px"></div>
+        <div class="sk-line" style="width:60px;height:18px"></div>
+        <div class="sk-line" style="width:40px;height:12px"></div>
+        <div class="sk-line" style="width:70px;height:12px"></div>
+        <div class="sk-line" style="width:50px;height:12px"></div>
       </div>
     </div>
 
@@ -66,42 +76,54 @@
       <button v-if="activeStatus === 'All'" class="btn btn-primary" @click="showNewFormModal = true">Create New Form</button>
     </div>
 
-    <!-- Forms grid -->
-    <div v-else class="forms-grid">
-      <div v-for="form in filteredForms" :key="form.id" class="form-card" @click="openFormModal(form)">
-        <div class="form-card-hd">
+    <!-- Forms table -->
+    <div v-else class="forms-table">
+      <div class="table-hd">
+        <div class="th th-emp">Employee</div>
+        <div class="th th-type">Type</div>
+        <div class="th th-status">Status</div>
+        <div class="th th-rating">Rating</div>
+        <div class="th th-date">Updated</div>
+        <div class="th th-act">Actions</div>
+      </div>
+      <div v-for="form in filteredForms" :key="form.id" class="table-row" @click="openFormModal(form)">
+        <div class="td td-emp">
+          <div class="form-name">{{ form.employeeName }}</div>
+          <div class="form-meta">
+            <span>{{ form.divisionName || '—' }}</span>
+            <span class="dot">·</span>
+            <span>S{{ form.semester }} {{ form.year }}</span>
+          </div>
+        </div>
+        <div class="td td-type">
           <span :class="['type-badge', form.type === 'IPCRF' ? 'type-ipcrf' : 'type-ccef']">{{ form.type }}</span>
+        </div>
+        <div class="td td-status">
           <span :class="['status-badge', statusClass(form.status)]">{{ form.status }}</span>
         </div>
-        <div class="form-name">{{ form.employeeName }}</div>
-        <div class="form-meta">
-          <span>{{ form.divisionName || '—' }}</span>
-          <span class="dot">·</span>
-          <span>S{{ form.semester }} {{ form.year }}</span>
-        </div>
-        <div v-if="form.finalNumericalRating" class="form-rating">
-          <span class="rating-val">{{ form.finalNumericalRating }}</span>
-          <span class="rating-label">{{ form.adjectivalRating }}</span>
-        </div>
-        <div class="form-card-ft">
-          <span class="form-date">{{ fmtDate(form.updatedAt || form.createdAt) }}</span>
-          <div class="form-actions" @click.stop>
-            <button v-if="form.status === 'Draft' || form.status === 'Returned'"
-              class="btn btn-xs btn-outline" @click.stop="quickSubmit(form)">Submit</button>
-            <button v-if="form.status === 'Submitted' && canApprove"
-              class="btn btn-xs btn-success" @click.stop="quickApprove(form)">Approve</button>
-            <button v-if="form.status === 'Submitted' && canApprove"
-              class="btn btn-xs btn-warn" @click.stop="quickReturn(form)">Return</button>
-            <button class="btn btn-xs" @click.stop="openFormModal(form)">
-              <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
-                <path d="M1 9.5L7.5 3l1.5 1.5L2.5 11H1V9.5z" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-              </svg>
-              Open
-            </button>
+        <div class="td td-rating">
+          <div v-if="form.finalNumericalRating" class="form-rating">
+            <span class="rating-val">{{ form.finalNumericalRating }}</span>
+            <span class="rating-label">{{ form.adjectivalRating }}</span>
           </div>
+          <span v-else class="muted-text">—</span>
+        </div>
+        <div class="td td-date">{{ fmtDate(form.updatedAt || form.createdAt) }}</div>
+        <div class="td td-act" @click.stop>
+          <button v-if="form.status === 'Draft' || form.status === 'Returned'"
+            class="btn btn-xs btn-outline" @click.stop="quickSubmit(form)">Submit</button>
+          <button v-if="form.status === 'Submitted' && canApprove"
+            class="btn btn-xs btn-success" @click.stop="quickApprove(form)">Approve</button>
+          <button v-if="form.status === 'Submitted' && canApprove"
+            class="btn btn-xs btn-warn" @click.stop="quickReturn(form)">Return</button>
+          <button v-if="form.status === 'Submitted' && canApprove"
+            class="btn btn-xs btn-info" @click.stop="openFormModal(form)" title="Open" aria-label="Open">View</button>
         </div>
       </div>
     </div>
+
+    </div>
+    <!-- /Content card -->
 
     <!-- ══════════════════════════════════
          FORM DETAIL MODAL
@@ -978,10 +1000,13 @@ function _sync(u) {
 
 <style>
 *{box-sizing:border-box;}
-.ipcrf-page { padding: 24px; font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;font-size:13px;color:#1A2332;background: transparent; min-height: 100%; }
+.ipcrf-page { padding: 0; font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;font-size:13px;color:#1A2332;background: transparent; min-height: 100%; }
 .muted-text{color:#94A3B8;}
 .req{color:#EF4444;font-size:11px;}
 .ml6{margin-left:6px;}
+
+/* Content card wrapper */
+.content-card { background: #fff; border: 1px solid #E2E8F0; border-radius: 14px; padding: 20px; }
 
 /* Header */
 .page-hd{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;}
@@ -999,22 +1024,35 @@ function _sync(u) {
 .filter-select{padding:6px 10px;border:1px solid #E2E8F0;border-radius:7px;font-size:12px;font-family:inherit;color:#374151;background:#fff;outline:none;cursor:pointer;}
 .filter-select:focus{border-color:#3B82F6;}
 
-/* Grid */
-.forms-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+/* Forms table */
+.forms-table { border: 1px solid #E2E8F0; border-radius: 10px; overflow-x: auto; }
+.table-hd, .table-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 1.6fr) minmax(60px, 0.6fr) minmax(80px, 0.8fr) minmax(70px, 0.7fr) minmax(70px, 0.7fr) minmax(150px, 1.1fr);
+  align-items: center;
+  column-gap: 8px;
+}
+.table-hd { padding: 10px 16px; background: #F8FAFC; border-bottom: 1px solid #E2E8F0; }
+.th { font-size: 10px; font-weight: 700; color: #94A3B8; text-transform: uppercase; letter-spacing: .06em; }
+.th-emp { text-align: left; }
+.th-type, .th-status, .th-rating, .th-date, .th-act { text-align: center; }
 
-/* Form card */
-.form-card{background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:16px;cursor:pointer;transition:all .15s;box-shadow:0 1px 3px rgba(0,0,0,.04);}
-.form-card:hover{border-color:#CBD5E1;box-shadow:0 4px 12px rgba(0,0,0,.08);transform:translateY(-1px);}
-.form-card-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
-.form-name{font-size:14px;font-weight:600;color:#0F172A;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.form-meta{font-size:11px;color:#94A3B8;margin-bottom:8px;display:flex;gap:4px;align-items:center;}
+.table-row { padding: 12px 16px; border-bottom: 1px solid #F1F5F9; cursor: pointer; transition: background .12s; }
+.table-row:last-child { border-bottom: none; }
+.table-row:hover { background: #F8FBFF; }
+
+.td { font-size: 12px; color: #374151; min-width: 0; }
+.td-emp { min-width: 0; }
+.td-type, .td-status, .td-rating, .td-date { text-align: center; min-width: 0; }
+.td-date { font-size: 11px; color: #94A3B8; }
+.td-act { display: flex; gap: 4px; flex-wrap: nowrap; justify-content: center; min-width: 0; }
+
+.form-name{font-size:13px;font-weight:600;color:#0F172A;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.form-meta{font-size:11px;color:#94A3B8;display:flex;gap:4px;align-items:center;}
 .dot{color:#CBD5E1;}
-.form-rating{display:flex;align-items:center;gap:6px;margin-bottom:10px;padding:6px 10px;background:#F8FAFC;border-radius:7px;}
-.rating-val{font-size:18px;font-weight:700;color:#0F172A;}
-.rating-label{font-size:11px;color:#64748B;}
-.form-card-ft{display:flex;align-items:center;justify-content:space-between;margin-top:auto;padding-top:10px;border-top:1px solid #F1F5F9;}
-.form-date{font-size:10px;color:#94A3B8;}
-.form-actions{display:flex;gap:4px;}
+.form-rating{display:flex;align-items:baseline;justify-content:center;gap:5px;}
+.rating-val{font-size:14px;font-weight:700;color:#0F172A;}
+.rating-label{font-size:10px;color:#64748B;}
 
 /* Type badges */
 .type-badge{display:inline-flex;padding:3px 8px;border-radius:6px;font-size:10px;font-weight:700;letter-spacing:.3px;}
@@ -1043,7 +1081,7 @@ function _sync(u) {
 .btn-danger{background:#EF4444;color:#fff;border-color:#EF4444;}
 .btn-danger:hover{background:#DC2626;}
 .btn-sm{padding:5px 12px;font-size:11px;}
-.btn-xs{padding:4px 10px;font-size:11px;border-radius:6px;}
+.btn-xs{padding:4px 7px;font-size:10.5px;border-radius:6px;white-space:nowrap;}
 .btn-outline{border-color:#CBD5E1;}
 
 /* Empty */
@@ -1053,13 +1091,7 @@ function _sync(u) {
 
 /* Skeleton */
 @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
-.sk-line,.sk-badge,.sk-btn{background:linear-gradient(90deg,#E2E8F0 25%,#F1F5F9 50%,#E2E8F0 75%);background-size:200%;animation:shimmer 1.4s infinite;border-radius:4px;}
-.sk-line{height:12px;display:block;}
-.sk-badge{height:20px;width:50px;border-radius:6px;display:inline-block;}
-.sk-btn{height:24px;width:60px;border-radius:6px;display:inline-block;}
-.sk-card{display:flex;flex-direction:column;gap:10px;pointer-events:none;}
-.sk-hd{display:flex;justify-content:space-between;align-items:center;}
-.sk-footer{display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:10px;border-top:1px solid #F1F5F9;}
+.sk-line{background:linear-gradient(90deg,#E2E8F0 25%,#F1F5F9 50%,#E2E8F0 75%);background-size:200%;animation:shimmer 1.4s infinite;border-radius:4px;height:12px;display:block;}
 
 /* Modal overlay */
 .modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.5);display:flex;align-items:center;justify-content:center;z-index:300;padding:16px;backdrop-filter:blur(4px);}

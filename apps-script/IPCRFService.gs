@@ -78,6 +78,7 @@ const IpcrfService = (() => {
       positionLevel:         _level,
       divisionId:            profile.divisionId    || '',
       divisionName:          profile.divisionName  || '',
+      sectionName:           profile.section       || '',
       semester:              body.semester         || '',
       year:                  body.year             || new Date().getFullYear(),
       status:                'Draft',

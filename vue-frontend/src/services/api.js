@@ -250,6 +250,14 @@ export const ipcrfApi = {
   finalizeForm: (id, data = {})        => gasWrite('PATCH', `ipcrf/${id}/finalize`,    data),
 }
 
+// ── Document Generation (official IPCRF/CCEF Targets & Ratings forms) ──
+
+export const docGenApi = {
+  generateTargets: (formId)  => gasWrite('POST', `ipcrf/${formId}/generate-targets`),
+  generateRatings: (formId)  => gasWrite('POST', `ipcrf/${formId}/generate-ratings`),
+  printPdf:        (fileId)  => gasGet(`docgen/${fileId}/print`)
+}
+
 // ── Attendance ─────────────────────────────────
 
 export const attendanceApi = {
@@ -291,6 +299,7 @@ export default {
   auditApi,
   deadlinesApi,
   ipcrfApi,
+  docGenApi,
   attendanceApi,
   peerAssignmentsApi
 }

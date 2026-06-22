@@ -78,7 +78,8 @@
 
         <!-- Employee -->
         <div class="fc-name">{{ form.employeeName }}</div>
-        <div class="fc-sub">{{ form.divisionName || '—' }}<span v-if="form.sectionName"> · {{ form.sectionName }}</span></div>
+        <div class="fc-sub">{{ form.divisionName || '—' }}</div>
+        <!-- <div class="fc-sub">{{ form.divisionName || '—' }}<span v-if="form.sectionName"> · {{ form.sectionName }}</span></div> -->
 
         <!-- Status + rating -->
         <div class="fc-mid">

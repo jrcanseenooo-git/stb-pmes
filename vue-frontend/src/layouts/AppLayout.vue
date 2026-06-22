@@ -202,7 +202,7 @@
         <div class="topbar-right">
           <div class="sem-pill">
             <span class="live-dot"></span>
-            S1 · 2025
+            {{ currentSemester }}
           </div>
 
           <div class="search-wrap">
@@ -301,6 +301,14 @@ const titleMap = {
 
 const pageTitle = computed(() => titleMap[route.path]?.title ?? 'PMES')
 const pageSub = computed(() => titleMap[route.path]?.sub ?? '')
+
+const currentSemester = computed(() => {
+  const now = new Date()
+  const month = now.getMonth() + 1 // 1–12
+  const year = now.getFullYear()
+  const sem = month >= 1 && month <= 6 ? 'S1' : 'S2'
+  return `${sem} · ${year}`
+})
 
 const notifs = [
   { type: 'Deadline', msg: 'Q1 IPCR ends in 2 days', time: 'May 11 · 8:00 AM', bg: '#FEF2F2', color: '#EF4444' },

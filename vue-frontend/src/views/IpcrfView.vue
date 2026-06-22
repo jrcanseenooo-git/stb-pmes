@@ -100,11 +100,8 @@
               class="btn btn-xs btn-success" @click.stop="quickApprove(form)">Approve</button>
             <button v-if="form.status === 'Submitted' && canApprove"
               class="btn btn-xs btn-warn" @click.stop="quickReturn(form)">Return</button>
-            <button class="btn btn-xs btn-icon-only" @click.stop="openFormModal(form)" title="Open" aria-label="Open">
-              <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
-                <path d="M1 9.5L7.5 3l1.5 1.5L2.5 11H1V9.5z" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-              </svg>
-            </button>
+            <button v-if="form.status === 'Submitted' && canApprove"
+              class="btn btn-xs btn-info" @click.stop="openFormModal(form)" title="Open" aria-label="Open">View</button>
           </div>
         </div>
       </div>

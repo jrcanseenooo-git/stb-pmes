@@ -237,6 +237,12 @@
       </div>
     </div>
   </div>
+
+  <LogoutConfirmModal
+    :show="showLogoutConfirm"
+    @confirm="confirmLogout"
+    @cancel="showLogoutConfirm = false"
+  />
 </template>
 
 <script setup>
@@ -244,6 +250,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { usersApi, dashboardApi, auditApi } from '@/services/api'
+import LogoutConfirmModal from '@/components/common/LogoutConfirmModal.vue'
 
 const authStore = useAuthStore()
 const router    = useRouter()
@@ -435,7 +442,14 @@ async function saveProfile() {
 }
 
 // ── Logout ──
-async function handleLogout() {
+const showLogoutConfirm = ref(false)
+
+function handleLogout() {
+  showLogoutConfirm.value = true
+}
+
+async function confirmLogout() {
+  showLogoutConfirm.value = false
   await authStore.logout()
   router.push('/auth/login')
 }

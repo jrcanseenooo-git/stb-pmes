@@ -256,6 +256,23 @@
                 <button class="btn btn-warn btn-sm" @click="doReturn">Return</button>
               </div>
             </div>
+
+            <!-- Targets document generation -->
+            <div class="docgen-bar">
+              <div class="docgen-info">
+                <span class="docgen-label">Targets Document</span>
+                <span class="docgen-sub">Generates the official Annex F.1 form from these indicators</span>
+              </div>
+              <div class="docgen-actions">
+                <template v-if="docGen.targets">
+                  <a :href="docGen.targets.fileUrl" target="_blank" class="btn btn-sm btn-outline">Open in Sheets</a>
+                  <button class="btn btn-sm" :disabled="docGen.printing" @click="doPrint(docGen.targets.fileId)">{{ docGen.printing ? 'Preparing…' : 'Print' }}</button>
+                </template>
+                <button v-else class="btn btn-primary btn-sm" :disabled="docGen.generating === 'targets'" @click="doGenerateTargets">
+                  {{ docGen.generating === 'targets' ? 'Generating…' : 'Generate Targets Doc' }}
+                </button>
+              </div>
+            </div>
           </div>
 
           <!-- DETAILS TAB -->
@@ -315,6 +332,23 @@
                 </div>
               </div>
               <button class="btn btn-sm" style="margin-top:14px" @click="doCompute">Recompute</button>
+
+              <!-- Ratings document generation -->
+              <div class="docgen-bar" style="margin-top:18px;text-align:left">
+                <div class="docgen-info">
+                  <span class="docgen-label">Ratings Document</span>
+                  <span class="docgen-sub">Generates the official Annex F.2 form with accomplishments and ratings</span>
+                </div>
+                <div class="docgen-actions">
+                  <template v-if="docGen.ratings">
+                    <a :href="docGen.ratings.fileUrl" target="_blank" class="btn btn-sm btn-outline">Open in Sheets</a>
+                    <button class="btn btn-sm" :disabled="docGen.printing" @click="doPrint(docGen.ratings.fileId)">{{ docGen.printing ? 'Preparing…' : 'Print' }}</button>
+                  </template>
+                  <button v-else class="btn btn-primary btn-sm" :disabled="docGen.generating === 'ratings'" @click="doGenerateRatings">
+                    {{ docGen.generating === 'ratings' ? 'Generating…' : 'Generate Ratings Doc' }}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -687,7 +721,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { ipcrf as ipcrfApi, kraLibrary as kraLibraryApi } from '@/services/api'
+import { ipcrf as ipcrfApi, kraLibrary as kraLibraryApi, docGenApi } from '@/services/api'
 
 const PHASES = ['ANALYSIS', 'DESIGN', 'TESTING', 'PILOT IMPLEMENTATION', 'EVALUATION', 'SUPPORT', 'PROMOTION']
 
@@ -726,6 +760,9 @@ const savingEntry    = ref(false)
 const deletingEntry  = ref(false)
 const confirmDel     = ref({ show: false, entryId: null, name: '' })
 const toast          = ref({ show: false, msg: '', type: 'success' })
+
+// Document generation (Targets / Ratings official forms)
+const docGen = ref({ targets: null, ratings: null, generating: '', printing: false })
 
 const newForm = ref({
   type: 'IPCRF',
@@ -839,6 +876,7 @@ async function openFormModal(form) {
   activeForm.value   = form
   activeTab.value    = 'indicators'
   allEntries.value   = []
+  docGen.value       = { targets: null, ratings: null, generating: '', printing: false }
   showFormModal.value   = true
   entriesLoading.value  = true
   try {
@@ -981,6 +1019,40 @@ function _sync(u) {
   activeForm.value = { ...activeForm.value, ...u }
   const i = forms.value.findIndex(f => f.id === activeForm.value.id)
   if (i !== -1) forms.value[i] = activeForm.value
+}
+
+// ── Document generation (official Targets / Ratings forms) ──
+async function doGenerateTargets() {
+  docGen.value.generating = 'targets'
+  try {
+    const r = await docGenApi.generateTargets(activeForm.value.id)
+    docGen.value.targets = r
+    showToast('Targets document generated')
+  } catch (e) { showToast(e.message, 'error') }
+  finally { docGen.value.generating = '' }
+}
+
+async function doGenerateRatings() {
+  docGen.value.generating = 'ratings'
+  try {
+    const r = await docGenApi.generateRatings(activeForm.value.id)
+    docGen.value.ratings = r
+    showToast('Ratings document generated')
+  } catch (e) { showToast(e.message, 'error') }
+  finally { docGen.value.generating = '' }
+}
+
+async function doPrint(fileId) {
+  if (!fileId || docGen.value.printing) return
+  docGen.value.printing = true
+  try {
+    const r = await docGenApi.printPdf(fileId)
+    const bytes = Uint8Array.from(atob(r.pdfBase64), c => c.charCodeAt(0))
+    const blob  = new Blob([bytes], { type: 'application/pdf' })
+    const url   = URL.createObjectURL(blob)
+    window.open(url, '_blank')
+  } catch (e) { showToast(e.message, 'error') }
+  finally { docGen.value.printing = false }
 }
 </script>
 
@@ -1177,6 +1249,13 @@ function _sync(u) {
 /* Workflow bar */
 .wf-bar{display:flex;align-items:center;justify-content:space-between;padding:14px 0;margin-top:4px;border-top:1px solid #F1F5F9;}
 .wf-info{font-size:11px;color:#64748B;}
+
+/* Document generation bar */
+.docgen-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;margin-top:14px;background:#F8FAFC;border:1px solid #F1F5F9;border-radius:9px;flex-wrap:wrap;}
+.docgen-info{display:flex;flex-direction:column;gap:2px;}
+.docgen-label{font-size:12px;font-weight:600;color:#374151;}
+.docgen-sub{font-size:10.5px;color:#94A3B8;}
+.docgen-actions{display:flex;gap:6px;flex-shrink:0;}
 
 /* Details tab */
 .det-2col{display:grid;grid-template-columns:1fr 1fr;gap:32px;}

@@ -43,29 +43,12 @@
     </div>
 
     <!-- Skeleton loading -->
-    <div v-if="loading" class="forms-table">
-      <div class="forms-table-inner">
-      <div class="table-hd">
-        <div class="th th-emp">Employee</div>
-        <div class="th th-type">Type</div>
-        <div class="th th-status">Status</div>
-        <div class="th th-rating">Rating</div>
-        <div class="th th-date">Updated</div>
-        <div class="th th-act">Actions</div>
-      </div>
-      <div v-for="i in 4" :key="'sk'+i" class="table-row">
-        <div class="td td-emp" style="display:table-cell">
-          <div style="display:flex;flex-direction:column;gap:6px">
-            <div class="sk-line" style="width:55%;height:13px"></div>
-            <div class="sk-line" style="width:35%;height:11px"></div>
-          </div>
-        </div>
-        <div class="td td-type"><div class="sk-line" style="width:50px;height:18px;margin:auto"></div></div>
-        <div class="td td-status"><div class="sk-line" style="width:60px;height:18px;margin:auto"></div></div>
-        <div class="td td-rating"><div class="sk-line" style="width:40px;height:12px;margin:auto"></div></div>
-        <div class="td td-date"><div class="sk-line" style="width:70px;height:12px;margin:auto"></div></div>
-        <div class="td td-act"><div class="sk-line" style="width:50px;height:12px;margin:auto"></div></div>
-      </div>
+    <div v-if="loading" class="forms-grid">
+      <div v-for="i in 4" :key="'sk'+i" class="fc fc-sk">
+        <div class="fc-hd"><div class="sk-badge"></div><div class="sk-line" style="width:55px"></div></div>
+        <div class="sk-line" style="width:75%;margin-bottom:5px"></div>
+        <div class="sk-line" style="width:50%;margin-bottom:14px"></div>
+        <div class="sk-line" style="width:100%;height:30px;border-radius:8px"></div>
       </div>
     </div>
 
@@ -80,56 +63,49 @@
       <button v-if="activeStatus === 'All'" class="btn btn-primary" @click="showNewFormModal = true">Create New Form</button>
     </div>
 
-    <!-- Forms table -->
-    <div v-else class="forms-table">
-      <div class="forms-table-inner">
-      <div class="table-hd">
-        <div class="th th-emp">Employee</div>
-        <div class="th th-type">Type</div>
-        <div class="th th-status">Status</div>
-        <div class="th th-rating">Rating</div>
-        <div class="th th-date">Updated</div>
-        <div class="th th-act">Actions</div>
-      </div>
-      <div v-for="form in filteredForms" :key="form.id" class="table-row" @click="openFormModal(form)">
-        <div class="td td-emp">
-          <div class="form-name">{{ form.employeeName }}</div>
-          <div class="form-meta">
-            <span>{{ form.divisionName || '—' }}</span>
-            <span class="dot">·</span>
-            <span>S{{ form.semester }} {{ form.year }}</span>
-          </div>
-        </div>
-        <div class="td td-type">
+    <!-- Forms grid -->
+    <div v-else class="forms-grid">
+      <div
+        v-for="form in filteredForms" :key="form.id"
+        class="fc"
+        @click="openFormModal(form)"
+      >
+        <!-- Header: type badge + period -->
+        <div class="fc-hd">
           <span :class="['type-badge', form.type === 'IPCRF' ? 'type-ipcrf' : 'type-ccef']">{{ form.type }}</span>
+          <span class="fc-period">S{{ form.semester }} {{ form.year }}</span>
         </div>
-        <div class="td td-status">
+
+        <!-- Employee -->
+        <div class="fc-name">{{ form.employeeName }}</div>
+        <div class="fc-sub">{{ form.divisionName || '—' }}<span v-if="form.sectionName"> · {{ form.sectionName }}</span></div>
+
+        <!-- Status + rating -->
+        <div class="fc-mid">
           <span :class="['status-badge', statusClass(form.status)]">{{ form.status }}</span>
-        </div>
-        <div class="td td-rating">
-          <div v-if="form.finalNumericalRating" class="form-rating">
-            <span class="rating-val">{{ form.finalNumericalRating }}</span>
-            <span class="rating-label">{{ form.adjectivalRating }}</span>
-          </div>
-          <span v-else class="muted-text">—</span>
-        </div>
-        <div class="td td-date">{{ fmtDate(form.updatedAt || form.createdAt) }}</div>
-        <div class="td td-act" @click.stop>
-          <div class="act-cell">
-          <button v-if="form.status === 'Draft' || form.status === 'Returned'"
-            class="btn btn-xs btn-outline" @click.stop="quickSubmit(form)">Submit</button>
-          <button v-if="form.status === 'Submitted' && canApprove"
-            class="btn btn-xs btn-success" @click.stop="quickApprove(form)">Approve</button>
-          <button v-if="form.status === 'Submitted' && canApprove"
-            class="btn btn-xs btn-warn" @click.stop="quickReturn(form)">Return</button>
-          <button class="btn btn-xs btn-icon-only" @click.stop="openFormModal(form)" title="Open" aria-label="Open">
-            <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
-              <path d="M1 9.5L7.5 3l1.5 1.5L2.5 11H1V9.5z" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-            </svg>
-          </button>
+          <div v-if="form.finalNumericalRating" class="fc-score">
+            <span class="fc-score-val">{{ form.finalNumericalRating }}</span>
+            <span class="fc-score-lbl">{{ form.adjectivalRating }}</span>
           </div>
         </div>
-      </div>
+
+        <!-- Footer: date + actions -->
+        <div class="fc-foot" @click.stop>
+          <span class="fc-date">{{ fmtDate(form.updatedAt || form.createdAt) }}</span>
+          <div class="fc-actions">
+            <button v-if="form.status === 'Draft' || form.status === 'Returned'"
+              class="btn btn-xs btn-outline" @click.stop="quickSubmit(form)">Submit</button>
+            <button v-if="form.status === 'Submitted' && canApprove"
+              class="btn btn-xs btn-success" @click.stop="quickApprove(form)">Approve</button>
+            <button v-if="form.status === 'Submitted' && canApprove"
+              class="btn btn-xs btn-warn" @click.stop="quickReturn(form)">Return</button>
+            <button class="btn btn-xs btn-icon-only" @click.stop="openFormModal(form)" title="Open" aria-label="Open">
+              <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+                <path d="M1 9.5L7.5 3l1.5 1.5L2.5 11H1V9.5z" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+              </svg>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -291,8 +267,9 @@
                 <div class="det-st">Period & Role</div>
                 <div class="det-row"><span class="dk">Form Type</span><span class="dv">{{ activeForm?.type }}</span></div>
                 <div class="det-row"><span class="dk">Semester / Year</span><span class="dv">S{{ activeForm?.semester }}, {{ activeForm?.year }}</span></div>
-                <div class="det-row"><span class="dk">Position Level</span><span class="dv">{{ activeForm?.positionLevel || '—' }}</span></div>
+                <!-- <div class="det-row"><span class="dk">Position Level</span><span class="dv">{{ activeForm?.positionLevel || '—' }}</span></div> -->
                 <div class="det-row"><span class="dk">Division</span><span class="dv">{{ activeForm?.divisionName || '—' }}</span></div>
+                <div class="det-row"><span class="dk">Section</span><span class="dv">{{ activeForm?.sectionName || '—' }}</span></div>
                 <div class="det-st" style="margin-top:16px">Weights</div>
                 <div class="weights-bar">
                   <div class="wb-c" :style="{ width: activeForm?.coreFunctionWeight + '%' }">Core {{ activeForm?.coreFunctionWeight }}%</div>
@@ -1035,53 +1012,41 @@ function _sync(u) {
 .filter-select{padding:6px 10px;border:1px solid #E2E8F0;border-radius:7px;font-size:12px;font-family:inherit;color:#374151;background:#fff;outline:none;cursor:pointer;}
 .filter-select:focus{border-color:#3B82F6;}
 
-/* Forms table */
-.forms-table { border: 1px solid #E2E8F0; border-radius: 10px; overflow-x: auto; width: 100%; }
-.forms-table-inner { display: table; width: 100%; min-width: 600px; border-collapse: collapse; table-layout: fixed; }
+/* Forms grid */
+.forms-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
 
-.table-hd { display: table-row; background: #F8FAFC; border-bottom: 1px solid #E2E8F0; }
-.th {
-  display: table-cell;
-  padding: 10px 12px;
-  font-size: 10px; font-weight: 700; color: #94A3B8;
-  text-transform: uppercase; letter-spacing: .06em;
-  border-bottom: 1px solid #E2E8F0;
-  white-space: nowrap;
-  vertical-align: middle;
+.fc {
+  background: #fff;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  padding: 16px;
+  cursor: pointer;
+  transition: all .15s;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }
-.th-emp { text-align: left; width: 35%; }
-.th-type, .th-status, .th-rating, .th-date, .th-act { text-align: center; }
-.th-type   { width: 8%; }
-.th-status { width: 12%; }
-.th-rating { width: 10%; }
-.th-date   { width: 13%; }
-.th-act    { width: 22%; }
+.fc:hover { border-color: #CBD5E1; box-shadow: 0 4px 12px rgba(0,0,0,.07); transform: translateY(-1px); }
+.fc-sk { pointer-events: none; }
 
-.table-row { display: table-row; border-bottom: 1px solid #F1F5F9; cursor: pointer; transition: background .12s; }
-.table-row:last-child .td { border-bottom: none; }
-.table-row:hover { background: #F8FBFF; }
+.fc-hd { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.fc-period { font-size: 11px; color: #64748B; }
 
-.td {
-  display: table-cell;
-  padding: 12px 12px;
-  font-size: 12px; color: #374151;
-  border-bottom: 1px solid #F1F5F9;
-  vertical-align: middle;
-}
-.td-emp { text-align: left; }
-.td-type, .td-status, .td-rating, .td-date { text-align: center; }
-.td-date { font-size: 11px; color: #94A3B8; white-space: nowrap; }
-.td-act { text-align: center; white-space: nowrap; }
-.act-cell { display: inline-flex; gap: 4px; align-items: center; }
+.fc-name { font-size: 14px; font-weight: 600; color: #0F172A; margin-bottom: 3px; }
+.fc-sub { font-size: 11px; color: #94A3B8; margin-bottom: 12px; }
+
+.fc-mid { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.fc-score { display: flex; align-items: baseline; gap: 4px; }
+.fc-score-val { font-size: 16px; font-weight: 700; color: #1A56B0; }
+.fc-score-lbl { font-size: 10px; color: #64748B; }
+
+.fc-foot { display: flex; align-items: center; justify-content: space-between; padding-top: 10px; border-top: 1px solid #F1F5F9; }
+.fc-date { font-size: 11px; color: #94A3B8; }
+.fc-actions { display: flex; align-items: center; gap: 4px; }
+
+.dot { color: #CBD5E1; }
 .btn-info { background: #EBF4FF; color: #1A56B0; border-color: #BFDBFE; }
 .btn-info:hover { background: #DBEAFE; }
-
-.form-name{font-size:13px;font-weight:600;color:#0F172A;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.form-meta{font-size:11px;color:#94A3B8;display:flex;gap:4px;align-items:center;}
-.dot{color:#CBD5E1;}
-.form-rating{display:flex;align-items:baseline;justify-content:center;gap:5px;}
-.rating-val{font-size:14px;font-weight:700;color:#0F172A;}
-.rating-label{font-size:10px;color:#64748B;}
 
 /* Type badges */
 .type-badge{display:inline-flex;padding:3px 8px;border-radius:6px;font-size:10px;font-weight:700;letter-spacing:.3px;}

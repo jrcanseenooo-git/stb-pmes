@@ -44,6 +44,7 @@
 
     <!-- Skeleton loading -->
     <div v-if="loading" class="forms-table">
+      <div class="forms-table-inner">
       <div class="table-hd">
         <div class="th th-emp">Employee</div>
         <div class="th th-type">Type</div>
@@ -53,15 +54,18 @@
         <div class="th th-act">Actions</div>
       </div>
       <div v-for="i in 4" :key="'sk'+i" class="table-row">
-        <div style="flex:1;display:flex;flex-direction:column;gap:6px">
-          <div class="sk-line" style="width:55%;height:13px"></div>
-          <div class="sk-line" style="width:35%;height:11px"></div>
+        <div class="td td-emp" style="display:table-cell">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div class="sk-line" style="width:55%;height:13px"></div>
+            <div class="sk-line" style="width:35%;height:11px"></div>
+          </div>
         </div>
-        <div class="sk-line" style="width:50px;height:18px"></div>
-        <div class="sk-line" style="width:60px;height:18px"></div>
-        <div class="sk-line" style="width:40px;height:12px"></div>
-        <div class="sk-line" style="width:70px;height:12px"></div>
-        <div class="sk-line" style="width:50px;height:12px"></div>
+        <div class="td td-type"><div class="sk-line" style="width:50px;height:18px;margin:auto"></div></div>
+        <div class="td td-status"><div class="sk-line" style="width:60px;height:18px;margin:auto"></div></div>
+        <div class="td td-rating"><div class="sk-line" style="width:40px;height:12px;margin:auto"></div></div>
+        <div class="td td-date"><div class="sk-line" style="width:70px;height:12px;margin:auto"></div></div>
+        <div class="td td-act"><div class="sk-line" style="width:50px;height:12px;margin:auto"></div></div>
+      </div>
       </div>
     </div>
 
@@ -78,6 +82,7 @@
 
     <!-- Forms table -->
     <div v-else class="forms-table">
+      <div class="forms-table-inner">
       <div class="table-hd">
         <div class="th th-emp">Employee</div>
         <div class="th th-type">Type</div>
@@ -110,15 +115,21 @@
         </div>
         <div class="td td-date">{{ fmtDate(form.updatedAt || form.createdAt) }}</div>
         <div class="td td-act" @click.stop>
+          <div class="act-cell">
           <button v-if="form.status === 'Draft' || form.status === 'Returned'"
             class="btn btn-xs btn-outline" @click.stop="quickSubmit(form)">Submit</button>
           <button v-if="form.status === 'Submitted' && canApprove"
             class="btn btn-xs btn-success" @click.stop="quickApprove(form)">Approve</button>
           <button v-if="form.status === 'Submitted' && canApprove"
             class="btn btn-xs btn-warn" @click.stop="quickReturn(form)">Return</button>
-          <button v-if="form.status === 'Submitted' && canApprove"
-            class="btn btn-xs btn-info" @click.stop="openFormModal(form)" title="Open" aria-label="Open">View</button>
+          <button class="btn btn-xs btn-icon-only" @click.stop="openFormModal(form)" title="Open" aria-label="Open">
+            <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+              <path d="M1 9.5L7.5 3l1.5 1.5L2.5 11H1V9.5z" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+            </svg>
+          </button>
+          </div>
         </div>
+      </div>
       </div>
     </div>
 
@@ -280,9 +291,8 @@
                 <div class="det-st">Period & Role</div>
                 <div class="det-row"><span class="dk">Form Type</span><span class="dv">{{ activeForm?.type }}</span></div>
                 <div class="det-row"><span class="dk">Semester / Year</span><span class="dv">S{{ activeForm?.semester }}, {{ activeForm?.year }}</span></div>
-                <!-- <div class="det-row"><span class="dk">Position Level</span><span class="dv">{{ activeForm?.positionLevel || '—' }}</span></div> -->
+                <div class="det-row"><span class="dk">Position Level</span><span class="dv">{{ activeForm?.positionLevel || '—' }}</span></div>
                 <div class="det-row"><span class="dk">Division</span><span class="dv">{{ activeForm?.divisionName || '—' }}</span></div>
-                <div class="det-row"><span class="dk">Section</span><span class="dv">{{ activeForm?.sectionName || '—' }}</span></div>
                 <div class="det-st" style="margin-top:16px">Weights</div>
                 <div class="weights-bar">
                   <div class="wb-c" :style="{ width: activeForm?.coreFunctionWeight + '%' }">Core {{ activeForm?.coreFunctionWeight }}%</div>
@@ -561,11 +571,11 @@
               </div>
               <div class="field full">
                 <label class="field-label">Approving Authority</label>
-                <input v-model="newForm.approvingAuthority" type="text" class="field-input" placeholder="e.g. Helen Y. Suzara"/>
+                <input v-model="newForm.approvingAuthority" type="text" class="field-input" placeholder="Fullname"/>
               </div>
               <div class="field full">
                 <label class="field-label">Authority Position</label>
-                <input v-model="newForm.authorityPosition" type="text" class="field-input" placeholder="e.g. Bureau Director"/>
+                <input v-model="newForm.authorityPosition" type="text" class="field-input" placeholder="e.g. Director IV"/>
               </div>
             </div>
           </div>
@@ -1026,27 +1036,45 @@ function _sync(u) {
 .filter-select:focus{border-color:#3B82F6;}
 
 /* Forms table */
-.forms-table { border: 1px solid #E2E8F0; border-radius: 10px; overflow-x: auto; }
-.table-hd, .table-row {
-  display: grid;
-  grid-template-columns: minmax(140px, 1.6fr) minmax(60px, 0.6fr) minmax(80px, 0.8fr) minmax(70px, 0.7fr) minmax(70px, 0.7fr) minmax(150px, 1.1fr);
-  align-items: center;
-  column-gap: 8px;
-}
-.table-hd { padding: 10px 16px; background: #F8FAFC; border-bottom: 1px solid #E2E8F0; }
-.th { font-size: 10px; font-weight: 700; color: #94A3B8; text-transform: uppercase; letter-spacing: .06em; }
-.th-emp { text-align: left; }
-.th-type, .th-status, .th-rating, .th-date, .th-act { text-align: center; }
+.forms-table { border: 1px solid #E2E8F0; border-radius: 10px; overflow-x: auto; width: 100%; }
+.forms-table-inner { display: table; width: 100%; min-width: 600px; border-collapse: collapse; table-layout: fixed; }
 
-.table-row { padding: 12px 16px; border-bottom: 1px solid #F1F5F9; cursor: pointer; transition: background .12s; }
-.table-row:last-child { border-bottom: none; }
+.table-hd { display: table-row; background: #F8FAFC; border-bottom: 1px solid #E2E8F0; }
+.th {
+  display: table-cell;
+  padding: 10px 12px;
+  font-size: 10px; font-weight: 700; color: #94A3B8;
+  text-transform: uppercase; letter-spacing: .06em;
+  border-bottom: 1px solid #E2E8F0;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.th-emp { text-align: left; width: 35%; }
+.th-type, .th-status, .th-rating, .th-date, .th-act { text-align: center; }
+.th-type   { width: 8%; }
+.th-status { width: 12%; }
+.th-rating { width: 10%; }
+.th-date   { width: 13%; }
+.th-act    { width: 22%; }
+
+.table-row { display: table-row; border-bottom: 1px solid #F1F5F9; cursor: pointer; transition: background .12s; }
+.table-row:last-child .td { border-bottom: none; }
 .table-row:hover { background: #F8FBFF; }
 
-.td { font-size: 12px; color: #374151; min-width: 0; }
-.td-emp { min-width: 0; }
-.td-type, .td-status, .td-rating, .td-date { text-align: center; min-width: 0; }
-.td-date { font-size: 11px; color: #94A3B8; }
-.td-act { display: flex; gap: 4px; flex-wrap: nowrap; justify-content: center; min-width: 0; }
+.td {
+  display: table-cell;
+  padding: 12px 12px;
+  font-size: 12px; color: #374151;
+  border-bottom: 1px solid #F1F5F9;
+  vertical-align: middle;
+}
+.td-emp { text-align: left; }
+.td-type, .td-status, .td-rating, .td-date { text-align: center; }
+.td-date { font-size: 11px; color: #94A3B8; white-space: nowrap; }
+.td-act { text-align: center; white-space: nowrap; }
+.act-cell { display: inline-flex; gap: 4px; align-items: center; }
+.btn-info { background: #EBF4FF; color: #1A56B0; border-color: #BFDBFE; }
+.btn-info:hover { background: #DBEAFE; }
 
 .form-name{font-size:13px;font-weight:600;color:#0F172A;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .form-meta{font-size:11px;color:#94A3B8;display:flex;gap:4px;align-items:center;}
@@ -1083,6 +1111,7 @@ function _sync(u) {
 .btn-danger:hover{background:#DC2626;}
 .btn-sm{padding:5px 12px;font-size:11px;}
 .btn-xs{padding:4px 7px;font-size:10.5px;border-radius:6px;white-space:nowrap;}
+.btn-icon-only{padding:5px;width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;}
 .btn-outline{border-color:#CBD5E1;}
 
 /* Empty */

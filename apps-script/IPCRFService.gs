@@ -14,9 +14,15 @@ const IpcrfService = (() => {
   // ─────────────────────────────────────────────
 
   function list(params, user) {
-    const profile = AuthService.getProfile(user)
-    const sheet   = SpreadsheetService.getSheet(SHEET.IPCRF_FORMS)
-    let rows      = SpreadsheetService.getAllRows(sheet)
+    const profile   = AuthService.getProfile(user)
+    const sheet     = SpreadsheetService.getSheet(SHEET.IPCRF_FORMS)
+    let rows        = SpreadsheetService.getAllRows(sheet)
+
+    // Build userId → section lookup from Users sheet (for backfill of existing rows)
+    const usersSheet  = SpreadsheetService.getSheet(SHEET.USERS)
+    const usersRows   = SpreadsheetService.getAllRows(usersSheet)
+    const sectionMap  = {}
+    usersRows.forEach(u => { if (u.id) sectionMap[u.id] = u.section || '' })
 
     // Scope by role
     if (!['System Administrator', 'Bureau Director', 'Assistant Bureau Director'].includes(profile.role)) {
@@ -34,6 +40,12 @@ const IpcrfService = (() => {
     if (params.divisionId) rows = rows.filter(r => r.divisionId === params.divisionId)
     if (params.type)       rows = rows.filter(r => r.type       === params.type)
 
+    // Attach sectionName — prefer stored value, fall back to live user lookup
+    rows = rows.map(r => ({
+      ...r,
+      sectionName: r.sectionName || sectionMap[r.userId] || ''
+    }))
+
     rows.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
     return SpreadsheetService.paginate(rows, params.page, params.pageSize)
   }
@@ -44,6 +56,13 @@ const IpcrfService = (() => {
     const row     = SpreadsheetService.getRow(sheet, id)
     if (!row) throw HttpError('IPCRF form not found', 404)
     _guardAccess(row, profile)
+
+    // Backfill sectionName from Users sheet if not stored on the row
+    if (!row.sectionName) {
+      const usersSheet = SpreadsheetService.getSheet(SHEET.USERS)
+      const owner      = SpreadsheetService.getAllRows(usersSheet).find(u => u.id === row.userId)
+      row.sectionName  = owner ? (owner.section || '') : ''
+    }
 
     // Attach form entries
     row.entries = _getEntries(id)

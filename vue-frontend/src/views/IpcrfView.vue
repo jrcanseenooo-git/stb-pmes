@@ -153,7 +153,7 @@
           <div v-else-if="activeTab === 'indicators'" class="modal-body-scroll">
 
             <!-- Core Functions -->
-            <div class="fn-section">
+            <div class="fn-section fn-core">
               <div class="fn-hd">
                 <div class="fn-hd-l">
                   <span class="fn-label">Core Functions</span>
@@ -167,7 +167,7 @@
               </div>
               <div v-if="!coreEntries.length" class="fn-empty">No core indicators added yet</div>
               <div v-else class="ind-list">
-                <div v-for="e in coreEntries" :key="e.id" class="ind-card">
+                <div v-for="e in coreEntries" :key="e.id" class="ind-card ind-card-core">
                   <div class="ind-card-hd">
                     <span class="ind-kra ind-kra-core">{{ e.kraName }}</span>
                     <div class="ind-acts">
@@ -199,7 +199,7 @@
             </div>
 
             <!-- Support Functions -->
-            <div class="fn-section">
+            <div class="fn-section fn-support">
               <div class="fn-hd">
                 <div class="fn-hd-l">
                   <span class="fn-label">Support Functions</span>
@@ -213,7 +213,7 @@
               </div>
               <div v-if="!supportEntries.length" class="fn-empty">No support indicators added yet</div>
               <div v-else class="ind-list">
-                <div v-for="e in supportEntries" :key="e.id" class="ind-card">
+                <div v-for="e in supportEntries" :key="e.id" class="ind-card ind-card-support">
                   <div class="ind-card-hd">
                     <span class="ind-kra ind-kra-support">{{ e.kraName }}</span>
                     <div class="ind-acts">
@@ -1087,7 +1087,7 @@ function _sync(u) {
 .sk-line{background:linear-gradient(90deg,#E2E8F0 25%,#F1F5F9 50%,#E2E8F0 75%);background-size:200%;animation:shimmer 1.4s infinite;border-radius:4px;height:12px;display:block;}
 
 /* Modal overlay */
-.modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.5);display:flex;align-items:center;justify-content:center;z-index:300;padding:16px;backdrop-filter:blur(4px);}
+.modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.5);display:flex;align-items:center;justify-content:center;z-index:300;padding:16px;backdrop-filter:blur(4px);font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;}
 
 /* Modal XL (form detail) */
 .modal-xl{background:#fff;border-radius:16px;width:100%;max-width:700px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.2);overflow:hidden;}
@@ -1117,9 +1117,9 @@ function _sync(u) {
 
 /* Tabs */
 .dtabs{display:flex;padding:0 24px;border-bottom:1px solid #E8EDF3;flex-shrink:0;}
-.dtab{padding:10px 14px;font-size:12px;font-weight:500;cursor:pointer;border:none;background:transparent;color:#64748B;border-bottom:2px solid transparent;margin-bottom:-1px;font-family:inherit;transition:all .15s;display:inline-flex;align-items:center;gap:5px;}
-.dtab:hover{color:#374151;}
-.dtab.active{color:#1A56B0;border-bottom-color:#1A56B0;font-weight:600;}
+.dtab{flex:1 1 0;padding:13px 14px;font-size:13px;font-weight:500;cursor:pointer;border:none;background:transparent;color:#64748B;border-bottom:3px solid transparent;margin-bottom:-1px;font-family:inherit;transition:all .15s;display:inline-flex;align-items:center;justify-content:center;gap:6px;}
+.dtab:hover{color:#374151;background:#FAFBFF;}
+.dtab.active{color:#1A56B0;border-bottom-color:#1A56B0;font-weight:700;background:#F5F9FF;}
 .dtab-cnt{background:#EBF4FF;color:#1A56B0;border-radius:9px;font-size:10px;padding:1px 6px;font-weight:600;}
 
 /* Loading */
@@ -1129,6 +1129,10 @@ function _sync(u) {
 
 /* Function sections */
 .fn-section{margin-bottom:24px;}
+.fn-section.fn-core .fn-hd{background:#F5F9FF;border-color:#DCE9FB;border-left:3px solid #1A56B0;}
+.fn-section.fn-support .fn-hd{background:#FAF7FF;border-color:#E9DFFA;border-left:3px solid #6B3FA0;}
+.ind-card-core{border-left:3px solid #BFDBFE;}
+.ind-card-support{border-left:3px solid #DDD0F3;}
 .fn-hd{display:flex;align-items:center;justify-content:space-between;background:#F8FAFC;border:1px solid #F1F5F9;border-radius:8px;padding:9px 14px;margin-bottom:10px;}
 .fn-hd-l{display:flex;align-items:center;gap:8px;}
 .fn-label{font-size:12px;font-weight:600;color:#374151;}
@@ -1245,7 +1249,7 @@ function _sync(u) {
 .ci-rm:hover{background:#FEF2F2;color:#EF4444;}
 
 /* Fullscreen lock */
-.fullscreen-lock{position:fixed;inset:0;background:rgba(15,23,42,.9);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);}
+.fullscreen-lock{position:fixed;inset:0;background:rgba(15,23,42,.9);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;}
 .lock-box{background:#fff;border-radius:20px;padding:36px 44px;text-align:center;width:380px;max-width:calc(100vw - 32px);box-shadow:0 32px 80px rgba(0,0,0,.35);}
 .lock-spin{width:48px;height:48px;border:4px solid #E2E8F0;border-top-color:#1A56B0;border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 20px;}
 .lock-title{font-size:17px;font-weight:700;color:#0F172A;margin-bottom:16px;letter-spacing:-.3px;}

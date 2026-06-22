@@ -148,6 +148,8 @@ const Router = (() => {
         if (id && sub === 'rate') return IpcrfService.rate(id, body, user)
         if (id && sub === 'finalize') return IpcrfService.finalize(id, body, user)
         if (id && sub === 'compute-score') return IpcrfService.computeScore(id, user)
+        if (id && sub === 'generate-targets') return DocGenService.generateTargetsDoc(id, user)
+        if (id && sub === 'generate-ratings') return DocGenService.generateRatingsDoc(id, user)
         if (id && sub === 'entries') {
           if (!subId && method === 'GET') return IpcrfService.listEntries(id, user)
           if (!subId && method === 'POST') return IpcrfService.addEntry(id, body, user)
@@ -170,6 +172,14 @@ const Router = (() => {
         if (id && sub === 'compute')                             return IPATService.computeOverall(id, user)
         if (id === 'themes')        return IPATService.getThemes(params, user)
         if (id === 'jf-indicators') return IPATService.getJFIndicators(params, user)
+        break
+
+      // ─────────────────────────────────────────
+      // Generated documents — print/export
+      // docgen/{fileId}/print — id = the generated Drive file's id
+      // ─────────────────────────────────────────
+      case 'docgen':
+        if (id && sub === 'print') return DocGenService.exportPdf(id, user)
         break
 
       default:

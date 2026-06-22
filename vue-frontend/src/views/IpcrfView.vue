@@ -280,8 +280,9 @@
                 <div class="det-st">Period & Role</div>
                 <div class="det-row"><span class="dk">Form Type</span><span class="dv">{{ activeForm?.type }}</span></div>
                 <div class="det-row"><span class="dk">Semester / Year</span><span class="dv">S{{ activeForm?.semester }}, {{ activeForm?.year }}</span></div>
-                <div class="det-row"><span class="dk">Position Level</span><span class="dv">{{ activeForm?.positionLevel || '—' }}</span></div>
+                <!-- <div class="det-row"><span class="dk">Position Level</span><span class="dv">{{ activeForm?.positionLevel || '—' }}</span></div> -->
                 <div class="det-row"><span class="dk">Division</span><span class="dv">{{ activeForm?.divisionName || '—' }}</span></div>
+                <div class="det-row"><span class="dk">Section</span><span class="dv">{{ activeForm?.sectionName || '—' }}</span></div>
                 <div class="det-st" style="margin-top:16px">Weights</div>
                 <div class="weights-bar">
                   <div class="wb-c" :style="{ width: activeForm?.coreFunctionWeight + '%' }">Core {{ activeForm?.coreFunctionWeight }}%</div>

@@ -66,7 +66,7 @@ function initializeSheets() {
     // ── IPCRF / CCEF Form sheets (previously missing) ──
     IPCRForms: [
       'id', 'type', 'userId', 'employeeName', 'position', 'positionLevel',
-      'divisionId', 'divisionName', 'semester', 'year', 'status',
+      'divisionId', 'divisionName', 'sectionName', 'semester', 'year', 'status',
       'coreFunctionWeight', 'supportFunctionWeight',
       'finalNumericalRating', 'adjectivalRating',
       'immediateSupervisor', 'supervisorPosition',

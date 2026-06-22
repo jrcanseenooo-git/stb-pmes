@@ -37,7 +37,7 @@
               <th>Section</th>
               <th>Temp Password</th>
               <th>Status</th>
-              <th>Last Login</th>
+              <!-- <th>Last Login</th> -->
               <th>Actions</th>
             </tr>
           </thead>
@@ -61,7 +61,7 @@
                 <td><div class="sk-line" style="width:120px"></div></td>
                 <td><div class="sk-line" style="width:80px"></div></td>
                 <td><div class="sk-pill" style="width:55px"></div></td>
-                <td><div class="sk-line" style="width:60px"></div></td>
+                <!-- <td><div class="sk-line" style="width:60px"></div></td> -->
                 <td><div class="sk-actions"></div></td>
               </tr>
             </template>
@@ -106,7 +106,7 @@
                     {{ u.status }}
                   </span>
                 </td>
-                <td class="text-xs muted">{{ u.lastLogin }}</td>
+                <!-- <td class="text-xs muted">{{ u.lastLogin }}</td> -->
                 <td>
                   <div class="flex-row gap-4">
                     <button class="icon-btn-sm" @click="openEditModal(u)" title="Edit">

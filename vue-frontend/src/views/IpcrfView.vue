@@ -1106,7 +1106,7 @@ function _sync(u) {
 .modal-close:hover{background:#F1F5F9;color:#374151;}
 .modal-body{padding:20px 24px;overflow-y:auto;flex:1;}
 .modal-footer{display:flex;justify-content:flex-end;gap:8px;padding:14px 24px;border-top:1px solid #F1F5F9;background:#F8FAFC;flex-shrink:0;}
-.modal-body-scroll{flex:1;overflow-y:auto;padding:16px 24px 20px;}
+.modal-body-scroll{flex:1;min-height:0;overflow-y:auto;padding:20px 28px 24px;}
 
 /* Form detail header */
 .dh{display:flex;align-items:flex-start;justify-content:space-between;padding:18px 24px 14px;border-bottom:1px solid #F1F5F9;flex-shrink:0;gap:12px;}
@@ -1123,7 +1123,7 @@ function _sync(u) {
 .dtab-cnt{background:#EBF4FF;color:#1A56B0;border-radius:9px;font-size:10px;padding:1px 6px;font-weight:600;}
 
 /* Loading */
-.loading-state{display:flex;align-items:center;justify-content:center;gap:10px;padding:40px 0;flex:1;}
+.loading-state{display:flex;align-items:center;justify-content:center;gap:10px;padding:40px 0;flex:1;min-height:0;}
 @keyframes spin{to{transform:rotate(360deg)}}
 .spinner-sm2{width:18px;height:18px;border:2px solid #E2E8F0;border-top-color:#3B82F6;border-radius:50%;animation:spin .6s linear infinite;}
 
@@ -1175,10 +1175,10 @@ function _sync(u) {
 .wf-info{font-size:11px;color:#64748B;}
 
 /* Details tab */
-.det-2col{display:grid;grid-template-columns:1fr 1fr;gap:24px;}
+.det-2col{display:grid;grid-template-columns:1fr 1fr;gap:32px;}
 .det-st{font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px;}
-.det-row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #F8FAFC;gap:12px;}
-.dk{font-size:11px;color:#94A3B8;font-weight:500;flex-shrink:0;}
+.det-row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #F8FAFC;gap:16px;}
+.dk{font-size:11px;color:#94A3B8;font-weight:500;flex-shrink:0;min-width:110px;}
 .dv{font-size:12px;color:#1A2332;text-align:right;}
 .weights-bar{display:flex;height:26px;border-radius:6px;overflow:hidden;margin-bottom:4px;}
 .wb-c{background:#1A56B0;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;font-weight:600;}

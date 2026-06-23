@@ -180,7 +180,7 @@ const Router = (() => {
       // docgen/{fileId}/print — id = the generated Drive file's id
       // ─────────────────────────────────────────
       case 'docgen':
-        if (id && sub === 'print') return DocGenService.exportPdf(id, user)
+        if (id && sub === 'print') return DocGenService.exportPdf(id, params.tab, user)
         break
 
       default:

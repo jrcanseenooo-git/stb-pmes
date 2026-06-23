@@ -572,7 +572,7 @@ const IpcrfService = (() => {
   // Accomplishments record has been approved yet.
   function getPeriodStatus(params, user) {
     const profile = AuthService.getProfile(user)
-    const type    = profile.type === 'Contractor of Service (COS)' ? 'CCEF' : 'IPCRF'
+    const type    = ['Contract of Service (COS)', 'Contractor of Service (COS)'].includes(profile.type) ? 'CCEF' : 'IPCRF'
 
     const sheet = SpreadsheetService.getSheet(SHEET.IPCRF_FORMS)
     const form  = SpreadsheetService.getAllRows(sheet).find(r =>

@@ -362,6 +362,18 @@
 import { ref, computed, onMounted } from 'vue'
 import { usersApi } from '@/services/api'
 
+// Must match the canonical Divisions seeded in InitSheets.gs exactly.
+// The division <select> binds to the display name only; this resolves it to
+// the id the backend actually scopes/filters by (divisionId was previously
+// never sent at all, so every newly-created user got an empty divisionId
+// regardless of role — silently breaking any division/section-scoped access).
+const DIVISION_IDS = {
+  'Admin Pool': 'admin-pool',
+  'Design Formulation Division': 'dfd',
+  'Pilot Implementation Division': 'pid',
+  'Social Technology Analysis and Evaluation Division': 'staed'
+}
+
 const search        = ref('')
 const showModal     = ref(false)
 const showResetModal = ref(false)
@@ -492,6 +504,7 @@ async function saveUser() {
       lastName:    form.value.lastName,
       email:       form.value.email,
       role:        form.value.role,
+      divisionId:   DIVISION_IDS[form.value.division] || '',
       divisionName: form.value.division,
       section:     form.value.section,
       position:    form.value.position,

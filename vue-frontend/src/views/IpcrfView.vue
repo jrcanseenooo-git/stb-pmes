@@ -633,16 +633,17 @@
             <div class="form-grid">
               <div class="field full">
                 <label class="field-label">Form Type <span class="req">*</span></label>
-                <div class="type-toggle">
-                  <button :class="['type-opt', newForm.type === 'IPCRF' && 'active']" @click="newForm.type = 'IPCRF'">
+                <div class="type-toggle type-toggle-single">
+                  <div v-if="myFormType === 'IPCRF'" class="type-opt active type-opt-locked">
                     <strong>IPCRF</strong>
                     <span>Individual Performance Commitment &amp; Review</span>
-                  </button>
-                  <button :class="['type-opt', newForm.type === 'CCEF' && 'active']" @click="newForm.type = 'CCEF'">
+                  </div>
+                  <div v-else class="type-opt active type-opt-locked">
                     <strong>CCEF</strong>
                     <span>Core Competency Evaluation Form</span>
-                  </button>
+                  </div>
                 </div>
+                <p class="type-auto-hint">Set automatically based on your Employment Type ({{ authStore.employmentType || 'Regular' }})</p>
               </div>
               <div class="field">
                 <label class="field-label">Semester <span class="req">*</span></label>
@@ -871,6 +872,12 @@ const newForm = ref({
   approvingAuthority: '', authorityPosition: ''
 })
 
+// Form Type is no longer a real choice — it's locked to the employee's own
+// Employment Type. Keep it in sync no matter which entry point opened the modal.
+watch(showNewFormModal, (open) => {
+  if (open) newForm.value.type = myFormType.value
+})
+
 const entryForm = ref({
   kraName: '', successIndicator: '', functionType: 'Core', weight: 5,
   applicableRatingPeriod: 'Both semesters', classification: 'Complex',
@@ -931,7 +938,8 @@ const scoreColorClass = computed(() => {
 const { canApprove, isAdmin, isDirector, isAsstDir } = usePermissions()
 const canFinalize  = computed(() => isAdmin.value || isDirector.value || isAsstDir.value)
 const canSelfServe = computed(() => !isDirector.value && !isAsstDir.value)
-const myFormType   = computed(() => authStore.employmentType === 'Contractor of Service (COS)' ? 'CCEF' : 'IPCRF')
+const COS_TYPE_VALUES = ['Contract of Service (COS)', 'Contractor of Service (COS)'] // tolerate the old typo'd value until existing users are re-saved
+const myFormType   = computed(() => COS_TYPE_VALUES.includes(authStore.employmentType) ? 'CCEF' : 'IPCRF')
 
 // Period-level Generate Targets/Ratings (self-service, list-page entry point)
 const periodSemester = ref(String(new Date().getMonth() < 6 ? 1 : 2))
@@ -1592,6 +1600,10 @@ async function doPrint(fileId, tab) {
 
 /* Type toggle */
 .type-toggle{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.type-toggle-single{grid-template-columns:1fr;}
+.type-opt-locked{cursor:default;}
+.type-opt-locked:hover{border-color:#3B82F6;}
+.type-auto-hint{font-size:10.5px;color:#94A3B8;margin:6px 0 0;}
 .type-opt{padding:12px;border:1.5px solid #E2E8F0;border-radius:10px;cursor:pointer;text-align:left;background:#fff;transition:all .15s;font-family:inherit;}
 .type-opt strong{display:block;font-size:13px;font-weight:700;color:#0F172A;margin-bottom:3px;}
 .type-opt span{font-size:10px;color:#94A3B8;line-height:1.4;}

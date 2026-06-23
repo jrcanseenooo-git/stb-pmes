@@ -24,6 +24,7 @@ function initializeSheets() {
     Accomplishments: [
       'id', 'type', 'semester', 'year',
       'userId', 'employeeName', 'divisionId', 'division',
+      'formId', 'entryId',
       'kraId', 'kraTitle', 'siId', 'target', 'targetQty', 'targetUnit',
       'accomplished', 'progressPct', 'status', 'deadline',
       'submittedAt', 'approvedAt', 'approvedBy',

@@ -473,7 +473,7 @@
             </div>
             <select v-model="libPhase" class="field-input" style="width:140px">
               <option value="">All Phases</option>
-              <option v-for="p in PHASES" :key="p" :value="p">{{ p }}</option>
+              <option v-for="p in PHASES" :key="p" :value="p">{{ p.replace(/_/g, ' ') }}</option>
             </select>
             <select v-model="libClass" class="field-input" style="width:140px">
               <option value="">All Types</option>
@@ -818,7 +818,7 @@ import { useAuthStore } from '@/stores/auth'
 const router    = useRouter()
 const authStore = useAuthStore()
 
-const PHASES = ['ANALYSIS', 'DESIGN', 'TESTING', 'PILOT IMPLEMENTATION', 'EVALUATION', 'SUPPORT', 'PROMOTION']
+const PHASES = ['ANALYSIS', 'DESIGN', 'TESTING', 'PILOT IMPLEMENTATION', 'EVALUATION', 'PROMOTION', 'PORTFOLIO', 'SOCIAL_MARKETING', 'STRATEGIC', 'SUPPORT']
 
 // ── State ──
 const forms          = ref([])

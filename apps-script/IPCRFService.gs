@@ -555,14 +555,22 @@ const IpcrfService = (() => {
     )
 
     if (!form) {
-      return { type, hasForm: false, formId: null, formStatus: null, ratingsReady: false, totalEntries: 0, readyEntries: 0 }
+      return {
+        type, hasForm: false, formId: null, formStatus: null, ratingsReady: false,
+        totalEntries: 0, readyEntries: 0,
+        docFileId: null, docFileUrl: null, hasTargetsDoc: false, hasRatingsDoc: false
+      }
     }
 
     const completeness = AccomplishmentsService.completenessForForm(form.id)
     return {
       type, hasForm: true, formId: form.id, formStatus: form.status,
       ratingsReady: completeness.isReady,
-      totalEntries: completeness.total, readyEntries: completeness.ready
+      totalEntries: completeness.total, readyEntries: completeness.ready,
+      docFileId: form.docFileId || null,
+      docFileUrl: form.docFileId ? `https://docs.google.com/spreadsheets/d/${form.docFileId}/edit` : null,
+      hasTargetsDoc: !!form.targetsGeneratedAt,
+      hasRatingsDoc: !!form.ratingsGeneratedAt
     }
   }
 

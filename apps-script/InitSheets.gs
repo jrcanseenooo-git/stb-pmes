@@ -76,6 +76,7 @@ function initializeSheets() {
       'feedbackStrengths', 'feedbackAreasForImprovement',
       'feedbackComments', 'feedbackRecommendations',
       'submittedAt', 'approvedAt', 'ratedAt', 'finalizedAt',
+      'docFileId', 'targetsGeneratedAt', 'ratingsGeneratedAt',
       'createdAt', 'updatedAt'
     ],
     FormEntries: [

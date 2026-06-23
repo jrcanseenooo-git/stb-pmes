@@ -248,6 +248,7 @@ export const ipcrfApi = {
   returnForm:   (id, data = {})        => gasWrite('PATCH', `ipcrf/${id}/return`,      data),
   rateForm:     (id, data)             => gasWrite('PATCH', `ipcrf/${id}/rate`,        data),
   finalizeForm: (id, data = {})        => gasWrite('PATCH', `ipcrf/${id}/finalize`,    data),
+  periodStatus: (semester, year)       => gasGet(`ipcrf/period-status`, { semester, year }),
 }
 
 // ── Document Generation (official IPCRF/CCEF Targets & Ratings forms) ──

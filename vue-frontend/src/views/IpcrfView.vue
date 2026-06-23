@@ -30,12 +30,24 @@
         <input v-model.number="periodYear" type="number" class="filter-select" style="width:80px"/>
       </div>
       <div class="generate-actions">
-        <button class="btn btn-sm" :disabled="periodBusy" @click="doPeriodGenerate('targets')">
-          {{ periodBusy === 'targets' ? 'Checking…' : `Generate ${myFormType} Targets` }}
-        </button>
-        <button class="btn btn-primary btn-sm" :disabled="periodBusy" @click="doPeriodGenerate('ratings')">
-          {{ periodBusy === 'ratings' ? 'Checking…' : `Generate ${myFormType} Ratings` }}
-        </button>
+        <div class="generate-item">
+          <button class="btn btn-sm" :class="periodStatusInfo?.hasForm && 'btn-active-ok'" :disabled="!!periodBusy" @click="doPeriodGenerate('targets')">
+            {{ periodBusy === 'targets' ? 'Checking…' : `Generate ${myFormType} Targets` }}
+          </button>
+          <span v-if="periodStatusLoading" class="generate-hint">Checking…</span>
+          <span v-else-if="periodStatusInfo?.hasForm" class="generate-hint generate-hint-ok">✓ Created — {{ periodStatusInfo.formStatus }}</span>
+          <span v-else-if="periodStatusInfo" class="generate-hint">Not created yet for this period</span>
+        </div>
+        <div class="generate-item">
+          <button class="btn btn-primary btn-sm" :disabled="!!periodBusy" @click="doPeriodGenerate('ratings')">
+            {{ periodBusy === 'ratings' ? 'Checking…' : `Generate ${myFormType} Ratings` }}
+          </button>
+          <span v-if="periodStatusLoading" class="generate-hint">Checking…</span>
+          <span v-else-if="periodStatusInfo?.hasForm && periodStatusInfo.ratingsReady" class="generate-hint generate-hint-ok">✓ Accomplishments approved</span>
+          <span v-else-if="periodStatusInfo?.hasForm && periodStatusInfo.totalEntries > 0" class="generate-hint generate-hint-warn">{{ periodStatusInfo.readyEntries }}/{{ periodStatusInfo.totalEntries }} accomplishments approved</span>
+          <span v-else-if="periodStatusInfo?.hasForm" class="generate-hint">No indicators added yet</span>
+          <span v-else-if="periodStatusInfo" class="generate-hint">Create Targets first</span>
+        </div>
       </div>
     </div>
 
@@ -786,7 +798,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ipcrf as ipcrfApi, kraLibrary as kraLibraryApi, docGenApi } from '@/services/api'
 import { usePermissions } from '@/composables/usePermissions'
@@ -915,6 +927,8 @@ const myFormType   = computed(() => authStore.employmentType === 'Contractor of 
 const periodSemester = ref(String(new Date().getMonth() < 6 ? 1 : 2))
 const periodYear     = ref(new Date().getFullYear())
 const periodBusy     = ref('')
+const periodStatusInfo    = ref(null)
+const periodStatusLoading = ref(false)
 
 // ── Helpers ──
 function countByStatus(s)   { return forms.value.filter(f => f.status === s).length }
@@ -940,6 +954,25 @@ function statusClass(status) {
 }
 
 onMounted(loadForms)
+onMounted(loadPeriodStatus)
+
+let periodWatchTimer = null
+watch([periodSemester, periodYear], () => {
+  clearTimeout(periodWatchTimer)
+  periodWatchTimer = setTimeout(loadPeriodStatus, 400)
+})
+
+async function loadPeriodStatus() {
+  if (!canSelfServe.value) return
+  periodStatusLoading.value = true
+  try {
+    periodStatusInfo.value = await ipcrfApi.periodStatus(periodSemester.value, periodYear.value)
+  } catch (e) {
+    periodStatusInfo.value = null
+  } finally {
+    periodStatusLoading.value = false
+  }
+}
 
 // ── API ──
 async function loadForms() {
@@ -1177,7 +1210,7 @@ async function doPeriodGenerate(kind) {
     activeTab.value = 'score'
     await doGenerateRatings()
   } catch (e) { showToast(e.message, 'error') }
-  finally { periodBusy.value = '' }
+  finally { periodBusy.value = ''; loadPeriodStatus() }
 }
 
 function _sync(u) {
@@ -1243,7 +1276,13 @@ async function doPrint(fileId) {
 .generate-bar{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 16px;margin-bottom:16px;background:#F5F9FF;border:1px solid #DCE9FB;border-radius:10px;flex-wrap:wrap;}
 .generate-period{display:flex;align-items:center;gap:8px;}
 .generate-period .field-label{margin:0;}
-.generate-actions{display:flex;gap:8px;flex-wrap:wrap;}
+.generate-actions{display:flex;gap:14px;flex-wrap:wrap;}
+.generate-item{display:flex;flex-direction:column;gap:4px;align-items:flex-start;}
+.generate-hint{font-size:10.5px;color:#94A3B8;}
+.generate-hint-ok{color:#15803D;font-weight:600;}
+.generate-hint-warn{color:#B45309;font-weight:600;}
+.btn-active-ok{background:#F0FDF4;color:#15803D;border-color:#BBF7D0;}
+.btn-active-ok:hover{background:#DCFCE7;}
 .status-tabs{display:flex;gap:4px;flex-wrap:wrap;}
 .status-tab{padding:5px 14px;border-radius:20px;font-size:12px;font-weight:500;border:1px solid #E2E8F0;background:#fff;color:#64748B;cursor:pointer;transition:all .15s;font-family:inherit;}
 .status-tab:hover{border-color:#CBD5E1;}
@@ -1349,7 +1388,8 @@ async function doPrint(fileId) {
 .modal-close:hover{background:#F1F5F9;color:#374151;}
 .modal-body{padding:20px 24px;overflow-y:auto;flex:1;}
 .modal-footer{display:flex;justify-content:flex-end;gap:8px;padding:14px 24px;border-top:1px solid #F1F5F9;background:#F8FAFC;flex-shrink:0;}
-.modal-body-scroll{flex:1;min-height:0;overflow-y:auto;padding:20px 28px 24px;}
+.modal-body-scroll{flex:1;min-height:0;overflow-y:auto;padding:20px 28px 24px;scrollbar-width:none;-ms-overflow-style:none;}
+.modal-body-scroll::-webkit-scrollbar{width:0;height:0;display:none;}
 
 /* Form detail header */
 .dh{display:flex;align-items:flex-start;justify-content:space-between;padding:18px 24px 14px;border-bottom:1px solid #F1F5F9;flex-shrink:0;gap:12px;}

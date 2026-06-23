@@ -224,14 +224,16 @@ const DocGenService = (() => {
       const r = startRow + i
       sheet.getRange(r, _colNum(col.kra)).setValue(e.kraName || '')
       sheet.getRange(r, _colNum(col.si)).setValue(e.successIndicator || '')
-      sheet.getRange(r, _colNum(col.mov)).setValue(e.meansOfVerification || '')
 
       if (docType === 'targets') {
+        sheet.getRange(r, _colNum(col.mov)).setValue(e.meansOfVerification || '')
         sheet.getRange(r, _colNum(col.period)).setValue(e.applicableRatingPeriod || '')
         sheet.getRange(r, _colNum(col.effGuide)).setValue(e.efficiencyGuide || 'N/A')
         sheet.getRange(r, _colNum(col.qualGuide)).setValue(e.qualityGuide || '')
         sheet.getRange(r, _colNum(col.timeGuide)).setValue(e.timelinessGuide || '')
       } else {
+        // Ratings doc shows the actual MOV reference code(s), not the guidance text
+        sheet.getRange(r, _colNum(col.mov)).setValue(e.movReferences || e.meansOfVerification || '')
         sheet.getRange(r, _colNum(col.accomplishment)).setValue(e.accomplishment || '')
         sheet.getRange(r, _colNum(col.eff)).setValue(e.ratingEfficiency === '' ? 'N/A' : e.ratingEfficiency)
         sheet.getRange(r, _colNum(col.qual)).setValue(e.ratingQuality === '' ? 'N/A' : e.ratingQuality)

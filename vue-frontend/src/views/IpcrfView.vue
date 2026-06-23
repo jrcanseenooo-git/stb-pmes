@@ -31,19 +31,27 @@
       </div>
       <div class="generate-actions">
         <div class="generate-item">
-          <button class="btn btn-sm" :class="periodStatusInfo?.hasForm && 'btn-active-ok'" :disabled="!!periodBusy" @click="doPeriodGenerate('targets')">
+          <template v-if="periodStatusInfo?.hasTargetsDoc">
+            <a :href="periodStatusInfo.docFileUrl" target="_blank" class="btn btn-sm btn-active-ok">Open Targets Sheet</a>
+          </template>
+          <button v-else class="btn btn-sm" :disabled="!!periodBusy" @click="doPeriodGenerate('targets')">
             {{ periodBusy === 'targets' ? 'Checking…' : `Generate ${myFormType} Targets` }}
           </button>
           <span v-if="periodStatusLoading" class="generate-hint">Checking…</span>
-          <span v-else-if="periodStatusInfo?.hasForm" class="generate-hint generate-hint-ok">✓ Created — {{ periodStatusInfo.formStatus }}</span>
+          <span v-else-if="periodStatusInfo?.hasTargetsDoc" class="generate-hint generate-hint-ok">✓ Generated — {{ periodStatusInfo.formStatus }}</span>
+          <span v-else-if="periodStatusInfo?.hasForm" class="generate-hint">Form exists — doc not generated yet</span>
           <span v-else-if="periodStatusInfo" class="generate-hint">Not created yet for this period</span>
         </div>
         <div class="generate-item">
-          <button class="btn btn-primary btn-sm" :disabled="!!periodBusy" @click="doPeriodGenerate('ratings')">
+          <template v-if="periodStatusInfo?.hasRatingsDoc">
+            <a :href="periodStatusInfo.docFileUrl" target="_blank" class="btn btn-sm btn-active-ok">Open Ratings Sheet</a>
+          </template>
+          <button v-else class="btn btn-primary btn-sm" :disabled="!!periodBusy" @click="doPeriodGenerate('ratings')">
             {{ periodBusy === 'ratings' ? 'Checking…' : `Generate ${myFormType} Ratings` }}
           </button>
           <span v-if="periodStatusLoading" class="generate-hint">Checking…</span>
-          <span v-else-if="periodStatusInfo?.hasForm && periodStatusInfo.ratingsReady" class="generate-hint generate-hint-ok">✓ Accomplishments approved</span>
+          <span v-else-if="periodStatusInfo?.hasRatingsDoc" class="generate-hint generate-hint-ok">✓ Generated</span>
+          <span v-else-if="periodStatusInfo?.hasForm && periodStatusInfo.ratingsReady" class="generate-hint generate-hint-ok">Ready — accomplishments approved</span>
           <span v-else-if="periodStatusInfo?.hasForm && periodStatusInfo.totalEntries > 0" class="generate-hint generate-hint-warn">{{ periodStatusInfo.readyEntries }}/{{ periodStatusInfo.totalEntries }} accomplishments approved</span>
           <span v-else-if="periodStatusInfo?.hasForm" class="generate-hint">No indicators added yet</span>
           <span v-else-if="periodStatusInfo" class="generate-hint">Create Targets first</span>
@@ -298,8 +306,9 @@
               </div>
               <div class="docgen-actions">
                 <template v-if="docGen.targets">
-                  <a :href="docGen.targets.fileUrl" target="_blank" class="btn btn-sm btn-outline">Open in Sheets</a>
-                  <button class="btn btn-sm" :disabled="docGen.printing" @click="doPrint(docGen.targets.fileId)">{{ docGen.printing ? 'Preparing…' : 'Print' }}</button>
+                  <a :href="docGen.targets.fileUrl" target="_blank" class="btn btn-sm btn-outline">Open Targets Sheet</a>
+                  <button class="btn btn-sm" :disabled="docGen.printing" @click="doPrint(docGen.targets.fileId, 'Targets')">{{ docGen.printing ? 'Preparing…' : 'Print' }}</button>
+                  <button class="btn-link" :disabled="docGen.generating === 'targets'" @click="doGenerateTargets">{{ docGen.generating === 'targets' ? 'Regenerating…' : 'Regenerate' }}</button>
                 </template>
                 <button v-else class="btn btn-primary btn-sm" :disabled="docGen.generating === 'targets'" @click="doGenerateTargets">
                   {{ docGen.generating === 'targets' ? 'Generating…' : 'Generate Targets Doc' }}
@@ -415,12 +424,13 @@
               <div class="docgen-bar" style="margin-top:18px;text-align:left">
                 <div class="docgen-info">
                   <span class="docgen-label">Ratings Document</span>
-                  <span class="docgen-sub">Generates the official Annex F.2 form with accomplishments and ratings</span>
+                  <span class="docgen-sub">Adds the official Annex F.2 tab to the same Targets file</span>
                 </div>
                 <div class="docgen-actions">
                   <template v-if="docGen.ratings">
-                    <a :href="docGen.ratings.fileUrl" target="_blank" class="btn btn-sm btn-outline">Open in Sheets</a>
-                    <button class="btn btn-sm" :disabled="docGen.printing" @click="doPrint(docGen.ratings.fileId)">{{ docGen.printing ? 'Preparing…' : 'Print' }}</button>
+                    <a :href="docGen.ratings.fileUrl" target="_blank" class="btn btn-sm btn-outline">Open Ratings Sheet</a>
+                    <button class="btn btn-sm" :disabled="docGen.printing" @click="doPrint(docGen.ratings.fileId, 'Ratings')">{{ docGen.printing ? 'Preparing…' : 'Print' }}</button>
+                    <button class="btn-link" :disabled="docGen.generating === 'ratings'" @click="doGenerateRatings">{{ docGen.generating === 'ratings' ? 'Regenerating…' : 'Regenerate' }}</button>
                   </template>
                   <button v-else class="btn btn-primary btn-sm" :disabled="docGen.generating === 'ratings'" @click="doGenerateRatings">
                     {{ docGen.generating === 'ratings' ? 'Generating…' : 'Generate Ratings Doc' }}
@@ -991,7 +1001,13 @@ async function openFormModal(form) {
   activeForm.value   = form
   activeTab.value    = 'indicators'
   allEntries.value   = []
-  docGen.value       = { targets: null, ratings: null, generating: '', printing: false }
+  docGen.value       = {
+    targets: (form.docFileId && form.targetsGeneratedAt)
+      ? { fileId: form.docFileId, fileUrl: `https://docs.google.com/spreadsheets/d/${form.docFileId}/edit` } : null,
+    ratings: (form.docFileId && form.ratingsGeneratedAt)
+      ? { fileId: form.docFileId, fileUrl: `https://docs.google.com/spreadsheets/d/${form.docFileId}/edit` } : null,
+    generating: '', printing: false
+  }
   feedbackForm.value = {
     feedbackStrengths:           form.feedbackStrengths           || '',
     feedbackComments:            form.feedbackComments            || '',
@@ -1225,9 +1241,10 @@ async function doGenerateTargets() {
   try {
     const r = await docGenApi.generateTargets(activeForm.value.id)
     docGen.value.targets = r
+    _sync({ docFileId: r.fileId, targetsGeneratedAt: new Date().toISOString() })
     showToast('Targets document generated')
   } catch (e) { showToast(e.message, 'error') }
-  finally { docGen.value.generating = '' }
+  finally { docGen.value.generating = ''; loadPeriodStatus() }
 }
 
 async function doGenerateRatings() {
@@ -1235,16 +1252,17 @@ async function doGenerateRatings() {
   try {
     const r = await docGenApi.generateRatings(activeForm.value.id)
     docGen.value.ratings = r
+    _sync({ docFileId: r.fileId, ratingsGeneratedAt: new Date().toISOString() })
     showToast('Ratings document generated')
   } catch (e) { showToast(e.message, 'error') }
-  finally { docGen.value.generating = '' }
+  finally { docGen.value.generating = ''; loadPeriodStatus() }
 }
 
-async function doPrint(fileId) {
+async function doPrint(fileId, tab) {
   if (!fileId || docGen.value.printing) return
   docGen.value.printing = true
   try {
-    const r = await docGenApi.printPdf(fileId)
+    const r = await docGenApi.printPdf(fileId, tab)
     const bytes = Uint8Array.from(atob(r.pdfBase64), c => c.charCodeAt(0))
     const blob  = new Blob([bytes], { type: 'application/pdf' })
     const url   = URL.createObjectURL(blob)
@@ -1466,7 +1484,10 @@ async function doPrint(fileId) {
 .docgen-info{display:flex;flex-direction:column;gap:2px;}
 .docgen-label{font-size:12px;font-weight:600;color:#374151;}
 .docgen-sub{font-size:10.5px;color:#94A3B8;}
-.docgen-actions{display:flex;gap:6px;flex-shrink:0;}
+.docgen-actions{display:flex;gap:6px;flex-shrink:0;align-items:center;}
+.btn-link{background:none;border:none;color:#94A3B8;font-size:11px;cursor:pointer;text-decoration:underline;padding:0 4px;font-family:inherit;}
+.btn-link:hover{color:#475569;}
+.btn-link:disabled{opacity:.5;cursor:not-allowed;}
 .rate-panel{margin-top:18px;padding:14px;background:#F8FAFC;border:1px solid #F1F5F9;border-radius:9px;text-align:left;}
 
 /* Details tab */

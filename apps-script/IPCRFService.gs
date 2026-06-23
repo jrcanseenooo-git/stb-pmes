@@ -270,8 +270,13 @@ const IpcrfService = (() => {
 
     const entries = _getEntries(id)
     if (entries.length === 0) {
+      const updated = SpreadsheetService.updateRow(sheet, id, {
+        finalNumericalRating: 0,
+        adjectivalRating:     'Poor',
+        updatedAt:            new Date().toISOString()
+      })
       AuditService.log('COMPUTE_SCORE', 'IPCRF', `Computed score for form ${id}: 0 (Poor)`, user)
-      return { score: 0, label: 'Poor', entryCount: 0 }
+      return { ...updated, entryCount: 0, ratedCount: 0 }
     }
 
     // Group entries by function type and compute weighted averages
@@ -305,14 +310,14 @@ const IpcrfService = (() => {
     const label = _ratingLabel(score)
 
     // Persist computed score back to the form
-    SpreadsheetService.updateRow(sheet, id, {
+    const updated = SpreadsheetService.updateRow(sheet, id, {
       finalNumericalRating: score,
       adjectivalRating:     label,
       updatedAt:            new Date().toISOString()
     })
 
     AuditService.log('COMPUTE_SCORE', 'IPCRF', `Computed score for form ${id}: ${score} (${label})`, user)
-    return { score, label, entryCount: total, ratedCount: rated }
+    return { ...updated, entryCount: total, ratedCount: rated }
   }
 
   // ─────────────────────────────────────────────
@@ -366,6 +371,22 @@ const IpcrfService = (() => {
 
     SpreadsheetService.appendRow(sheet, entry)
     AuditService.log('ADD_ENTRY', 'IPCRF', `Added entry ${entry.id} to form ${formId}`, user)
+
+    // Auto-create the linked Accomplishments record so the staff member has a place
+    // to log their narrative + MOV for this exact indicator. Best-effort: a failure
+    // here shouldn't block the entry itself from being added.
+    try {
+      AccomplishmentsService.create({
+        formId, entryId: entry.id,
+        type: form.type, semester: form.semester, year: form.year,
+        userId: form.userId, employeeName: form.employeeName,
+        divisionId: form.divisionId, division: form.divisionName,
+        kraTitle: entry.kraName, target: entry.successIndicator
+      }, user)
+    } catch (e) {
+      Logger.log('[IPCRF] Could not auto-create linked Accomplishments record: ' + e.message)
+    }
+
     return entry
   }
 
@@ -411,6 +432,7 @@ const IpcrfService = (() => {
       }
     }
     AuditService.log('DELETE_ENTRY', 'IPCRF', `Deleted entry ${entryId}`, user)
+    try { AccomplishmentsService.softDeleteByEntryId(entryId, user) } catch (e) { Logger.log('[IPCRF] Linked Accomplishments cleanup skipped: ' + e.message) }
     return { deleted: true }
   }
 
@@ -516,10 +538,38 @@ const IpcrfService = (() => {
     )
   }
 
+  // ── Period status check (self-service Generate Targets/Ratings entry point) ──
+  // Derives IPCRF vs CCEF from the caller's own Employment Type, finds their own
+  // form for the given semester/year, and — for Ratings — whether every linked
+  // Accomplishments record has been approved yet.
+  function getPeriodStatus(params, user) {
+    const profile = AuthService.getProfile(user)
+    const type    = profile.type === 'Contractor of Service (COS)' ? 'CCEF' : 'IPCRF'
+
+    const sheet = SpreadsheetService.getSheet(SHEET.IPCRF_FORMS)
+    const form  = SpreadsheetService.getAllRows(sheet).find(r =>
+      r.userId === profile.id &&
+      String(r.semester) === String(params.semester) &&
+      String(r.year)     === String(params.year) &&
+      r.type === type
+    )
+
+    if (!form) {
+      return { type, hasForm: false, formId: null, formStatus: null, ratingsReady: false, totalEntries: 0, readyEntries: 0 }
+    }
+
+    const completeness = AccomplishmentsService.completenessForForm(form.id)
+    return {
+      type, hasForm: true, formId: form.id, formStatus: form.status,
+      ratingsReady: completeness.isReady,
+      totalEntries: completeness.total, readyEntries: completeness.ready
+    }
+  }
+
   return {
     list, get, create, update,
     submit, approve, return_, rate, finalize, computeScore,
     listEntries, addEntry, updateEntry, deleteEntry,
-    getFinalRatingForUser
+    getFinalRatingForUser, getPeriodStatus
   }
 })()

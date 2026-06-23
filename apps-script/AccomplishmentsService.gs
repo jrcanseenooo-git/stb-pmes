@@ -29,7 +29,8 @@ const AccomplishmentsService = (() => {
     const filters = {
       status:     params.status     || '',
       divisionId: params.divisionId || '',
-      kraId:      params.kraId      || ''
+      kraId:      params.kraId      || '',
+      formId:     params.formId     || ''
     }
     rows = SpreadsheetService.filterRows(rows, filters)
 
@@ -72,6 +73,8 @@ const AccomplishmentsService = (() => {
       employeeName:  body.employeeName  || profile.fullName,
       divisionId:    body.divisionId    || profile.divisionId,
       division:      body.division      || profile.divisionName,
+      formId:        body.formId        || '',
+      entryId:       body.entryId       || '',
       kraId:         body.kraId         || '',
       kraTitle:      body.kraTitle      || '',
       siId:          body.siId          || '',
@@ -105,13 +108,31 @@ const AccomplishmentsService = (() => {
     if (!existing) throw HttpError('Accomplishment not found', 404)
     guardAccess(existing, profile)
 
+    // Only these fields are editable through the generic update endpoint.
+    // Status changes must go through updateStatus()/approve()/requestRevision(),
+    // which enforce ALLOWED_TRANSITIONS and role checks — letting `status` pass
+    // through here would let anyone set their own record to "Approved"/"Completed"
+    // without real sign-off, which would also have quietly defeated the IPCRF
+    // Ratings-readiness check that depends on this status being trustworthy.
+    const EDITABLE = ['accomplishment', 'progressPct', 'accomplished', 'deadline', 'remarks', 'targetQty', 'targetUnit']
+    const patch = {}
+    EDITABLE.forEach(k => { if (body[k] !== undefined) patch[k] = body[k] })
+
+    // KRA/target text is only editable here if this record isn't linked to an
+    // official IPCRF/CCEF entry — once linked, that text belongs to the form.
+    if (!existing.formId) {
+      ['kraName', 'kraTitle', 'successIndicator', 'target'].forEach(k => {
+        if (body[k] !== undefined) patch[k] = body[k]
+      })
+    }
+
     // Recompute progress
-    if (body.accomplished !== undefined && existing.targetQty) {
-      body.progressPct = Math.min(100, Math.round((body.accomplished / existing.targetQty) * 100))
+    if (patch.accomplished !== undefined && existing.targetQty) {
+      patch.progressPct = Math.min(100, Math.round((patch.accomplished / existing.targetQty) * 100))
     }
 
     const updated = SpreadsheetService.updateRow(sheet, id, {
-      ...body,
+      ...patch,
       updatedAt: new Date().toISOString()
     })
     AuditService.log('UPDATE', 'Accomplishments', `Updated entry: ${id}`, user)
@@ -125,17 +146,28 @@ const AccomplishmentsService = (() => {
     const sheet   = SpreadsheetService.getSheet(SHEET.ACCOMPLISHMENTS)
     const row     = SpreadsheetService.getRow(sheet, id)
     if (!row) throw HttpError('Not found', 404)
+    guardAccess(row, profile)
 
     const allowed = ALLOWED_TRANSITIONS[row.status] || []
     if (!allowed.includes(status)) {
       throw HttpError(`Cannot transition from "${row.status}" to "${status}"`, 400)
     }
 
+    // Sign-off transitions require an approver role, even through this shared
+    // function — approve()/requestRevision() are thin wrappers around this, so
+    // the check needs to live here too, not just in the wrapper.
+    const APPROVER_ROLES = ['System Administrator', 'Bureau Director', 'Assistant Bureau Director', 'Division Chief']
+    if (['Approved', 'For Revision'].includes(status) && !APPROVER_ROLES.includes(profile.role)) {
+      throw HttpError('Only an approver can set this status', 403)
+    }
+
     const updated = SpreadsheetService.updateRow(sheet, id, {
       status,
       remarks:   remarks || row.remarks,
       updatedAt: new Date().toISOString(),
-      submittedAt: status === 'Submitted' ? new Date().toISOString() : row.submittedAt
+      submittedAt: status === 'Submitted' ? new Date().toISOString() : row.submittedAt,
+      approvedAt:  status === 'Approved'  ? new Date().toISOString() : row.approvedAt,
+      approvedBy:  status === 'Approved'  ? profile.id                : row.approvedBy
     })
 
     logRevision(id, row.status, status, remarks, profile)
@@ -201,5 +233,22 @@ const AccomplishmentsService = (() => {
     })
   }
 
-  return { list, get, create, update, updateStatus, approve, requestRevision, history }
+  // ── Completeness check for IPCRF/CCEF Ratings generation ──
+  // "ready" = every Accomplishments record linked to this form is Approved or Completed
+  function completenessForForm(formId) {
+    const sheet = SpreadsheetService.getSheet(SHEET.ACCOMPLISHMENTS)
+    const rows  = SpreadsheetService.getAllRows(sheet).filter(r => r.formId === formId && !r.deleted)
+    const ready = rows.filter(r => r.status === 'Approved' || r.status === 'Completed')
+    return { total: rows.length, ready: ready.length, isReady: rows.length > 0 && ready.length === rows.length }
+  }
+
+  // ── Called from IPCRFService when an entry is removed from a Targets form ──
+  function softDeleteByEntryId(entryId, user) {
+    const sheet = SpreadsheetService.getSheet(SHEET.ACCOMPLISHMENTS)
+    const row   = SpreadsheetService.getAllRows(sheet).find(r => r.entryId === entryId && !r.deleted)
+    if (!row) return null
+    return SpreadsheetService.updateRow(sheet, row.id, { deleted: true, deletedAt: new Date().toISOString() })
+  }
+
+  return { list, get, create, update, updateStatus, approve, requestRevision, history, completenessForForm, softDeleteByEntryId }
 })()

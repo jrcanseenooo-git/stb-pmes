@@ -256,7 +256,7 @@ export const ipcrfApi = {
 export const docGenApi = {
   generateTargets: (formId)  => gasWrite('POST', `ipcrf/${formId}/generate-targets`),
   generateRatings: (formId)  => gasWrite('POST', `ipcrf/${formId}/generate-ratings`),
-  printPdf:        (fileId)  => gasGet(`docgen/${fileId}/print`)
+  printPdf:        (fileId, tab)  => gasGet(`docgen/${fileId}/print`, { tab })
 }
 
 // ── Attendance ─────────────────────────────────

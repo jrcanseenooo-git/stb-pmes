@@ -10,12 +10,33 @@
         <h2 class="page-title">IPCRF / CCEF Forms</h2>
         <p class="page-sub">Individual Performance Commitment and Review Forms</p>
       </div>
-      <button class="btn btn-primary" @click="showNewFormModal = true">
+      <button v-if="canSelfServe" class="btn btn-primary" @click="showNewFormModal = true">
         <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
           <path d="M6.5 1v11M1 6.5h11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
         </svg>
         New Form
       </button>
+    </div>
+
+    <!-- Self-service Generate Targets/Ratings -->
+    <div v-if="canSelfServe" class="generate-bar">
+      <div class="generate-period">
+        <label class="field-label">Semester</label>
+        <select v-model="periodSemester" class="filter-select">
+          <option value="1">1st Semester</option>
+          <option value="2">2nd Semester</option>
+        </select>
+        <label class="field-label">Year</label>
+        <input v-model.number="periodYear" type="number" class="filter-select" style="width:80px"/>
+      </div>
+      <div class="generate-actions">
+        <button class="btn btn-sm" :disabled="periodBusy" @click="doPeriodGenerate('targets')">
+          {{ periodBusy === 'targets' ? 'Checking…' : `Generate ${myFormType} Targets` }}
+        </button>
+        <button class="btn btn-primary btn-sm" :disabled="periodBusy" @click="doPeriodGenerate('ratings')">
+          {{ periodBusy === 'ratings' ? 'Checking…' : `Generate ${myFormType} Ratings` }}
+        </button>
+      </div>
     </div>
 
     <!-- Filter bar -->
@@ -60,7 +81,7 @@
       </svg>
       <p class="empty-title">{{ activeStatus !== 'All' ? `No ${activeStatus.toLowerCase()} forms` : 'No forms yet' }}</p>
       <p class="empty-sub">{{ activeStatus !== 'All' ? 'Try a different filter.' : 'Create your first IPCRF or CCEF form.' }}</p>
-      <button v-if="activeStatus === 'All'" class="btn btn-primary" @click="showNewFormModal = true">Create New Form</button>
+      <button v-if="activeStatus === 'All' && canSelfServe" class="btn btn-primary" @click="showNewFormModal = true">Create New Form</button>
     </div>
 
     <!-- Forms grid -->
@@ -332,6 +353,51 @@
                 </div>
               </div>
               <button class="btn btn-sm" style="margin-top:14px" @click="doCompute">Recompute</button>
+
+              <!-- Rate / Finalize workflow -->
+              <div v-if="activeForm?.status === 'Approved'" class="rate-panel">
+                <div class="det-st" style="text-align:left">Feedback (Part II)</div>
+                <div class="form-grid" style="text-align:left">
+                  <div class="field full">
+                    <label class="field-label">Strengths</label>
+                    <textarea v-model="feedbackForm.feedbackStrengths" class="field-input" rows="2" placeholder="What the ratee does well…"></textarea>
+                  </div>
+                  <div class="field full">
+                    <label class="field-label">Rater's Comments &amp; Recommendations</label>
+                    <textarea v-model="feedbackForm.feedbackComments" class="field-input" rows="2" placeholder="Comments, recommendations, commendations…"></textarea>
+                  </div>
+                  <div class="field full">
+                    <label class="field-label">Areas for Improvement</label>
+                    <textarea v-model="feedbackForm.feedbackAreasForImprovement" class="field-input" rows="2" placeholder="Development needs…"></textarea>
+                  </div>
+                </div>
+                <button v-if="canApprove" class="btn btn-primary btn-sm" style="margin-top:10px" :disabled="ratingBusy" @click="doMarkRated">
+                  {{ ratingBusy ? 'Saving…' : 'Mark as Rated' }}
+                </button>
+                <p v-else class="muted-text" style="margin-top:10px;font-size:11px">Only the rater/approver can mark this form as Rated.</p>
+              </div>
+
+              <div v-else-if="activeForm?.status === 'Rated'" class="rate-panel">
+                <div class="det-st" style="text-align:left">Sign-off Dates</div>
+                <div class="form-grid" style="text-align:left">
+                  <div class="field">
+                    <label class="field-label">Ratee Signed</label>
+                    <input v-model="finalizeForm.dateSignedRatee" type="text" class="field-input" placeholder="e.g. 17 March 2026"/>
+                  </div>
+                  <div class="field">
+                    <label class="field-label">Supervisor Signed</label>
+                    <input v-model="finalizeForm.dateSignedSupervisor" type="text" class="field-input" placeholder="e.g. 17 March 2026"/>
+                  </div>
+                  <div class="field">
+                    <label class="field-label">Authority Signed</label>
+                    <input v-model="finalizeForm.dateSignedAuthority" type="text" class="field-input" placeholder="e.g. 17 March 2026"/>
+                  </div>
+                </div>
+                <button v-if="canFinalize" class="btn btn-primary btn-sm" style="margin-top:10px" :disabled="ratingBusy" @click="doFinalize">
+                  {{ ratingBusy ? 'Saving…' : 'Finalize' }}
+                </button>
+                <p v-else class="muted-text" style="margin-top:10px;font-size:11px">Only an Administrator/Director can finalize this form.</p>
+              </div>
 
               <!-- Ratings document generation -->
               <div class="docgen-bar" style="margin-top:18px;text-align:left">
@@ -721,7 +787,13 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ipcrf as ipcrfApi, kraLibrary as kraLibraryApi, docGenApi } from '@/services/api'
+import { usePermissions } from '@/composables/usePermissions'
+import { useAuthStore } from '@/stores/auth'
+
+const router    = useRouter()
+const authStore = useAuthStore()
 
 const PHASES = ['ANALYSIS', 'DESIGN', 'TESTING', 'PILOT IMPLEMENTATION', 'EVALUATION', 'SUPPORT', 'PROMOTION']
 
@@ -763,6 +835,11 @@ const toast          = ref({ show: false, msg: '', type: 'success' })
 
 // Document generation (Targets / Ratings official forms)
 const docGen = ref({ targets: null, ratings: null, generating: '', printing: false })
+
+// Rate / Finalize workflow (Approved -> Rated -> Finalized)
+const feedbackForm = ref({ feedbackStrengths: '', feedbackComments: '', feedbackRecommendations: '', feedbackAreasForImprovement: '' })
+const finalizeForm = ref({ dateSignedRatee: '', dateSignedSupervisor: '', dateSignedAuthority: '' })
+const ratingBusy   = ref(false)
 
 const newForm = ref({
   type: 'IPCRF',
@@ -829,10 +906,15 @@ const scoreColorClass = computed(() => {
   return 'score-low'
 })
 
-const canApprove = computed(() => {
-  // Roles that can approve — extend as needed
-  return true
-})
+const { canApprove, isAdmin, isDirector, isAsstDir } = usePermissions()
+const canFinalize  = computed(() => isAdmin.value || isDirector.value || isAsstDir.value)
+const canSelfServe = computed(() => !isDirector.value && !isAsstDir.value)
+const myFormType   = computed(() => authStore.employmentType === 'Contractor of Service (COS)' ? 'CCEF' : 'IPCRF')
+
+// Period-level Generate Targets/Ratings (self-service, list-page entry point)
+const periodSemester = ref(String(new Date().getMonth() < 6 ? 1 : 2))
+const periodYear     = ref(new Date().getFullYear())
+const periodBusy     = ref('')
 
 // ── Helpers ──
 function countByStatus(s)   { return forms.value.filter(f => f.status === s).length }
@@ -877,6 +959,17 @@ async function openFormModal(form) {
   activeTab.value    = 'indicators'
   allEntries.value   = []
   docGen.value       = { targets: null, ratings: null, generating: '', printing: false }
+  feedbackForm.value = {
+    feedbackStrengths:           form.feedbackStrengths           || '',
+    feedbackComments:            form.feedbackComments            || '',
+    feedbackRecommendations:     form.feedbackRecommendations     || '',
+    feedbackAreasForImprovement: form.feedbackAreasForImprovement || ''
+  }
+  finalizeForm.value = {
+    dateSignedRatee:      form.dateSignedRatee      || '',
+    dateSignedSupervisor: form.dateSignedSupervisor || '',
+    dateSignedAuthority:  form.dateSignedAuthority  || ''
+  }
   showFormModal.value   = true
   entriesLoading.value  = true
   try {
@@ -1015,6 +1108,78 @@ async function doApprove() { try { const u = await ipcrfApi.approveForm(activeFo
 async function doReturn()  { try { const u = await ipcrfApi.returnForm(activeForm.value.id);  _sync(u); showToast('Returned for revision') } catch (e) { showToast(e.message, 'error') } }
 async function doCompute() { try { const u = await ipcrfApi.computeScore(activeForm.value.id); _sync(u); showToast(`${u.finalNumericalRating} — ${u.adjectivalRating}`) } catch (e) { showToast(e.message, 'error') } }
 
+async function doMarkRated() {
+  if (ratingBusy.value) return
+  ratingBusy.value = true
+  try {
+    const u = await ipcrfApi.rateForm(activeForm.value.id, {
+      finalNumericalRating: activeForm.value.finalNumericalRating,
+      adjectivalRating:     activeForm.value.adjectivalRating,
+      ...feedbackForm.value
+    })
+    _sync(u)
+    showToast('Form marked as Rated')
+  } catch (e) { showToast(e.message, 'error') }
+  finally { ratingBusy.value = false }
+}
+
+async function doFinalize() {
+  if (ratingBusy.value) return
+  ratingBusy.value = true
+  try {
+    const u = await ipcrfApi.finalizeForm(activeForm.value.id, finalizeForm.value)
+    _sync(u)
+    showToast('Form finalized')
+  } catch (e) { showToast(e.message, 'error') }
+  finally { ratingBusy.value = false }
+}
+
+// ── Self-service period Generate (list-page entry point) ──
+async function doPeriodGenerate(kind) {
+  if (periodBusy.value) return
+  periodBusy.value = kind
+  try {
+    const status = await ipcrfApi.periodStatus(periodSemester.value, periodYear.value)
+
+    if (!status.hasForm) {
+      if (kind === 'targets') {
+        showToast(`No ${status.type} Targets form yet for S${periodSemester.value} ${periodYear.value} — create one below.`, 'error')
+        newForm.value = { ...newForm.value, type: status.type, semester: String(periodSemester.value), year: Number(periodYear.value) }
+        showNewFormModal.value = true
+      } else {
+        showToast(`Create your ${status.type} Targets form for S${periodSemester.value} ${periodYear.value} first.`, 'error')
+      }
+      return
+    }
+
+    let form = forms.value.find(f => f.id === status.formId)
+    if (!form) form = await ipcrfApi.get(status.formId)
+    await openFormModal(form)
+
+    if (kind === 'targets') {
+      activeTab.value = 'indicators'
+      await doGenerateTargets()
+      return
+    }
+
+    if (status.totalEntries === 0) {
+      showToast('Add indicators to this form before generating Ratings.', 'error')
+      activeTab.value = 'indicators'
+      return
+    }
+    if (!status.ratingsReady) {
+      showToast(`Accomplishments aren't fully approved yet (${status.readyEntries}/${status.totalEntries}). Redirecting…`, 'error')
+      closeFormModal()
+      router.push({ path: '/accomplishments', query: { formId: status.formId } })
+      return
+    }
+
+    activeTab.value = 'score'
+    await doGenerateRatings()
+  } catch (e) { showToast(e.message, 'error') }
+  finally { periodBusy.value = '' }
+}
+
 function _sync(u) {
   activeForm.value = { ...activeForm.value, ...u }
   const i = forms.value.findIndex(f => f.id === activeForm.value.id)
@@ -1073,6 +1238,12 @@ async function doPrint(fileId) {
 
 /* Filters */
 .filter-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:12px;flex-wrap:wrap;}
+
+/* Self-service period generate bar */
+.generate-bar{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 16px;margin-bottom:16px;background:#F5F9FF;border:1px solid #DCE9FB;border-radius:10px;flex-wrap:wrap;}
+.generate-period{display:flex;align-items:center;gap:8px;}
+.generate-period .field-label{margin:0;}
+.generate-actions{display:flex;gap:8px;flex-wrap:wrap;}
 .status-tabs{display:flex;gap:4px;flex-wrap:wrap;}
 .status-tab{padding:5px 14px;border-radius:20px;font-size:12px;font-weight:500;border:1px solid #E2E8F0;background:#fff;color:#64748B;cursor:pointer;transition:all .15s;font-family:inherit;}
 .status-tab:hover{border-color:#CBD5E1;}
@@ -1256,6 +1427,7 @@ async function doPrint(fileId) {
 .docgen-label{font-size:12px;font-weight:600;color:#374151;}
 .docgen-sub{font-size:10.5px;color:#94A3B8;}
 .docgen-actions{display:flex;gap:6px;flex-shrink:0;}
+.rate-panel{margin-top:18px;padding:14px;background:#F8FAFC;border:1px solid #F1F5F9;border-radius:9px;text-align:left;}
 
 /* Details tab */
 .det-2col{display:grid;grid-template-columns:1fr 1fr;gap:32px;}

@@ -123,7 +123,28 @@ const UsersService = (() => {
       throw HttpError('Insufficient permissions', 403)
     }
 
-    const sheet   = SpreadsheetService.getSheet(SHEET.USERS)
+    const sheet    = SpreadsheetService.getSheet(SHEET.USERS)
+    const existing = SpreadsheetService.getRow(sheet, id)
+    if (!existing) throw HttpError('User not found', 404)
+
+    // A tempPassword in the update body means this is a password reset.
+    // Previously this only ever changed what's displayed in the Sheet —
+    // the real Firebase Auth credential was never touched, so the admin
+    // would hand someone a "new" password that didn't actually work.
+    // Do this FIRST and let it throw before touching the Sheet at all —
+    // otherwise a failed Firebase update would still leave the Sheet
+    // showing a password that was never actually set.
+    if (body.tempPassword) {
+      if (!existing.uid) {
+        throw HttpError('No Firebase account linked to this user (uid is empty) — password was not changed.', 400)
+      }
+      try {
+        FirebaseAuthService.updatePassword(existing.uid, body.tempPassword)
+      } catch (e) {
+        throw HttpError('Password change failed, nothing was updated: ' + e.message, 502)
+      }
+    }
+
     const updated = SpreadsheetService.updateRow(sheet, id, {
       ...body,
       updatedAt: new Date().toISOString()

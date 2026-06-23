@@ -636,11 +636,11 @@
                 <div class="type-toggle type-toggle-single">
                   <div v-if="myFormType === 'IPCRF'" class="type-opt active type-opt-locked">
                     <strong>IPCRF</strong>
-                    <span>Individual Performance Commitment &amp; Review Form</span>
+                    <span>Individual Performance Commitment &amp; Review</span>
                   </div>
                   <div v-else class="type-opt active type-opt-locked">
                     <strong>CCEF</strong>
-                    <span>Contractor Commitment Evaluation Form</span>
+                    <span>Core Competency Evaluation Form</span>
                   </div>
                 </div>
                 <p class="type-auto-hint">Set automatically based on your Employment Type ({{ authStore.employmentType || 'Regular' }})</p>
@@ -907,7 +907,7 @@ const coreEntries    = computed(() => allEntries.value.filter(e => e.functionTyp
 const supportEntries = computed(() => allEntries.value.filter(e => e.functionType === 'Support'))
 
 const filteredLibrary = computed(() => {
-  let items = libraryItems.value
+  let items = libraryItems.value.filter(i => i.functionType === currentFnType.value)
   if (libSearch.value) {
     const q = libSearch.value.toLowerCase()
     items = items.filter(i =>

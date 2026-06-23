@@ -94,8 +94,8 @@
             </div>
           </div>
         </div>
-        <div class="td td-kra text-muted">{{ row.kraName || '—' }}</div>
-        <div class="td td-target">{{ row.successIndicator || row.target || '—' }}</div>
+        <div class="td td-kra text-muted">{{ row.kraTitle || '—' }}</div>
+        <div class="td td-target">{{ row.target || '—' }}</div>
         <div class="td td-prog">
           <div class="prog-wrap">
             <div class="prog-track"><div class="prog-fill" :style="{ width: (row.progressPct || 0) + '%', background: progColor(row.progressPct) }"></div></div>
@@ -128,7 +128,7 @@
               <div style="display:flex;gap:6px;margin-bottom:6px">
                 <span :class="['status-badge', statusClass(viewItem?.status)]">{{ viewItem?.status }}</span>
               </div>
-              <h3 class="modal-title">{{ viewItem?.kraName }}</h3>
+              <h3 class="modal-title">{{ viewItem?.kraTitle }}</h3>
               <p class="modal-sub">{{ viewItem?.employeeName }} · {{ viewItem?.divisionName }}</p>
             </div>
             <button class="modal-close" @click="showViewModal = false">
@@ -136,7 +136,7 @@
             </button>
           </div>
           <div class="modal-body" v-if="viewItem">
-            <div class="view-section"><div class="view-label">Target / Success Indicator</div><div class="view-text">{{ viewItem.successIndicator || '—' }}</div></div>
+            <div class="view-section"><div class="view-label">Target / Success Indicator</div><div class="view-text">{{ viewItem.target || '—' }}</div></div>
             <div class="view-section"><div class="view-label">Accomplishment</div><div class="view-text">{{ viewItem.accomplishment || '—' }}</div></div>
             <div class="view-2col">
               <div class="view-section"><div class="view-label">Progress</div><div class="view-text">{{ viewItem.progressPct || 0 }}%</div></div>
@@ -172,11 +172,11 @@
             <div class="form-grid">
               <div class="field full">
                 <label class="field-label">KRA Name <span class="req">*</span></label>
-                <input v-model="form.kraName" type="text" class="field-input" placeholder="e.g. Research & Documentation" :readonly="!!editingItem?.formId" :class="editingItem?.formId && 'readonly-input'"/>
+                <input v-model="form.kraTitle" type="text" class="field-input" placeholder="e.g. Research & Documentation" :readonly="!!editingItem?.formId" :class="editingItem?.formId && 'readonly-input'"/>
               </div>
               <div class="field full">
                 <label class="field-label">Success Indicator / Target <span class="req">*</span></label>
-                <textarea v-model="form.successIndicator" class="field-input" rows="2" placeholder="Specific target or output…" :readonly="!!editingItem?.formId" :class="editingItem?.formId && 'readonly-input'"></textarea>
+                <textarea v-model="form.target" class="field-input" rows="2" placeholder="Specific target or output…" :readonly="!!editingItem?.formId" :class="editingItem?.formId && 'readonly-input'"></textarea>
               </div>
               <p v-if="editingItem?.formId" class="linked-note">Linked to your IPCRF/CCEF form — KRA and indicator text come from there and can't be edited here.</p>
               <div class="field full"><label class="field-label">Accomplishment</label><textarea v-model="form.accomplishment" class="field-input" rows="2" placeholder="What was actually accomplished…"></textarea></div>
@@ -212,7 +212,7 @@
       <div v-if="showRevisionModal" class="modal-overlay" @click.self="showRevisionModal = false">
         <div class="modal" style="max-width:420px">
           <div class="modal-hd">
-            <div><h3 class="modal-title">Request Revision</h3><p class="modal-sub">{{ revisionItem?.kraName }}</p></div>
+            <div><h3 class="modal-title">Request Revision</h3><p class="modal-sub">{{ revisionItem?.kraTitle }}</p></div>
             <button class="modal-close" @click="showRevisionModal = false"><svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M2 2l11 11M13 2L2 13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
           </div>
           <div class="modal-body">
@@ -263,7 +263,7 @@ const revisionRemarks = ref('')
 const toast = ref({ show: false, msg: '', type: 'success' })
 
 const form = ref({
-  kraName: '', successIndicator: '', accomplishment: '',
+  kraTitle: '', target: '', accomplishment: '',
   progressPct: 0, deadline: '', status: 'Not Started', remarks: ''
 })
 
@@ -288,8 +288,8 @@ const filteredRows = computed(() => {
   if (search.value) {
     const q = search.value.toLowerCase()
     r = r.filter(x =>
-      (x.kraName || '').toLowerCase().includes(q) ||
-      (x.successIndicator || '').toLowerCase().includes(q) ||
+      (x.kraTitle || '').toLowerCase().includes(q) ||
+      (x.target || '').toLowerCase().includes(q) ||
       (x.employeeName || '').toLowerCase().includes(q)
     )
   }
@@ -309,8 +309,8 @@ function statusClass(s) {
   return m[s] || 'st-gray'
 }
 
-function openAddModal() { editingItem.value = null; form.value = { kraName: '', successIndicator: '', accomplishment: '', progressPct: 0, deadline: '', status: 'Not Started', remarks: '' }; showFormModal.value = true }
-function openEditModal(item) { editingItem.value = item; form.value = { kraName: item.kraName || '', successIndicator: item.successIndicator || '', accomplishment: item.accomplishment || '', progressPct: Number(item.progressPct) || 0, deadline: item.deadline ? item.deadline.split('T')[0] : '', status: item.status || 'Not Started', remarks: item.remarks || '' }; showFormModal.value = true }
+function openAddModal() { editingItem.value = null; form.value = { kraTitle: '', target: '', accomplishment: '', progressPct: 0, deadline: '', status: 'Not Started', remarks: '' }; showFormModal.value = true }
+function openEditModal(item) { editingItem.value = item; form.value = { kraTitle: item.kraTitle || '', target: item.target || '', accomplishment: item.accomplishment || '', progressPct: Number(item.progressPct) || 0, deadline: item.deadline ? item.deadline.split('T')[0] : '', status: item.status || 'Not Started', remarks: item.remarks || '' }; showFormModal.value = true }
 function openViewModal(item) { viewItem.value = item; showViewModal.value = true }
 function openRevisionModal(item) { revisionItem.value = item; revisionRemarks.value = ''; showRevisionModal.value = true }
 function closeFormModal() { showFormModal.value = false; editingItem.value = null }
@@ -327,7 +327,7 @@ async function loadRows() {
 }
 
 async function saveEntry() {
-  if (!form.value.kraName || !form.value.successIndicator) { showToast('KRA name and target are required', 'error'); return }
+  if (!form.value.kraTitle || !form.value.target) { showToast('KRA name and target are required', 'error'); return }
   saving.value = true
   try {
     if (editingItem.value) {

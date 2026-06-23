@@ -45,20 +45,19 @@ const DocGenService = (() => {
   // PUBLIC: generate Annex F.1 — Targets
   // ─────────────────────────────────────────────
   function generateTargetsDoc(formId, user) {
-    const form = IpcrfService.get(formId, user)
-
-    const tabName  = SOURCE_TAB[form.type].targets
-    const fileName = `${form.type} Targets - ${form.employeeName} - CY ${form.year}`
-    const { ss, sheet } = _cloneTab(TEMPLATE_ID[form.type], tabName, fileName)
+    const form  = IpcrfService.get(formId, user)
+    const ss    = _getOrCreateFormFile(form)
+    const sheet = _addOrReplaceTab(ss, TEMPLATE_ID[form.type], SOURCE_TAB[form.type].targets, 'Targets')
 
     _fillTargetsHeader(sheet, form)
     _fillIndicatorSections(sheet, form, 'targets')
 
-    const file = DriveApp.getFileById(ss.getId())
-    file.moveTo(_getOutputFolder())
+    SpreadsheetService.updateRow(SpreadsheetService.getSheet(SHEET.IPCRF_FORMS), formId, {
+      docFileId: ss.getId(), targetsGeneratedAt: new Date().toISOString()
+    })
 
     AuditService.log('GENERATE_DOC', 'IPCRF', `Generated Targets doc for ${form.employeeName} (${form.type})`, user)
-    return { fileId: ss.getId(), fileUrl: ss.getUrl(), fileName, sheetId: sheet.getSheetId() }
+    return { fileId: ss.getId(), fileUrl: ss.getUrl(), fileName: ss.getName(), sheetId: sheet.getSheetId() }
   }
 
   // ─────────────────────────────────────────────
@@ -66,30 +65,30 @@ const DocGenService = (() => {
   // ─────────────────────────────────────────────
   function generateRatingsDoc(formId, user) {
     const form = IpcrfService.get(formId, user)
+    const sem  = String(form.semester) === '2' ? '2' : '1'
 
-    const sem      = String(form.semester) === '2' ? '2' : '1'
-    const tabName  = SOURCE_TAB[form.type].ratings[sem]
-    const fileName = `${form.type} Ratings - ${form.employeeName} - S${sem} ${form.year}`
-    const { ss, sheet } = _cloneTab(TEMPLATE_ID[form.type], tabName, fileName)
+    const ss    = _getOrCreateFormFile(form)
+    const sheet = _addOrReplaceTab(ss, TEMPLATE_ID[form.type], SOURCE_TAB[form.type].ratings[sem], 'Ratings')
 
     _fillRatingsHeader(sheet, form, sem)
     _fillIndicatorSections(sheet, form, 'ratings')
     _fillFinalRating(sheet, form)
     _fillFeedbackSection(sheet, form)
 
-    const file = DriveApp.getFileById(ss.getId())
-    file.moveTo(_getOutputFolder())
+    SpreadsheetService.updateRow(SpreadsheetService.getSheet(SHEET.IPCRF_FORMS), formId, {
+      docFileId: ss.getId(), ratingsGeneratedAt: new Date().toISOString()
+    })
 
     AuditService.log('GENERATE_DOC', 'IPCRF', `Generated Ratings doc for ${form.employeeName} (${form.type}, S${sem} ${form.year})`, user)
-    return { fileId: ss.getId(), fileUrl: ss.getUrl(), fileName, sheetId: sheet.getSheetId() }
+    return { fileId: ss.getId(), fileUrl: ss.getUrl(), fileName: ss.getName(), sheetId: sheet.getSheetId() }
   }
 
   // ─────────────────────────────────────────────
   // PUBLIC: export a previously generated file as PDF (for the in-app Print button)
   // ─────────────────────────────────────────────
-  function exportPdf(fileId, user) {
+  function exportPdf(fileId, tabName, user) {
     const ss    = SpreadsheetApp.openById(fileId)
-    const sheet = ss.getSheets()[0]
+    const sheet = (tabName && ss.getSheetByName(tabName)) || ss.getSheets()[0]
     const url = 'https://docs.google.com/spreadsheets/d/' + fileId + '/export'
       + '?format=pdf&size=A4&portrait=false&fitw=true&scale=4'
       + '&gridlines=false&printtitle=false&sheetnames=false&pagenumbers=false'
@@ -101,30 +100,46 @@ const DocGenService = (() => {
     })
     if (resp.getResponseCode() !== 200) throw HttpError('Could not export PDF: ' + resp.getContentText(), 500)
 
-    AuditService.log('PRINT_DOC', 'IPCRF', `Exported PDF for file ${fileId}`, user)
+    AuditService.log('PRINT_DOC', 'IPCRF', `Exported PDF for file ${fileId} (${sheet.getName()})`, user)
     return {
       pdfBase64: Utilities.base64Encode(resp.getBlob().getBytes()),
-      fileName:  ss.getName() + '.pdf'
+      fileName:  ss.getName() + ' - ' + sheet.getName() + '.pdf'
     }
   }
 
   // ─────────────────────────────────────────────
-  // INTERNAL — sheet cloning
+  // INTERNAL — one combined Drive file per form (Targets + Ratings as tabs)
   // ─────────────────────────────────────────────
-  function _cloneTab(templateId, sourceTabName, fileName) {
+  function _getOrCreateFormFile(form) {
+    if (form.docFileId) {
+      try { return SpreadsheetApp.openById(form.docFileId) }
+      catch (e) { Logger.log('[DocGen] Stored docFileId no longer accessible, creating a new file: ' + e.message) }
+    }
+    const fileName = `${form.type} - ${form.employeeName} - S${form.semester} ${form.year}`
+    const ss = SpreadsheetApp.create(fileName)
+    DriveApp.getFileById(ss.getId()).moveTo(_getOutputFolder())
+    return ss
+  }
+
+  // Clone a template tab into an existing spreadsheet under a fixed name
+  // (Targets/Ratings), replacing any previous tab of that name so repeat
+  // generation refreshes in place instead of piling up duplicate tabs.
+  function _addOrReplaceTab(ss, templateId, sourceTabName, fixedTabName) {
+    const existing = ss.getSheetByName(fixedTabName)
+    if (existing) ss.deleteSheet(existing)
+
     const templateSS  = SpreadsheetApp.openById(templateId)
     const sourceSheet = templateSS.getSheetByName(sourceTabName)
     if (!sourceSheet) throw HttpError(`Template tab "${sourceTabName}" not found in template ${templateId}`, 500)
 
-    const newSS    = SpreadsheetApp.create(fileName)
-    const newSheet = sourceSheet.copyTo(newSS)
-    newSheet.setName(sourceTabName)
+    const newSheet = sourceSheet.copyTo(ss)
+    newSheet.setName(fixedTabName)
 
-    // Remove the blank default "Sheet1" that SpreadsheetApp.create() adds
-    const defaultSheet = newSS.getSheetByName('Sheet1')
-    if (defaultSheet) newSS.deleteSheet(defaultSheet)
+    // Clean up the blank default "Sheet1" now that there's at least one real tab
+    const placeholder = ss.getSheetByName('Sheet1')
+    if (placeholder && ss.getSheets().length > 1) ss.deleteSheet(placeholder)
 
-    return { ss: newSS, sheet: newSheet }
+    return newSheet
   }
 
   function _getOutputFolder() {

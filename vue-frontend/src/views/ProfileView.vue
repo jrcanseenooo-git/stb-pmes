@@ -89,7 +89,7 @@
                 <div v-if="!editMode" class="info-val">{{ employmentTypeLabel(form.employmentType) }}</div>
                 <select v-else v-model="form.employmentType" class="field-input">
                   <option value="Regular">Regular</option>
-                  <option value="COS">Contractor of Service (COS)</option>
+                  <option value="COS">Contract of Service (COS)</option>
                   <option value="Co-Term">Co-Term</option>
                 </select>
               </div>
@@ -339,7 +339,7 @@ function normalizeEmploymentType(raw) {
 }
 
 function employmentTypeLabel(val) {
-  if (val === 'COS') return 'Contractor of Service (COS)'
+  if (val === 'COS') return 'Contract of Service (COS)'
   if (val === 'Co-Term') return 'Co-Term'
   return 'Regular'
 }
@@ -416,7 +416,7 @@ async function saveProfile() {
     const lastName  = nameParts.slice(1).join(' ') || ''
 
     // Map display value back to what the DB stores in the `type` column
-    const typeMap = { Regular: 'Regular', COS: 'Contractor of Service (COS)', 'Co-Term': 'Co-Term' }
+    const typeMap = { Regular: 'Regular', COS: 'Contract of Service (COS)', 'Co-Term': 'Co-Term' }
     const typeVal  = typeMap[form.value.employmentType] || form.value.employmentType
 
     await usersApi.update(authStore.profileId, {

@@ -140,6 +140,7 @@ const Router = (() => {
       case 'ipcrf':
         if (!id && method === 'GET') return IpcrfService.list(params, user)
         if (!id && method === 'POST') return IpcrfService.create(body, user)
+        if (id === 'period-status' && method === 'GET') return IpcrfService.getPeriodStatus(params, user)
         if (id && !sub && method === 'GET') return IpcrfService.get(id, user)
         if (id && !sub && method === 'PUT') return IpcrfService.update(id, body, user)
         if (id && sub === 'submit') return IpcrfService.submit(id, body, user)

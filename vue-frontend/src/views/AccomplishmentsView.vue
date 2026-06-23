@@ -16,6 +16,12 @@
       </button>
     </div>
 
+    <!-- Linked-from-IPCRF banner -->
+    <div v-if="linkedFormId" class="link-banner">
+      <span>Showing accomplishments for your IPCRF/CCEF form — get these to <strong>Approved</strong> before generating the Ratings document.</span>
+      <button class="btn btn-sm" @click="router.push('/ipcrf')">← Back to IPCRF/CCEF Forms</button>
+    </div>
+
     <!-- Filters -->
     <div class="filter-bar">
       <div class="status-tabs">
@@ -103,8 +109,8 @@
           {{ fmtDate(row.deadline) }}{{ isOverdue(row.deadline) ? ' ⚠' : '' }}
         </div>
         <div class="td td-act" @click.stop>
-          <button v-if="canApprove && row.status === 'For Review'" class="btn btn-xs btn-success" @click="doApprove(row)">Approve</button>
-          <button v-if="canApprove && row.status === 'For Review'" class="btn btn-xs btn-warn" @click="openRevisionModal(row)">Revise</button>
+          <button v-if="canApprove && row.status === 'Submitted'" class="btn btn-xs btn-success" @click="doApprove(row)">Approve</button>
+          <button v-if="canApprove && row.status === 'Submitted'" class="btn btn-xs btn-warn" @click="openRevisionModal(row)">Revise</button>
           <button class="btn btn-xs" @click="openEditModal(row)">Edit</button>
         </div>
       </div>
@@ -164,8 +170,15 @@
           </div>
           <div class="modal-body">
             <div class="form-grid">
-              <div class="field full"><label class="field-label">KRA Name <span class="req">*</span></label><input v-model="form.kraName" type="text" class="field-input" placeholder="e.g. Research & Documentation"/></div>
-              <div class="field full"><label class="field-label">Success Indicator / Target <span class="req">*</span></label><textarea v-model="form.successIndicator" class="field-input" rows="2" placeholder="Specific target or output…"></textarea></div>
+              <div class="field full">
+                <label class="field-label">KRA Name <span class="req">*</span></label>
+                <input v-model="form.kraName" type="text" class="field-input" placeholder="e.g. Research & Documentation" :readonly="!!editingItem?.formId" :class="editingItem?.formId && 'readonly-input'"/>
+              </div>
+              <div class="field full">
+                <label class="field-label">Success Indicator / Target <span class="req">*</span></label>
+                <textarea v-model="form.successIndicator" class="field-input" rows="2" placeholder="Specific target or output…" :readonly="!!editingItem?.formId" :class="editingItem?.formId && 'readonly-input'"></textarea>
+              </div>
+              <p v-if="editingItem?.formId" class="linked-note">Linked to your IPCRF/CCEF form — KRA and indicator text come from there and can't be edited here.</p>
               <div class="field full"><label class="field-label">Accomplishment</label><textarea v-model="form.accomplishment" class="field-input" rows="2" placeholder="What was actually accomplished…"></textarea></div>
               <div class="field"><label class="field-label">Progress (%)</label><input v-model.number="form.progressPct" type="number" class="field-input" min="0" max="100"/></div>
               <div class="field"><label class="field-label">Deadline</label><input v-model="form.deadline" type="date" class="field-input"/></div>
@@ -173,7 +186,9 @@
                 <select v-model="form.status" class="field-input">
                   <option value="Not Started">Not Started</option>
                   <option value="Ongoing">Ongoing</option>
-                  <option value="For Review">For Review</option>
+                  <option value="Submitted">Submitted (for DC review)</option>
+                  <option v-if="canApprove" value="For Revision">For Revision</option>
+                  <option v-if="canApprove" value="Approved">Approved</option>
                   <option value="Completed">Completed</option>
                   <option value="Delayed">Delayed</option>
                 </select>
@@ -224,10 +239,14 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { accomplishmentsApi } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
 
 const authStore = useAuthStore()
+const route     = useRoute()
+const router    = useRouter()
+const linkedFormId = computed(() => route.query.formId || '')
 
 const rows         = ref([])
 const loading      = ref(false)
@@ -249,12 +268,14 @@ const form = ref({
 })
 
 const statusTabs = [
-  { label: 'All',         value: 'All'         },
-  { label: 'Not Started', value: 'Not Started' },
-  { label: 'Ongoing',     value: 'Ongoing'     },
-  { label: 'For Review',  value: 'For Review'  },
-  { label: 'Completed',   value: 'Completed'   },
-  { label: 'Delayed',     value: 'Delayed'     }
+  { label: 'All',          value: 'All'          },
+  { label: 'Not Started',  value: 'Not Started'  },
+  { label: 'Ongoing',      value: 'Ongoing'      },
+  { label: 'Submitted',    value: 'Submitted'    },
+  { label: 'For Revision', value: 'For Revision' },
+  { label: 'Approved',     value: 'Approved'     },
+  { label: 'Completed',    value: 'Completed'    },
+  { label: 'Delayed',      value: 'Delayed'      }
 ]
 
 const canApprove = computed(() =>
@@ -284,7 +305,7 @@ function fmtDate(iso) { return iso ? new Date(iso).toLocaleDateString('en-PH', {
 function showToast(msg, type = 'success') { toast.value = { show: true, msg, type }; setTimeout(() => { toast.value.show = false }, 3500) }
 
 function statusClass(s) {
-  const m = { 'Completed': 'st-green', 'Ongoing': 'st-blue', 'For Review': 'st-orange', 'Delayed': 'st-red', 'Approved': 'st-green', 'For Revision': 'st-orange' }
+  const m = { 'Completed': 'st-green', 'Ongoing': 'st-blue', 'Submitted': 'st-orange', 'Delayed': 'st-red', 'Approved': 'st-green', 'For Revision': 'st-orange' }
   return m[s] || 'st-gray'
 }
 
@@ -299,7 +320,7 @@ onMounted(loadRows)
 async function loadRows() {
   loading.value = true
   try {
-    const r = await accomplishmentsApi.list()
+    const r = await accomplishmentsApi.list(linkedFormId.value ? { formId: linkedFormId.value } : {})
     rows.value = r?.items || (Array.isArray(r) ? r : [])
   } catch (e) { showToast(`Could not load: ${e.message}`, 'error') }
   finally { loading.value = false }
@@ -310,7 +331,14 @@ async function saveEntry() {
   saving.value = true
   try {
     if (editingItem.value) {
-      const u = await accomplishmentsApi.update(editingItem.value.id, form.value)
+      let u = await accomplishmentsApi.update(editingItem.value.id, form.value)
+      if (form.value.status !== editingItem.value.status) {
+        try {
+          u = await accomplishmentsApi.updateStatus(editingItem.value.id, form.value.status, form.value.remarks)
+        } catch (e) {
+          showToast(`Saved, but status change failed: ${e.message}`, 'error')
+        }
+      }
       const i = rows.value.findIndex(r => r.id === editingItem.value.id)
       if (i !== -1) rows.value[i] = { ...rows.value[i], ...u }
       showToast('Entry updated')
@@ -354,6 +382,11 @@ async function doRevision() {
 .page-title { font-size: 20px; font-weight: 700; color: #0F172A; margin: 0 0 3px; letter-spacing: -.3px; }
 .page-sub { font-size: 12px; color: #94A3B8; margin: 0; }
 .filter-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+
+/* Linked-from-IPCRF banner */
+.link-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; margin-bottom: 14px; background: #F5F9FF; border: 1px solid #DCE9FB; border-radius: 9px; font-size: 12px; color: #1A56B0; flex-wrap: wrap; }
+.readonly-input { background: #F8FAFC; color: #64748B; cursor: not-allowed; }
+.linked-note { font-size: 11px; color: #94A3B8; grid-column: span 2; margin: -4px 0 4px; }
 .status-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
 .status-tab { padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; border: 1px solid #E2E8F0; background: #fff; color: #64748B; cursor: pointer; transition: all .15s; font-family: inherit; }
 .status-tab:hover { border-color: #CBD5E1; }

@@ -241,9 +241,9 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { accomplishmentsApi } from '@/services/api'
-import { useAuthStore } from '@/stores/auth'
+import { usePermissions } from '@/composables/usePermissions'
 
-const authStore = useAuthStore()
+const { canApprove } = usePermissions()
 const route     = useRoute()
 const router    = useRouter()
 const linkedFormId = computed(() => route.query.formId || '')
@@ -277,10 +277,6 @@ const statusTabs = [
   { label: 'Completed',    value: 'Completed'    },
   { label: 'Delayed',      value: 'Delayed'      }
 ]
-
-const canApprove = computed(() =>
-  ['System Administrator', 'Bureau Director', 'Assistant Bureau Director', 'Division Chief'].includes(authStore.role)
-)
 
 const filteredRows = computed(() => {
   let r = rows.value

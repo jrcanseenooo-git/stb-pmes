@@ -28,6 +28,9 @@ const IpcrfService = (() => {
     if (!['System Administrator', 'Bureau Director', 'Assistant Bureau Director'].includes(profile.role)) {
       if (profile.role === 'Division Chief') {
         rows = rows.filter(r => r.divisionId === profile.divisionId)
+      } else if (profile.role === 'Section Head') {
+        rows = rows.filter(r => r.divisionId === profile.divisionId &&
+          (r.sectionName || sectionMap[r.userId] || '') === profile.section)
       } else {
         rows = rows.filter(r => r.userId === profile.id)
       }
@@ -172,13 +175,14 @@ const IpcrfService = (() => {
   }
 
   function approve(id, body, user) {
-    AuthService.requireRole(user,
+    const profile = AuthService.requireRole(user,
       'System Administrator', 'Bureau Director',
-      'Assistant Bureau Director', 'Division Chief'
+      'Assistant Bureau Director', 'Division Chief', 'Section Head'
     )
     const sheet = SpreadsheetService.getSheet(SHEET.IPCRF_FORMS)
     const row   = SpreadsheetService.getRow(sheet, id)
     if (!row) throw HttpError('Form not found', 404)
+    _assertApproverScope(row, profile)
     _assertTransition(row.status, 'Approved')
 
     const updated = SpreadsheetService.updateRow(sheet, id, {
@@ -191,13 +195,14 @@ const IpcrfService = (() => {
   }
 
   function return_(id, body, user) {
-    AuthService.requireRole(user,
+    const profile = AuthService.requireRole(user,
       'System Administrator', 'Bureau Director',
-      'Assistant Bureau Director', 'Division Chief'
+      'Assistant Bureau Director', 'Division Chief', 'Section Head'
     )
     const sheet = SpreadsheetService.getSheet(SHEET.IPCRF_FORMS)
     const row   = SpreadsheetService.getRow(sheet, id)
     if (!row) throw HttpError('Form not found', 404)
+    _assertApproverScope(row, profile)
     _assertTransition(row.status, 'Returned')
 
     const updated = SpreadsheetService.updateRow(sheet, id, {
@@ -213,13 +218,14 @@ const IpcrfService = (() => {
   }
 
   function rate(id, body, user) {
-    AuthService.requireRole(user,
+    const profile = AuthService.requireRole(user,
       'System Administrator', 'Bureau Director',
-      'Assistant Bureau Director', 'Division Chief'
+      'Assistant Bureau Director', 'Division Chief', 'Section Head'
     )
     const sheet = SpreadsheetService.getSheet(SHEET.IPCRF_FORMS)
     const row   = SpreadsheetService.getRow(sheet, id)
     if (!row) throw HttpError('Form not found', 404)
+    _assertApproverScope(row, profile)
     _assertTransition(row.status, 'Rated')
 
     const updated = SpreadsheetService.updateRow(sheet, id, {
@@ -500,6 +506,28 @@ const IpcrfService = (() => {
     if (!allowed.includes(to)) {
       throw HttpError(`Cannot transition form from "${from}" to "${to}"`, 400)
     }
+  }
+
+  // Enforces that an approver's role-level access (checked by requireRole) also
+  // matches the specific form's division/section. Previously Division Chief had
+  // no such check here at all — any Division Chief could approve/rate/return any
+  // division's form via direct API call, not just their own. Section Head needs
+  // this even more, since its whole point is a narrower scope than Division Chief.
+  function _assertApproverScope(row, profile) {
+    const { role, divisionId, section } = profile
+    if (['System Administrator', 'Bureau Director', 'Assistant Bureau Director'].includes(role)) return
+    if (role === 'Division Chief' && row.divisionId === divisionId) return
+    if (role === 'Section Head') {
+      const ownerSection = row.sectionName || _ownerSection(row.userId)
+      if (row.divisionId === divisionId && ownerSection === section) return
+    }
+    throw HttpError('You do not have approval rights over this form', 403)
+  }
+
+  function _ownerSection(userId) {
+    const usersSheet = SpreadsheetService.getSheet(SHEET.USERS)
+    const owner = SpreadsheetService.getRow(usersSheet, userId)
+    return owner ? (owner.section || '') : ''
   }
 
   function _ratingLabel(score) {

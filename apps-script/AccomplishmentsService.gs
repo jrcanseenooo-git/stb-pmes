@@ -156,7 +156,7 @@ const AccomplishmentsService = (() => {
     // Sign-off transitions require an approver role, even through this shared
     // function — approve()/requestRevision() are thin wrappers around this, so
     // the check needs to live here too, not just in the wrapper.
-    const APPROVER_ROLES = ['System Administrator', 'Bureau Director', 'Assistant Bureau Director', 'Division Chief']
+    const APPROVER_ROLES = ['System Administrator', 'Bureau Director', 'Assistant Bureau Director', 'Division Chief', 'Section Head']
     if (['Approved', 'For Revision'].includes(status) && !APPROVER_ROLES.includes(profile.role)) {
       throw HttpError('Only an approver can set this status', 403)
     }
@@ -178,13 +178,13 @@ const AccomplishmentsService = (() => {
 
   // ── APPROVE ──
   function approve(id, body, user) {
-    const profile = AuthService.requireRole(user, 'System Administrator', 'Bureau Director', 'Assistant Bureau Director', 'Division Chief')
+    const profile = AuthService.requireRole(user, 'System Administrator', 'Bureau Director', 'Assistant Bureau Director', 'Division Chief', 'Section Head')
     return updateStatus(id, { status: 'Approved', remarks: body.remarks }, user)
   }
 
   // ── REQUEST REVISION ──
   function requestRevision(id, body, user) {
-    AuthService.requireRole(user, 'System Administrator', 'Bureau Director', 'Assistant Bureau Director', 'Division Chief')
+    AuthService.requireRole(user, 'System Administrator', 'Bureau Director', 'Assistant Bureau Director', 'Division Chief', 'Section Head')
     const sheet = SpreadsheetService.getSheet(SHEET.ACCOMPLISHMENTS)
     const row   = SpreadsheetService.getRow(sheet, id)
     if (!row) throw HttpError('Not found', 404)
@@ -203,18 +203,30 @@ const AccomplishmentsService = (() => {
 
   // ── Internals ──
   function applyRoleScope(rows, profile) {
-    const { role, id: userId, divisionId } = profile
+    const { role, id: userId, divisionId, section } = profile
     if (role === 'System Administrator' || role === 'Bureau Director') return rows
     if (role === 'Assistant Bureau Director') return rows.filter(r => r.divisionId === 'admin-pool')
     if (role === 'Division Chief') return rows.filter(r => r.divisionId === divisionId)
+    if (role === 'Section Head') {
+      const sectionMap = _sectionMap()
+      return rows.filter(r => r.divisionId === divisionId && sectionMap[r.userId] === section)
+    }
     return rows.filter(r => r.userId === userId) // Staff: own only
   }
 
+  function _sectionMap() {
+    const usersSheet = SpreadsheetService.getSheet(SHEET.USERS)
+    const map = {}
+    SpreadsheetService.getAllRows(usersSheet).forEach(u => { if (u.id) map[u.id] = u.section || '' })
+    return map
+  }
+
   function guardAccess(row, profile) {
-    const { role, id: userId, divisionId } = profile
+    const { role, id: userId, divisionId, section } = profile
     if (['System Administrator', 'Bureau Director'].includes(role)) return
     if (role === 'Assistant Bureau Director' && row.divisionId === 'admin-pool') return
     if (role === 'Division Chief' && row.divisionId === divisionId) return
+    if (role === 'Section Head' && row.divisionId === divisionId && _sectionMap()[row.userId] === section) return
     if (row.userId === userId) return
     throw HttpError('Access denied to this record', 403)
   }

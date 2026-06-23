@@ -636,11 +636,11 @@
                 <div class="type-toggle type-toggle-single">
                   <div v-if="myFormType === 'IPCRF'" class="type-opt active type-opt-locked">
                     <strong>IPCRF</strong>
-                    <span>Individual Performance Commitment &amp; Review</span>
+                    <span>Individual Performance Commitment &amp; Review Form</span>
                   </div>
                   <div v-else class="type-opt active type-opt-locked">
                     <strong>CCEF</strong>
-                    <span>Core Competency Evaluation Form</span>
+                    <span>Contractor Commitment Evaluation Form</span>
                   </div>
                 </div>
                 <p class="type-auto-hint">Set automatically based on your Employment Type ({{ authStore.employmentType || 'Regular' }})</p>

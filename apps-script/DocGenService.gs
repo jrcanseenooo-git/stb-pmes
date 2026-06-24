@@ -44,9 +44,8 @@ const PmesDocGenService = (() => {
   // ─────────────────────────────────────────────
   // PUBLIC: generate Annex F.1 — Targets
   // ─────────────────────────────────────────────
-  function generateTargetsDoc(formId, user, options = {}) {
+  function generateTargetsDoc(formId, user) {
     const form  = _withOwnerProfileFields(IpcrfService.get(formId, user))
-    form.entries = _filterEntriesByApplicablePeriod(form.entries || [], options.applicableRatingPeriod)
     const ss    = _getOrCreateFormFile(form)
     const sheet = _addOrReplaceTab(ss, TEMPLATE_ID[form.type], SOURCE_TAB[form.type].targets, 'Targets')
 
@@ -167,22 +166,6 @@ const PmesDocGenService = (() => {
       Logger.log('[DocGen] Could not refresh owner profile fields: ' + e.message)
       return form
     }
-  }
-
-  function _filterEntriesByApplicablePeriod(entries, applicableRatingPeriod) {
-    const selected = _normaliseApplicablePeriod(applicableRatingPeriod)
-    if (selected === 'both') return entries
-    return entries.filter(e => {
-      const entryPeriod = _normaliseApplicablePeriod(e.applicableRatingPeriod)
-      return entryPeriod === 'both' || entryPeriod === selected
-    })
-  }
-
-  function _normaliseApplicablePeriod(value) {
-    const text = String(value || '').toLowerCase()
-    if (text.includes('1')) return '1st'
-    if (text.includes('2')) return '2nd'
-    return 'both'
   }
 
   // ─────────────────────────────────────────────

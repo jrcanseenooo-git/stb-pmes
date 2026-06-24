@@ -1,10 +1,15 @@
-/**
+﻿/**
  * AccomplishmentsService.gs
  * Handles all IPCR / CCEF accomplishment CRUD, status workflow,
  * approval, revision requests, and history tracking.
  */
 
 const AccomplishmentsService = (() => {
+
+  const RATING_FIELDS = [
+    'accomplishment', 'movReferences',
+    'ratingEfficiency', 'ratingQuality', 'ratingTimeliness', 'ratingAverage'
+  ]
 
   const ALLOWED_TRANSITIONS = {
     'Not Started':  ['Ongoing'],
@@ -16,10 +21,11 @@ const AccomplishmentsService = (() => {
     'Completed':    []
   }
 
-  // ── LIST (with filters + pagination) ──
+  // â”€â”€ LIST (with filters + pagination) â”€â”€
   function list(params, user) {
     const profile = AuthService.getProfile(user)
     const sheet   = SpreadsheetService.getSheet(SHEET.ACCOMPLISHMENTS)
+    _ensureColumns(sheet, RATING_FIELDS)
     let rows      = SpreadsheetService.getAllRows(sheet).filter(r => !r.deleted)
 
     // Scope by role
@@ -27,7 +33,6 @@ const AccomplishmentsService = (() => {
 
     // Apply query filters
     const filters = {
-      status:     params.status     || '',
       divisionId: params.divisionId || '',
       kraId:      params.kraId      || '',
       formId:     params.formId     || ''
@@ -47,19 +52,22 @@ const AccomplishmentsService = (() => {
     return SpreadsheetService.paginate(rows, params.page, params.pageSize)
   }
 
-  // ── GET single ──
+  // â”€â”€ GET single â”€â”€
   function get(id, user) {
     const profile = AuthService.getProfile(user)
     const sheet   = SpreadsheetService.getSheet(SHEET.ACCOMPLISHMENTS)
+    _ensureColumns(sheet, RATING_FIELDS)
     const row     = SpreadsheetService.getRow(sheet, id)
     if (!row) throw HttpError('Accomplishment not found', 404)
     guardAccess(row, profile)
     return row
   }
 
-  // ── CREATE ──
+  // â”€â”€ CREATE â”€â”€
   function create(body, user) {
     const profile = AuthService.getProfile(user)
+    const sheet = SpreadsheetService.getSheet(SHEET.ACCOMPLISHMENTS)
+    _ensureColumns(sheet, RATING_FIELDS)
 
     // Staff can only create for themselves
     if (profile.role === 'Staff' && body.userId && body.userId !== profile.id) {
@@ -79,10 +87,12 @@ const AccomplishmentsService = (() => {
       kraTitle:      body.kraTitle      || '',
       siId:          body.siId          || '',
       target:        body.target        || '',
-      accomplished:  0,
-      progressPct:   0,
-      status:        'Not Started',
-      deadline:      body.deadline      || '',
+      accomplishment: body.accomplishment || '',
+      movReferences: body.movReferences || '',
+      ratingEfficiency: body.ratingEfficiency || '',
+      ratingQuality: body.ratingQuality || '',
+      ratingTimeliness: body.ratingTimeliness || '',
+      ratingAverage: body.ratingAverage || '',
       remarks:       '',
       revisions:     0,
       movCount:      0,
@@ -95,51 +105,63 @@ const AccomplishmentsService = (() => {
       deleted:       false
     }
 
-    SpreadsheetService.appendRow(SpreadsheetService.getSheet(SHEET.ACCOMPLISHMENTS), entry)
+    SpreadsheetService.appendRow(sheet, entry)
     AuditService.log('CREATE', 'Accomplishments', `Created entry: ${entry.id}`, user)
     return entry
   }
 
-  // ── UPDATE ──
+  // â”€â”€ UPDATE â”€â”€
   function update(id, body, user) {
     const profile = AuthService.getProfile(user)
     const sheet   = SpreadsheetService.getSheet(SHEET.ACCOMPLISHMENTS)
+    _ensureColumns(sheet, RATING_FIELDS)
     const existing = SpreadsheetService.getRow(sheet, id)
     if (!existing) throw HttpError('Accomplishment not found', 404)
     guardAccess(existing, profile)
 
     // Only these fields are editable through the generic update endpoint.
     // Status changes must go through updateStatus()/approve()/requestRevision(),
-    // which enforce ALLOWED_TRANSITIONS and role checks — letting `status` pass
+    // which enforce ALLOWED_TRANSITIONS and role checks â€” letting `status` pass
     // through here would let anyone set their own record to "Approved"/"Completed"
     // without real sign-off, which would also have quietly defeated the IPCRF
     // Ratings-readiness check that depends on this status being trustworthy.
-    const EDITABLE = ['accomplishment', 'progressPct', 'accomplished', 'deadline', 'remarks', 'targetQty', 'targetUnit']
+    const EDITABLE = [
+      'accomplishment', 'remarks', 'targetQty', 'targetUnit',
+      'movReferences', 'ratingEfficiency', 'ratingQuality', 'ratingTimeliness', 'ratingAverage'
+    ]
     const patch = {}
     EDITABLE.forEach(k => { if (body[k] !== undefined) patch[k] = body[k] })
 
+    if (
+      patch.ratingAverage === undefined &&
+      (patch.ratingEfficiency !== undefined || patch.ratingQuality !== undefined || patch.ratingTimeliness !== undefined)
+    ) {
+      patch.ratingAverage = _computeRatingAverage({
+        ratingEfficiency: patch.ratingEfficiency !== undefined ? patch.ratingEfficiency : existing.ratingEfficiency,
+        ratingQuality: patch.ratingQuality !== undefined ? patch.ratingQuality : existing.ratingQuality,
+        ratingTimeliness: patch.ratingTimeliness !== undefined ? patch.ratingTimeliness : existing.ratingTimeliness
+      })
+    }
+
     // KRA/target text is only editable here if this record isn't linked to an
-    // official IPCRF/CCEF entry — once linked, that text belongs to the form.
+    // official IPCRF/CCEF entry â€” once linked, that text belongs to the form.
     if (!existing.formId) {
       ['kraName', 'kraTitle', 'successIndicator', 'target'].forEach(k => {
         if (body[k] !== undefined) patch[k] = body[k]
       })
     }
 
-    // Recompute progress
-    if (patch.accomplished !== undefined && existing.targetQty) {
-      patch.progressPct = Math.min(100, Math.round((patch.accomplished / existing.targetQty) * 100))
-    }
-
     const updated = SpreadsheetService.updateRow(sheet, id, {
       ...patch,
       updatedAt: new Date().toISOString()
     })
+
+    _syncLinkedFormEntry(existing, patch)
     AuditService.log('UPDATE', 'Accomplishments', `Updated entry: ${id}`, user)
     return updated
   }
 
-  // ── UPDATE STATUS ──
+  // â”€â”€ UPDATE STATUS â”€â”€
   function updateStatus(id, body, user) {
     const { status, remarks } = body
     const profile = AuthService.getProfile(user)
@@ -154,7 +176,7 @@ const AccomplishmentsService = (() => {
     }
 
     // Sign-off transitions require an approver role, even through this shared
-    // function — approve()/requestRevision() are thin wrappers around this, so
+    // function â€” approve()/requestRevision() are thin wrappers around this, so
     // the check needs to live here too, not just in the wrapper.
     const APPROVER_ROLES = ['System Administrator', 'Bureau Director', 'Assistant Bureau Director', 'Division Chief', 'Section Head']
     if (['Approved', 'For Revision'].includes(status) && !APPROVER_ROLES.includes(profile.role)) {
@@ -171,18 +193,18 @@ const AccomplishmentsService = (() => {
     })
 
     logRevision(id, row.status, status, remarks, profile)
-    AuditService.log('STATUS_CHANGE', 'Accomplishments', `${id}: ${row.status} → ${status}`, user)
+    AuditService.log('STATUS_CHANGE', 'Accomplishments', `${id}: ${row.status} â†’ ${status}`, user)
     NotificationsService.createForStatusChange(updated, status, profile)
     return updated
   }
 
-  // ── APPROVE ──
+  // â”€â”€ APPROVE â”€â”€
   function approve(id, body, user) {
     const profile = AuthService.requireRole(user, 'System Administrator', 'Bureau Director', 'Assistant Bureau Director', 'Division Chief', 'Section Head')
     return updateStatus(id, { status: 'Approved', remarks: body.remarks }, user)
   }
 
-  // ── REQUEST REVISION ──
+  // â”€â”€ REQUEST REVISION â”€â”€
   function requestRevision(id, body, user) {
     AuthService.requireRole(user, 'System Administrator', 'Bureau Director', 'Assistant Bureau Director', 'Division Chief', 'Section Head')
     const sheet = SpreadsheetService.getSheet(SHEET.ACCOMPLISHMENTS)
@@ -195,13 +217,13 @@ const AccomplishmentsService = (() => {
     return updateStatus(id, { status: 'For Revision', remarks: body.remarks }, user)
   }
 
-  // ── HISTORY ──
+  // â”€â”€ HISTORY â”€â”€
   function history(id, user) {
     const sheet = SpreadsheetService.getSheet(SHEET.REVISIONS)
     return SpreadsheetService.getAllRows(sheet).filter(r => r.accomplishmentId === id)
   }
 
-  // ── Internals ──
+  // â”€â”€ Internals â”€â”€
   function applyRoleScope(rows, profile) {
     const { role, id: userId, divisionId, section } = profile
     if (role === 'System Administrator' || role === 'Bureau Director') return rows
@@ -231,6 +253,50 @@ const AccomplishmentsService = (() => {
     throw HttpError('Access denied to this record', 403)
   }
 
+  function _ensureColumns(sheet, headers) {
+    const existingHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => String(h).trim())
+    const missing = headers.filter(h => !existingHeaders.includes(h))
+    if (!missing.length) return
+
+    const startCol = sheet.getLastColumn() + 1
+    missing.forEach((header, idx) => {
+      sheet.getRange(1, startCol + idx)
+        .setValue(header)
+        .setBackground('#0D2137')
+        .setFontColor('#FFFFFF')
+        .setFontWeight('bold')
+        .setFontSize(10)
+    })
+  }
+
+  function _computeRatingAverage(row) {
+    const values = [row.ratingEfficiency, row.ratingQuality, row.ratingTimeliness]
+      .filter(v => v !== '' && v !== null && v !== undefined && String(v).toUpperCase() !== 'N/A')
+      .map(Number)
+      .filter(n => !Number.isNaN(n))
+    if (!values.length) return ''
+    return Math.round((values.reduce((sum, n) => sum + n, 0) / values.length) * 100000) / 100000
+  }
+
+  function _syncLinkedFormEntry(existing, patch) {
+    if (!existing.formId || !existing.entryId) return
+    const updates = {}
+    RATING_FIELDS.forEach(field => {
+      if (patch[field] !== undefined) updates[field] = patch[field]
+    })
+    if (patch.remarks !== undefined) updates.remarks = patch.remarks
+    if (!Object.keys(updates).length) return
+
+    try {
+      SpreadsheetService.updateRow(SpreadsheetService.getSheet(SHEET.FORM_ENTRIES), existing.entryId, {
+        ...updates,
+        updatedAt: new Date().toISOString()
+      })
+    } catch (e) {
+      Logger.log('[Accomplishments] Could not sync linked FormEntries row: ' + e.message)
+    }
+  }
+
   function logRevision(accomplishmentId, fromStatus, toStatus, remarks, profile) {
     const sheet = SpreadsheetService.getSheet(SHEET.REVISIONS)
     SpreadsheetService.appendRow(sheet, {
@@ -244,17 +310,14 @@ const AccomplishmentsService = (() => {
       changedAt:        new Date().toISOString()
     })
   }
-
-  // ── Completeness check for IPCRF/CCEF Ratings generation ──
-  // "ready" = every Accomplishments record linked to this form is Approved or Completed
+  // Completeness check for IPCRF/CCEF Ratings generation. Linked rows are ready once they exist.
   function completenessForForm(formId) {
     const sheet = SpreadsheetService.getSheet(SHEET.ACCOMPLISHMENTS)
     const rows  = SpreadsheetService.getAllRows(sheet).filter(r => r.formId === formId && !r.deleted)
-    const ready = rows.filter(r => r.status === 'Approved' || r.status === 'Completed')
-    return { total: rows.length, ready: ready.length, isReady: rows.length > 0 && ready.length === rows.length }
+    return { total: rows.length, ready: rows.length, isReady: rows.length > 0 }
   }
 
-  // ── Called from IPCRFService when an entry is removed from a Targets form ──
+  // â”€â”€ Called from IPCRFService when an entry is removed from a Targets form â”€â”€
   function softDeleteByEntryId(entryId, user) {
     const sheet = SpreadsheetService.getSheet(SHEET.ACCOMPLISHMENTS)
     const row   = SpreadsheetService.getAllRows(sheet).find(r => r.entryId === entryId && !r.deleted)

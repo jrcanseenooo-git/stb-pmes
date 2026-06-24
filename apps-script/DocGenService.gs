@@ -49,8 +49,8 @@ const PmesDocGenService = (() => {
     const ss    = _getOrCreateFormFile(form)
     const sheet = _addOrReplaceTab(ss, TEMPLATE_ID[form.type], SOURCE_TAB[form.type].targets, 'Targets')
 
-    _fillTargetsHeader(sheet, form)
     _fillIndicatorSections(sheet, form, 'targets')
+    _fillTargetsHeader(sheet, form)
     _cleanHeaderLogoArea(sheet)
     _trimUnusedColumns(sheet, 'I')
     _forceWrapAndAutosize(sheet)
@@ -236,18 +236,18 @@ const PmesDocGenService = (() => {
     // ("Girardo Badana") bleed through when CCEF's header block didn't line up
     // exactly with the row count the offsets were derived from on IPCRF.
     const rTable = _findRow(sheet, 'INDIVIDUAL COMMITMENTS AND ACCOMPLISHMENTS')
-    const rName = rTable - 3
-    const rPosition = rTable - 2
-    const rDate = rTable - 1
+    const rName = rTable - 4
+    const rPosition = rTable - 3
+    const rDate = rTable - 2
 
-    sheet.getRange(rName, 5, 3, 5).clearContent()
+    sheet.getRange(rName, 5, 4, 5).clearContent()
     sheet.getRange(rName, 5).setValue(_staffName(form.employeeName)).setFontWeight('bold')
     sheet.getRange(rPosition, 5).setValue(form.position || '').setFontWeight('normal')
     sheet.getRange(rDate, 7).setValue(_todaySignedDate())
 
     const sig = _normalizedSignatories(form)
     const rCert = _findRow(sheet, 'We hereby certify that the above success indicators')
-    sheet.getRange(rCert + 1, 2, 4, 8).clearContent()
+    sheet.getRange(rCert + 1, 2, 2, 8).clearContent()
     sheet.getRange(rCert + 1, 2).setValue(sig.immediateSupervisor).setFontWeight('bold')
     sheet.getRange(rCert + 1, 5).setValue(sig.approvingAuthority).setFontWeight('bold')
     sheet.getRange(rCert + 2, 2).setValue(sig.supervisorPosition).setFontWeight('normal')

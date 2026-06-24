@@ -64,11 +64,11 @@ export const CONFIRMS = {
   submitForm: (formType, semester, year) => ({
     type:         'submit',
     title:        `Submit ${formType} for Approval`,
-    message:      `You are about to submit your ${formType} for ${semester === 1 ? '1st' : '2nd'} Semester ${year} to your immediate supervisor for review and approval.`,
+    message:      `You are about to submit your ${formType} for ${String(semester) === '1' ? '1st' : '2nd'} Semester ${year} to your immediate supervisor for review and approval.`,
     details: [
       { label: 'Form Type', value: formType },
-      { label: 'Period',    value: `${semester === 1 ? '1st' : '2nd'} Semester ${year}` },
-      { label: 'Status',   value: 'DRAFT → SUBMITTED' }
+      { label: 'Period',    value: `${String(semester) === '1' ? '1st' : '2nd'} Semester ${year}` },
+      { label: 'Status',   value: 'DRAFT -> SUBMITTED' }
     ],
     note:         'Once submitted, you will not be able to edit your targets unless your supervisor returns it for revision.',
     confirmLabel: 'Yes, Submit Form',
@@ -83,7 +83,7 @@ export const CONFIRMS = {
     details: [
       { label: 'Employee',  value: employeeName },
       { label: 'Form Type', value: formType },
-      { label: 'Action',   value: 'SUBMITTED → APPROVED' }
+      { label: 'Action',   value: 'SUBMITTED -> APPROVED' }
     ],
     note:         'Approved targets are locked for the employee. You can still add ratings at the end of the semester.',
     confirmLabel: 'Approve Targets',
@@ -128,10 +128,10 @@ export const CONFIRMS = {
   createForm: (type, semester, year) => ({
     type:         'info',
     title:        `Create New ${type} Form`,
-    message:      `A new ${type} form will be created for ${semester === '1' ? '1st' : '2nd'} Semester ${year}.`,
+    message:      `A new ${type} form will be created for ${String(semester) === '1' ? '1st' : '2nd'} Semester ${year}.`,
     details: [
       { label: 'Form Type', value: type },
-      { label: 'Period',    value: `${semester === '1' ? '1st' : '2nd'} Semester ${year}` }
+      { label: 'Period',    value: `${String(semester) === '1' ? '1st' : '2nd'} Semester ${year}` }
     ],
     note:         'You can start adding your KRA targets immediately after creation.',
     confirmLabel: 'Create Form',
@@ -155,7 +155,7 @@ export const CONFIRMS = {
     message:      `${name}'s account will be deactivated. They will no longer be able to log in to the system.`,
     details: [
       { label: 'User', value: name },
-      { label: 'Action', value: 'Active → Inactive' }
+      { label: 'Action', value: 'Active -> Inactive' }
     ],
     note:         'You can reactivate this account at any time from User Management.',
     confirmLabel: 'Deactivate Account',

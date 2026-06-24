@@ -18,6 +18,7 @@ const PmesDocGenService = (() => {
     IPCRF: '1xM914zoR2TGJhwo6xdzK6x6gV79VJojhg1zXDSU6hrY',
     CCEF:  '1oshiYy-gHDkriyufzQtNRmISmeeFKbu15diYYHPS_eY'
   }
+  const CCEF_RATINGS_TEMPLATE_ID = '1zo_bsR3Jb3C-23i7HeIZ6ULfZ1aDS-eNFpaODjLqCwo'
 
   // Source tab to clone the STRUCTURE/FORMATTING from for each doc type.
   // These are filled example tabs in the template files — we copy them, then
@@ -29,7 +30,7 @@ const PmesDocGenService = (() => {
     },
     CCEF: {
       targets: 'Enhanced CCEF - Targets',
-      ratings: { '1': 'Enhanced CCEF - Ratings - 1st sem', '2': 'Enhanced CCEF - Ratings - 2nd sem' }
+      ratings: { '1': 'Enhanced CCEF-Ratings-1st Sem', '2': 'Enhanced CCEF-Ratings-2nd Sem' }
     }
   }
 
@@ -67,11 +68,12 @@ const PmesDocGenService = (() => {
   // PUBLIC: generate Annex F.2 — Ratings
   // ─────────────────────────────────────────────
   function generateRatingsDoc(formId, user) {
-    const form = _withOwnerProfileFields(IpcrfService.get(formId, user))
+    const form = _withAccomplishmentFields(_withOwnerProfileFields(IpcrfService.get(formId, user)))
     const sem  = String(form.semester) === '2' ? '2' : '1'
 
     const ss    = _getOrCreateFormFile(form)
-    const sheet = _addOrReplaceTab(ss, TEMPLATE_ID[form.type], SOURCE_TAB[form.type].ratings[sem], 'Ratings')
+    const templateId = form.type === 'CCEF' ? CCEF_RATINGS_TEMPLATE_ID : TEMPLATE_ID[form.type]
+    const sheet = _addOrReplaceTab(ss, templateId, SOURCE_TAB[form.type].ratings[sem], 'Ratings')
 
     _fillRatingsHeader(sheet, form, sem)
     _fillIndicatorSections(sheet, form, 'ratings')
@@ -177,6 +179,37 @@ const PmesDocGenService = (() => {
     }
   }
 
+  function _withAccomplishmentFields(form) {
+    try {
+      const accRows = SpreadsheetService.getAllRows(SpreadsheetService.getSheet(SHEET.ACCOMPLISHMENTS))
+        .filter(r => r.formId === form.id && !r.deleted)
+      if (!accRows.length) return form
+
+      const byEntryId = {}
+      accRows.forEach(r => { if (r.entryId) byEntryId[r.entryId] = r })
+      return {
+        ...form,
+        entries: (form.entries || []).map(e => {
+          const acc = byEntryId[e.id]
+          if (!acc) return e
+          return {
+            ...e,
+            accomplishment: e.accomplishment || acc.accomplishment || '',
+            remarks: e.remarks || acc.remarks || '',
+            movReferences: e.movReferences || acc.movReferences || '',
+            ratingEfficiency: e.ratingEfficiency || acc.ratingEfficiency || '',
+            ratingQuality: e.ratingQuality || acc.ratingQuality || '',
+            ratingTimeliness: e.ratingTimeliness || acc.ratingTimeliness || '',
+            ratingAverage: e.ratingAverage || acc.ratingAverage || ''
+          }
+        })
+      }
+    } catch (e) {
+      Logger.log('[DocGen] Could not merge accomplishment fields: ' + e.message)
+      return form
+    }
+  }
+
   function _resolveEmployeeName(form, owner) {
     const formName = String(form.employeeName || '').trim()
     if (formName && !_sameText(formName, owner.position)) return formName
@@ -243,15 +276,19 @@ const PmesDocGenService = (() => {
     sheet.getRange(rName, 5, 4, 5).clearContent()
     sheet.getRange(rName, 5).setValue(_staffName(form.employeeName)).setFontWeight('bold')
     sheet.getRange(rPosition, 5).setValue(form.position || '').setFontWeight('normal')
+    sheet.getRange(rDate, 6).setValue('Date Signed:')
     sheet.getRange(rDate, 7).setValue(_todaySignedDate())
 
     const sig = _normalizedSignatories(form)
     const rCert = _findRow(sheet, 'We hereby certify that the above success indicators')
-    sheet.getRange(rCert + 1, 2, 2, 8).clearContent()
-    sheet.getRange(rCert + 1, 2).setValue(sig.immediateSupervisor).setFontWeight('bold')
-    sheet.getRange(rCert + 1, 5).setValue(sig.approvingAuthority).setFontWeight('bold')
-    sheet.getRange(rCert + 2, 2).setValue(sig.supervisorPosition).setFontWeight('normal')
-    sheet.getRange(rCert + 2, 5).setValue(sig.authorityPosition).setFontWeight('normal')
+    const rScale = _findRow(sheet, 'Rating Scale:')
+    const rSignature = Math.max(rCert + 1, rScale - 1)
+    if (rScale > rCert + 1) {
+      sheet.getRange(rCert + 1, 2, rScale - rCert - 1, 8).clearContent()
+    }
+    _setSignatureBlock(sheet.getRange(rSignature, 2), _upper(sig.immediateSupervisor), _upper(sig.supervisorPosition))
+    _setSignatureBlock(sheet.getRange(rSignature, 5), _upper(sig.approvingAuthority), _upper(sig.authorityPosition))
+    _restoreCertificationBorder(sheet, rCert, rScale)
   }
 
   function _refreshTargetsSignedDate(sheet) {
@@ -260,7 +297,39 @@ const PmesDocGenService = (() => {
   }
 
   function _staffName(name) {
-    return name ? String(name).toUpperCase() : ''
+    return _upper(name)
+  }
+
+  function _upper(value) {
+    return value ? String(value).toUpperCase() : ''
+  }
+
+  function _setSignatureBlock(range, name, position) {
+    const value = [name, position].filter(Boolean).join('\n')
+    if (!value) {
+      range.clearContent()
+      return
+    }
+
+    const builder = SpreadsheetApp.newRichTextValue().setText(value)
+    if (name) {
+      builder.setTextStyle(0, name.length, SpreadsheetApp.newTextStyle().setBold(true).build())
+    }
+    if (position) {
+      const start = name ? name.length + 1 : 0
+      builder.setTextStyle(start, value.length, SpreadsheetApp.newTextStyle().setBold(false).build())
+    }
+    range.setRichTextValue(builder.build()).setWrap(true).setVerticalAlignment('middle')
+  }
+
+  function _restoreCertificationBorder(sheet, rCert, rScale) {
+    const endRow = Math.max(rScale - 1, rCert)
+    const numRows = endRow - rCert + 1
+    sheet.getRange(rCert, 2, numRows, 8).setBorder(
+      true, true, true, true, false, false,
+      '#000000',
+      SpreadsheetApp.BorderStyle.SOLID_THICK
+    )
   }
 
   function _normalizedSignatories(form) {
@@ -361,6 +430,7 @@ const PmesDocGenService = (() => {
         sheet.getRange(r, _colNum(col.qual)).setValue(e.ratingQuality === '' ? 'N/A' : e.ratingQuality)
         sheet.getRange(r, _colNum(col.time)).setValue(e.ratingTimeliness === '' ? 'N/A' : e.ratingTimeliness)
         sheet.getRange(r, _colNum(col.avg)).setValue(e.ratingAverage || '')
+        sheet.getRange(r, _colNum(col.remarks)).setValue(e.remarks || '')
       }
     })
   }
@@ -376,21 +446,51 @@ const PmesDocGenService = (() => {
   // ─────────────────────────────────────────────
   function _fillFinalRating(sheet, form) {
     const rFinal = _findRow(sheet, 'FINAL NUMERICAL RATING')
+    const finalRating = form.finalNumericalRating || _finalScore(form)
     sheet.getRange(rFinal, 10).setValue(form.finalNumericalRating || '')      // col J — template quirk, not col H
+    sheet.getRange(rFinal, 10).setValue(finalRating || '')
     const rAdj = _findRow(sheet, 'ADJECTIVAL RATING')
     sheet.getRange(rAdj, 10).setValue(form.adjectivalRating || '')           // col J
 
+    sheet.getRange(rAdj, 10).setValue(form.adjectivalRating || _ratingLabel(finalRating) || '')
     const sig = _normalizedSignatories(form)
     const rCert = _findRow(sheet, 'We hereby certify that the above accomplishments')
-    sheet.getRange(rCert + 2, 2).setValue(_staffName(form.employeeName))
-    sheet.getRange(rCert + 2, 4).setValue(sig.immediateSupervisor)
-    sheet.getRange(rCert + 2, 7).setValue(sig.approvingAuthority)
+    sheet.getRange(rCert + 2, 2).setValue(_staffName(form.employeeName)).setFontWeight('bold')
+    sheet.getRange(rCert + 2, 4).setValue(_upper(sig.immediateSupervisor)).setFontWeight('bold')
+    sheet.getRange(rCert + 2, 7).setValue(_upper(sig.approvingAuthority)).setFontWeight('bold')
     sheet.getRange(rCert + 3, 2).setValue(form.position || '')
     sheet.getRange(rCert + 3, 4).setValue(sig.supervisorPosition)
     sheet.getRange(rCert + 3, 7).setValue(sig.authorityPosition)
-    sheet.getRange(rCert + 4, 2).setValue(form.dateSignedRatee || '')
-    sheet.getRange(rCert + 4, 4).setValue(form.dateSignedSupervisor || '')
-    sheet.getRange(rCert + 4, 7).setValue(form.dateSignedAuthority || '')
+    sheet.getRange(rCert + 4, 2).setValue('Date Signed: ' + (form.dateSignedRatee || ''))
+    sheet.getRange(rCert + 4, 4).setValue('Date Signed: ' + (form.dateSignedSupervisor || ''))
+    sheet.getRange(rCert + 4, 7).setValue('Date Signed: ' + (form.dateSignedAuthority || ''))
+  }
+
+  function _finalScore(form) {
+    const entries = form.entries || []
+    const core = entries.filter(e => e.functionType === 'Core')
+    const support = entries.filter(e => e.functionType === 'Support')
+    const coreAvg = Number(_avg(core)) || 0
+    const supportAvg = Number(_avg(support)) || 0
+    const coreWeight = Number(form.coreFunctionWeight) || 70
+    const supportWeight = Number(form.supportFunctionWeight) || 30
+
+    let score = ''
+    if (core.length && support.length) score = (coreAvg * coreWeight + supportAvg * supportWeight) / 100
+    else if (core.length) score = coreAvg
+    else if (support.length) score = supportAvg
+
+    return score === '' ? '' : Math.round(Number(score) * 100000) / 100000
+  }
+
+  function _ratingLabel(score) {
+    const n = Number(score)
+    if (!n) return ''
+    if (n >= 4.5) return 'Outstanding'
+    if (n >= 3.5) return 'Very Satisfactory'
+    if (n >= 2.5) return 'Satisfactory'
+    if (n >= 1.5) return 'Unsatisfactory'
+    return 'Poor'
   }
 
   // PART II — Feedback. These fields exist on the IPCRF_FORMS sheet

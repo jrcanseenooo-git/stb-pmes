@@ -260,33 +260,17 @@ const PmesDocGenService = (() => {
   }
 
   function _normalizedSignatories(form) {
-    const sig = {
+    return {
       immediateSupervisor: form.immediateSupervisor || '',
       supervisorPosition: form.supervisorPosition || '',
       approvingAuthority: form.approvingAuthority || '',
       authorityPosition: form.authorityPosition || ''
     }
-
-    if (_looksLikeBureauDirector(sig.approvingAuthority) && _looksLikeDirectorOffice(sig.authorityPosition)) {
-      sig.approvingAuthority = form.authorityPosition || ''
-      sig.authorityPosition = _staffName(form.approvingAuthority)
-    }
-
-    return sig
-  }
-
-  function _looksLikeBureauDirector(value) {
-    return String(value || '').trim().toLowerCase() === 'bureau director'
-  }
-
-  function _looksLikeDirectorOffice(value) {
-    const text = String(value || '').toLowerCase()
-    return text.includes('director') && text.includes('bureau')
   }
 
   function _todaySignedDate() {
     const tz = Session.getScriptTimeZone() || 'Asia/Manila'
-    const months = ['Enero', 'Pebrero', 'Marso', 'Abril', 'Mayo', 'Hunyo', 'Hulyo', 'Agosto', 'Setyembre', 'Oktubre', 'Nobyembre', 'Disyembre']
+    const months = ['JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE', 'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER']
     const now = new Date()
     const day = Utilities.formatDate(now, tz, 'd')
     const month = months[Number(Utilities.formatDate(now, tz, 'M')) - 1]

@@ -28,12 +28,6 @@
         </select>
         <label class="field-label">Year</label>
         <input v-model.number="periodYear" type="number" class="filter-select" style="width:80px"/>
-        <label class="field-label">Applicable Period</label>
-        <select v-model="targetApplicablePeriod" class="filter-select">
-          <option value="Both semesters">Both semesters</option>
-          <option value="1st Semester">1st semester only</option>
-          <option value="2nd Semester">2nd semester only</option>
-        </select>
       </div>
       <div class="generate-actions">
         <div class="generate-item">
@@ -533,6 +527,14 @@
                 </div>
                 <div class="ci-label">Performance Indicator</div>
                 <div class="ci-pi">{{ item.performanceIndicator || item.successIndicator || '' }}</div>
+                <div class="ci-period">
+                  <label class="ci-label">Applicable Rating Period</label>
+                  <select v-model="item.applicableRatingPeriod" class="field-input ci-period-select">
+                    <option value="Both semesters">Both semesters</option>
+                    <option value="1st Semester">1st Semester</option>
+                    <option value="2nd Semester">2nd Semester</option>
+                  </select>
+                </div>
                 <div v-if="item.meansOfVerification" class="ci-mov-wrap">
                   <div class="ci-label">Means of Verification</div>
                   <div class="ci-mov">{{ item.meansOfVerification }}</div>
@@ -926,7 +928,6 @@ const myFormType   = computed(() => isCosEmploymentType(authStore.employmentType
 // Period-level Generate Targets/Ratings (self-service, list-page entry point)
 const periodSemester = ref(String(new Date().getMonth() < 6 ? 1 : 2))
 const periodYear     = ref(new Date().getFullYear())
-const targetApplicablePeriod = ref('Both semesters')
 const periodBusy     = ref('')
 const periodStatusInfo    = ref(null)
 const periodStatusLoading = ref(false)
@@ -943,7 +944,16 @@ function isSelected(item)   { return libSelected.value.some(s => s.id === item.i
 function toggleSelect(item) {
   const i = libSelected.value.findIndex(s => s.id === item.id)
   if (i !== -1) libSelected.value.splice(i, 1)
-  else libSelected.value.push(item)
+  else libSelected.value.push({
+    ...item,
+    applicableRatingPeriod: defaultApplicablePeriod(item)
+  })
+}
+function defaultApplicablePeriod(item) {
+  const value = String(item.applicableTo || '').toLowerCase()
+  if (value.includes('1')) return '1st Semester'
+  if (value.includes('2')) return '2nd Semester'
+  return 'Both semesters'
 }
 function cancelLibrary()  { showLibrary.value = false; showLibConfirm.value = false; libSelected.value = [] }
 function closeEntry()     { showEntryModal.value = false; editingEntry.value = null }
@@ -1069,7 +1079,7 @@ async function commitSelection() {
         masterKRAId: item.id, functionType: currentFnType.value,
         kraName: item.kraName,
         successIndicator: item.performanceIndicator || item.successIndicator || '',
-        applicableRatingPeriod: item.applicableTo === 'BOTH' ? 'Both semesters' : (item.applicableTo || 'Both semesters'),
+        applicableRatingPeriod: item.applicableRatingPeriod || defaultApplicablePeriod(item),
         weight: posWeight(item), classification: item.classification || '',
         efficiencyGuide: item.efficiencyGuide || '', qualityGuide: item.qualityGuide || '',
         timelinessGuide: item.timelinessGuide || '', meansOfVerification: item.meansOfVerification || '',
@@ -1187,9 +1197,7 @@ async function doPeriodGenerate(kind) {
     }
 
     if (kind === 'targets') {
-      const r = await docGenApi.generateTargets(status.formId, {
-        applicableRatingPeriod: targetApplicablePeriod.value
-      })
+      const r = await docGenApi.generateTargets(status.formId)
       _syncList(status.formId, { docFileId: r.fileId, targetsGeneratedAt: new Date().toISOString() })
       showToast('Targets document generated')
       return
@@ -1518,6 +1526,8 @@ async function doPrint(fileId, tab) {
 .ci-tags{display:flex;flex-wrap:wrap;gap:4px;}
 .ci-label{font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px;margin-top:8px;}
 .ci-pi{font-size:12px;color:#334155;line-height:1.65;}
+.ci-period{margin-top:10px;max-width:260px;}
+.ci-period-select{height:32px;padding:5px 9px;font-size:12px;}
 .ci-mov-wrap{margin-top:8px;}
 .ci-mov{font-size:12px;color:#64748B;background:#F8FAFC;border:1px solid #F1F5F9;border-radius:6px;padding:6px 10px;line-height:1.55;}
 .ci-rm{display:flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:5px;border:none;background:transparent;cursor:pointer;color:#CBD5E1;flex-shrink:0;margin-top:2px;}

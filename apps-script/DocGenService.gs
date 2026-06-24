@@ -128,14 +128,16 @@ const PmesDocGenService = (() => {
   // (Targets/Ratings), replacing any previous tab of that name so repeat
   // generation refreshes in place instead of piling up duplicate tabs.
   function _addOrReplaceTab(ss, templateId, sourceTabName, fixedTabName) {
-    const existing = ss.getSheetByName(fixedTabName)
-    if (existing) ss.deleteSheet(existing)
-
     const templateSS  = SpreadsheetApp.openById(templateId)
     const sourceSheet = templateSS.getSheetByName(sourceTabName)
     if (!sourceSheet) throw HttpError(`Template tab "${sourceTabName}" not found in template ${templateId}`, 500)
 
+    const existing = ss.getSheetByName(fixedTabName)
     const newSheet = sourceSheet.copyTo(ss)
+
+    // A spreadsheet cannot have zero tabs. Copy first, then remove the previous
+    // fixed-name tab so regenerating still works when Targets/Ratings is alone.
+    if (existing) ss.deleteSheet(existing)
     newSheet.setName(fixedTabName)
 
     // Clean up the blank default "Sheet1" now that there's at least one real tab

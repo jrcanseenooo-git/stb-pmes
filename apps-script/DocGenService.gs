@@ -12,7 +12,7 @@
  * document for each docType and spot-check alignment before relying on this for
  * real signed forms.
  */
-const DocGenService = (() => {
+const PmesDocGenService = (() => {
 
   const TEMPLATE_ID = {
     IPCRF: '1xM914zoR2TGJhwo6xdzK6x6gV79VJojhg1zXDSU6hrY',
@@ -44,8 +44,9 @@ const DocGenService = (() => {
   // ─────────────────────────────────────────────
   // PUBLIC: generate Annex F.1 — Targets
   // ─────────────────────────────────────────────
-  function generateTargetsDoc(formId, user) {
-    const form  = IpcrfService.get(formId, user)
+  function generateTargetsDoc(formId, user, options = {}) {
+    const form  = _withOwnerProfileFields(IpcrfService.get(formId, user))
+    form.entries = _filterEntriesByApplicablePeriod(form.entries || [], options.applicableRatingPeriod)
     const ss    = _getOrCreateFormFile(form)
     const sheet = _addOrReplaceTab(ss, TEMPLATE_ID[form.type], SOURCE_TAB[form.type].targets, 'Targets')
 
@@ -65,7 +66,7 @@ const DocGenService = (() => {
   // PUBLIC: generate Annex F.2 — Ratings
   // ─────────────────────────────────────────────
   function generateRatingsDoc(formId, user) {
-    const form = IpcrfService.get(formId, user)
+    const form = _withOwnerProfileFields(IpcrfService.get(formId, user))
     const sem  = String(form.semester) === '2' ? '2' : '1'
 
     const ss    = _getOrCreateFormFile(form)
@@ -148,6 +149,40 @@ const DocGenService = (() => {
     const existing = DriveApp.getFoldersByName(OUTPUT_FOLDER_NAME)
     if (existing.hasNext()) return existing.next()
     return DriveApp.createFolder(OUTPUT_FOLDER_NAME)
+  }
+
+  function _withOwnerProfileFields(form) {
+    try {
+      const owner = SpreadsheetService.getRow(SpreadsheetService.getSheet(SHEET.USERS), form.userId)
+      if (!owner) return form
+      return {
+        ...form,
+        employeeName: owner.fullName || form.employeeName,
+        position: owner.position || form.position,
+        divisionId: owner.divisionId || form.divisionId,
+        divisionName: owner.divisionName || form.divisionName,
+        sectionName: owner.section || form.sectionName
+      }
+    } catch (e) {
+      Logger.log('[DocGen] Could not refresh owner profile fields: ' + e.message)
+      return form
+    }
+  }
+
+  function _filterEntriesByApplicablePeriod(entries, applicableRatingPeriod) {
+    const selected = _normaliseApplicablePeriod(applicableRatingPeriod)
+    if (selected === 'both') return entries
+    return entries.filter(e => {
+      const entryPeriod = _normaliseApplicablePeriod(e.applicableRatingPeriod)
+      return entryPeriod === 'both' || entryPeriod === selected
+    })
+  }
+
+  function _normaliseApplicablePeriod(value) {
+    const text = String(value || '').toLowerCase()
+    if (text.includes('1')) return '1st'
+    if (text.includes('2')) return '2nd'
+    return 'both'
   }
 
   // ─────────────────────────────────────────────

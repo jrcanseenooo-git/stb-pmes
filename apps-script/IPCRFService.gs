@@ -606,14 +606,27 @@ const IpcrfService = (() => {
     }
 
     const completeness = AccomplishmentsService.completenessForForm(form.id)
+    const doc = _docAvailability(form.docFileId)
     return {
       type, hasForm: true, formId: form.id, formStatus: form.status,
       ratingsReady: completeness.isReady,
       totalEntries: completeness.total, readyEntries: completeness.ready,
-      docFileId: form.docFileId || null,
-      docFileUrl: form.docFileId ? `https://docs.google.com/spreadsheets/d/${form.docFileId}/edit` : null,
-      hasTargetsDoc: !!form.targetsGeneratedAt,
-      hasRatingsDoc: !!form.ratingsGeneratedAt
+      docFileId: doc.exists ? form.docFileId : null,
+      docFileUrl: doc.exists ? `https://docs.google.com/spreadsheets/d/${form.docFileId}/edit` : null,
+      hasTargetsDoc: doc.exists && !!form.targetsGeneratedAt,
+      hasRatingsDoc: doc.exists && !!form.ratingsGeneratedAt,
+      docMissing: !!form.docFileId && !doc.exists
+    }
+  }
+
+  function _docAvailability(fileId) {
+    if (!fileId) return { exists: false }
+    try {
+      const file = DriveApp.getFileById(fileId)
+      return { exists: !file.isTrashed() }
+    } catch (e) {
+      Logger.log('[IPCRF] Stored docFileId no longer available: ' + fileId + ' :: ' + e.message)
+      return { exists: false }
     }
   }
 

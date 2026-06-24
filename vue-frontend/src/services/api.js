@@ -254,7 +254,7 @@ export const ipcrfApi = {
 // ── Document Generation (official IPCRF/CCEF Targets & Ratings forms) ──
 
 export const docGenApi = {
-  generateTargets: (formId, options = {})  => gasWrite('POST', `ipcrf/${formId}/generate-targets`, options),
+  generateTargets: (formId)  => gasWrite('POST', `ipcrf/${formId}/generate-targets`),
   generateRatings: (formId)  => gasWrite('POST', `ipcrf/${formId}/generate-ratings`),
   printPdf:        (fileId, tab)  => gasGet(`docgen/${fileId}/print`, { tab })
 }

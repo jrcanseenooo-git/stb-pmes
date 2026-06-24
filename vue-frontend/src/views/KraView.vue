@@ -30,7 +30,6 @@
           <option value="">All Types</option>
           <option value="Core">Core</option>
           <option value="Support">Support</option>
-          <option value="Strategic">Strategic</option>
         </select>
         <select v-model="filterClass" class="filter-select">
           <option value="">All Classifications</option>

@@ -1243,9 +1243,11 @@ async function doPrint(fileId, tab) {
 .generate-bar{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 16px;margin-bottom:16px;background:#F5F9FF;border:1px solid #DCE9FB;border-radius:10px;flex-wrap:wrap;}
 .generate-period{display:flex;align-items:center;gap:8px;}
 .generate-period .field-label{margin:0;}
-.generate-actions{display:flex;gap:14px;flex-wrap:wrap;}
-.generate-item{display:flex;flex-direction:column;gap:4px;align-items:flex-start;}
-.generate-hint{font-size:10.5px;color:#94A3B8;}
+.generate-actions{display:flex;gap:14px;flex-wrap:wrap;justify-content:flex-end;}
+.generate-item{display:grid;grid-template-columns:auto auto auto;align-items:center;gap:6px 8px;justify-content:flex-start;}
+.generate-item > .btn,
+.generate-item > .btn-link{white-space:nowrap;}
+.generate-hint{grid-column:1 / -1;font-size:10.5px;color:#94A3B8;}
 .generate-hint-ok{color:#15803D;font-weight:600;}
 .generate-hint-warn{color:#B45309;font-weight:600;}
 .btn-active-ok{background:#F0FDF4;color:#15803D;border-color:#BBF7D0;}

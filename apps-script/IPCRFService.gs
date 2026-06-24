@@ -159,6 +159,9 @@ const IpcrfService = (() => {
     const row     = SpreadsheetService.getRow(sheet, id)
     if (!row) throw HttpError('Form not found', 404)
     _guardAccess(row, profile)
+    if (row.userId !== profile.id) {
+      throw HttpError('Only the form owner can submit it for review', 403)
+    }
     _assertTransition(row.status, 'Submitted')
 
     const entries = _getEntries(id)
@@ -493,10 +496,14 @@ const IpcrfService = (() => {
   }
 
   function _guardAccess(form, profile) {
-    const { role, id: userId, divisionId } = profile
+    const { role, id: userId, divisionId, section } = profile
     if (['System Administrator', 'Bureau Director'].includes(role)) return
     if (role === 'Assistant Bureau Director' && form.divisionId === 'admin-pool') return
     if (role === 'Division Chief' && form.divisionId === divisionId) return
+    if (role === 'Section Head') {
+      const ownerSection = form.sectionName || _ownerSection(form.userId)
+      if (form.divisionId === divisionId && ownerSection === section) return
+    }
     if (form.userId === userId) return
     throw HttpError('Access denied to this form', 403)
   }

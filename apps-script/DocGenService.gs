@@ -51,6 +51,7 @@ const DocGenService = (() => {
 
     _fillTargetsHeader(sheet, form)
     _fillIndicatorSections(sheet, form, 'targets')
+    _forceWrapAndAutosize(sheet)
 
     SpreadsheetService.updateRow(SpreadsheetService.getSheet(SHEET.IPCRF_FORMS), formId, {
       docFileId: ss.getId(), targetsGeneratedAt: new Date().toISOString()
@@ -74,6 +75,7 @@ const DocGenService = (() => {
     _fillIndicatorSections(sheet, form, 'ratings')
     _fillFinalRating(sheet, form)
     _fillFeedbackSection(sheet, form)
+    _forceWrapAndAutosize(sheet)
 
     SpreadsheetService.updateRow(SpreadsheetService.getSheet(SHEET.IPCRF_FORMS), formId, {
       docFileId: ss.getId(), ratingsGeneratedAt: new Date().toISOString()
@@ -90,8 +92,8 @@ const DocGenService = (() => {
     const ss    = SpreadsheetApp.openById(fileId)
     const sheet = (tabName && ss.getSheetByName(tabName)) || ss.getSheets()[0]
     const url = 'https://docs.google.com/spreadsheets/d/' + fileId + '/export'
-      + '?format=pdf&size=A4&portrait=false&fitw=true&scale=4'
-      + '&gridlines=false&printtitle=false&sheetnames=false&pagenumbers=false'
+      + '?format=pdf&size=A4&portrait=false&fitw=true'
+      + '&gridlines=false&printtitle=false&sheetnames=false&pagenum=UNDEFINED&attachment=false'
       + '&gid=' + sheet.getSheetId()
 
     const resp = UrlFetchApp.fetch(url, {
@@ -157,6 +159,14 @@ const DocGenService = (() => {
     return match.getRow()
   }
 
+  // Explicitly forces wrap + row auto-height on the whole used range, rather than
+  // assuming the template's own formatting carried over correctly through copyTo().
+  // This is what actually prevents long indicator/accomplishment text from
+  // overlapping the row below it.
+  function _forceWrapAndAutosize(sheet) {
+    sheet.getDataRange().setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP)
+  }
+
   // ─────────────────────────────────────────────
   // INTERNAL — header fields (Targets)
   // ─────────────────────────────────────────────
@@ -164,9 +174,15 @@ const DocGenService = (() => {
     const rDept = _findRow(sheet, 'DEPARTMENT OF SOCIAL WELFARE AND DEVELOPMENT')
     sheet.getRange(rDept + 3, 2).setValue(`CY ${form.year}`)                                   // "CY 2026" line
     sheet.getRange(rDept + 5, 2).setValue(`SOCIAL TECHNOLOGY BUREAU - ${(form.divisionName || '').toUpperCase()}`)
-    sheet.getRange(rDept + 9, 5).setValue(form.employeeName)                                    // commitment block name
-    sheet.getRange(rDept + 10, 5).setValue(form.position || '')
-    sheet.getRange(rDept + 11, 7).setValue(form.dateSignedRatee || '')
+
+    // Anchored close to the actual target cells instead of a long offset chain from
+    // a distant header label — that long chain is what let a stale template name
+    // ("Girardo Badana") bleed through when CCEF's header block didn't line up
+    // exactly with the row count the offsets were derived from on IPCRF.
+    const rCommit = _findRow(sheet, 'I commit to deliver and agree')
+    sheet.getRange(rCommit + 2, 5).setValue(form.employeeName)
+    sheet.getRange(rCommit + 3, 5).setValue(form.position || '')
+    sheet.getRange(rCommit + 4, 7).setValue(form.dateSignedRatee || '')
 
     const rCert = _findRow(sheet, 'We hereby certify that the above success indicators')
     sheet.getRange(rCert + 2, 2).setValue(form.immediateSupervisor || '')

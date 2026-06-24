@@ -907,7 +907,8 @@ const coreEntries    = computed(() => allEntries.value.filter(e => e.functionTyp
 const supportEntries = computed(() => allEntries.value.filter(e => e.functionType === 'Support'))
 
 const filteredLibrary = computed(() => {
-  let items = libraryItems.value.filter(i => i.functionType === currentFnType.value)
+  const addedIds = new Set(allEntries.value.filter(e => e.masterKRAId).map(e => e.masterKRAId))
+  let items = libraryItems.value.filter(i => i.functionType === currentFnType.value && !addedIds.has(i.id))
   if (libSearch.value) {
     const q = libSearch.value.toLowerCase()
     items = items.filter(i =>

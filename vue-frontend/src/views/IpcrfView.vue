@@ -135,7 +135,7 @@
         <div class="fc-foot" @click.stop>
           <span class="fc-date">{{ fmtDate(form.updatedAt || form.createdAt) }}</span>
           <div class="fc-actions">
-            <button v-if="form.status === 'Draft' || form.status === 'Returned'"
+            <button v-if="(form.status === 'Draft' || form.status === 'Returned') && form.userId === authStore.profileId"
               class="btn btn-xs btn-outline" @click.stop="quickSubmit(form)">Submit</button>
             <button v-if="form.status === 'Submitted' && canApprove"
               class="btn btn-xs btn-success" @click.stop="quickApprove(form)">Approve</button>
@@ -286,9 +286,12 @@
             </div>
 
             <!-- Workflow bar -->
-            <div v-if="['Draft', 'Returned'].includes(activeForm?.status)" class="wf-bar">
+            <div v-if="['Draft', 'Returned'].includes(activeForm?.status) && activeForm?.userId === authStore.profileId" class="wf-bar">
               <span class="wf-info">{{ allEntries.length }} indicator{{ allEntries.length !== 1 ? 's' : '' }}</span>
               <button class="btn btn-primary btn-sm" @click="doSubmit">Submit for Review</button>
+            </div>
+            <div v-else-if="['Draft', 'Returned'].includes(activeForm?.status)" class="wf-bar">
+              <span class="wf-info muted-text">Waiting on {{ activeForm?.employeeName }} to submit this for review.</span>
             </div>
             <div v-else-if="activeForm?.status === 'Submitted'" class="wf-bar">
               <span class="wf-info">Pending review</span>

@@ -51,6 +51,8 @@ const PmesDocGenService = (() => {
 
     _fillTargetsHeader(sheet, form)
     _fillIndicatorSections(sheet, form, 'targets')
+    _cleanHeaderLogoArea(sheet)
+    _trimUnusedColumns(sheet, 'I')
     _forceWrapAndAutosize(sheet)
 
     SpreadsheetService.updateRow(SpreadsheetService.getSheet(SHEET.IPCRF_FORMS), formId, {
@@ -75,6 +77,8 @@ const PmesDocGenService = (() => {
     _fillIndicatorSections(sheet, form, 'ratings')
     _fillFinalRating(sheet, form)
     _fillFeedbackSection(sheet, form)
+    _cleanHeaderLogoArea(sheet)
+    _trimUnusedColumns(sheet, 'J')
     _forceWrapAndAutosize(sheet)
 
     SpreadsheetService.updateRow(SpreadsheetService.getSheet(SHEET.IPCRF_FORMS), formId, {
@@ -94,6 +98,8 @@ const PmesDocGenService = (() => {
     if (sheet.getName() === 'Targets') _refreshTargetsSignedDate(sheet)
     const url = 'https://docs.google.com/spreadsheets/d/' + fileId + '/export'
       + '?format=pdf&size=A4&portrait=false&fitw=true'
+      + '&scale=4&fzr=false&horizontal_alignment=CENTER'
+      + '&top_margin=0.25&bottom_margin=0.25&left_margin=0.25&right_margin=0.25'
       + '&gridlines=false&printtitle=false&sheetnames=false&pagenum=UNDEFINED&attachment=false'
       + '&gid=' + sheet.getSheetId()
 
@@ -205,6 +211,18 @@ const PmesDocGenService = (() => {
     sheet.getDataRange().setWrapStrategy(SpreadsheetApp.WrapStrategy.WRAP)
   }
 
+  function _cleanHeaderLogoArea(sheet) {
+    // Some source tabs have colored cells behind transparent logo art. Force the
+    // header canvas white so the DSWD logo does not render with a green block.
+    sheet.getRange(1, 1, Math.min(8, sheet.getMaxRows()), Math.min(4, sheet.getMaxColumns())).setBackground('#ffffff')
+  }
+
+  function _trimUnusedColumns(sheet, lastColumnLetter) {
+    const keep = _colNum(lastColumnLetter)
+    const max = sheet.getMaxColumns()
+    if (max > keep) sheet.hideColumns(keep + 1, max - keep)
+  }
+
   // ─────────────────────────────────────────────
   // INTERNAL — header fields (Targets)
   // ─────────────────────────────────────────────
@@ -218,15 +236,16 @@ const PmesDocGenService = (() => {
     // ("Girardo Badana") bleed through when CCEF's header block didn't line up
     // exactly with the row count the offsets were derived from on IPCRF.
     const rCommit = _findRow(sheet, 'I commit to deliver and agree')
-    sheet.getRange(rCommit, 5).setValue(_signatureName(form.employeeName)).setFontWeight('bold')
+    sheet.getRange(rCommit, 5).setValue(_staffName(form.employeeName)).setFontWeight('bold')
     sheet.getRange(rCommit + 1, 5).setValue(form.position || '').setFontWeight('normal')
     sheet.getRange(rCommit + 1, 7).setValue(_todaySignedDate())
 
+    const sig = _normalizedSignatories(form)
     const rCert = _findRow(sheet, 'We hereby certify that the above success indicators')
-    sheet.getRange(rCert + 2, 2).setValue(_signatureName(form.immediateSupervisor)).setFontWeight('bold')
-    sheet.getRange(rCert + 2, 5).setValue(_signatureName(form.approvingAuthority)).setFontWeight('bold')
-    sheet.getRange(rCert + 3, 2).setValue(form.supervisorPosition || '').setFontWeight('normal')
-    sheet.getRange(rCert + 3, 5).setValue(form.authorityPosition || '').setFontWeight('normal')
+    sheet.getRange(rCert + 2, 2).setValue(sig.immediateSupervisor).setFontWeight('bold')
+    sheet.getRange(rCert + 2, 5).setValue(sig.approvingAuthority).setFontWeight('bold')
+    sheet.getRange(rCert + 3, 2).setValue(sig.supervisorPosition).setFontWeight('normal')
+    sheet.getRange(rCert + 3, 5).setValue(sig.authorityPosition).setFontWeight('normal')
   }
 
   function _refreshTargetsSignedDate(sheet) {
@@ -234,8 +253,33 @@ const PmesDocGenService = (() => {
     sheet.getRange(rCommit + 1, 7).setValue(_todaySignedDate())
   }
 
-  function _signatureName(name) {
+  function _staffName(name) {
     return name ? String(name).toUpperCase() : ''
+  }
+
+  function _normalizedSignatories(form) {
+    const sig = {
+      immediateSupervisor: form.immediateSupervisor || '',
+      supervisorPosition: form.supervisorPosition || '',
+      approvingAuthority: form.approvingAuthority || '',
+      authorityPosition: form.authorityPosition || ''
+    }
+
+    if (_looksLikeBureauDirector(sig.approvingAuthority) && _looksLikeDirectorOffice(sig.authorityPosition)) {
+      sig.approvingAuthority = form.authorityPosition || ''
+      sig.authorityPosition = _staffName(form.approvingAuthority)
+    }
+
+    return sig
+  }
+
+  function _looksLikeBureauDirector(value) {
+    return String(value || '').trim().toLowerCase() === 'bureau director'
+  }
+
+  function _looksLikeDirectorOffice(value) {
+    const text = String(value || '').toLowerCase()
+    return text.includes('director') && text.includes('bureau')
   }
 
   function _todaySignedDate() {
@@ -346,13 +390,14 @@ const PmesDocGenService = (() => {
     const rAdj = _findRow(sheet, 'ADJECTIVAL RATING')
     sheet.getRange(rAdj, 10).setValue(form.adjectivalRating || '')           // col J
 
+    const sig = _normalizedSignatories(form)
     const rCert = _findRow(sheet, 'We hereby certify that the above accomplishments')
-    sheet.getRange(rCert + 2, 2).setValue(form.employeeName || '')
-    sheet.getRange(rCert + 2, 4).setValue(form.immediateSupervisor || '')
-    sheet.getRange(rCert + 2, 7).setValue(form.approvingAuthority || '')
+    sheet.getRange(rCert + 2, 2).setValue(_staffName(form.employeeName))
+    sheet.getRange(rCert + 2, 4).setValue(sig.immediateSupervisor)
+    sheet.getRange(rCert + 2, 7).setValue(sig.approvingAuthority)
     sheet.getRange(rCert + 3, 2).setValue(form.position || '')
-    sheet.getRange(rCert + 3, 4).setValue(form.supervisorPosition || '')
-    sheet.getRange(rCert + 3, 7).setValue(form.authorityPosition || '')
+    sheet.getRange(rCert + 3, 4).setValue(sig.supervisorPosition)
+    sheet.getRange(rCert + 3, 7).setValue(sig.authorityPosition)
     sheet.getRange(rCert + 4, 2).setValue(form.dateSignedRatee || '')
     sheet.getRange(rCert + 4, 4).setValue(form.dateSignedSupervisor || '')
     sheet.getRange(rCert + 4, 7).setValue(form.dateSignedAuthority || '')

@@ -159,7 +159,7 @@ const PmesDocGenService = (() => {
       if (!owner) return form
       return {
         ...form,
-        employeeName: owner.fullName || form.employeeName,
+        employeeName: _resolveEmployeeName(form, owner),
         position: owner.position || form.position,
         divisionId: owner.divisionId || form.divisionId,
         divisionName: owner.divisionName || form.divisionName,
@@ -169,6 +169,23 @@ const PmesDocGenService = (() => {
       Logger.log('[DocGen] Could not refresh owner profile fields: ' + e.message)
       return form
     }
+  }
+
+  function _resolveEmployeeName(form, owner) {
+    const formName = String(form.employeeName || '').trim()
+    if (formName && !_sameText(formName, owner.position)) return formName
+
+    const profileName = String(owner.fullName || '').trim()
+    if (profileName && !_sameText(profileName, owner.position)) return profileName
+
+    const partsName = [owner.firstName, owner.lastName].filter(Boolean).join(' ').trim()
+    if (partsName) return partsName
+
+    return formName || profileName || ''
+  }
+
+  function _sameText(a, b) {
+    return String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase()
   }
 
   // ─────────────────────────────────────────────

@@ -91,6 +91,7 @@ const PmesDocGenService = (() => {
   function exportPdf(fileId, tabName, user) {
     const ss    = SpreadsheetApp.openById(fileId)
     const sheet = (tabName && ss.getSheetByName(tabName)) || ss.getSheets()[0]
+    if (sheet.getName() === 'Targets') _refreshTargetsSignedDate(sheet)
     const url = 'https://docs.google.com/spreadsheets/d/' + fileId + '/export'
       + '?format=pdf&size=A4&portrait=false&fitw=true'
       + '&gridlines=false&printtitle=false&sheetnames=false&pagenum=UNDEFINED&attachment=false'
@@ -198,15 +199,34 @@ const PmesDocGenService = (() => {
     // ("Girardo Badana") bleed through when CCEF's header block didn't line up
     // exactly with the row count the offsets were derived from on IPCRF.
     const rCommit = _findRow(sheet, 'I commit to deliver and agree')
-    sheet.getRange(rCommit + 2, 5).setValue(form.employeeName)
-    sheet.getRange(rCommit + 3, 5).setValue(form.position || '')
-    sheet.getRange(rCommit + 4, 7).setValue(form.dateSignedRatee || '')
+    sheet.getRange(rCommit, 5).setValue(_signatureName(form.employeeName)).setFontWeight('bold')
+    sheet.getRange(rCommit + 1, 5).setValue(form.position || '').setFontWeight('normal')
+    sheet.getRange(rCommit + 1, 7).setValue(_todaySignedDate())
 
     const rCert = _findRow(sheet, 'We hereby certify that the above success indicators')
-    sheet.getRange(rCert + 2, 2).setValue(form.immediateSupervisor || '')
-    sheet.getRange(rCert + 2, 5).setValue(form.approvingAuthority || '')
-    sheet.getRange(rCert + 3, 2).setValue(form.supervisorPosition || '')
-    sheet.getRange(rCert + 3, 5).setValue(form.authorityPosition || '')
+    sheet.getRange(rCert + 2, 2).setValue(_signatureName(form.immediateSupervisor)).setFontWeight('bold')
+    sheet.getRange(rCert + 2, 5).setValue(_signatureName(form.approvingAuthority)).setFontWeight('bold')
+    sheet.getRange(rCert + 3, 2).setValue(form.supervisorPosition || '').setFontWeight('normal')
+    sheet.getRange(rCert + 3, 5).setValue(form.authorityPosition || '').setFontWeight('normal')
+  }
+
+  function _refreshTargetsSignedDate(sheet) {
+    const rCommit = _findRow(sheet, 'I commit to deliver and agree')
+    sheet.getRange(rCommit + 1, 7).setValue(_todaySignedDate())
+  }
+
+  function _signatureName(name) {
+    return name ? String(name).toUpperCase() : ''
+  }
+
+  function _todaySignedDate() {
+    const tz = Session.getScriptTimeZone() || 'Asia/Manila'
+    const months = ['Enero', 'Pebrero', 'Marso', 'Abril', 'Mayo', 'Hunyo', 'Hulyo', 'Agosto', 'Setyembre', 'Oktubre', 'Nobyembre', 'Disyembre']
+    const now = new Date()
+    const day = Utilities.formatDate(now, tz, 'd')
+    const month = months[Number(Utilities.formatDate(now, tz, 'M')) - 1]
+    const year = Utilities.formatDate(now, tz, 'yyyy')
+    return `${day} ${month} ${year}`
   }
 
   // ─────────────────────────────────────────────

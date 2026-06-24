@@ -41,6 +41,7 @@
           </button>
           <span v-if="periodStatusLoading" class="generate-hint">Checking…</span>
           <span v-else-if="periodStatusInfo?.hasTargetsDoc" class="generate-hint generate-hint-ok">✓ Generated — {{ periodStatusInfo.formStatus }}</span>
+          <span v-else-if="periodStatusInfo?.docMissing" class="generate-hint generate-hint-warn">Generated sheet missing — regenerate</span>
           <span v-else-if="periodStatusInfo?.hasForm" class="generate-hint">Form exists — doc not generated yet</span>
           <span v-else-if="periodStatusInfo" class="generate-hint">Not created yet for this period</span>
         </div>
@@ -55,6 +56,7 @@
           </button>
           <span v-if="periodStatusLoading" class="generate-hint">Checking…</span>
           <span v-else-if="periodStatusInfo?.hasRatingsDoc" class="generate-hint generate-hint-ok">✓ Generated</span>
+          <span v-else-if="periodStatusInfo?.docMissing" class="generate-hint generate-hint-warn">Generated sheet missing — regenerate Targets first</span>
           <span v-else-if="periodStatusInfo?.hasForm && periodStatusInfo.ratingsReady" class="generate-hint generate-hint-ok">Ready — accomplishments approved</span>
           <span v-else-if="periodStatusInfo?.hasForm && periodStatusInfo.totalEntries > 0" class="generate-hint generate-hint-warn">{{ periodStatusInfo.readyEntries }}/{{ periodStatusInfo.totalEntries }} accomplishments approved</span>
           <span v-else-if="periodStatusInfo?.hasForm" class="generate-hint">No indicators added yet</span>

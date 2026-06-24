@@ -64,7 +64,7 @@
             @click="$emit('confirm')" :disabled="loading">
             <span v-if="loading" class="spinner"></span>
             <component :is="confirmIcon" v-else-if="confirmIcon"/>
-            {{ loading ? 'Processing…' : confirmLabel || 'Confirm' }}
+            {{ loading ? 'Processing...' : confirmLabel || 'Confirm' }}
           </button>
         </div>
 

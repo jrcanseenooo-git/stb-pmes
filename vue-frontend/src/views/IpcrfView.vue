@@ -818,7 +818,7 @@ import { useAuthStore } from '@/stores/auth'
 const router    = useRouter()
 const authStore = useAuthStore()
 
-const PHASES = ['ANALYSIS', 'DESIGN', 'TESTING', 'PILOT IMPLEMENTATION', 'EVALUATION', 'PROMOTION', 'PORTFOLIO', 'SOCIAL_MARKETING', 'STRATEGIC', 'SUPPORT']
+const PHASES = ['ANALYSIS', 'DESIGN', 'TESTING', 'EVALUATION', 'PROMOTION', 'PORTFOLIO', 'SOCIAL_MARKETING', 'STRATEGIC']
 
 // ── State ──
 const forms          = ref([])

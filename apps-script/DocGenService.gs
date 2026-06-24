@@ -236,12 +236,14 @@ const PmesDocGenService = (() => {
     // ("Girardo Badana") bleed through when CCEF's header block didn't line up
     // exactly with the row count the offsets were derived from on IPCRF.
     const rCommit = _findRow(sheet, 'I commit to deliver and agree')
-    _setNamePositionBlock(sheet.getRange(rCommit, 5), _staffName(form.employeeName), form.position || '')
-    sheet.getRange(rCommit + 1, 5).clearContent()
+    sheet.getRange(rCommit, 5, 3, 3).clearContent()
+    sheet.getRange(rCommit, 5).setValue(_staffName(form.employeeName)).setFontWeight('bold')
+    sheet.getRange(rCommit + 1, 5).setValue(form.position || '').setFontWeight('normal')
     sheet.getRange(rCommit + 1, 7).setValue(_todaySignedDate())
 
     const sig = _normalizedSignatories(form)
     const rCert = _findRow(sheet, 'We hereby certify that the above success indicators')
+    sheet.getRange(rCert + 1, 2, 3, 4).clearContent()
     sheet.getRange(rCert + 1, 2).setValue(sig.immediateSupervisor).setFontWeight('bold')
     sheet.getRange(rCert + 1, 5).setValue(sig.approvingAuthority).setFontWeight('bold')
     sheet.getRange(rCert + 2, 2).setValue(sig.supervisorPosition).setFontWeight('normal')
@@ -255,24 +257,6 @@ const PmesDocGenService = (() => {
 
   function _staffName(name) {
     return name ? String(name).toUpperCase() : ''
-  }
-
-  function _setNamePositionBlock(range, name, position) {
-    const value = [name, position].filter(Boolean).join('\n')
-    if (!value) {
-      range.clearContent()
-      return
-    }
-
-    const builder = SpreadsheetApp.newRichTextValue().setText(value)
-    if (name) {
-      builder.setTextStyle(0, name.length, SpreadsheetApp.newTextStyle().setBold(true).build())
-    }
-    if (position) {
-      const start = name ? name.length + 1 : 0
-      builder.setTextStyle(start, value.length, SpreadsheetApp.newTextStyle().setBold(false).build())
-    }
-    range.setRichTextValue(builder.build()).setWrap(true)
   }
 
   function _normalizedSignatories(form) {

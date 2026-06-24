@@ -26,7 +26,8 @@ function initializeSheets() {
       'userId', 'employeeName', 'divisionId', 'division',
       'formId', 'entryId',
       'kraId', 'kraTitle', 'siId', 'target', 'targetQty', 'targetUnit',
-      'accomplished', 'progressPct', 'status', 'deadline',
+      'accomplishment', 'movReferences',
+      'ratingEfficiency', 'ratingQuality', 'ratingTimeliness', 'ratingAverage',
       'submittedAt', 'approvedAt', 'approvedBy',
       'remarks', 'revisions', 'movCount',
       'createdBy', 'createdAt', 'updatedAt', 'deleted', 'deletedAt'

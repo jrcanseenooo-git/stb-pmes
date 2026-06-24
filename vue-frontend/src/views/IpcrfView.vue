@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="ipcrf-page">
 
     <!-- Content card -->
@@ -33,32 +33,30 @@
         <div class="generate-item">
           <template v-if="periodStatusInfo?.hasTargetsDoc">
             <a :href="periodStatusInfo.docFileUrl" target="_blank" class="btn btn-sm btn-active-ok">Open Targets Sheet</a>
-            <button class="btn btn-sm" :disabled="docGen.printing" @click="doPrint(periodStatusInfo.docFileId, 'Targets')">{{ docGen.printing ? 'Preparing…' : 'Print' }}</button>
-            <button class="btn-link" :disabled="!!periodBusy" @click="doPeriodGenerate('targets')">{{ periodBusy === 'targets' ? 'Regenerating…' : 'Regenerate' }}</button>
+            <button class="btn-link" :disabled="!!periodBusy" @click="doPeriodGenerate('targets')">{{ periodBusy === 'targets' ? 'Regenerating...' : 'Regenerate' }}</button>
           </template>
           <button v-else class="btn btn-sm" :disabled="!!periodBusy" @click="doPeriodGenerate('targets')">
-            {{ periodBusy === 'targets' ? 'Checking…' : `Generate ${myFormType} Targets` }}
+            {{ periodBusy === 'targets' ? 'Checking...' : `Generate ${myFormType} Targets` }}
           </button>
-          <span v-if="periodStatusLoading" class="generate-hint">Checking…</span>
-          <span v-else-if="periodStatusInfo?.hasTargetsDoc" class="generate-hint generate-hint-ok">✓ Generated — {{ periodStatusInfo.formStatus }}</span>
-          <span v-else-if="periodStatusInfo?.docMissing" class="generate-hint generate-hint-warn">Generated sheet missing — regenerate</span>
-          <span v-else-if="periodStatusInfo?.hasForm" class="generate-hint">Form exists — doc not generated yet</span>
+          <span v-if="periodStatusLoading" class="generate-hint">Checking...</span>
+          <span v-else-if="periodStatusInfo?.hasTargetsDoc" class="generate-hint generate-hint-ok">Generated - {{ periodStatusInfo.formStatus }}</span>
+          <span v-else-if="periodStatusInfo?.docMissing" class="generate-hint generate-hint-warn">Generated sheet missing - regenerate</span>
+          <span v-else-if="periodStatusInfo?.hasForm" class="generate-hint">Form exists - doc not generated yet</span>
           <span v-else-if="periodStatusInfo" class="generate-hint">Not created yet for this period</span>
         </div>
         <div class="generate-item">
           <template v-if="periodStatusInfo?.hasRatingsDoc">
             <a :href="periodStatusInfo.docFileUrl" target="_blank" class="btn btn-sm btn-active-ok">Open Ratings Sheet</a>
-            <button class="btn btn-sm" :disabled="docGen.printing" @click="doPrint(periodStatusInfo.docFileId, 'Ratings')">{{ docGen.printing ? 'Preparing…' : 'Print' }}</button>
-            <button class="btn-link" :disabled="!!periodBusy" @click="doPeriodGenerate('ratings')">{{ periodBusy === 'ratings' ? 'Regenerating…' : 'Regenerate' }}</button>
+            <button class="btn-link" :disabled="!!periodBusy" @click="doPeriodGenerate('ratings')">{{ periodBusy === 'ratings' ? 'Regenerating...' : 'Regenerate' }}</button>
           </template>
           <button v-else class="btn btn-primary btn-sm" :disabled="!!periodBusy" @click="doPeriodGenerate('ratings')">
-            {{ periodBusy === 'ratings' ? 'Checking…' : `Generate ${myFormType} Ratings` }}
+            {{ periodBusy === 'ratings' ? 'Checking...' : `Generate ${myFormType} Ratings` }}
           </button>
-          <span v-if="periodStatusLoading" class="generate-hint">Checking…</span>
-          <span v-else-if="periodStatusInfo?.hasRatingsDoc" class="generate-hint generate-hint-ok">✓ Generated</span>
-          <span v-else-if="periodStatusInfo?.docMissing" class="generate-hint generate-hint-warn">Generated sheet missing — regenerate Targets first</span>
-          <span v-else-if="periodStatusInfo?.hasForm && periodStatusInfo.ratingsReady" class="generate-hint generate-hint-ok">Ready — accomplishments approved</span>
-          <span v-else-if="periodStatusInfo?.hasForm && periodStatusInfo.totalEntries > 0" class="generate-hint generate-hint-warn">{{ periodStatusInfo.readyEntries }}/{{ periodStatusInfo.totalEntries }} accomplishments approved</span>
+          <span v-if="periodStatusLoading" class="generate-hint">Checking...</span>
+          <span v-else-if="periodStatusInfo?.hasRatingsDoc" class="generate-hint generate-hint-ok">Generated</span>
+          <span v-else-if="periodStatusInfo?.docMissing" class="generate-hint generate-hint-warn">Generated sheet missing - regenerate Targets first</span>
+          <span v-else-if="periodStatusInfo?.hasForm && periodStatusInfo.ratingsReady" class="generate-hint generate-hint-ok">Ready - ratings entries available</span>
+          <span v-else-if="periodStatusInfo?.hasForm && periodStatusInfo.totalEntries > 0" class="generate-hint generate-hint-ok">{{ periodStatusInfo.totalEntries }} ratings entries available</span>
           <span v-else-if="periodStatusInfo?.hasForm" class="generate-hint">No indicators added yet</span>
           <span v-else-if="periodStatusInfo" class="generate-hint">Create Targets first</span>
         </div>
@@ -125,8 +123,8 @@
 
         <!-- Employee -->
         <div class="fc-name">{{ form.employeeName }}</div>
-        <div class="fc-sub">{{ form.divisionName || '—' }}</div>
-        <!-- <div class="fc-sub">{{ form.divisionName || '—' }}<span v-if="form.sectionName"> · {{ form.sectionName }}</span></div> -->
+        <div class="fc-sub">{{ form.divisionName || '-' }}</div>
+        <!-- <div class="fc-sub">{{ form.divisionName || '-' }}<span v-if="form.sectionName"> | {{ form.sectionName }}</span></div> -->
 
         <!-- Status + rating -->
         <div class="fc-mid">
@@ -157,9 +155,9 @@
     </div>
     <!-- /Content card -->
 
-    <!-- ══════════════════════════════════
+    <!-- ==================================
          FORM DETAIL MODAL
-    ══════════════════════════════════ -->
+    ================================== -->
     <teleport to="body">
       <div v-if="showFormModal" class="modal-overlay" @click.self="closeFormModal">
         <div class="modal-xl">
@@ -172,7 +170,7 @@
                 <span :class="['status-badge', statusClass(activeForm?.status)]">{{ activeForm?.status }}</span>
               </div>
               <div class="dh-name">{{ activeForm?.employeeName }}</div>
-              <div class="dh-sub">S{{ activeForm?.semester }} {{ activeForm?.year }} · {{ activeForm?.divisionName }}</div>
+              <div class="dh-sub">S{{ activeForm?.semester }} {{ activeForm?.year }} | {{ activeForm?.divisionName }}</div>
             </div>
             <button class="modal-close" @click="closeFormModal">
               <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
@@ -193,7 +191,7 @@
           <!-- Loading -->
           <div v-if="entriesLoading" class="loading-state">
             <div class="spinner-sm2"></div>
-            <span class="muted-text">Loading indicators…</span>
+            <span class="muted-text">Loading indicators...</span>
           </div>
 
           <!-- INDICATORS TAB -->
@@ -315,25 +313,25 @@
                 <div class="det-st">Period & Role</div>
                 <div class="det-row"><span class="dk">Form Type</span><span class="dv">{{ activeForm?.type }}</span></div>
                 <div class="det-row"><span class="dk">Semester / Year</span><span class="dv">S{{ activeForm?.semester }}, {{ activeForm?.year }}</span></div>
-                <!-- <div class="det-row"><span class="dk">Position Level</span><span class="dv">{{ activeForm?.positionLevel || '—' }}</span></div> -->
-                <div class="det-row"><span class="dk">Division</span><span class="dv">{{ activeForm?.divisionName || '—' }}</span></div>
-                <div class="det-row"><span class="dk">Section</span><span class="dv">{{ activeForm?.sectionName || '—' }}</span></div>
+                <!-- <div class="det-row"><span class="dk">Position Level</span><span class="dv">{{ activeForm?.positionLevel || '-' }}</span></div> -->
+                <div class="det-row"><span class="dk">Division</span><span class="dv">{{ activeForm?.divisionName || '-' }}</span></div>
+                <div class="det-row"><span class="dk">Section</span><span class="dv">{{ activeForm?.sectionName || '-' }}</span></div>
                 <div class="det-st" style="margin-top:16px">Weights</div>
                 <div class="weights-bar">
                   <div class="wb-c" :style="{ width: activeForm?.coreFunctionWeight + '%' }">Core {{ activeForm?.coreFunctionWeight }}%</div>
                   <div class="wb-s" :style="{ width: activeForm?.supportFunctionWeight + '%' }">Support {{ activeForm?.supportFunctionWeight }}%</div>
                 </div>
                 <div class="det-st" style="margin-top:16px">Timeline</div>
-                <div class="det-row"><span class="dk">Created</span><span class="dv">{{ fmtDate(activeForm?.createdAt) || '—' }}</span></div>
-                <div class="det-row"><span class="dk">Submitted</span><span class="dv">{{ fmtDate(activeForm?.submittedAt) || '—' }}</span></div>
-                <div class="det-row"><span class="dk">Approved</span><span class="dv">{{ fmtDate(activeForm?.approvedAt) || '—' }}</span></div>
+                <div class="det-row"><span class="dk">Created</span><span class="dv">{{ fmtDate(activeForm?.createdAt) || '-' }}</span></div>
+                <div class="det-row"><span class="dk">Submitted</span><span class="dv">{{ fmtDate(activeForm?.submittedAt) || '-' }}</span></div>
+                <div class="det-row"><span class="dk">Approved</span><span class="dv">{{ fmtDate(activeForm?.approvedAt) || '-' }}</span></div>
               </div>
               <div>
                 <div class="det-st">Signatories</div>
-                <div class="det-row"><span class="dk">Supervisor</span><span class="dv">{{ activeForm?.immediateSupervisor || '—' }}</span></div>
-                <div class="det-row"><span class="dk">Supervisor Position</span><span class="dv">{{ activeForm?.supervisorPosition || '—' }}</span></div>
-                <div class="det-row"><span class="dk">Approving Authority</span><span class="dv">{{ activeForm?.approvingAuthority || '—' }}</span></div>
-                <div class="det-row"><span class="dk">Authority Position</span><span class="dv">{{ activeForm?.authorityPosition || '—' }}</span></div>
+                <div class="det-row"><span class="dk">Supervisor</span><span class="dv">{{ activeForm?.immediateSupervisor || '-' }}</span></div>
+                <div class="det-row"><span class="dk">Supervisor Position</span><span class="dv">{{ activeForm?.supervisorPosition || '-' }}</span></div>
+                <div class="det-row"><span class="dk">Approving Authority</span><span class="dv">{{ activeForm?.approvingAuthority || '-' }}</span></div>
+                <div class="det-row"><span class="dk">Authority Position</span><span class="dv">{{ activeForm?.authorityPosition || '-' }}</span></div>
               </div>
             </div>
           </div>
@@ -361,7 +359,7 @@
                     <span :class="['st-fn', e.functionType === 'Core' ? 'fn-c' : 'fn-s']">{{ e.functionType[0] }}</span>
                     <span class="st-name">{{ e.kraName }}</span>
                   </div>
-                  <span :class="['st-val', e.ratingAverage ? '' : 'muted-text']">{{ e.ratingAverage || '—' }}</span>
+                  <span :class="['st-val', e.ratingAverage ? '' : 'muted-text']">{{ e.ratingAverage || '-' }}</span>
                 </div>
               </div>
               <button class="btn btn-sm" style="margin-top:14px" @click="doCompute">Recompute</button>
@@ -372,19 +370,19 @@
                 <div class="form-grid" style="text-align:left">
                   <div class="field full">
                     <label class="field-label">Strengths</label>
-                    <textarea v-model="feedbackForm.feedbackStrengths" class="field-input" rows="2" placeholder="What the ratee does well…"></textarea>
+                    <textarea v-model="feedbackForm.feedbackStrengths" class="field-input" rows="2" placeholder="What the ratee does well..."></textarea>
                   </div>
                   <div class="field full">
                     <label class="field-label">Rater's Comments &amp; Recommendations</label>
-                    <textarea v-model="feedbackForm.feedbackComments" class="field-input" rows="2" placeholder="Comments, recommendations, commendations…"></textarea>
+                    <textarea v-model="feedbackForm.feedbackComments" class="field-input" rows="2" placeholder="Comments, recommendations, commendations..."></textarea>
                   </div>
                   <div class="field full">
                     <label class="field-label">Areas for Improvement</label>
-                    <textarea v-model="feedbackForm.feedbackAreasForImprovement" class="field-input" rows="2" placeholder="Development needs…"></textarea>
+                    <textarea v-model="feedbackForm.feedbackAreasForImprovement" class="field-input" rows="2" placeholder="Development needs..."></textarea>
                   </div>
                 </div>
                 <button v-if="canApprove" class="btn btn-primary btn-sm" style="margin-top:10px" :disabled="ratingBusy" @click="doMarkRated">
-                  {{ ratingBusy ? 'Saving…' : 'Mark as Rated' }}
+                  {{ ratingBusy ? 'Saving...' : 'Mark as Rated' }}
                 </button>
                 <p v-else class="muted-text" style="margin-top:10px;font-size:11px">Only the rater/approver can mark this form as Rated.</p>
               </div>
@@ -406,7 +404,7 @@
                   </div>
                 </div>
                 <button v-if="canFinalize" class="btn btn-primary btn-sm" style="margin-top:10px" :disabled="ratingBusy" @click="doFinalize">
-                  {{ ratingBusy ? 'Saving…' : 'Finalize' }}
+                  {{ ratingBusy ? 'Saving...' : 'Finalize' }}
                 </button>
                 <p v-else class="muted-text" style="margin-top:10px;font-size:11px">Only an Administrator/Director can finalize this form.</p>
               </div>
@@ -417,9 +415,9 @@
       </div>
     </teleport>
 
-    <!-- ══════════════════════════════════
+    <!-- ==================================
          KRA LIBRARY MODAL
-    ══════════════════════════════════ -->
+    ================================== -->
     <teleport to="body">
       <div v-if="showLibrary" class="modal-overlay" @click.self="cancelLibrary">
         <div class="modal modal-lib">
@@ -442,7 +440,7 @@
                 <circle cx="5" cy="5" r="4" stroke="#94A3B8" stroke-width="1.2"/>
                 <path d="M8.5 8.5l2 2" stroke="#94A3B8" stroke-width="1.2" stroke-linecap="round"/>
               </svg>
-              <input v-model="libSearch" type="text" class="srch-inp" placeholder="Search KRA or indicator…"/>
+              <input v-model="libSearch" type="text" class="srch-inp" placeholder="Search KRA or indicator..."/>
             </div>
             <select v-if="currentFnType === 'Core'" v-model="libPhase" class="field-input" style="width:140px">
               <option value="">All Phases</option>
@@ -502,16 +500,16 @@
       </div>
     </teleport>
 
-    <!-- ══════════════════════════════════
+    <!-- ==================================
          CONFIRM SELECTION MODAL
-    ══════════════════════════════════ -->
+    ================================== -->
     <teleport to="body">
       <div v-if="showLibConfirm" class="modal-overlay">
         <div class="modal modal-confirm">
           <div class="modal-hd">
             <div>
-              <h3 class="modal-title">Confirm — {{ libSelected.length }} Indicator{{ libSelected.length !== 1 ? 's' : '' }}</h3>
-              <p class="modal-sub">Review carefully. Click ← Back to adjust.</p>
+              <h3 class="modal-title">Confirm - {{ libSelected.length }} Indicator{{ libSelected.length !== 1 ? 's' : '' }}</h3>
+              <p class="modal-sub">Review carefully. Click Back to adjust.</p>
             </div>
           </div>
           <div class="confirm-scroll">
@@ -550,7 +548,7 @@
             </div>
           </div>
           <div class="modal-footer">
-            <button class="btn" @click="showLibConfirm = false">← Back to Library</button>
+            <button class="btn" @click="showLibConfirm = false">Back to Library</button>
             <button class="btn btn-primary" :disabled="!libSelected.length" @click="commitSelection">
               Confirm & Add {{ libSelected.length }} Indicator{{ libSelected.length !== 1 ? 's' : '' }}
             </button>
@@ -559,14 +557,14 @@
       </div>
     </teleport>
 
-    <!-- ══════════════════════════════════
+    <!-- ==================================
          FULLSCREEN PROGRESS LOCK
-    ══════════════════════════════════ -->
+    ================================== -->
     <teleport to="body">
       <div v-if="addProg.active" class="fullscreen-lock">
         <div class="lock-box">
           <div class="lock-spin"></div>
-          <div class="lock-title">Saving Indicators…</div>
+          <div class="lock-title">Saving Indicators...</div>
           <div class="lock-items">
             <div v-for="(item, i) in addProg.items" :key="i"
               :class="['lock-item', addProg.current > i ? 'done' : addProg.current === i ? 'active' : '']">
@@ -581,14 +579,14 @@
             </div>
           </div>
           <div class="prog-track"><div class="prog-fill" :style="{ width: addProg.pct + '%' }"></div></div>
-          <div class="lock-hint">{{ addProg.current }} of {{ addProg.total }} saved — please wait</div>
+          <div class="lock-hint">{{ addProg.current }} of {{ addProg.total }} saved - please wait</div>
         </div>
       </div>
     </teleport>
 
-    <!-- ══════════════════════════════════
+    <!-- ==================================
          NEW FORM MODAL
-    ══════════════════════════════════ -->
+    ================================== -->
     <teleport to="body">
       <div v-if="showNewFormModal" class="modal-overlay" @click.self="showNewFormModal = false">
         <div class="modal" style="max-width:500px">
@@ -629,8 +627,8 @@
               <div class="field">
                 <label class="field-label">Semester <span class="req">*</span></label>
                 <select v-model="newForm.semester" class="field-input">
-                  <option value="1">1st Semester (Jan–Jun)</option>
-                  <option value="2">2nd Semester (Jul–Dec)</option>
+                  <option value="1">1st Semester (Jan-Jun)</option>
+                  <option value="2">2nd Semester (Jul-Dec)</option>
                 </select>
               </div>
               <div class="field">
@@ -662,16 +660,16 @@
             <button class="btn" @click="showNewFormModal = false">Cancel</button>
             <button class="btn btn-primary" :disabled="creating" @click="createForm">
               <span v-if="creating" class="spinner-sm"></span>
-              {{ creating ? 'Creating…' : 'Create Form' }}
+              {{ creating ? 'Creating...' : 'Create Form' }}
             </button>
           </div>
         </div>
       </div>
     </teleport>
 
-    <!-- ══════════════════════════════════
+    <!-- ==================================
          CUSTOM / EDIT ENTRY MODAL
-    ══════════════════════════════════ -->
+    ================================== -->
     <teleport to="body">
       <div v-if="showEntryModal" class="modal-overlay" @click.self="closeEntry">
         <div class="modal" style="max-width:480px">
@@ -696,7 +694,7 @@
               </div>
               <div class="field full">
                 <label class="field-label">Success Indicator <span class="req">*</span></label>
-                <textarea v-model="entryForm.successIndicator" class="field-input" rows="3" placeholder="Describe the specific target output…"></textarea>
+                <textarea v-model="entryForm.successIndicator" class="field-input" rows="3" placeholder="Describe the specific target output..."></textarea>
               </div>
               <div class="field">
                 <label class="field-label">Weight (%)</label>
@@ -732,15 +730,15 @@
                   <textarea v-model="entryForm.accomplishment" class="field-input" rows="2"></textarea>
                 </div>
                 <div class="field">
-                  <label class="field-label">Efficiency <span class="muted-text">(1–5)</span></label>
+                  <label class="field-label">Efficiency <span class="muted-text">(1-5)</span></label>
                   <input v-model.number="entryForm.ratingEfficiency" type="number" class="field-input" min="1" max="5" step="0.01"/>
                 </div>
                 <div class="field">
-                  <label class="field-label">Quality <span class="muted-text">(1–5)</span></label>
+                  <label class="field-label">Quality <span class="muted-text">(1-5)</span></label>
                   <input v-model.number="entryForm.ratingQuality" type="number" class="field-input" min="1" max="5" step="0.01"/>
                 </div>
                 <div class="field">
-                  <label class="field-label">Timeliness <span class="muted-text">(1–5)</span></label>
+                  <label class="field-label">Timeliness <span class="muted-text">(1-5)</span></label>
                   <input v-model.number="entryForm.ratingTimeliness" type="number" class="field-input" min="1" max="5" step="0.01"/>
                 </div>
                 <div v-if="computedAvg" class="field">
@@ -753,7 +751,7 @@
           <div class="modal-footer">
             <button class="btn" @click="closeEntry">Cancel</button>
             <button class="btn btn-primary" :disabled="savingEntry" @click="saveEntry">
-              {{ savingEntry ? 'Saving…' : (editingEntry ? 'Save Changes' : 'Add Indicator') }}
+              {{ savingEntry ? 'Saving...' : (editingEntry ? 'Save Changes' : 'Add Indicator') }}
             </button>
           </div>
         </div>
@@ -773,7 +771,7 @@
           <div class="cb-msg">Remove <strong>{{ confirmDel.name }}</strong>?<br><span class="muted-text" style="font-size:11px">This cannot be undone.</span></div>
           <div class="cb-btns">
             <button class="btn" @click="confirmDel.show = false">Cancel</button>
-            <button class="btn btn-danger" :disabled="deletingEntry" @click="doDelete">{{ deletingEntry ? 'Removing…' : 'Remove' }}</button>
+            <button class="btn btn-danger" :disabled="deletingEntry" @click="doDelete">{{ deletingEntry ? 'Removing...' : 'Remove' }}</button>
           </div>
         </div>
       </div>
@@ -795,13 +793,15 @@ import { useRouter } from 'vue-router'
 import { ipcrf as ipcrfApi, kraLibrary as kraLibraryApi, docGenApi } from '@/services/api'
 import { usePermissions } from '@/composables/usePermissions'
 import { useAuthStore } from '@/stores/auth'
+import { useConfirm, CONFIRMS } from '@/composables/useConfirm'
 
 const router    = useRouter()
 const authStore = useAuthStore()
+const { confirm } = useConfirm()
 
 const PHASES = ['ANALYSIS', 'DESIGN', 'TESTING', 'EVALUATION', 'PROMOTION', 'PORTFOLIO', 'SOCIAL_MARKETING', 'STRATEGIC']
 
-// ── State ──
+// â”€â”€ State â”€â”€
 const forms          = ref([])
 const loading        = ref(false)
 const entriesLoading = ref(false)
@@ -853,7 +853,7 @@ const newForm = ref({
   approvingAuthority: '', authorityPosition: ''
 })
 
-// Form Type is no longer a real choice — it's locked to the employee's own
+// Form Type is no longer a real choice - it's locked to the employee's own
 // Employment Type. Keep it in sync no matter which entry point opened the modal.
 watch(showNewFormModal, (open) => {
   if (open) newForm.value.type = myFormType.value
@@ -875,7 +875,7 @@ const statusTabs = [
   { label: 'Finalized', value: 'Finalized' }
 ]
 
-// ── Computed ──
+// â”€â”€ Computed â”€â”€
 const filteredForms = computed(() => {
   let f = forms.value
   if (activeStatus.value !== 'All') f = f.filter(x => x.status === activeStatus.value)
@@ -934,7 +934,7 @@ const periodBusy     = ref('')
 const periodStatusInfo    = ref(null)
 const periodStatusLoading = ref(false)
 
-// ── Helpers ──
+// â”€â”€ Helpers â”€â”€
 function countByStatus(s)   { return forms.value.filter(f => f.status === s).length }
 function posWeight(item)    {
   const l = activeForm.value?.positionLevel || 'III'
@@ -942,6 +942,9 @@ function posWeight(item)    {
 }
 function fmtDate(iso)       { return iso ? new Date(iso).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' }) : '' }
 function showToast(msg, type = 'success') { toast.value = { show: true, msg, type }; setTimeout(() => { toast.value.show = false }, 3500) }
+function semesterLabel(semester = periodSemester.value) {
+  return String(semester) === '1' ? '1st Semester' : '2nd Semester'
+}
 function isSelected(item)   { return libSelected.value.some(s => s.id === item.id) }
 function toggleSelect(item) {
   const i = libSelected.value.findIndex(s => s.id === item.id)
@@ -987,7 +990,7 @@ async function loadPeriodStatus() {
   }
 }
 
-// ── API ──
+// â”€â”€ API â”€â”€
 async function loadForms() {
   loading.value = true
   try {
@@ -1037,6 +1040,8 @@ async function openFormModal(form) {
 
 async function createForm() {
   if (creating.value) return
+  const ok = await confirm(CONFIRMS.createForm(newForm.value.type, newForm.value.semester, newForm.value.year))
+  if (!ok) return
   creating.value = true
   try {
     const f = await ipcrfApi.createForm(newForm.value)
@@ -1052,9 +1057,21 @@ async function createForm() {
 }
 
 // Quick actions from card
-async function quickSubmit(form)  { try { const u = await ipcrfApi.submitForm(form.id);  _syncList(form.id, u); showToast('Submitted') } catch (e) { showToast(e.message, 'error') } }
-async function quickApprove(form) { try { const u = await ipcrfApi.approveForm(form.id); _syncList(form.id, u); showToast('Approved') } catch (e) { showToast(e.message, 'error') } }
-async function quickReturn(form)  { try { const u = await ipcrfApi.returnForm(form.id);  _syncList(form.id, u); showToast('Returned') } catch (e) { showToast(e.message, 'error') } }
+async function quickSubmit(form)  {
+  const ok = await confirm(CONFIRMS.submitForm(form.type, form.semester, form.year))
+  if (!ok) return
+  try { const u = await ipcrfApi.submitForm(form.id);  _syncList(form.id, u); showToast('Submitted') } catch (e) { showToast(e.message, 'error') }
+}
+async function quickApprove(form) {
+  const ok = await confirm(CONFIRMS.approveForm(form.employeeName, form.type))
+  if (!ok) return
+  try { const u = await ipcrfApi.approveForm(form.id); _syncList(form.id, u); showToast('Approved') } catch (e) { showToast(e.message, 'error') }
+}
+async function quickReturn(form)  {
+  const ok = await confirm(CONFIRMS.returnForm(form.employeeName))
+  if (!ok) return
+  try { const u = await ipcrfApi.returnForm(form.id);  _syncList(form.id, u); showToast('Returned') } catch (e) { showToast(e.message, 'error') }
+}
 function _syncList(id, u) { const i = forms.value.findIndex(f => f.id === id); if (i !== -1) forms.value[i] = { ...forms.value[i], ...u } }
 
 function openLibrary(fnType) {
@@ -1067,6 +1084,15 @@ function openLibrary(fnType) {
 async function commitSelection() {
   const items = [...libSelected.value]
   if (!items.length) return
+  const ok = await confirm({
+    type: 'info',
+    title: 'Add Selected Indicators',
+    message: `${items.length} selected indicator${items.length !== 1 ? 's' : ''} will be added to this ${activeForm.value?.type || 'form'}.`,
+    note: 'You can still edit the indicator details before submitting the form.',
+    confirmLabel: 'Add Indicators',
+    cancelLabel: 'Review Again'
+  })
+  if (!ok) return
   showLibConfirm.value = false
   showLibrary.value    = false
   addProg.value = { active: true, current: 0, total: items.length, pct: 0, items: items.map(i => ({ kraName: i.kraName })) }
@@ -1119,6 +1145,8 @@ function openEditEntry(entry) {
 
 async function saveEntry() {
   if (!entryForm.value.kraName || !entryForm.value.successIndicator) { showToast('KRA name and indicator are required', 'error'); return }
+  const ok = await confirm(CONFIRMS.saveEntry(!!editingEntry.value))
+  if (!ok) return
   savingEntry.value = true
   try {
     if (editingEntry.value) {
@@ -1149,13 +1177,37 @@ async function doDelete() {
   finally { deletingEntry.value = false }
 }
 
-async function doSubmit()  { try { const u = await ipcrfApi.submitForm(activeForm.value.id);  _sync(u); showToast('Submitted') }       catch (e) { showToast(e.message, 'error') } }
-async function doApprove() { try { const u = await ipcrfApi.approveForm(activeForm.value.id); _sync(u); showToast('Approved') }       catch (e) { showToast(e.message, 'error') } }
-async function doReturn()  { try { const u = await ipcrfApi.returnForm(activeForm.value.id);  _sync(u); showToast('Returned for revision') } catch (e) { showToast(e.message, 'error') } }
-async function doCompute() { try { const u = await ipcrfApi.computeScore(activeForm.value.id); _sync(u); showToast(`${u.finalNumericalRating} — ${u.adjectivalRating}`) } catch (e) { showToast(e.message, 'error') } }
+async function doSubmit()  {
+  const ok = await confirm(CONFIRMS.submitForm(activeForm.value.type, activeForm.value.semester, activeForm.value.year))
+  if (!ok) return
+  try { const u = await ipcrfApi.submitForm(activeForm.value.id);  _sync(u); showToast('Submitted') }       catch (e) { showToast(e.message, 'error') }
+}
+async function doApprove() {
+  const ok = await confirm(CONFIRMS.approveForm(activeForm.value.employeeName, activeForm.value.type))
+  if (!ok) return
+  try { const u = await ipcrfApi.approveForm(activeForm.value.id); _sync(u); showToast('Approved') }       catch (e) { showToast(e.message, 'error') }
+}
+async function doReturn()  {
+  const ok = await confirm(CONFIRMS.returnForm(activeForm.value.employeeName))
+  if (!ok) return
+  try { const u = await ipcrfApi.returnForm(activeForm.value.id);  _sync(u); showToast('Returned for revision') } catch (e) { showToast(e.message, 'error') }
+}
+async function doCompute() {
+  const ok = await confirm(CONFIRMS.computeScore(activeForm.value.employeeName))
+  if (!ok) return
+  try { const u = await ipcrfApi.computeScore(activeForm.value.id); _sync(u); showToast(`${u.finalNumericalRating} - ${u.adjectivalRating}`) } catch (e) { showToast(e.message, 'error') }
+}
 
 async function doMarkRated() {
   if (ratingBusy.value) return
+  const ok = await confirm({
+    type: 'approve',
+    title: `Mark ${activeForm.value?.type || 'Form'} as Rated`,
+    message: `This will save the final rating and move ${activeForm.value?.employeeName || 'this form'} to Rated status.`,
+    confirmLabel: 'Mark as Rated',
+    cancelLabel: 'Cancel'
+  })
+  if (!ok) return
   ratingBusy.value = true
   try {
     const u = await ipcrfApi.rateForm(activeForm.value.id, {
@@ -1171,6 +1223,15 @@ async function doMarkRated() {
 
 async function doFinalize() {
   if (ratingBusy.value) return
+  const ok = await confirm({
+    type: 'approve',
+    title: 'Finalize Form',
+    message: `This will finalize ${activeForm.value?.employeeName || 'this'} ${activeForm.value?.type || 'form'}.`,
+    note: 'Finalized forms are treated as completed records.',
+    confirmLabel: 'Finalize',
+    cancelLabel: 'Cancel'
+  })
+  if (!ok) return
   ratingBusy.value = true
   try {
     const u = await ipcrfApi.finalizeForm(activeForm.value.id, finalizeForm.value)
@@ -1180,16 +1241,30 @@ async function doFinalize() {
   finally { ratingBusy.value = false }
 }
 
-// ── Self-service period Generate (list-page entry point) ──
+// â”€â”€ Self-service period Generate (list-page entry point) â”€â”€
 async function doPeriodGenerate(kind) {
   if (periodBusy.value) return
+  const docName = kind === 'targets' ? 'Targets Sheet' : 'Ratings Sheet'
+  const ok = await confirm({
+    type: 'submit',
+    title: `Generate ${myFormType.value} ${docName}`,
+    message: `This will generate or regenerate the ${docName.toLowerCase()} for ${semesterLabel()} ${periodYear.value}.`,
+    details: [
+      { label: 'Form Type', value: myFormType.value },
+      { label: 'Period', value: `${semesterLabel()} ${periodYear.value}` }
+    ],
+    note: 'If a generated sheet already exists, it may be updated or regenerated.',
+    confirmLabel: `Generate ${docName}`,
+    cancelLabel: 'Cancel'
+  })
+  if (!ok) return
   periodBusy.value = kind
   try {
     const status = await ipcrfApi.periodStatus(periodSemester.value, periodYear.value)
 
     if (!status.hasForm) {
       if (kind === 'targets') {
-        showToast(`No ${status.type} Targets form yet for S${periodSemester.value} ${periodYear.value} — create one below.`, 'error')
+        showToast(`No ${status.type} Targets form yet for S${periodSemester.value} ${periodYear.value} - create one below.`, 'error')
         newForm.value = { ...newForm.value, type: status.type, semester: String(periodSemester.value), year: Number(periodYear.value) }
         showNewFormModal.value = true
       } else {
@@ -1206,19 +1281,13 @@ async function doPeriodGenerate(kind) {
     }
 
     if (status.totalEntries === 0) {
-      showToast('Add indicators to this form before generating Ratings — open the form to add them.', 'error')
+      showToast('Add indicators to this form before generating Ratings - open the form to add them.', 'error')
       return
     }
     if (!status.hasTargetsDoc) {
       showToast('Generate the Targets sheet first so Ratings can be added to the same spreadsheet file.', 'error')
       return
     }
-    if (!status.ratingsReady) {
-      showToast(`Accomplishments aren't fully approved yet (${status.readyEntries}/${status.totalEntries}). Redirecting…`, 'error')
-      router.push({ path: '/accomplishments', query: { formId: status.formId } })
-      return
-    }
-
     const r = await docGenApi.generateRatings(status.formId)
     _syncList(status.formId, { docFileId: r.fileId, ratingsGeneratedAt: new Date().toISOString() })
     showToast('Ratings document generated')
@@ -1232,7 +1301,7 @@ function _sync(u) {
   if (i !== -1) forms.value[i] = activeForm.value
 }
 
-// ── Document generation (official Targets / Ratings forms) — list-page only, see doPeriodGenerate ──
+// â”€â”€ Document generation (official Targets / Ratings forms) - list-page only, see doPeriodGenerate â”€â”€
 
 async function doPrint(fileId, tab) {
   if (!fileId || docGen.value.printing) return

@@ -61,6 +61,15 @@ const SpreadsheetService = (() => {
     const headers = data[0]
     const idIdx   = headers.indexOf('id')
 
+    const unknownKeys = Object.keys(updates).filter(k => headers.indexOf(k) < 0)
+    if (unknownKeys.length) {
+      Logger.log(
+        `⚠️ updateRow: column(s) [${unknownKeys.join(', ')}] don't exist in sheet "${sheet.getName()}" — ` +
+        `those fields were NOT written, even though the response will look like they were. ` +
+        `Run initializeSheets() to add missing columns.`
+      )
+    }
+
     for (let i = 1; i < data.length; i++) {
       if (String(data[i][idIdx]) === String(id)) {
         // Write each updated field individually

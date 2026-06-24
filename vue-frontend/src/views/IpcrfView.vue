@@ -33,6 +33,8 @@
         <div class="generate-item">
           <template v-if="periodStatusInfo?.hasTargetsDoc">
             <a :href="periodStatusInfo.docFileUrl" target="_blank" class="btn btn-sm btn-active-ok">Open Targets Sheet</a>
+            <button class="btn btn-sm" :disabled="docGen.printing" @click="doPrint(periodStatusInfo.docFileId, 'Targets')">{{ docGen.printing ? 'Preparing…' : 'Print' }}</button>
+            <button class="btn-link" :disabled="!!periodBusy" @click="doPeriodGenerate('targets')">{{ periodBusy === 'targets' ? 'Regenerating…' : 'Regenerate' }}</button>
           </template>
           <button v-else class="btn btn-sm" :disabled="!!periodBusy" @click="doPeriodGenerate('targets')">
             {{ periodBusy === 'targets' ? 'Checking…' : `Generate ${myFormType} Targets` }}
@@ -45,6 +47,8 @@
         <div class="generate-item">
           <template v-if="periodStatusInfo?.hasRatingsDoc">
             <a :href="periodStatusInfo.docFileUrl" target="_blank" class="btn btn-sm btn-active-ok">Open Ratings Sheet</a>
+            <button class="btn btn-sm" :disabled="docGen.printing" @click="doPrint(periodStatusInfo.docFileId, 'Ratings')">{{ docGen.printing ? 'Preparing…' : 'Print' }}</button>
+            <button class="btn-link" :disabled="!!periodBusy" @click="doPeriodGenerate('ratings')">{{ periodBusy === 'ratings' ? 'Regenerating…' : 'Regenerate' }}</button>
           </template>
           <button v-else class="btn btn-primary btn-sm" :disabled="!!periodBusy" @click="doPeriodGenerate('ratings')">
             {{ periodBusy === 'ratings' ? 'Checking…' : `Generate ${myFormType} Ratings` }}
@@ -300,24 +304,6 @@
                 <button class="btn btn-warn btn-sm" @click="doReturn">Return</button>
               </div>
             </div>
-
-            <!-- Targets document generation -->
-            <div class="docgen-bar">
-              <div class="docgen-info">
-                <span class="docgen-label">Targets Document</span>
-                <span class="docgen-sub">Generates the official Annex F.1 form from these indicators</span>
-              </div>
-              <div class="docgen-actions">
-                <template v-if="docGen.targets">
-                  <a :href="docGen.targets.fileUrl" target="_blank" class="btn btn-sm btn-outline">Open Targets Sheet</a>
-                  <button class="btn btn-sm" :disabled="docGen.printing" @click="doPrint(docGen.targets.fileId, 'Targets')">{{ docGen.printing ? 'Preparing…' : 'Print' }}</button>
-                  <button class="btn-link" :disabled="docGen.generating === 'targets'" @click="doGenerateTargets">{{ docGen.generating === 'targets' ? 'Regenerating…' : 'Regenerate' }}</button>
-                </template>
-                <button v-else class="btn btn-primary btn-sm" :disabled="docGen.generating === 'targets'" @click="doGenerateTargets">
-                  {{ docGen.generating === 'targets' ? 'Generating…' : 'Generate Targets Doc' }}
-                </button>
-              </div>
-            </div>
           </div>
 
           <!-- DETAILS TAB -->
@@ -421,24 +407,6 @@
                   {{ ratingBusy ? 'Saving…' : 'Finalize' }}
                 </button>
                 <p v-else class="muted-text" style="margin-top:10px;font-size:11px">Only an Administrator/Director can finalize this form.</p>
-              </div>
-
-              <!-- Ratings document generation -->
-              <div class="docgen-bar" style="margin-top:18px;text-align:left">
-                <div class="docgen-info">
-                  <span class="docgen-label">Ratings Document</span>
-                  <span class="docgen-sub">Adds the official Annex F.2 tab to the same Targets file</span>
-                </div>
-                <div class="docgen-actions">
-                  <template v-if="docGen.ratings">
-                    <a :href="docGen.ratings.fileUrl" target="_blank" class="btn btn-sm btn-outline">Open Ratings Sheet</a>
-                    <button class="btn btn-sm" :disabled="docGen.printing" @click="doPrint(docGen.ratings.fileId, 'Ratings')">{{ docGen.printing ? 'Preparing…' : 'Print' }}</button>
-                    <button class="btn-link" :disabled="docGen.generating === 'ratings'" @click="doGenerateRatings">{{ docGen.generating === 'ratings' ? 'Regenerating…' : 'Regenerate' }}</button>
-                  </template>
-                  <button v-else class="btn btn-primary btn-sm" :disabled="docGen.generating === 'ratings'" @click="doGenerateRatings">
-                    {{ docGen.generating === 'ratings' ? 'Generating…' : 'Generate Ratings Doc' }}
-                  </button>
-                </div>
               </div>
             </div>
           </div>
@@ -860,7 +828,7 @@ const confirmDel     = ref({ show: false, entryId: null, name: '' })
 const toast          = ref({ show: false, msg: '', type: 'success' })
 
 // Document generation (Targets / Ratings official forms)
-const docGen = ref({ targets: null, ratings: null, generating: '', printing: false })
+const docGen = ref({ printing: false })
 
 // Rate / Finalize workflow (Approved -> Rated -> Finalized)
 const feedbackForm = ref({ feedbackStrengths: '', feedbackComments: '', feedbackRecommendations: '', feedbackAreasForImprovement: '' })
@@ -1013,13 +981,7 @@ async function openFormModal(form) {
   activeForm.value   = form
   activeTab.value    = 'indicators'
   allEntries.value   = []
-  docGen.value       = {
-    targets: (form.docFileId && form.targetsGeneratedAt)
-      ? { fileId: form.docFileId, fileUrl: `https://docs.google.com/spreadsheets/d/${form.docFileId}/edit` } : null,
-    ratings: (form.docFileId && form.ratingsGeneratedAt)
-      ? { fileId: form.docFileId, fileUrl: `https://docs.google.com/spreadsheets/d/${form.docFileId}/edit` } : null,
-    generating: '', printing: false
-  }
+  docGen.value.printing = false
   feedbackForm.value = {
     feedbackStrengths:           form.feedbackStrengths           || '',
     feedbackComments:            form.feedbackComments            || '',
@@ -1213,30 +1175,26 @@ async function doPeriodGenerate(kind) {
       return
     }
 
-    let form = forms.value.find(f => f.id === status.formId)
-    if (!form) form = await ipcrfApi.get(status.formId)
-    await openFormModal(form)
-
     if (kind === 'targets') {
-      activeTab.value = 'indicators'
-      await doGenerateTargets()
+      const r = await docGenApi.generateTargets(status.formId)
+      _syncList(status.formId, { docFileId: r.fileId, targetsGeneratedAt: new Date().toISOString() })
+      showToast('Targets document generated')
       return
     }
 
     if (status.totalEntries === 0) {
-      showToast('Add indicators to this form before generating Ratings.', 'error')
-      activeTab.value = 'indicators'
+      showToast('Add indicators to this form before generating Ratings — open the form to add them.', 'error')
       return
     }
     if (!status.ratingsReady) {
       showToast(`Accomplishments aren't fully approved yet (${status.readyEntries}/${status.totalEntries}). Redirecting…`, 'error')
-      closeFormModal()
       router.push({ path: '/accomplishments', query: { formId: status.formId } })
       return
     }
 
-    activeTab.value = 'score'
-    await doGenerateRatings()
+    const r = await docGenApi.generateRatings(status.formId)
+    _syncList(status.formId, { docFileId: r.fileId, ratingsGeneratedAt: new Date().toISOString() })
+    showToast('Ratings document generated')
   } catch (e) { showToast(e.message, 'error') }
   finally { periodBusy.value = ''; loadPeriodStatus() }
 }
@@ -1247,28 +1205,7 @@ function _sync(u) {
   if (i !== -1) forms.value[i] = activeForm.value
 }
 
-// ── Document generation (official Targets / Ratings forms) ──
-async function doGenerateTargets() {
-  docGen.value.generating = 'targets'
-  try {
-    const r = await docGenApi.generateTargets(activeForm.value.id)
-    docGen.value.targets = r
-    _sync({ docFileId: r.fileId, targetsGeneratedAt: new Date().toISOString() })
-    showToast('Targets document generated')
-  } catch (e) { showToast(e.message, 'error') }
-  finally { docGen.value.generating = ''; loadPeriodStatus() }
-}
-
-async function doGenerateRatings() {
-  docGen.value.generating = 'ratings'
-  try {
-    const r = await docGenApi.generateRatings(activeForm.value.id)
-    docGen.value.ratings = r
-    _sync({ docFileId: r.fileId, ratingsGeneratedAt: new Date().toISOString() })
-    showToast('Ratings document generated')
-  } catch (e) { showToast(e.message, 'error') }
-  finally { docGen.value.generating = ''; loadPeriodStatus() }
-}
+// ── Document generation (official Targets / Ratings forms) — list-page only, see doPeriodGenerate ──
 
 async function doPrint(fileId, tab) {
   if (!fileId || docGen.value.printing) return
@@ -1492,11 +1429,6 @@ async function doPrint(fileId, tab) {
 .wf-info{font-size:11px;color:#64748B;}
 
 /* Document generation bar */
-.docgen-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;margin-top:14px;background:#F8FAFC;border:1px solid #F1F5F9;border-radius:9px;flex-wrap:wrap;}
-.docgen-info{display:flex;flex-direction:column;gap:2px;}
-.docgen-label{font-size:12px;font-weight:600;color:#374151;}
-.docgen-sub{font-size:10.5px;color:#94A3B8;}
-.docgen-actions{display:flex;gap:6px;flex-shrink:0;align-items:center;}
 .btn-link{background:none;border:none;color:#94A3B8;font-size:11px;cursor:pointer;text-decoration:underline;padding:0 4px;font-family:inherit;}
 .btn-link:hover{color:#475569;}
 .btn-link:disabled{opacity:.5;cursor:not-allowed;}

@@ -78,13 +78,14 @@ const IpcrfService = (() => {
 
     // Prevent duplicate form per user per semester/year/type
     const sheet    = SpreadsheetService.getSheet(SHEET.IPCRF_FORMS)
+    const _type = _formTypeForProfile(profile)
     const existing = SpreadsheetService.getAllRows(sheet).find(r =>
       r.userId   === (body.userId || profile.id) &&
       r.semester === body.semester &&
       String(r.year) === String(body.year) &&
-      r.type === (body.type || 'IPCRF')
+      r.type === _type
     )
-    if (existing) throw HttpError(`An ${body.type || 'IPCRF'} form already exists for this period`, 409)
+    if (existing) throw HttpError(`An ${_type} form already exists for this period`, 409)
 
     // ── Derive position level and weights from user's position title ──
     // Never trust frontend input for these — always compute server-side.
@@ -93,7 +94,7 @@ const IpcrfService = (() => {
 
     const form = {
       id:                    SpreadsheetService.generateId('FORM-'),
-      type:                  body.type             || 'IPCRF',
+      type:                  _type,
       userId:                body.userId           || profile.id,
       employeeName:          body.employeeName     || profile.fullName,
       position:              profile.position      || '',
@@ -537,6 +538,13 @@ const IpcrfService = (() => {
     return owner ? (owner.section || '') : ''
   }
 
+  function _formTypeForProfile(profile) {
+    const employmentType = String(profile.type || '').toLowerCase()
+    return employmentType.includes('contract') || employmentType.includes('cos')
+      ? 'CCEF'
+      : 'IPCRF'
+  }
+
   function _ratingLabel(score) {
     if (score >= 4.500) return 'Outstanding'
     if (score >= 3.500) return 'Very Satisfactory'
@@ -579,7 +587,7 @@ const IpcrfService = (() => {
   // Accomplishments record has been approved yet.
   function getPeriodStatus(params, user) {
     const profile = AuthService.getProfile(user)
-    const type    = ['Contract of Service (COS)', 'Contractor of Service (COS)'].includes(profile.type) ? 'CCEF' : 'IPCRF'
+    const type    = _formTypeForProfile(profile)
 
     const sheet = SpreadsheetService.getSheet(SHEET.IPCRF_FORMS)
     const form  = SpreadsheetService.getAllRows(sheet).find(r =>

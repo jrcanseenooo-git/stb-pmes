@@ -28,6 +28,12 @@
         </select>
         <label class="field-label">Year</label>
         <input v-model.number="periodYear" type="number" class="filter-select" style="width:80px"/>
+        <label class="field-label">Applicable Period</label>
+        <select v-model="targetApplicablePeriod" class="filter-select">
+          <option value="Both semesters">Both semesters</option>
+          <option value="1st Semester">1st semester only</option>
+          <option value="2nd Semester">2nd semester only</option>
+        </select>
       </div>
       <div class="generate-actions">
         <div class="generate-item">
@@ -910,12 +916,17 @@ const scoreColorClass = computed(() => {
 const { canApprove, isAdmin, isDirector, isAsstDir } = usePermissions()
 const canFinalize  = computed(() => isAdmin.value || isDirector.value || isAsstDir.value)
 const canSelfServe = computed(() => !isDirector.value && !isAsstDir.value)
-const COS_TYPE_VALUES = ['Contract of Service (COS)', 'Contractor of Service (COS)'] // tolerate the old typo'd value until existing users are re-saved
-const myFormType   = computed(() => COS_TYPE_VALUES.includes(authStore.employmentType) ? 'CCEF' : 'IPCRF')
+function isCosEmploymentType(value) {
+  const type = String(value || '').toLowerCase()
+  return type.includes('contract') || type.includes('cos')
+}
+
+const myFormType   = computed(() => isCosEmploymentType(authStore.employmentType) ? 'CCEF' : 'IPCRF')
 
 // Period-level Generate Targets/Ratings (self-service, list-page entry point)
 const periodSemester = ref(String(new Date().getMonth() < 6 ? 1 : 2))
 const periodYear     = ref(new Date().getFullYear())
+const targetApplicablePeriod = ref('Both semesters')
 const periodBusy     = ref('')
 const periodStatusInfo    = ref(null)
 const periodStatusLoading = ref(false)
@@ -1176,7 +1187,9 @@ async function doPeriodGenerate(kind) {
     }
 
     if (kind === 'targets') {
-      const r = await docGenApi.generateTargets(status.formId)
+      const r = await docGenApi.generateTargets(status.formId, {
+        applicableRatingPeriod: targetApplicablePeriod.value
+      })
       _syncList(status.formId, { docFileId: r.fileId, targetsGeneratedAt: new Date().toISOString() })
       showToast('Targets document generated')
       return
@@ -1184,6 +1197,10 @@ async function doPeriodGenerate(kind) {
 
     if (status.totalEntries === 0) {
       showToast('Add indicators to this form before generating Ratings — open the form to add them.', 'error')
+      return
+    }
+    if (!status.hasTargetsDoc) {
+      showToast('Generate the Targets sheet first so Ratings can be added to the same spreadsheet file.', 'error')
       return
     }
     if (!status.ratingsReady) {
@@ -1241,7 +1258,7 @@ async function doPrint(fileId, tab) {
 
 /* Self-service period generate bar */
 .generate-bar{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 16px;margin-bottom:16px;background:#F5F9FF;border:1px solid #DCE9FB;border-radius:10px;flex-wrap:wrap;}
-.generate-period{display:flex;align-items:center;gap:8px;}
+.generate-period{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
 .generate-period .field-label{margin:0;}
 .generate-actions{display:flex;gap:14px;flex-wrap:wrap;justify-content:flex-end;}
 .generate-item{display:grid;grid-template-columns:auto auto auto;align-items:center;gap:6px 8px;justify-content:flex-start;}

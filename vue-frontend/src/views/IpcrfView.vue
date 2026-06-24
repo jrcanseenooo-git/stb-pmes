@@ -471,7 +471,7 @@
               </svg>
               <input v-model="libSearch" type="text" class="srch-inp" placeholder="Search KRA or indicator…"/>
             </div>
-            <select v-model="libPhase" class="field-input" style="width:140px">
+            <select v-if="currentFnType === 'Core'" v-model="libPhase" class="field-input" style="width:140px">
               <option value="">All Phases</option>
               <option v-for="p in PHASES" :key="p" :value="p">{{ p.replace(/_/g, ' ') }}</option>
             </select>

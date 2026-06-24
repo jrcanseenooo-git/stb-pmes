@@ -96,7 +96,7 @@ const IpcrfService = (() => {
       id:                    SpreadsheetService.generateId('FORM-'),
       type:                  _type,
       userId:                body.userId           || profile.id,
-      employeeName:          body.employeeName     || profile.fullName,
+      employeeName:          body.employeeName     || _profileEmployeeName(profile),
       position:              profile.position      || '',
       positionLevel:         _level,
       divisionId:            profile.divisionId    || '',
@@ -543,6 +543,18 @@ const IpcrfService = (() => {
     return employmentType.includes('contract') || employmentType.includes('cos')
       ? 'CCEF'
       : 'IPCRF'
+  }
+
+  function _profileEmployeeName(profile) {
+    const fullName = String(profile.fullName || '').trim()
+    if (fullName && !_sameText(fullName, profile.position)) return fullName
+
+    const partsName = [profile.firstName, profile.lastName].filter(Boolean).join(' ').trim()
+    return partsName || fullName || ''
+  }
+
+  function _sameText(a, b) {
+    return String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase()
   }
 
   function _ratingLabel(score) {

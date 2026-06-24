@@ -149,7 +149,7 @@ const Router = (() => {
         if (id && sub === 'rate') return IpcrfService.rate(id, body, user)
         if (id && sub === 'finalize') return IpcrfService.finalize(id, body, user)
         if (id && sub === 'compute-score') return IpcrfService.computeScore(id, user)
-        if (id && sub === 'generate-targets') return PmesDocGenService.generateTargetsDoc(id, user, body)
+        if (id && sub === 'generate-targets') return PmesDocGenService.generateTargetsDoc(id, user)
         if (id && sub === 'generate-ratings') return PmesDocGenService.generateRatingsDoc(id, user)
         if (id && sub === 'entries') {
           if (!subId && method === 'GET') return IpcrfService.listEntries(id, user)

@@ -10,14 +10,60 @@
         </svg>
         <input v-model="search" type="text" placeholder="Search users…"/>
       </div>
-      <button class="btn btn-primary" @click="openAddModal">
-        <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-          <circle cx="6.5" cy="5" r="2.5" stroke="currentColor" stroke-width="1.3"/>
-          <path d="M1 12c0-3 2.5-5 5.5-5s5.5 2 5.5 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-          <path d="M10 3v4M12 5H8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-        </svg>
-        Add User
-      </button>
+      <div class="top-actions">
+        <button v-if="isSystemAdmin" class="btn btn-secondary" @click="toggleFocalPanel">
+          Focal Assignments
+        </button>
+        <button class="btn btn-primary" @click="openAddModal">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <circle cx="6.5" cy="5" r="2.5" stroke="currentColor" stroke-width="1.3"/>
+            <path d="M1 12c0-3 2.5-5 5.5-5s5.5 2 5.5 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+            <path d="M10 3v4M12 5H8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+          </svg>
+          Add User
+        </button>
+      </div>
+    </div>
+
+    <div v-if="isSystemAdmin && showFocalPanel" class="card focal-card">
+      <div class="card-hd">
+        <span class="card-title">Focal Assignments</span>
+        <span class="badge badge-blue">{{ focalLoading ? 'Loading...' : 'Review routing' }}</span>
+      </div>
+
+      <div class="focal-grid">
+        <div class="field focal-bureau">
+          <label class="field-label">Bureau Focal</label>
+          <select v-model="bureauFocalUserId" class="field-select">
+            <option value="">No bureau focal assigned</option>
+            <option v-for="u in focalUsers" :key="u.id" :value="u.id">
+              {{ u.fullName }} — {{ u.divisionName || u.role }}
+            </option>
+          </select>
+        </div>
+
+        <div class="focal-list">
+          <div v-for="item in divisionFocalRows" :key="item.divisionId" class="focal-row">
+            <div>
+              <div class="focal-division">{{ item.divisionName }}</div>
+              <div class="text-xs muted">Division IPCRF/CCEF checker and reviewer</div>
+            </div>
+            <select v-model="item.userId" class="field-select">
+              <option value="">No division focal assigned</option>
+              <option v-for="u in focalUsersForDivision(item.divisionId)" :key="u.id" :value="u.id">
+                {{ u.fullName }} — {{ u.role }}
+              </option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="focal-actions">
+        <button class="btn" @click="loadFocalAssignments" :disabled="focalLoading || focalSaving">Refresh</button>
+        <button class="btn btn-primary" @click="saveFocalAssignments" :disabled="focalLoading || focalSaving">
+          {{ focalSaving ? 'Saving...' : 'Save Assignments' }}
+        </button>
+      </div>
     </div>
 
     <!-- Table card -->
@@ -360,7 +406,9 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { usersApi } from '@/services/api'
+import { usersApi, focalAssignmentsApi } from '@/services/api'
+import { useAuthStore } from '@/stores/auth'
+import { useConfirm, CONFIRMS } from '@/composables/useConfirm'
 
 // Must match the canonical Divisions seeded in InitSheets.gs exactly.
 // The division <select> binds to the display name only; this resolves it to
@@ -377,15 +425,24 @@ const DIVISION_IDS = {
 const search        = ref('')
 const showModal     = ref(false)
 const showResetModal = ref(false)
+const showFocalPanel = ref(false)
 const editingUser   = ref(null)
 const resetTarget   = ref(null)
 const resetTempPw   = ref('')
 const saving        = ref(false)
 const loading       = ref(false)
+const focalLoading  = ref(false)
+const focalSaving   = ref(false)
 const copied        = ref(false)
 const showPw        = ref({})
 const toast         = ref({ show: false, msg: '', type: 'success' })
 const users         = ref([])
+const focalUsers    = ref([])
+const divisionFocalRows = ref([])
+const bureauFocalUserId = ref('')
+const authStore = useAuthStore()
+const { confirm } = useConfirm()
+const isSystemAdmin = computed(() => authStore.role === 'System Administrator')
 
 // ── Load users on mount ──
 onMounted(async () => {
@@ -400,6 +457,79 @@ onMounted(async () => {
     loading.value = false
   }
 })
+
+async function toggleFocalPanel() {
+  showFocalPanel.value = !showFocalPanel.value
+  if (showFocalPanel.value && !divisionFocalRows.value.length) {
+    await loadFocalAssignments()
+  }
+}
+
+async function loadFocalAssignments() {
+  focalLoading.value = true
+  try {
+    const data = await focalAssignmentsApi.list()
+    focalUsers.value = data.users || []
+    bureauFocalUserId.value = data.bureauFocal?.userId || ''
+    divisionFocalRows.value = (data.divisionFocals || []).map(row => ({
+      divisionId: row.divisionId,
+      divisionName: row.divisionName,
+      userId: row.userId || ''
+    }))
+  } catch (e) {
+    showToast(`Could not load focal assignments: ${e.message}`, 'error')
+  } finally {
+    focalLoading.value = false
+  }
+}
+
+function focalUsersForDivision(divisionId) {
+  const sameDivision = focalUsers.value.filter(u => u.divisionId === divisionId)
+  const admins = focalUsers.value.filter(u =>
+    ['System Administrator', 'Bureau Director', 'Assistant Bureau Director'].includes(u.role)
+  )
+  const combined = [...sameDivision, ...admins]
+  return combined.filter((u, idx, arr) => arr.findIndex(x => x.id === u.id) === idx)
+}
+
+async function saveFocalAssignments() {
+  const ok = await confirm({
+    type: 'submit',
+    title: 'Save Focal Assignments',
+    message: 'These assignments will control who receives and checks submitted IPCRF/CCEF forms.',
+    details: [
+      { label: 'Bureau Focal', value: focalUsers.value.find(u => u.id === bureauFocalUserId.value)?.fullName || 'Not assigned' },
+      { label: 'Divisions', value: `${divisionFocalRows.value.length} division routing records` }
+    ],
+    note: 'A submitted form will be routed to the assigned Division Focal for the staff member’s division.',
+    confirmLabel: 'Save Assignments',
+    cancelLabel: 'Cancel'
+  })
+  if (!ok) return
+
+  focalSaving.value = true
+  try {
+    const data = await focalAssignmentsApi.save({
+      bureauFocalUserId: bureauFocalUserId.value,
+      divisionFocals: divisionFocalRows.value.map(row => ({
+        divisionId: row.divisionId,
+        userId: row.userId
+      }))
+    })
+    focalUsers.value = data.users || focalUsers.value
+    bureauFocalUserId.value = data.bureauFocal?.userId || ''
+    divisionFocalRows.value = (data.divisionFocals || []).map(row => ({
+      divisionId: row.divisionId,
+      divisionName: row.divisionName,
+      userId: row.userId || ''
+    }))
+    showToast('Focal assignments saved.')
+  } catch (e) {
+    showToast(`Failed: ${e.message}`, 'error')
+  } finally {
+    focalSaving.value = false
+  }
+}
 
 // ── Map sheet row → display object ──
 function mapUser(row) {
@@ -496,6 +626,17 @@ async function saveUser() {
   if (!form.value.firstName || !form.value.lastName || !form.value.email || !form.value.role) {
     showToast('Please fill in all required fields.', 'error'); return
   }
+  const ok = await confirm(editingUser.value
+    ? {
+        type: 'info',
+        title: 'Save User Changes',
+        message: `Changes to ${form.value.firstName} ${form.value.lastName}'s account will be saved.`,
+        confirmLabel: 'Save Changes',
+        cancelLabel: 'Cancel'
+      }
+    : CONFIRMS.createUser(form.value.email, form.value.role)
+  )
+  if (!ok) return
   saving.value = true
   try {
     const payload = {
@@ -531,10 +672,14 @@ async function saveUser() {
 
 // ── Activate / Deactivate ──
 async function activateUser(user) {
+  const ok = await confirm(CONFIRMS.activateUser(user.name))
+  if (!ok) return
   try   { await usersApi.activate(user.id); user.status = 'Active';   showToast(`${user.name} activated.`) }
   catch (e) { showToast(`Failed: ${e.message}`, 'error') }
 }
 async function deactivateUser(user) {
+  const ok = await confirm(CONFIRMS.deactivateUser(user.name))
+  if (!ok) return
   try   { await usersApi.deactivate(user.id); user.status = 'Inactive'; showToast(`${user.name} deactivated.`, 'warning') }
   catch (e) { showToast(`Failed: ${e.message}`, 'error') }
 }
@@ -542,6 +687,8 @@ async function deactivateUser(user) {
 // ── Reset password ──
 function resetPassword(user) { resetTarget.value = user; resetTempPw.value = generatePassword(); showResetModal.value = true }
 async function confirmReset() {
+  const ok = await confirm(CONFIRMS.resetPassword(resetTarget.value.name))
+  if (!ok) return
   try {
     await usersApi.update(resetTarget.value.id, { tempPassword: resetTempPw.value, mustChangePassword: true })
     resetTarget.value.tempPassword = resetTempPw.value
@@ -581,6 +728,7 @@ function showToast(msg, type='success') {
 
 /* Top bar */
 .top-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.top-actions{display:flex;align-items:center;gap:8px;}
 .search-box{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #E2E8F0;border-radius:8px;padding:7px 12px;width:260px;}
 .search-box input{border:none;outline:none;font-size:13px;font-family:'DM Sans',sans-serif;color:#1A2332;width:100%;}
 
@@ -589,6 +737,8 @@ function showToast(msg, type='success') {
 .btn:hover{border-color:#CBD5E1;background:#F8FAFC;}
 .btn-primary{background:#0D2137;color:#fff;border-color:#0D2137;}
 .btn-primary:hover{background:#1e3f61;border-color:#1e3f61;}
+.btn-secondary{background:#F8FAFC;color:#0D2137;border-color:#CBD5E1;}
+.btn-secondary:hover{background:#EEF2F7;border-color:#94A3B8;}
 .btn:disabled{opacity:.55;cursor:not-allowed;}
 .btn-sm{padding:4px 9px;font-size:11px;}
 .btn-xs{padding:3px 8px;font-size:10px;border-radius:5px;}
@@ -603,6 +753,16 @@ function showToast(msg, type='success') {
 .card-title{font-size:12px;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:.5px;}
 .badge{display:inline-flex;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;}
 .badge-blue{background:#EBF4FF;color:#1A56B0;}
+
+/* Focal assignments */
+.focal-card{margin-bottom:12px;}
+.focal-grid{display:grid;grid-template-columns:320px 1fr;gap:16px;padding:16px;}
+.focal-bureau{align-self:start;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;padding:14px;}
+.focal-list{display:flex;flex-direction:column;border:1px solid #E2E8F0;border-radius:10px;overflow:hidden;}
+.focal-row{display:grid;grid-template-columns:minmax(220px,1fr) minmax(260px,360px);gap:14px;align-items:center;padding:12px 14px;border-bottom:1px solid #F1F5F9;}
+.focal-row:last-child{border-bottom:none;}
+.focal-division{font-weight:700;color:#0F172A;}
+.focal-actions{display:flex;justify-content:flex-end;gap:8px;padding:0 16px 16px;}
 
 /* Table */
 .table-wrap{overflow-x:auto;}

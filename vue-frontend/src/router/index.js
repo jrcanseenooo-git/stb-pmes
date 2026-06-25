@@ -27,6 +27,7 @@ const routes = [
         component: () => import("@/views/DashboardView.vue"),
       },
       { path: "ipcrf", component: () => import("@/views/IpcrfView.vue") },
+      { path: "review", component: () => import("@/views/ReviewView.vue") },
       { path: "kra", component: () => import("@/views/KraView.vue") },
       {
         path: "accomplishments",

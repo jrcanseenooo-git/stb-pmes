@@ -30,35 +30,34 @@
         <input v-model.number="periodYear" type="number" class="filter-select" style="width:80px"/>
       </div>
       <div class="generate-actions">
+        <a
+          v-if="periodStatusInfo?.docFileUrl && (periodStatusInfo?.hasTargetsDoc || periodStatusInfo?.hasRatingsDoc)"
+          :href="periodStatusInfo.docFileUrl"
+          target="_blank"
+          class="btn btn-sm btn-active-ok">
+          Open Spreadsheet
+        </a>
         <div class="generate-item">
           <template v-if="periodStatusInfo?.hasTargetsDoc">
-            <a :href="periodStatusInfo.docFileUrl" target="_blank" class="btn btn-sm btn-active-ok">Open Targets Sheet</a>
-            <button class="btn-link" :disabled="!!periodBusy" @click="doPeriodGenerate('targets')">{{ periodBusy === 'targets' ? 'Regenerating...' : 'Regenerate' }}</button>
+            <span class="generate-label">Targets:</span>
+            <!-- <span class="doc-status-chip">{{ periodStatusInfo.formStatus || 'Generated' }}</span> -->
+            <button class="btn btn-xs btn-regenerate" :disabled="!!periodBusy" @click="doPeriodGenerate('targets')">{{ periodBusy === 'targets' ? 'Regenerating...' : 'Regenerate' }}</button>
           </template>
           <button v-else class="btn btn-sm" :disabled="!!periodBusy" @click="doPeriodGenerate('targets')">
             {{ periodBusy === 'targets' ? 'Checking...' : `Generate ${myFormType} Targets` }}
           </button>
           <span v-if="periodStatusLoading" class="generate-hint">Checking...</span>
-          <span v-else-if="periodStatusInfo?.hasTargetsDoc" class="generate-hint generate-hint-ok">Generated - {{ periodStatusInfo.formStatus }}</span>
-          <span v-else-if="periodStatusInfo?.docMissing" class="generate-hint generate-hint-warn">Generated sheet missing - regenerate</span>
-          <span v-else-if="periodStatusInfo?.hasForm" class="generate-hint">Form exists - doc not generated yet</span>
-          <span v-else-if="periodStatusInfo" class="generate-hint">Not created yet for this period</span>
         </div>
         <div class="generate-item">
           <template v-if="periodStatusInfo?.hasRatingsDoc">
-            <a :href="periodStatusInfo.docFileUrl" target="_blank" class="btn btn-sm btn-active-ok">Open Ratings Sheet</a>
-            <button class="btn-link" :disabled="!!periodBusy" @click="doPeriodGenerate('ratings')">{{ periodBusy === 'ratings' ? 'Regenerating...' : 'Regenerate' }}</button>
+            <span class="generate-label">Ratings:</span>
+            <!-- <span class="doc-status-chip">Generated</span> -->
+            <button class="btn btn-xs btn-regenerate" :disabled="!!periodBusy" @click="doPeriodGenerate('ratings')">{{ periodBusy === 'ratings' ? 'Regenerating...' : 'Regenerate' }}</button>
           </template>
           <button v-else class="btn btn-primary btn-sm" :disabled="!!periodBusy" @click="doPeriodGenerate('ratings')">
             {{ periodBusy === 'ratings' ? 'Checking...' : `Generate ${myFormType} Ratings` }}
           </button>
           <span v-if="periodStatusLoading" class="generate-hint">Checking...</span>
-          <span v-else-if="periodStatusInfo?.hasRatingsDoc" class="generate-hint generate-hint-ok">Generated</span>
-          <span v-else-if="periodStatusInfo?.docMissing" class="generate-hint generate-hint-warn">Generated sheet missing - regenerate Targets first</span>
-          <span v-else-if="periodStatusInfo?.hasForm && periodStatusInfo.ratingsReady" class="generate-hint generate-hint-ok">Ready - ratings entries available</span>
-          <span v-else-if="periodStatusInfo?.hasForm && periodStatusInfo.totalEntries > 0" class="generate-hint generate-hint-ok">{{ periodStatusInfo.totalEntries }} ratings entries available</span>
-          <span v-else-if="periodStatusInfo?.hasForm" class="generate-hint">No indicators added yet</span>
-          <span v-else-if="periodStatusInfo" class="generate-hint">Create Targets first</span>
         </div>
       </div>
     </div>
@@ -141,11 +140,11 @@
           <div class="fc-actions">
             <button v-if="(form.status === 'Draft' || form.status === 'Returned') && form.userId === authStore.profileId"
               class="btn btn-xs btn-outline" @click.stop="quickSubmit(form)">Submit</button>
-            <button v-if="form.status === 'Submitted' && canApprove"
+            <button v-if="canReviewForm(form)"
               class="btn btn-xs btn-success" @click.stop="quickApprove(form)">Approve</button>
-            <button v-if="form.status === 'Submitted' && canApprove"
+            <button v-if="canReviewForm(form)"
               class="btn btn-xs btn-warn" @click.stop="quickReturn(form)">Return</button>
-            <button v-if="form.status === 'Submitted' && canApprove"
+            <button v-if="canReviewForm(form)"
               class="btn btn-xs btn-info" @click.stop="openFormModal(form)" title="Open" aria-label="Open">View</button>
           </div>
         </div>
@@ -299,7 +298,7 @@
             </div>
             <div v-else-if="activeForm?.status === 'Submitted'" class="wf-bar">
               <span class="wf-info">Pending review</span>
-              <div style="display:flex;gap:8px">
+              <div v-if="canReviewActiveForm" style="display:flex;gap:8px">
                 <button class="btn btn-success btn-sm" @click="doApprove">Approve</button>
                 <button class="btn btn-warn btn-sm" @click="doReturn">Return</button>
               </div>
@@ -527,24 +526,28 @@
                 </div>
                 <div class="ci-label">Performance Indicator</div>
                 <div class="ci-pi">{{ item.performanceIndicator || item.successIndicator || '' }}</div>
-                <div class="ci-period">
-                  <label class="ci-label">Applicable Rating Period</label>
-                  <select v-model="item.applicableRatingPeriod" class="field-input ci-period-select">
-                    <option value="Both semesters">Both semesters</option>
-                    <option value="1st Semester">1st Semester</option>
-                    <option value="2nd Semester">2nd Semester</option>
-                  </select>
+                <div class="ci-control-row">
+                  <div class="ci-period">
+                    <div class="ci-period-head">
+                      <label class="ci-label">Applicable Rating Period</label>
+                      <button class="ci-rm" @click="libSelected.splice(idx, 1)" title="Remove indicator">
+                        <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                          <path d="M1 1l11 11M12 1L1 12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                        </svg>
+                      </button>
+                    </div>
+                    <select v-model="item.applicableRatingPeriod" class="field-input ci-period-select">
+                      <option value="Both semesters">Both semesters</option>
+                      <option value="1st Semester">1st Semester</option>
+                      <option value="2nd Semester">2nd Semester</option>
+                    </select>
+                  </div>
                 </div>
                 <div v-if="item.meansOfVerification" class="ci-mov-wrap">
                   <div class="ci-label">Means of Verification</div>
                   <div class="ci-mov">{{ item.meansOfVerification }}</div>
                 </div>
               </div>
-              <button class="ci-rm" @click="libSelected.splice(idx, 1)">
-                <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                  <path d="M1 1l11 11M12 1L1 12" stroke="#94A3B8" stroke-width="1.4" stroke-linecap="round"/>
-                </svg>
-              </button>
             </div>
           </div>
           <div class="modal-footer">
@@ -920,6 +923,11 @@ const scoreColorClass = computed(() => {
 const { canApprove, isAdmin, isDirector, isAsstDir } = usePermissions()
 const canFinalize  = computed(() => isAdmin.value || isDirector.value || isAsstDir.value)
 const canSelfServe = computed(() => !isDirector.value && !isAsstDir.value)
+const canReviewActiveForm = computed(() =>
+  activeForm.value &&
+  (activeForm.value.canReview === true || activeForm.value.canReview === 'true' || canApprove.value) &&
+  String(activeForm.value.userId || '') !== String(authStore.profileId || '')
+)
 function isCosEmploymentType(value) {
   const type = String(value || '').toLowerCase()
   return type.includes('contract') || type.includes('cos')
@@ -1003,6 +1011,15 @@ async function loadForms() {
   }
 }
 
+function canReviewForm(form) {
+  return !!(
+    form &&
+    form.status === 'Submitted' &&
+    (form.canReview === true || form.canReview === 'true' || canApprove.value) &&
+    String(form.userId || '') !== String(authStore.profileId || '')
+  )
+}
+
 async function openFormModal(form) {
   activeForm.value   = form
   activeTab.value    = 'indicators'
@@ -1063,11 +1080,13 @@ async function quickSubmit(form)  {
   try { const u = await ipcrfApi.submitForm(form.id);  _syncList(form.id, u); showToast('Submitted') } catch (e) { showToast(e.message, 'error') }
 }
 async function quickApprove(form) {
+  if (!canReviewForm(form)) return
   const ok = await confirm(CONFIRMS.approveForm(form.employeeName, form.type))
   if (!ok) return
   try { const u = await ipcrfApi.approveForm(form.id); _syncList(form.id, u); showToast('Approved') } catch (e) { showToast(e.message, 'error') }
 }
 async function quickReturn(form)  {
+  if (!canReviewForm(form)) return
   const ok = await confirm(CONFIRMS.returnForm(form.employeeName))
   if (!ok) return
   try { const u = await ipcrfApi.returnForm(form.id);  _syncList(form.id, u); showToast('Returned') } catch (e) { showToast(e.message, 'error') }
@@ -1183,11 +1202,13 @@ async function doSubmit()  {
   try { const u = await ipcrfApi.submitForm(activeForm.value.id);  _sync(u); showToast('Submitted') }       catch (e) { showToast(e.message, 'error') }
 }
 async function doApprove() {
+  if (!canReviewActiveForm.value) return
   const ok = await confirm(CONFIRMS.approveForm(activeForm.value.employeeName, activeForm.value.type))
   if (!ok) return
   try { const u = await ipcrfApi.approveForm(activeForm.value.id); _sync(u); showToast('Approved') }       catch (e) { showToast(e.message, 'error') }
 }
 async function doReturn()  {
+  if (!canReviewActiveForm.value) return
   const ok = await confirm(CONFIRMS.returnForm(activeForm.value.employeeName))
   if (!ok) return
   try { const u = await ipcrfApi.returnForm(activeForm.value.id);  _sync(u); showToast('Returned for revision') } catch (e) { showToast(e.message, 'error') }
@@ -1341,11 +1362,15 @@ async function doPrint(fileId, tab) {
 .generate-period .field-label{margin:0;}
 .generate-actions{display:flex;gap:14px;flex-wrap:wrap;justify-content:flex-end;}
 .generate-item{display:grid;grid-template-columns:auto auto auto;align-items:center;gap:6px 8px;justify-content:flex-start;}
+.generate-label{font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;}
+.doc-status-chip{display:inline-flex;align-items:center;justify-content:center;padding:2px 7px;border-radius:999px;background:#ECFDF5;border:1px solid #BBF7D0;color:#047857;font-size:10px;font-weight:700;line-height:1.4;white-space:nowrap;}
 .generate-item > .btn,
 .generate-item > .btn-link{white-space:nowrap;}
-.generate-hint{grid-column:1 / -1;font-size:10.5px;color:#94A3B8;}
-.generate-hint-ok{color:#15803D;font-weight:600;}
-.generate-hint-warn{color:#B45309;font-weight:600;}
+.generate-hint{grid-column:1 / -1;font-size:10px;color:#94A3B8;font-weight:500;line-height:1.2;}
+.generate-hint-ok{color:#15803D;font-weight:500;}
+.generate-hint-warn{color:#B45309;font-weight:500;}
+.btn-regenerate{padding:4px 9px;border-color:#CBD5E1;background:#fff;color:#334155;font-size:11px;font-weight:600;}
+.btn-regenerate:hover:not(:disabled){border-color:#3B82F6;background:#EFF6FF;color:#1D4ED8;}
 .btn-active-ok{background:#F0FDF4;color:#15803D;border-color:#BBF7D0;}
 .btn-active-ok:hover{background:#DCFCE7;}
 .status-tabs{display:flex;gap:4px;flex-wrap:wrap;}
@@ -1597,11 +1622,14 @@ async function doPrint(fileId, tab) {
 .ci-tags{display:flex;flex-wrap:wrap;gap:4px;}
 .ci-label{font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px;margin-top:8px;}
 .ci-pi{font-size:12px;color:#334155;line-height:1.65;}
-.ci-period{margin-top:10px;max-width:260px;}
-.ci-period-select{height:32px;padding:5px 9px;font-size:12px;}
+.ci-control-row{display:flex;align-items:flex-start;justify-content:flex-start;margin-top:10px;}
+.ci-period{width:260px;flex:0 0 auto;}
+.ci-period-head{display:inline-flex;align-items:center;justify-content:flex-start;gap:4px;margin-bottom:4px;width:max-content;}
+.ci-period-head .ci-label{margin:0;white-space:nowrap;}
+.ci-period-select{height:32px;padding:5px 9px;font-size:12px;width:100%;}
 .ci-mov-wrap{margin-top:8px;}
 .ci-mov{font-size:12px;color:#64748B;background:#F8FAFC;border:1px solid #F1F5F9;border-radius:6px;padding:6px 10px;line-height:1.55;}
-.ci-rm{display:flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:5px;border:none;background:transparent;cursor:pointer;color:#CBD5E1;flex-shrink:0;margin-top:2px;}
+.ci-rm{display:flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:5px;border:1px solid transparent;background:transparent;cursor:pointer;color:#94A3B8;flex-shrink:0;padding:0;}
 .ci-rm:hover{background:#FEF2F2;color:#EF4444;}
 
 /* Fullscreen lock */

@@ -92,6 +92,19 @@
             <span v-if="collapsed" class="nav-badge-dot"></span>
           </RouterLink>
 
+          <RouterLink to="/review" class="nav-item" active-class="active" :title="collapsed ? 'Review' : ''">
+            <div class="nav-icon">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.4" />
+                <path d="M5 5h6M5 8h6M5 11h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+                <path d="M10.5 10.5l1 1 2-2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </div>
+            <transition name="fade">
+              <span v-if="!collapsed" class="nav-label-text">Review</span>
+            </transition>
+          </RouterLink>
+
           <RouterLink to="/mov" class="nav-item" active-class="active" :title="collapsed ? 'MOV Files' : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -289,6 +302,7 @@ const showLogoutConfirm = ref(false)
 const titleMap = {
   '/dashboard': { title: 'Dashboard', sub: 'Bureau Overview' },
   '/ipcrf': { title: 'IPCRF / CCEF Forms', sub: 'Performance Commitments' },
+  '/review': { title: 'Review', sub: 'Assigned IPCRF / CCEF Forms' },
   '/kra': { title: 'KRA Library', sub: 'Master KRA & SI List' },
   '/accomplishments': { title: 'Accomplishments', sub: 'Q1 2025' },
   '/mov': { title: 'MOV Files', sub: 'Google Drive' },

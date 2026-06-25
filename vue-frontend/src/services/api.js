@@ -91,6 +91,14 @@ export const usersApi = {
   resetPassword: (id, data) => gasWrite('PATCH', `users/${id}/reset-password`, data)
 }
 
+export const focalAssignmentsApi = {
+  list: (p = {}) => gasGet('focal-assignments', p),
+  save: (data)   => gasWrite('POST', 'focal-assignments', {
+    ...data,
+    divisionFocals: JSON.stringify(data.divisionFocals || [])
+  })
+}
+
 // ── KRAs & Success Indicators ──────────────────
 
 export const kraApi = {
@@ -290,6 +298,7 @@ export default {
   authApi,
   dashboardApi,
   usersApi,
+  focalAssignmentsApi,
   kraApi,
   kraLibraryApi,
   accomplishmentsApi,

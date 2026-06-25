@@ -24,9 +24,11 @@ const IpcrfService = (() => {
     const sectionMap  = {}
     usersRows.forEach(u => { if (u.id) sectionMap[u.id] = u.section || '' })
 
-    // Scope by role
+    // Scope by role and focal assignment
     if (!['System Administrator', 'Bureau Director', 'Assistant Bureau Director'].includes(profile.role)) {
-      if (profile.role === 'Division Chief') {
+      if (FocalAssignmentService.isBureauFocal(profile)) {
+        rows = rows.filter(r => r.status !== 'Draft' || r.userId === profile.id)
+      } else if (profile.role === 'Division Chief' || _isDivisionFocalForProfile(profile)) {
         rows = rows.filter(r => r.divisionId === profile.divisionId)
       } else if (profile.role === 'Section Head') {
         rows = rows.filter(r => r.divisionId === profile.divisionId &&
@@ -46,7 +48,8 @@ const IpcrfService = (() => {
     // Attach sectionName — prefer stored value, fall back to live user lookup
     rows = rows.map(r => ({
       ...r,
-      sectionName: r.sectionName || sectionMap[r.userId] || ''
+      sectionName: r.sectionName || sectionMap[r.userId] || '',
+      canReview: _canReviewForm(r, profile)
     }))
 
     rows.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
@@ -179,10 +182,7 @@ const IpcrfService = (() => {
   }
 
   function approve(id, body, user) {
-    const profile = AuthService.requireRole(user,
-      'System Administrator', 'Bureau Director',
-      'Assistant Bureau Director', 'Division Chief', 'Section Head'
-    )
+    const profile = AuthService.getProfile(user)
     const sheet = SpreadsheetService.getSheet(SHEET.IPCRF_FORMS)
     const row   = SpreadsheetService.getRow(sheet, id)
     if (!row) throw HttpError('Form not found', 404)
@@ -199,10 +199,7 @@ const IpcrfService = (() => {
   }
 
   function return_(id, body, user) {
-    const profile = AuthService.requireRole(user,
-      'System Administrator', 'Bureau Director',
-      'Assistant Bureau Director', 'Division Chief', 'Section Head'
-    )
+    const profile = AuthService.getProfile(user)
     const sheet = SpreadsheetService.getSheet(SHEET.IPCRF_FORMS)
     const row   = SpreadsheetService.getRow(sheet, id)
     if (!row) throw HttpError('Form not found', 404)
@@ -500,6 +497,8 @@ const IpcrfService = (() => {
     const { role, id: userId, divisionId, section } = profile
     if (['System Administrator', 'Bureau Director'].includes(role)) return
     if (role === 'Assistant Bureau Director' && form.divisionId === 'admin-pool') return
+    if (FocalAssignmentService.isBureauFocal(profile)) return
+    if (FocalAssignmentService.isDivisionFocal(profile, form.divisionId)) return
     if (role === 'Division Chief' && form.divisionId === divisionId) return
     if (role === 'Section Head') {
       const ownerSection = form.sectionName || _ownerSection(form.userId)
@@ -522,20 +521,32 @@ const IpcrfService = (() => {
   // division's form via direct API call, not just their own. Section Head needs
   // this even more, since its whole point is a narrower scope than Division Chief.
   function _assertApproverScope(row, profile) {
+    if (_canReviewForm(row, profile)) return
+    throw HttpError('You do not have approval rights over this form', 403)
+  }
+
+  function _canReviewForm(row, profile) {
+    if (!row || !profile || row.userId === profile.id) return false
     const { role, divisionId, section } = profile
-    if (['System Administrator', 'Bureau Director', 'Assistant Bureau Director'].includes(role)) return
-    if (role === 'Division Chief' && row.divisionId === divisionId) return
+    if (['System Administrator', 'Bureau Director', 'Assistant Bureau Director'].includes(role)) return true
+    if (FocalAssignmentService.isBureauFocal(profile)) return true
+    if (FocalAssignmentService.isDivisionFocal(profile, row.divisionId)) return true
+    if (role === 'Division Chief' && row.divisionId === divisionId) return true
     if (role === 'Section Head') {
       const ownerSection = row.sectionName || _ownerSection(row.userId)
-      if (row.divisionId === divisionId && ownerSection === section) return
+      return row.divisionId === divisionId && ownerSection === section
     }
-    throw HttpError('You do not have approval rights over this form', 403)
+    return false
   }
 
   function _ownerSection(userId) {
     const usersSheet = SpreadsheetService.getSheet(SHEET.USERS)
     const owner = SpreadsheetService.getRow(usersSheet, userId)
     return owner ? (owner.section || '') : ''
+  }
+
+  function _isDivisionFocalForProfile(profile) {
+    return !!(profile && FocalAssignmentService.isDivisionFocal(profile, profile.divisionId))
   }
 
   function _formTypeForProfile(profile) {
@@ -584,8 +595,14 @@ const IpcrfService = (() => {
   }
 
   function _notifyReviewers(form, submitterProfile) {
+    const divisionFocal = FocalAssignmentService.getDivisionFocal(form.divisionId)
+    const recipientId = divisionFocal ? divisionFocal.userId : ''
+    if (!recipientId) {
+      Logger.log('No division focal assigned for divisionId=' + form.divisionId + '. Submission notification was not routed.')
+      return
+    }
     _notifyUser(
-      'division-chief-' + form.divisionId,
+      recipientId,
       'submission',
       `${form.employeeName} submitted their ${form.type} for ${form.semester} ${form.year}.`,
       form.id,

@@ -190,10 +190,12 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { accomplishmentsApi } from '@/services/api'
 import { useConfirm } from '@/composables/useConfirm'
+import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
 const router = useRouter()
 const { confirm } = useConfirm()
+const authStore = useAuthStore()
 const linkedFormId = computed(() => route.query.formId || '')
 
 const rows = ref([])
@@ -356,7 +358,10 @@ function closeFormModal() {
 async function loadRows() {
   loading.value = true
   try {
-    const response = await accomplishmentsApi.list(linkedFormId.value ? { formId: linkedFormId.value } : {})
+    const response = await accomplishmentsApi.list({
+      ...(authStore.profileId ? { userId: authStore.profileId } : {}),
+      ...(linkedFormId.value ? { formId: linkedFormId.value } : {})
+    })
     rows.value = response?.items || (Array.isArray(response) ? response : [])
   } catch (e) {
     showToast(`Could not load: ${e.message}`, 'error')

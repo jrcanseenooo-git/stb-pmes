@@ -36,6 +36,11 @@ function initializeSheets() {
       'id', 'accomplishmentId', 'fromStatus', 'toStatus',
       'remarks', 'changedBy', 'changedByName', 'changedAt'
     ],
+    FocalAssignments: [
+      'id', 'assignmentType', 'divisionId', 'divisionName',
+      'userId', 'userName', 'userEmail', 'active',
+      'assignedBy', 'assignedByName', 'assignedAt', 'updatedAt'
+    ],
     MOVFiles: [
       'id', 'driveFileId', 'driveUrl', 'fileName', 'mimeType', 'sizeBytes',
       'description', 'accomplishmentId', 'kraId', 'siId', 'divisionId',

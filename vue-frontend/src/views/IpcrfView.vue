@@ -530,17 +530,17 @@
                   <div class="ci-period">
                     <div class="ci-period-head">
                       <label class="ci-label">Applicable Rating Period</label>
+                      <select v-model="item.applicableRatingPeriod" class="field-input ci-period-select">
+                        <option value="Both semesters">Both semesters</option>
+                        <option value="1st Semester">1st Semester</option>
+                        <option value="2nd Semester">2nd Semester</option>
+                      </select>
                       <button class="ci-rm" @click="libSelected.splice(idx, 1)" title="Remove indicator">
                         <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
                           <path d="M1 1l11 11M12 1L1 12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
                         </svg>
                       </button>
                     </div>
-                    <select v-model="item.applicableRatingPeriod" class="field-input ci-period-select">
-                      <option value="Both semesters">Both semesters</option>
-                      <option value="1st Semester">1st Semester</option>
-                      <option value="2nd Semester">2nd Semester</option>
-                    </select>
                   </div>
                 </div>
                 <div v-if="item.meansOfVerification" class="ci-mov-wrap">
@@ -1622,11 +1622,11 @@ async function doPrint(fileId, tab) {
 .ci-tags{display:flex;flex-wrap:wrap;gap:4px;}
 .ci-label{font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px;margin-top:8px;}
 .ci-pi{font-size:12px;color:#334155;line-height:1.65;}
-.ci-control-row{display:flex;align-items:flex-start;justify-content:flex-start;margin-top:10px;}
-.ci-period{width:260px;flex:0 0 auto;}
-.ci-period-head{display:inline-flex;align-items:center;justify-content:flex-start;gap:4px;margin-bottom:4px;width:max-content;}
-.ci-period-head .ci-label{margin:0;white-space:nowrap;}
-.ci-period-select{height:32px;padding:5px 9px;font-size:12px;width:100%;}
+.ci-control-row{display:flex;align-items:flex-start;justify-content:flex-start;margin-top:10px;width:100%;}
+.ci-period{width:100%;flex:1 1 auto;}
+.ci-period-head{display:flex;align-items:center;justify-content:flex-start;gap:8px;width:100%;}
+.ci-period-head .ci-label{margin:0;white-space:nowrap;flex-shrink:0;}
+.ci-period-select{height:32px;padding:5px 9px;font-size:12px;flex:1;min-width:0;width:auto;}
 .ci-mov-wrap{margin-top:8px;}
 .ci-mov{font-size:12px;color:#64748B;background:#F8FAFC;border:1px solid #F1F5F9;border-radius:6px;padding:6px 10px;line-height:1.55;}
 .ci-rm{display:flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:5px;border:1px solid transparent;background:transparent;cursor:pointer;color:#94A3B8;flex-shrink:0;padding:0;}

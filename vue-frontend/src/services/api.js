@@ -234,6 +234,7 @@ export const ipcrfApi = {
   create:       (data)                 => gasWrite('POST',  'ipcrf',                   data),
   update:       (id, data)             => gasWrite('PUT',   `ipcrf/${id}`,             data),
   submit:       (id, data = {})        => gasWrite('PATCH', `ipcrf/${id}/submit`,      data),
+  reviewQueue:  (p = {})               => gasGet('ipcrf/review-queue',                 p),
   approve:      (id, data = {})        => gasWrite('PATCH', `ipcrf/${id}/approve`,     data),
   return:       (id, data = {})        => gasWrite('PATCH', `ipcrf/${id}/return`,      data),
   rate:         (id, data)             => gasWrite('PATCH', `ipcrf/${id}/rate`,        data),

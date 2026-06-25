@@ -194,13 +194,13 @@ const PmesDocGenService = (() => {
           if (!acc) return e
           return {
             ...e,
-            accomplishment: e.accomplishment || acc.accomplishment || '',
-            remarks: e.remarks || acc.remarks || '',
-            movReferences: e.movReferences || acc.movReferences || '',
-            ratingEfficiency: e.ratingEfficiency || acc.ratingEfficiency || '',
-            ratingQuality: e.ratingQuality || acc.ratingQuality || '',
-            ratingTimeliness: e.ratingTimeliness || acc.ratingTimeliness || '',
-            ratingAverage: e.ratingAverage || acc.ratingAverage || ''
+            accomplishment: acc.accomplishment || e.accomplishment || '',
+            remarks: acc.remarks || e.remarks || '',
+            movReferences: acc.movReferences || e.movReferences || '',
+            ratingEfficiency: acc.ratingEfficiency || e.ratingEfficiency || '',
+            ratingQuality: acc.ratingQuality || e.ratingQuality || '',
+            ratingTimeliness: acc.ratingTimeliness || e.ratingTimeliness || '',
+            ratingAverage: acc.ratingAverage || e.ratingAverage || ''
           }
         })
       }
@@ -278,6 +278,7 @@ const PmesDocGenService = (() => {
     sheet.getRange(rPosition, 5).setValue(form.position || '').setFontWeight('normal')
     sheet.getRange(rDate, 6).setValue('Date Signed:')
     sheet.getRange(rDate, 7).setValue(_todaySignedDate())
+    sheet.getRange(rTable - 1, 2, 1, 8).clearContent()
 
     const sig = _normalizedSignatories(form)
     const rCert = _findRow(sheet, 'We hereby certify that the above success indicators')
@@ -293,7 +294,8 @@ const PmesDocGenService = (() => {
 
   function _refreshTargetsSignedDate(sheet) {
     const rTable = _findRow(sheet, 'INDIVIDUAL COMMITMENTS AND ACCOMPLISHMENTS')
-    sheet.getRange(rTable - 1, 7).setValue(_todaySignedDate())
+    sheet.getRange(rTable - 2, 7).setValue(_todaySignedDate())
+    sheet.getRange(rTable - 1, 2, 1, 8).clearContent()
   }
 
   function _staffName(name) {
@@ -380,6 +382,8 @@ const PmesDocGenService = (() => {
     const rSupportHd = _resizeSection(sheet, rNextHd, rEndAnchor, support.length)
 
     rCoreHd = _findRow(sheet, 'Core Functions')
+    _breakDataRowMerges(sheet, rCoreHd + 1, core.length, docType)
+    _breakDataRowMerges(sheet, rSupportHd + 1, support.length, docType)
     _writeEntries(sheet, rCoreHd + 1, core, col, docType)
     _writeEntries(sheet, rSupportHd + 1, support, col, docType)
 
@@ -410,6 +414,13 @@ const PmesDocGenService = (() => {
     return headerRow
   }
 
+  function _breakDataRowMerges(sheet, startRow, count, docType) {
+    if (!count) return
+    const lastCol = docType === 'ratings' ? 'J' : 'I'
+    const range = sheet.getRange(startRow, 2, count, _colNum(lastCol) - 1)
+    range.getMergedRanges().forEach(merged => merged.breakApart())
+  }
+
   function _writeEntries(sheet, startRow, entries, col, docType) {
     entries.forEach((e, i) => {
       const r = startRow + i
@@ -424,21 +435,32 @@ const PmesDocGenService = (() => {
         sheet.getRange(r, _colNum(col.timeGuide)).setValue(e.timelinessGuide || '')
       } else {
         // Ratings doc shows the actual MOV reference code(s), not the guidance text
-        sheet.getRange(r, _colNum(col.mov)).setValue(e.movReferences || e.meansOfVerification || '')
+        sheet.getRange(r, _colNum(col.mov)).setValue(e.movReferences || '')
         sheet.getRange(r, _colNum(col.accomplishment)).setValue(e.accomplishment || '')
         sheet.getRange(r, _colNum(col.eff)).setValue(e.ratingEfficiency === '' ? 'N/A' : e.ratingEfficiency)
         sheet.getRange(r, _colNum(col.qual)).setValue(e.ratingQuality === '' ? 'N/A' : e.ratingQuality)
         sheet.getRange(r, _colNum(col.time)).setValue(e.ratingTimeliness === '' ? 'N/A' : e.ratingTimeliness)
-        sheet.getRange(r, _colNum(col.avg)).setValue(e.ratingAverage || '')
+        sheet.getRange(r, _colNum(col.avg)).setValue(e.ratingAverage || _entryAverage(e) || '')
         sheet.getRange(r, _colNum(col.remarks)).setValue(e.remarks || '')
       }
     })
   }
 
+  function _entryAverage(entry) {
+    const values = [entry.ratingEfficiency, entry.ratingQuality, entry.ratingTimeliness]
+      .filter(v => v !== '' && v !== null && v !== undefined && String(v).toUpperCase() !== 'N/A')
+      .map(Number)
+      .filter(n => !Number.isNaN(n))
+    if (!values.length) return ''
+    return Math.round((values.reduce((sum, n) => sum + n, 0) / values.length) * 100000) / 100000
+  }
+
   function _avg(entries) {
-    const rated = entries.filter(e => e.ratingAverage !== '' && e.ratingAverage !== null && e.ratingAverage !== undefined)
+    const rated = entries
+      .map(e => e.ratingAverage || _entryAverage(e))
+      .filter(v => v !== '' && v !== null && v !== undefined)
     if (!rated.length) return ''
-    return Math.round((rated.reduce((s, e) => s + Number(e.ratingAverage), 0) / rated.length) * 100000) / 100000
+    return Math.round((rated.reduce((s, v) => s + Number(v), 0) / rated.length) * 100000) / 100000
   }
 
   // ─────────────────────────────────────────────
@@ -455,9 +477,11 @@ const PmesDocGenService = (() => {
     sheet.getRange(rAdj, 10).setValue(form.adjectivalRating || _ratingLabel(finalRating) || '')
     const sig = _normalizedSignatories(form)
     const rCert = _findRow(sheet, 'We hereby certify that the above accomplishments')
-    sheet.getRange(rCert + 2, 2).setValue(_staffName(form.employeeName)).setFontWeight('bold')
-    sheet.getRange(rCert + 2, 4).setValue(_upper(sig.immediateSupervisor)).setFontWeight('bold')
-    sheet.getRange(rCert + 2, 7).setValue(_upper(sig.approvingAuthority)).setFontWeight('bold')
+    sheet.getRange(rCert + 1, 2, 5, 9).clearContent()
+
+    sheet.getRange(rCert + 1, 2).setValue(_staffName(form.employeeName)).setFontWeight('bold')
+    sheet.getRange(rCert + 1, 4).setValue(_upper(sig.immediateSupervisor)).setFontWeight('bold')
+    sheet.getRange(rCert + 1, 7).setValue(_upper(sig.approvingAuthority)).setFontWeight('bold')
     sheet.getRange(rCert + 3, 2).setValue(form.position || '')
     sheet.getRange(rCert + 3, 4).setValue(sig.supervisorPosition)
     sheet.getRange(rCert + 3, 7).setValue(sig.authorityPosition)
@@ -501,14 +525,30 @@ const PmesDocGenService = (() => {
   function _fillFeedbackSection(sheet, form) {
     try {
       const rStrengths = _findRow(sheet, 'STRENGTHS')
+      const rAreas = _findRow(sheet, 'AREAS FOR IMPROVEMENTS')
+      const rFeedbackCert = _findRow(sheet, 'I hereby certify that the identified performance feedback')
+      const rPage = _findRow(sheet, 'PAGE 3 of 3')
+
+      sheet.getRange(rStrengths, 4, Math.max(rFeedbackCert - rStrengths, 1), 7).clearContent()
+      if (rFeedbackCert > rAreas + 1) {
+        sheet.getRange(rAreas + 1, 4, rFeedbackCert - rAreas - 1, 7).clearContent()
+      }
+      if (rPage > rFeedbackCert + 1) {
+        sheet.getRange(rFeedbackCert + 1, 2, rPage - rFeedbackCert - 1, 9).clearContent()
+      }
+
       sheet.getRange(rStrengths, 4).setValue(form.feedbackStrengths || '')
 
       const rComments = _findRow(sheet, "RATER'S COMMENTS")
       const combined = [form.feedbackComments, form.feedbackRecommendations].filter(Boolean).join('\n\n')
       sheet.getRange(rComments, 4).setValue(combined)
 
-      const rAreas = _findRow(sheet, 'AREAS FOR IMPROVEMENTS')
       sheet.getRange(rAreas, 4).setValue(form.feedbackAreasForImprovement || '')
+
+      sheet.getRange(rFeedbackCert + 4, 2).setValue(_staffName(form.employeeName)).setFontWeight('bold')
+      sheet.getRange(rFeedbackCert + 4, 7).setValue(_upper(_normalizedSignatories(form).immediateSupervisor)).setFontWeight('bold')
+      sheet.getRange(rFeedbackCert + 5, 2).setValue('Date Discussed: ')
+      sheet.getRange(rFeedbackCert + 5, 7).setValue('Date Discussed: ')
     } catch (e) {
       // PART II anchors are best-effort — don't fail the whole doc generation over them
       Logger.log('[DocGen] PART II fill skipped: ' + e.message)

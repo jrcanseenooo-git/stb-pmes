@@ -45,6 +45,11 @@ const Router = (() => {
       // ─────────────────────────────────────────
       // KRAs & Success Indicators
       // ─────────────────────────────────────────
+      case 'focal-assignments':
+        if (!id && method === 'GET') return FocalAssignmentService.list(params, user)
+        if (!id && method === 'POST') return FocalAssignmentService.save(body, user)
+        break
+
       case 'kras':
         if (!id && method === 'GET') return KraService.list(params, user)
         if (!id && method === 'POST') return KraService.create(body, user)

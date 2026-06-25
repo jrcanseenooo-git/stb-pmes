@@ -12,6 +12,7 @@ const SHEET = {
   REPORTS:            'Reports',
   DEADLINES:          'Deadlines',
   REVISIONS:          'Revisions',
+  FOCAL_ASSIGNMENTS:  'FocalAssignments',
 
   // ── Previously missing – now added ──
   IPCRF_FORMS:        'IPCRForms',

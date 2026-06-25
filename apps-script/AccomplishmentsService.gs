@@ -33,6 +33,7 @@ const AccomplishmentsService = (() => {
 
     // Apply query filters
     const filters = {
+      userId:     params.userId     || '',
       divisionId: params.divisionId || '',
       kraId:      params.kraId      || '',
       formId:     params.formId     || ''

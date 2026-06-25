@@ -75,6 +75,32 @@ const IpcrfService = (() => {
     return row
   }
 
+  function reviewQueue(params, user) {
+    const profile = AuthService.getProfile(user)
+    const sheet = SpreadsheetService.getSheet(SHEET.IPCRF_FORMS)
+    const usersSheet = SpreadsheetService.getSheet(SHEET.USERS)
+    const usersRows = SpreadsheetService.getAllRows(usersSheet)
+    const sectionMap = {}
+    usersRows.forEach(u => { if (u.id) sectionMap[u.id] = u.section || '' })
+
+    let rows = SpreadsheetService.getAllRows(sheet)
+      .map(r => ({
+        ...r,
+        sectionName: r.sectionName || sectionMap[r.userId] || '',
+        canReview: _canReviewForm(r, profile)
+      }))
+      .filter(r => r.canReview)
+
+    if (params.status) rows = rows.filter(r => r.status === params.status)
+    else rows = rows.filter(r => ['Submitted', 'Approved', 'Rated'].includes(r.status))
+    if (params.semester) rows = rows.filter(r => String(r.semester) === String(params.semester))
+    if (params.year) rows = rows.filter(r => String(r.year) === String(params.year))
+    if (params.type) rows = rows.filter(r => r.type === params.type)
+
+    rows.sort((a, b) => new Date(b.submittedAt || b.updatedAt || b.createdAt) - new Date(a.submittedAt || a.updatedAt || a.createdAt))
+    return SpreadsheetService.paginate(rows, params.page, params.pageSize)
+  }
+
   function create(body, user) {
     const profile = AuthService.getProfile(user)
     const now     = new Date().toISOString()
@@ -660,7 +686,7 @@ const IpcrfService = (() => {
   }
 
   return {
-    list, get, create, update,
+    list, reviewQueue, get, create, update,
     submit, approve, return_, rate, finalize, computeScore,
     listEntries, addEntry, updateEntry, deleteEntry,
     getFinalRatingForUser, getPeriodStatus

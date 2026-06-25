@@ -1004,7 +1004,7 @@ async function loadPeriodStatus() {
 async function loadForms() {
   loading.value = true
   try {
-    const r = await ipcrfApi.listForms()
+    const r = await ipcrfApi.listForms(authStore.profileId ? { userId: authStore.profileId } : {})
     forms.value = r?.items || (Array.isArray(r) ? r : [])
   } catch (e) {
     showToast(`Could not load forms: ${e.message}`, 'error')

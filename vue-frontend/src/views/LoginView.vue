@@ -6,7 +6,12 @@
     <main class="stage">
 
       <div class="hero-block">
-        <div class="org-abbr">Performance Monitoring &amp; Evaluation System</div>
+        <div class="system-kicker">SOCIAL TECHNOLOGY BUREAU</div>
+        <h1 class="login-title">
+          <span>Performance Monitoring</span>
+          <span>Evaluation System</span>
+        </h1>
+        <p class="login-title-sub">Accountability, Accomplishments, and Performance evaluation</p>
       </div>
 
       <div class="form-shell">
@@ -258,12 +263,48 @@ async function handleGoogleLogin() {
   backdrop-filter: blur(8px);
 }
 
-.org-abbr {
-  font-size: 25px;
-  font-weight: 700;
-  color: rgba(233, 230, 221, 0.699);
-  letter-spacing: 2px;
+.system-kicker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  padding: 4px 12px;
+  margin-bottom: 12px;
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 999px;
+  background: rgba(255,255,255,.08);
+  color: rgba(255,255,255,.82);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.8px;
+}
+
+.login-title {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  color: #F8FAFC;
+  font-size: clamp(28px, 4vw, 42px);
+  line-height: .98;
+  font-weight: 800;
+  letter-spacing: -.9px;
   text-transform: uppercase;
+  text-shadow: 0 16px 40px rgba(0,0,0,.32);
+}
+
+.login-title span:first-child {
+  color: rgba(255,255,255,.72);
+  font-size: .72em;
+  letter-spacing: 3px;
+}
+
+.login-title-sub {
+  max-width: 520px;
+  margin: 14px auto 0;
+  color: rgba(226,232,240,.76);
+  font-size: 13px;
+  line-height: 1.55;
 }
 
 /* ── Center stage ── */
@@ -284,7 +325,7 @@ async function handleGoogleLogin() {
 
 .hero-block {
   text-align: center;
-  max-width: 480px;
+  max-width: 620px;
 }
 
 /* ── Form shell (the card) ── */

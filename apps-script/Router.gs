@@ -160,6 +160,7 @@ const Router = (() => {
         if (id && sub === 'generate-ratings') return PmesDocGenService.generateRatingsDoc(id, user)
         if (id && sub === 'review-comments' && method === 'GET') return IpcrfService.listReviewComments(id, params, user)
         if (id && sub === 'review-comments' && method === 'POST') return IpcrfService.saveReviewComments(id, body, user)
+        if (id && sub === 'assignable-users' && method === 'GET') return IpcrfService.listAssignableReviewers(id, params, user)
         if (id && sub === 'entries') {
           if (!subId && method === 'GET') return IpcrfService.listEntries(id, user)
           if (!subId && method === 'POST') return IpcrfService.addEntry(id, body, user)

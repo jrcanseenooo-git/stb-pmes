@@ -4,8 +4,8 @@ const IpcrfService = (() => {
     'Draft':     ['Submitted'],
     'Submitted': ['Approved', 'Returned'],
     'Returned':  ['Submitted'],
-    'Approved':  ['Rated'],
-    'Rated':     ['Finalized'],
+    'Approved':  ['Rated', 'Returned'],
+    'Rated':     ['Finalized', 'Returned'],
     'Finalized': []
   }
 
@@ -77,7 +77,7 @@ const IpcrfService = (() => {
 
   function reviewQueue(params, user) {
     const profile = AuthService.getProfile(user)
-    const sheet = SpreadsheetService.getSheet(SHEET.IPCRF_FORMS)
+    const sheet = _ipcrfFormsSheet()
     const usersSheet = SpreadsheetService.getSheet(SHEET.USERS)
     const usersRows = SpreadsheetService.getAllRows(usersSheet)
     const sectionMap = {}
@@ -91,14 +91,70 @@ const IpcrfService = (() => {
       }))
       .filter(r => r.canReview)
 
-    if (params.status) rows = rows.filter(r => r.status === params.status)
+    if (params.reviewType === 'targets') rows = rows.filter(r => r.status === 'Submitted')
+    else if (params.reviewType === 'ratings') rows = rows.filter(r => ['Approved', 'Rated'].includes(r.status))
+    else if (params.status) rows = rows.filter(r => r.status === params.status)
     else rows = rows.filter(r => ['Submitted', 'Approved', 'Rated'].includes(r.status))
     if (params.semester) rows = rows.filter(r => String(r.semester) === String(params.semester))
     if (params.year) rows = rows.filter(r => String(r.year) === String(params.year))
     if (params.type) rows = rows.filter(r => r.type === params.type)
+    if (params.reviewType === 'targets' || params.reviewType === 'ratings') {
+      rows = rows.filter(r => _isRoutedToReviewer(r, params.reviewType, profile))
+    }
 
     rows.sort((a, b) => new Date(b.submittedAt || b.updatedAt || b.createdAt) - new Date(a.submittedAt || a.updatedAt || a.createdAt))
     return SpreadsheetService.paginate(rows, params.page, params.pageSize)
+  }
+
+  function listReviewComments(formId, params, user) {
+    const profile = AuthService.getProfile(user)
+    const form = _getForm(formId)
+    _guardAccess(form, profile)
+    const reviewType = params.reviewType || _reviewTypeForForm(form)
+    return SpreadsheetService.getAllRows(_reviewCommentsSheet())
+      .filter(r => r.formId === formId && (!reviewType || r.reviewType === reviewType))
+  }
+
+  function saveReviewComments(formId, body, user) {
+    const profile = AuthService.getProfile(user)
+    const form = _getForm(formId)
+    _assertApproverScope(form, profile)
+    const reviewType = body.reviewType || _reviewTypeForForm(form)
+    const comments = _parseComments(body.comments)
+    const sheet = _reviewCommentsSheet()
+    const now = new Date().toISOString()
+
+    comments.forEach(item => {
+      const entryId = item.entryId || ''
+      if (!entryId) return
+      const existing = SpreadsheetService.getAllRows(sheet).find(r =>
+        r.formId === formId &&
+        r.entryId === entryId &&
+        r.reviewType === reviewType &&
+        r.reviewerId === profile.id
+      )
+      const patch = {
+        formId,
+        entryId,
+        reviewType,
+        comment: item.comment || '',
+        reviewerId: profile.id,
+        reviewerName: profile.fullName || profile.email || '',
+        updatedAt: now
+      }
+      if (existing) {
+        SpreadsheetService.updateRow(sheet, existing.id, patch)
+      } else {
+        SpreadsheetService.appendRow(sheet, {
+          id: SpreadsheetService.generateId('REVCOM-'),
+          ...patch,
+          createdAt: now
+        })
+      }
+    })
+
+    AuditService.log('SAVE_REVIEW_COMMENTS', 'IPCRF', `Saved review comments for ${formId}`, user)
+    return listReviewComments(formId, { reviewType }, user)
   }
 
   function create(body, user) {
@@ -185,7 +241,7 @@ const IpcrfService = (() => {
 
   function submit(id, body, user) {
     const profile = AuthService.getProfile(user)
-    const sheet   = SpreadsheetService.getSheet(SHEET.IPCRF_FORMS)
+    const sheet   = _ipcrfFormsSheet()
     const row     = SpreadsheetService.getRow(sheet, id)
     if (!row) throw HttpError('Form not found', 404)
     _guardAccess(row, profile)
@@ -197,13 +253,106 @@ const IpcrfService = (() => {
     const entries = _getEntries(id)
     if (entries.length === 0) throw HttpError('Cannot submit a form with no entries', 400)
 
+    const route = _routeTargetForStage(row, 'targets', 'Division Focal')
     const updated = SpreadsheetService.updateRow(sheet, id, {
       status:      'Submitted',
+      targetReviewStage: 'Division Focal',
+      targetRoutedToUserId: route.userId,
+      targetRoutedToName: route.userName,
+      targetRoutedAt: new Date().toISOString(),
       submittedAt: new Date().toISOString(),
       updatedAt:   new Date().toISOString()
     })
     AuditService.log('SUBMIT', 'IPCRF', `Submitted form ${id}`, user)
     _notifyReviewers(updated, profile)
+    return updated
+  }
+
+  function route(id, body, user) {
+    const profile = AuthService.getProfile(user)
+    const sheet = _ipcrfFormsSheet()
+    const row = SpreadsheetService.getRow(sheet, id)
+    if (!row) throw HttpError('Form not found', 404)
+    _assertApproverScope(row, profile)
+
+    const reviewType = body.reviewType || _reviewTypeForForm(row)
+    const action = body.action || 'forward'
+    const now = new Date().toISOString()
+
+    if (action === 'return') return return_(id, body, user)
+
+    if (reviewType === 'targets') {
+      if (row.status !== 'Submitted') throw HttpError('Only submitted targets can be routed.', 400)
+      const stage = _routeStage(row, 'targets')
+      _assertCurrentRouteReviewer(row, 'targets', profile)
+
+      if (stage === 'Division Focal') {
+        const next = _routeTargetForStage(row, 'targets', 'Bureau Focal')
+        const updated = SpreadsheetService.updateRow(sheet, id, {
+          targetReviewStage: 'Bureau Focal',
+          targetRoutedToUserId: next.userId,
+          targetRoutedToName: next.userName,
+          targetRoutedAt: now,
+          updatedAt: now
+        })
+        _notifyRouteRecipient(next.userId, `${row.employeeName}'s ${row.type} targets were routed to you for bureau review.`, id)
+        AuditService.log('ROUTE_TARGETS', 'IPCRF', `Routed form ${id} targets to Bureau Focal`, user)
+        return updated
+      }
+
+      const updated = SpreadsheetService.updateRow(sheet, id, {
+        status: 'Approved',
+        targetReviewStage: 'Completed',
+        targetCompletedAt: now,
+        approvedAt: now,
+        updatedAt: now
+      })
+      _notifyUser(row.userId, 'approval', `Your ${row.type} targets were approved. You may prepare accomplishments and ratings for the rating period.`, id, 'IPCRF')
+      AuditService.log('APPROVE_TARGETS_ROUTE', 'IPCRF', `Completed targets routing for ${id}`, user)
+      return updated
+    }
+
+    if (!['Approved', 'Rated'].includes(row.status)) throw HttpError('Ratings review is available after targets are approved.', 400)
+    const stage = _routeStage(row, 'ratings')
+    _assertCurrentRouteReviewer(row, 'ratings', profile)
+
+    if (stage === 'Division Focal') {
+      const next = _routeTargetForStage(row, 'ratings', 'Bureau Focal')
+      const updated = SpreadsheetService.updateRow(sheet, id, {
+        ratingReviewStage: 'Bureau Focal',
+        ratingRoutedToUserId: next.userId,
+        ratingRoutedToName: next.userName,
+        ratingRoutedAt: now,
+        updatedAt: now
+      })
+      _notifyRouteRecipient(next.userId, `${row.employeeName}'s ${row.type} ratings were routed to you for bureau review.`, id)
+      AuditService.log('ROUTE_RATINGS', 'IPCRF', `Routed form ${id} ratings to Bureau Focal`, user)
+      return updated
+    }
+
+    if (stage === 'Bureau Focal') {
+      const next = _routeTargetForStage(row, 'ratings', 'Division Chief')
+      const updated = SpreadsheetService.updateRow(sheet, id, {
+        ratingReviewStage: 'Division Chief',
+        ratingRoutedToUserId: next.userId,
+        ratingRoutedToName: next.userName,
+        ratingRoutedAt: now,
+        updatedAt: now
+      })
+      _notifyRouteRecipient(next.userId, `${row.employeeName}'s ${row.type} ratings are ready for Part II feedback and proposed intervention.`, id)
+      AuditService.log('ROUTE_RATINGS', 'IPCRF', `Routed form ${id} ratings to Division Chief`, user)
+      return updated
+    }
+
+    const updated = SpreadsheetService.updateRow(sheet, id, {
+      status: 'Rated',
+      ratingReviewStage: 'Completed',
+      ratingCompletedAt: now,
+      ratedAt: row.ratedAt || now,
+      updatedAt: now
+    })
+    _notifyUser(row.userId, 'approval', `Your ${row.type} ratings review is complete. Please coordinate for printing, signing, and physical submission.`, id, 'IPCRF')
+    AuditService.log('COMPLETE_RATINGS_ROUTE', 'IPCRF', `Completed ratings routing for ${id}`, user)
     return updated
   }
 
@@ -636,6 +785,73 @@ const IpcrfService = (() => {
     )
   }
 
+  function _notifyRouteRecipient(recipientId, message, formId) {
+    if (!recipientId) return
+    _notifyUser(recipientId, 'submission', message, formId, 'IPCRF')
+  }
+
+  function _routeStage(row, reviewType) {
+    if (reviewType === 'targets') return row.targetReviewStage || 'Division Focal'
+    return row.ratingReviewStage || 'Division Focal'
+  }
+
+  function _isRoutedToReviewer(row, reviewType, profile) {
+    if (['System Administrator', 'Bureau Director', 'Assistant Bureau Director'].includes(profile.role)) return true
+    const stage = _routeStage(row, reviewType)
+    if (stage === 'Completed') return false
+    if (stage === 'Division Focal') return FocalAssignmentService.isDivisionFocal(profile, row.divisionId)
+    if (stage === 'Bureau Focal') return FocalAssignmentService.isBureauFocal(profile)
+    if (stage === 'Division Chief') return profile.role === 'Division Chief' && String(profile.divisionId || '') === String(row.divisionId || '')
+    return false
+  }
+
+  function _assertCurrentRouteReviewer(row, reviewType, profile) {
+    if (_isRoutedToReviewer(row, reviewType, profile)) return
+    throw HttpError('This form is not currently routed to you.', 403)
+  }
+
+  function _routeTargetForStage(row, reviewType, stage) {
+    if (stage === 'Division Focal') {
+      const focal = FocalAssignmentService.getDivisionFocal(row.divisionId)
+      return { userId: focal ? focal.userId : '', userName: focal ? focal.userName : 'Division Focal' }
+    }
+    if (stage === 'Bureau Focal') {
+      const focal = FocalAssignmentService.getBureauFocal()
+      return { userId: focal ? focal.userId : '', userName: focal ? focal.userName : 'Bureau Focal' }
+    }
+    if (stage === 'Division Chief') {
+      const chief = _divisionChief(row.divisionId)
+      return { userId: chief ? chief.id : '', userName: chief ? _profileEmployeeName(chief) : 'Division Chief' }
+    }
+    return { userId: '', userName: stage || '' }
+  }
+
+  function _divisionChief(divisionId) {
+    return SpreadsheetService.getAllRows(SpreadsheetService.getSheet(SHEET.USERS)).find(u =>
+      u.role === 'Division Chief' &&
+      String(u.divisionId || '') === String(divisionId || '') &&
+      u.active !== false &&
+      String(u.active).toLowerCase() !== 'false'
+    ) || null
+  }
+
+  function _ipcrfFormsSheet() {
+    const sheet = SpreadsheetService.getSheet(SHEET.IPCRF_FORMS)
+    _ensureColumns(sheet, [
+      'targetReviewStage', 'targetRoutedToUserId', 'targetRoutedToName',
+      'targetRoutedAt', 'targetCompletedAt',
+      'ratingReviewStage', 'ratingRoutedToUserId', 'ratingRoutedToName',
+      'ratingRoutedAt', 'ratingCompletedAt'
+    ])
+    return sheet
+  }
+
+  function _ensureColumns(sheet, headers) {
+    const existing = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0].filter(Boolean)
+    const missing = headers.filter(h => !existing.includes(h))
+    if (missing.length) sheet.getRange(1, existing.length + 1, 1, missing.length).setValues([missing])
+  }
+
   // ── Period status check (self-service Generate Targets/Ratings entry point) ──
   // Derives IPCRF vs CCEF from the caller's own Employment Type, finds their own
   // form for the given semester/year, and — for Ratings — whether every linked
@@ -685,10 +901,47 @@ const IpcrfService = (() => {
     }
   }
 
+  function _reviewTypeForForm(form) {
+    return form.status === 'Submitted' ? 'targets' : 'ratings'
+  }
+
+  function _parseComments(value) {
+    if (Array.isArray(value)) return value
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value)
+        return Array.isArray(parsed) ? parsed : []
+      } catch (e) {
+        return []
+      }
+    }
+    return []
+  }
+
+  function _reviewCommentsSheet() {
+    const spreadsheet = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID'))
+    let sheet = spreadsheet.getSheetByName(SHEET.REVIEW_COMMENTS || 'ReviewComments')
+    const headers = ['id', 'formId', 'entryId', 'reviewType', 'comment', 'reviewerId', 'reviewerName', 'createdAt', 'updatedAt']
+    if (!sheet) {
+      sheet = spreadsheet.insertSheet(SHEET.REVIEW_COMMENTS || 'ReviewComments')
+      sheet.getRange(1, 1, 1, headers.length).setValues([headers])
+      return sheet
+    }
+    const existing = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0].filter(Boolean)
+    if (!existing.length) {
+      sheet.getRange(1, 1, 1, headers.length).setValues([headers])
+    } else {
+      const missing = headers.filter(h => !existing.includes(h))
+      if (missing.length) sheet.getRange(1, existing.length + 1, 1, missing.length).setValues([missing])
+    }
+    return sheet
+  }
+
   return {
     list, reviewQueue, get, create, update,
-    submit, approve, return_, rate, finalize, computeScore,
+    submit, route, approve, return_, rate, finalize, computeScore,
     listEntries, addEntry, updateEntry, deleteEntry,
-    getFinalRatingForUser, getPeriodStatus
+    getFinalRatingForUser, getPeriodStatus,
+    listReviewComments, saveReviewComments
   }
 })()

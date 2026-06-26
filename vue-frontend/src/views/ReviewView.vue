@@ -1,238 +1,497 @@
 <template>
   <div class="review-page">
-    <section class="review-shell">
-      <header class="review-hd">
-        <div>
-          <h2>Review Queue</h2>
-          <p>IPCRF / CCEF forms assigned for checking</p>
-        </div>
-        <div class="review-filters">
-          <div class="review-type-tabs" aria-label="Review type">
-            <button
-              type="button"
-              :class="['review-type-tab', reviewTypeFilter === 'targets' && 'active']"
-              @click="setReviewType('targets')"
-            >
-              Targets Review
-            </button>
-            <button
-              type="button"
-              :class="['review-type-tab', reviewTypeFilter === 'ratings' && 'active']"
-              @click="setReviewType('ratings')"
-            >
-              Ratings Review
-            </button>
-          </div>
-          <select v-model="semesterFilter" class="filter">
-            <option value="">All Semesters</option>
-            <option value="1">Semester 1</option>
-            <option value="2">Semester 2</option>
-          </select>
-          <button class="btn" @click="loadQueue" :disabled="loading">{{ loading ? 'Loading...' : 'Refresh' }}</button>
-        </div>
-      </header>
 
-      <div v-if="loading" class="empty">Loading assigned forms...</div>
-      <div v-else-if="!forms.length" class="empty">{{ emptyMessage }}</div>
-
-      <div v-else class="queue-grid">
-        <button
-          v-for="form in forms"
-          :key="form.id"
-          :class="['queue-card', selectedForm?.id === form.id && 'active']"
-          @click="selectForm(form)"
-        >
-          <span :class="['type-chip', form.type === 'IPCRF' ? 'ipcrf' : 'ccef']">{{ form.type }}</span>
-          <span class="period">S{{ form.semester }} {{ form.year }}</span>
-          <strong>{{ form.employeeName }}</strong>
-          <small>{{ form.divisionName }}<span v-if="form.sectionName"> - {{ form.sectionName }}</span></small>
-          <span class="status">{{ reviewLabel(form) }}</span>
-          <span class="route-stage">Stage: {{ routeStageFor(form) }}</span>
+    <!-- Top toolbar -->
+    <div class="rq-toolbar">
+      <div class="rq-toolbar-title">
+        <h1>Review Queue</h1>
+        <p>Forms routed to you for checking and sign-off</p>
+      </div>
+      <div class="rq-toolbar-controls">
+        <div class="rq-segmented" role="tablist" aria-label="Review type">
+          <button type="button" :class="['rq-seg-btn', reviewTypeFilter === 'targets' && 'active']" @click="setReviewType('targets')">Targets</button>
+          <button type="button" :class="['rq-seg-btn', reviewTypeFilter === 'ratings' && 'active']" @click="setReviewType('ratings')">Ratings</button>
+        </div>
+        <select v-model="semesterFilter" class="rq-select">
+          <option value="">All Semesters</option>
+          <option value="1">1st Semester</option>
+          <option value="2">2nd Semester</option>
+        </select>
+        <button class="rq-btn rq-btn-ghost" @click="loadQueue" :disabled="loading">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" :class="loading && 'rq-spin'">
+            <path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2.5v3.2h-3.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          {{ loading ? 'Loading' : 'Refresh' }}
         </button>
       </div>
+    </div>
 
-      <section v-if="selectedForm" class="workbook">
-        <div class="sheet-title">
-          <div>
-            <div class="agency">DEPARTMENT OF SOCIAL WELFARE AND DEVELOPMENT</div>
-            <div class="form-name">{{ formTitle }} - Review Workbook</div>
-            <div class="period-title">{{ semesterText(selectedForm.semester) }}, CY {{ selectedForm.year }}</div>
-            <div class="division-title">{{ selectedForm.divisionName }}</div>
-          </div>
-          <div class="sheet-actions">
-            <button class="btn" @click="saveSheetEdits" :disabled="editsSaving || entriesLoading">
-              {{ editsSaving ? 'Saving...' : 'Save Sheet Edits' }}
-            </button>
-            <button class="btn" @click="saveComments" :disabled="commentsSaving || entriesLoading">
-              {{ commentsSaving ? 'Saving...' : 'Save Comments' }}
-            </button>
-            <button class="btn approve" @click="routeSelected" :disabled="routing || entriesLoading">
-              {{ routing ? 'Routing...' : routeButtonLabel }}
-            </button>
-            <button class="btn return" @click="returnSelected">Return</button>
-          </div>
+    <div class="rq-body">
+
+      <!-- ============ LEFT: queue list ============ -->
+      <aside class="rq-list">
+        <div v-if="loading" class="rq-empty-state">
+          <div class="rq-spinner"></div>
+          <p>Loading assigned forms...</p>
         </div>
 
-        <div class="workbook-tabs">
-          <button
-            v-for="tab in workbookTabs"
-            :key="tab.value"
-            :class="['workbook-tab', activeWorkbookTab === tab.value && 'active']"
-            @click="activeWorkbookTab = tab.value"
-          >
-            {{ tab.label }}
-          </button>
+        <div v-else-if="!forms.length" class="rq-empty-state">
+          <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+            <path d="M20 5l13 6v9c0 7.5-5.5 12.5-13 14-7.5-1.5-13-6.5-13-14v-9l13-6z" stroke="#D7E0EE" stroke-width="2"/>
+            <path d="M14.5 20l4 4 7-8" stroke="#B9C5DD" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <p>{{ emptyMessage }}</p>
         </div>
 
-        <div class="cert-text">{{ activeInstruction }}</div>
-
-        <div v-if="activeWorkbookTab === 'targets'" class="sheet-table-wrap">
-          <table class="sheet-table targets-table">
-            <thead>
-              <tr class="band">
-                <th colspan="9">TARGETS - PERFORMANCE COMMITMENTS</th>
-              </tr>
-              <tr>
-                <th>Key Result Area (KRA)</th>
-                <th>Success Indicator (SI)</th>
-                <th>Applicable Rating Period</th>
-                <th>Efficiency (E)</th>
-                <th>Quality (Q)</th>
-                <th>Timeliness (T)</th>
-                <th>Means of Verification</th>
-                <th>Remarks</th>
-                <th>Review Notes</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-if="entriesLoading">
-                <td colspan="9" class="empty-cell">Loading form entries...</td>
-              </tr>
-              <tr v-for="entry in entries" :key="entry.id">
-                <td><textarea v-model="editableEntries[entry.id].kraName" class="cell-input strong"></textarea></td>
-                <td><textarea v-model="editableEntries[entry.id].successIndicator" class="cell-input tall"></textarea></td>
-                <td>
-                  <select v-model="editableEntries[entry.id].applicableRatingPeriod" class="cell-select">
-                    <option value="1st Semester">1st Semester</option>
-                    <option value="2nd Semester">2nd Semester</option>
-                    <option value="Both semesters">Both semesters</option>
-                  </select>
-                </td>
-                <td><textarea v-model="editableEntries[entry.id].efficiencyGuide" class="cell-input guide"></textarea></td>
-                <td><textarea v-model="editableEntries[entry.id].qualityGuide" class="cell-input guide"></textarea></td>
-                <td><textarea v-model="editableEntries[entry.id].timelinessGuide" class="cell-input guide"></textarea></td>
-                <td><textarea v-model="editableEntries[entry.id].meansOfVerification" class="cell-input"></textarea></td>
-                <td><textarea v-model="editableEntries[entry.id].remarks" class="cell-input"></textarea></td>
-                <td>
-                  <textarea
-                    v-model="reviewComments[entry.id]"
-                    class="review-note"
-                    placeholder="Cell/row comment..."
-                  ></textarea>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div v-else-if="activeWorkbookTab === 'ratings'" class="sheet-table-wrap">
-          <table class="sheet-table ratings-table">
-            <thead>
-              <tr class="band">
-                <th colspan="11">RATINGS - INDIVIDUAL COMMITMENTS AND ACCOMPLISHMENTS</th>
-              </tr>
-              <tr>
-                <th>Key Result Area (KRA)</th>
-                <th>Success Indicator / Target Basis</th>
-                <th>Applicable Rating Period</th>
-                <th>Accomplishment</th>
-                <th>Efficiency (E)</th>
-                <th>Quality (Q)</th>
-                <th>Timeliness (T)</th>
-                <th>Average</th>
-                <th>Means of Verification</th>
-                <th>Remarks</th>
-                <th>Review Notes</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-if="entriesLoading">
-                <td colspan="11" class="empty-cell">Loading form entries...</td>
-              </tr>
-              <tr v-for="entry in entries" :key="entry.id">
-                <td><textarea v-model="editableEntries[entry.id].kraName" class="cell-input strong"></textarea></td>
-                <td>
-                  <textarea v-model="editableEntries[entry.id].successIndicator" class="cell-input tall"></textarea>
-                  <div class="basis-box">
-                    <strong>Basis / EQT Guide</strong>
-                    <span>E: {{ editableEntries[entry.id].efficiencyGuide || '---' }}</span>
-                    <span>Q: {{ editableEntries[entry.id].qualityGuide || '---' }}</span>
-                    <span>T: {{ editableEntries[entry.id].timelinessGuide || '---' }}</span>
-                  </div>
-                </td>
-                <td>{{ entry.applicableRatingPeriod || '---' }}</td>
-                <td><textarea v-model="editableEntries[entry.id].accomplishment" class="cell-input tall"></textarea></td>
-                <td><input v-model="editableEntries[entry.id].ratingEfficiency" class="rating-input" inputmode="decimal"/></td>
-                <td><input v-model="editableEntries[entry.id].ratingQuality" class="rating-input" inputmode="decimal"/></td>
-                <td><input v-model="editableEntries[entry.id].ratingTimeliness" class="rating-input" inputmode="decimal"/></td>
-                <td><input v-model="editableEntries[entry.id].ratingAverage" class="rating-input" inputmode="decimal"/></td>
-                <td><textarea v-model="editableEntries[entry.id].movReferences" class="cell-input"></textarea></td>
-                <td><textarea v-model="editableEntries[entry.id].remarks" class="cell-input"></textarea></td>
-                <td>
-                  <textarea
-                    v-model="reviewComments[entry.id]"
-                    class="review-note"
-                    placeholder="Cell/row comment..."
-                  ></textarea>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div v-else-if="activeWorkbookTab === 'comments'" class="comments-panel">
-          <div class="panel-title">Reviewer Comments</div>
-          <div v-for="entry in entries" :key="entry.id" class="comment-row">
-            <div>
-              <strong>{{ entry.kraName }}</strong>
-              <p>{{ entry.successIndicator }}</p>
+        <button
+          v-else
+          v-for="form in forms" :key="form.id"
+          type="button"
+          :class="['rq-item', selectedForm?.id === form.id && 'active']"
+          @click="selectForm(form)"
+        >
+          <div class="rq-item-top">
+            <span class="rq-avatar">{{ initials(form.employeeName) }}</span>
+            <div class="rq-item-id">
+              <strong>{{ form.employeeName }}</strong>
+              <span>{{ form.divisionName }}<template v-if="form.sectionName"> · {{ form.sectionName }}</template></span>
             </div>
-            <textarea
-              v-model="reviewComments[entry.id]"
-              class="comment-input"
-              placeholder="Add clarification, correction, or note for this row..."
-            ></textarea>
+            <span :class="['rq-chip', form.type === 'IPCRF' ? 'tone-blue' : 'tone-note']">{{ form.type }}</span>
           </div>
+          <div class="rq-item-bottom">
+            <span class="rq-period">S{{ form.semester }} {{ form.year }}</span>
+            <span class="rq-item-status">{{ reviewLabel(form) }}</span>
+            <span :class="['rq-stage-pill', 'tone-' + stageTone(routeStageFor(form))]">{{ routeStageFor(form) }}</span>
+          </div>
+        </button>
+      </aside>
+
+      <!-- ============ RIGHT: workbook ============ -->
+      <main class="rq-detail">
+
+        <div v-if="!selectedForm" class="rq-empty-state rq-empty-detail">
+          <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+            <rect x="7" y="9" width="30" height="26" rx="3" stroke="#D7E0EE" stroke-width="2"/>
+            <path d="M13 17h18M13 23h18M13 29h11" stroke="#B9C5DD" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <p>Pick a form from the list to begin reviewing.</p>
         </div>
 
-        <div v-else class="routing-panel">
-          <div class="panel-title">Routing</div>
-          <div class="routing-grid">
-            <div>Employee</div><div>{{ selectedForm.employeeName }}</div>
-            <div>Form Type</div><div>{{ selectedForm.type }}</div>
-            <div>Period</div><div>{{ semesterText(selectedForm.semester) }}, CY {{ selectedForm.year }}</div>
-            <div>Current Review Type</div><div>{{ selectedReviewType }}</div>
-            <div>Current Stage</div><div>{{ currentRouteStage }}</div>
-            <div>Next Action</div><div>{{ routeButtonLabel }}</div>
-            <div>Targets Submitted</div><div>{{ formatDate(selectedForm.submittedAt) }}</div>
-            <div>Targets Approved</div><div>{{ formatDate(selectedForm.approvedAt) }}</div>
-            <div>Ratings Completed</div><div>{{ formatDate(selectedForm.ratingCompletedAt || selectedForm.ratedAt) }}</div>
-          </div>
-        </div>
+        <template v-else>
 
-        <div v-if="activeWorkbookTab === 'ratings'" class="feedback-block">
-          <div class="feedback-title">PART II. FEEDBACK AND PROPOSED INTERVENTION</div>
-          <div class="feedback-grid">
-            <div>Strengths</div>
-            <div>{{ selectedForm.feedbackStrengths || 'For Division Chief input' }}</div>
-            <div>Areas for Improvement</div>
-            <div>{{ selectedForm.feedbackAreasForImprovement || 'For Division Chief input' }}</div>
-            <div>Comments / Recommendations</div>
-            <div>{{ selectedForm.feedbackComments || selectedForm.feedbackRecommendations || 'For Division Chief input' }}</div>
+          <!-- Document header -->
+          <header class="rq-doc-head">
+            <div class="rq-doc-id">
+              <span class="rq-avatar lg">{{ initials(selectedForm.employeeName) }}</span>
+              <div>
+                <div class="rq-doc-name">{{ selectedForm.employeeName }}</div>
+                <div class="rq-doc-meta">{{ formTitle }} · {{ semesterText(selectedForm.semester) }}, CY {{ selectedForm.year }} · {{ selectedForm.divisionName }}</div>
+              </div>
+            </div>
+            <div class="rq-doc-actions">
+              <button class="rq-btn rq-btn-ghost" @click="saveSheetEdits" :disabled="editsSaving || entriesLoading">
+                {{ editsSaving ? 'Saving...' : 'Save Edits' }}
+              </button>
+              <button class="rq-btn rq-btn-ghost" @click="saveComments" :disabled="commentsSaving || entriesLoading">
+                {{ commentsSaving ? 'Saving...' : 'Save Comments' }}
+              </button>
+              <button class="rq-btn rq-btn-outline-warn" @click="returnSelected">Return</button>
+
+              <div class="rq-assign-wrap" v-click-outside="closeAssignPanel">
+                <button class="rq-btn rq-btn-ghost" @click="openAssignPanel" :disabled="routing">
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                    <circle cx="8" cy="5.5" r="2.5" stroke="currentColor" stroke-width="1.3"/>
+                    <path d="M3 13c0-2.5 2.2-4 5-4s5 1.5 5 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+                  </svg>
+                  Assign to...
+                </button>
+                <div v-if="showAssignPanel" class="rq-assign-panel">
+                  <input
+                    v-model="assigneeSearch"
+                    class="rq-assign-search"
+                    type="text"
+                    placeholder="Search a name, role, or division..."
+                    autofocus
+                  />
+                  <div class="rq-assign-results">
+                    <div v-if="assigneeLoading" class="rq-assign-empty">Searching...</div>
+                    <div v-else-if="!assigneeResults.length" class="rq-assign-empty">No matches.</div>
+                    <button
+                      v-else
+                      v-for="person in assigneeResults" :key="person.id"
+                      type="button"
+                      class="rq-assign-row"
+                      @click="confirmAssign(person)"
+                    >
+                      <span class="rq-avatar sm">{{ initials(person.fullName) }}</span>
+                      <div class="rq-assign-info">
+                        <strong>{{ person.fullName }}</strong>
+                        <span>{{ person.tag || person.role }}<template v-if="person.divisionName"> · {{ person.divisionName }}</template></span>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <button class="rq-btn rq-btn-primary" @click="completeSelected" :disabled="routing || entriesLoading">
+                {{ routing ? 'Saving...' : completeButtonLabel }}
+              </button>
+            </div>
+          </header>
+
+          <div class="rq-assignee-line">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 1.5a4.5 4.5 0 014.5 4.5v3l1.5 2.5H2L3.5 9V6A4.5 4.5 0 018 1.5z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+            Currently with <strong>{{ currentAssigneeName || '—' }}</strong>
           </div>
-        </div>
-      </section>
-    </section>
+
+          <!-- Stage stepper -->
+          <div class="rq-stepper" role="list" aria-label="Review progress">
+            <template v-for="(step, i) in routeSteps" :key="step.key">
+              <div class="rq-step" role="listitem">
+                <span :class="['rq-step-dot', 'is-' + step.state]">
+                  <svg v-if="step.state === 'done'" width="11" height="11" viewBox="0 0 12 12" fill="none">
+                    <path d="M2.5 6.2l2.6 2.6 4.4-5.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                  <template v-else>{{ i + 1 }}</template>
+                </span>
+                <span :class="['rq-step-label', 'is-' + step.state]">{{ step.label }}</span>
+              </div>
+              <div v-if="i < routeSteps.length - 1" :class="['rq-step-line', routeSteps[i + 1].state !== 'upcoming' && 'filled']"></div>
+            </template>
+          </div>
+
+          <!-- Workbook tabs -->
+          <nav class="rq-tabs">
+            <button v-for="tab in workbookTabs" :key="tab.value"
+              :class="['rq-tab', activeWorkbookTab === tab.value && 'active']"
+              @click="activeWorkbookTab = tab.value">{{ tab.label }}</button>
+          </nav>
+
+          <div class="rq-hint">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.3"/>
+              <path d="M8 7.2v3.6M8 5.2v.1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+            </svg>
+            <span>{{ activeInstruction }}</span>
+          </div>
+
+          <!-- ===== TARGETS ===== -->
+          <div v-if="activeWorkbookTab === 'targets'" class="rq-entries">
+            <div v-if="entriesLoading" class="rq-empty-state"><div class="rq-spinner"></div><p>Loading form entries...</p></div>
+            <div v-else-if="!entries.length" class="rq-empty-state"><p>No indicators submitted yet.</p></div>
+
+            <section v-if="coreEntries.length" class="rq-fn-section rq-fn-core">
+              <div class="rq-fn-hd">
+                <span class="rq-fn-label">Core Functions</span>
+                <span class="rq-fn-weight">{{ selectedForm.coreFunctionWeight }}%</span>
+                <span class="rq-fn-count">{{ coreEntries.length }} indicator{{ coreEntries.length !== 1 ? 's' : '' }}</span>
+              </div>
+              <article v-for="(entry, i) in coreEntries" :key="entry.id" class="rq-entry-card">
+                <div class="rq-entry-hd">
+                  <span class="rq-entry-no">{{ i + 1 }}</span>
+                  <textarea v-model="editableEntries[entry.id].kraName" class="rq-kra-input" rows="1" placeholder="Key Result Area"></textarea>
+                  <span class="rq-fn-tag">Core</span>
+                </div>
+                <div class="rq-entry-grid">
+                  <label class="rq-field rq-field-wide">
+                    <span>Success Indicator</span>
+                    <textarea :value="editableEntries[entry.id].successIndicator" rows="3" disabled></textarea>
+                  </label>
+
+                  <div class="rq-guide-table rq-field-wide">
+                    <div class="rq-guide-caption">
+                      <span>Rating Guide</span>
+                      <select v-model="editableEntries[entry.id].applicableRatingPeriod" class="rq-guide-period">
+                        <option value="1st Semester">1st Semester</option>
+                        <option value="2nd Semester">2nd Semester</option>
+                        <option value="Both semesters">Both semesters</option>
+                      </select>
+                    </div>
+                    <div class="rq-guide-cols">
+                      <div class="rq-guide-col">
+                        <div class="rq-guide-colhd">Efficiency (E)</div>
+                        <textarea v-model="editableEntries[entry.id].efficiencyGuide" class="rq-guide-input" :rows="guideRows(editableEntries[entry.id])"></textarea>
+                      </div>
+                      <div class="rq-guide-col">
+                        <div class="rq-guide-colhd">Quality (Q)</div>
+                        <textarea v-model="editableEntries[entry.id].qualityGuide" class="rq-guide-input" :rows="guideRows(editableEntries[entry.id])"></textarea>
+                      </div>
+                      <div class="rq-guide-col">
+                        <div class="rq-guide-colhd">Timeliness (T)</div>
+                        <textarea v-model="editableEntries[entry.id].timelinessGuide" class="rq-guide-input" :rows="guideRows(editableEntries[entry.id])"></textarea>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="rq-mov-remarks rq-field-wide">
+                    <label class="rq-field">
+                      <span>Means of Verification</span>
+                      <textarea v-model="editableEntries[entry.id].meansOfVerification" rows="4"></textarea>
+                    </label>
+                    <label class="rq-field">
+                      <span>Remarks</span>
+                      <textarea v-model="editableEntries[entry.id].remarks" rows="4"></textarea>
+                    </label>
+                  </div>
+                </div>
+                <label class="rq-note-field">
+                  <span>
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M2 13.5l1-3.3L11.5 1.7a1.2 1.2 0 0 1 1.7 0l1.1 1.1a1.2 1.2 0 0 1 0 1.7L5.8 12.9l-3.3 1z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+                    Your Review Notes
+                  </span>
+                  <textarea v-model="reviewComments[entry.id]" rows="2" placeholder="Add a note for this indicator..."></textarea>
+                </label>
+              </article>
+            </section>
+
+            <section v-if="supportEntries.length" class="rq-fn-section rq-fn-support">
+              <div class="rq-fn-hd">
+                <span class="rq-fn-label">Support Functions</span>
+                <span class="rq-fn-weight">{{ selectedForm.supportFunctionWeight }}%</span>
+                <span class="rq-fn-count">{{ supportEntries.length }} indicator{{ supportEntries.length !== 1 ? 's' : '' }}</span>
+              </div>
+              <article v-for="(entry, i) in supportEntries" :key="entry.id" class="rq-entry-card">
+                <div class="rq-entry-hd">
+                  <span class="rq-entry-no">{{ i + 1 }}</span>
+                  <textarea v-model="editableEntries[entry.id].kraName" class="rq-kra-input" rows="1" placeholder="Key Result Area"></textarea>
+                  <span class="rq-fn-tag">Support</span>
+                </div>
+                <div class="rq-entry-grid">
+                  <label class="rq-field rq-field-wide">
+                    <span>Success Indicator</span>
+                    <textarea :value="editableEntries[entry.id].successIndicator" rows="3" disabled></textarea>
+                  </label>
+
+                  <div class="rq-guide-table rq-field-wide">
+                    <div class="rq-guide-caption">
+                      <span>Rating Guide</span>
+                      <select v-model="editableEntries[entry.id].applicableRatingPeriod" class="rq-guide-period">
+                        <option value="1st Semester">1st Semester</option>
+                        <option value="2nd Semester">2nd Semester</option>
+                        <option value="Both semesters">Both semesters</option>
+                      </select>
+                    </div>
+                    <div class="rq-guide-cols">
+                      <div class="rq-guide-col">
+                        <div class="rq-guide-colhd">Efficiency (E)</div>
+                        <textarea v-model="editableEntries[entry.id].efficiencyGuide" class="rq-guide-input" :rows="guideRows(editableEntries[entry.id])"></textarea>
+                      </div>
+                      <div class="rq-guide-col">
+                        <div class="rq-guide-colhd">Quality (Q)</div>
+                        <textarea v-model="editableEntries[entry.id].qualityGuide" class="rq-guide-input" :rows="guideRows(editableEntries[entry.id])"></textarea>
+                      </div>
+                      <div class="rq-guide-col">
+                        <div class="rq-guide-colhd">Timeliness (T)</div>
+                        <textarea v-model="editableEntries[entry.id].timelinessGuide" class="rq-guide-input" :rows="guideRows(editableEntries[entry.id])"></textarea>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="rq-mov-remarks rq-field-wide">
+                    <label class="rq-field">
+                      <span>Means of Verification</span>
+                      <textarea v-model="editableEntries[entry.id].meansOfVerification" rows="4"></textarea>
+                    </label>
+                    <label class="rq-field">
+                      <span>Remarks</span>
+                      <textarea v-model="editableEntries[entry.id].remarks" rows="4"></textarea>
+                    </label>
+                  </div>
+                </div>
+                <label class="rq-note-field">
+                  <span>
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M2 13.5l1-3.3L11.5 1.7a1.2 1.2 0 0 1 1.7 0l1.1 1.1a1.2 1.2 0 0 1 0 1.7L5.8 12.9l-3.3 1z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+                    Your Review Notes
+                  </span>
+                  <textarea v-model="reviewComments[entry.id]" rows="2" placeholder="Add a note for this indicator..."></textarea>
+                </label>
+              </article>
+            </section>
+          </div>
+
+          <!-- ===== RATINGS ===== -->
+          <div v-else-if="activeWorkbookTab === 'ratings'" class="rq-entries">
+            <div v-if="entriesLoading" class="rq-empty-state"><div class="rq-spinner"></div><p>Loading form entries...</p></div>
+            <div v-else-if="!entries.length" class="rq-empty-state"><p>No accomplishments submitted yet.</p></div>
+
+            <section v-if="coreEntries.length" class="rq-fn-section rq-fn-core">
+              <div class="rq-fn-hd">
+                <span class="rq-fn-label">Core Functions</span>
+                <span class="rq-fn-weight">{{ selectedForm.coreFunctionWeight }}%</span>
+                <span class="rq-fn-count">{{ coreEntries.length }} indicator{{ coreEntries.length !== 1 ? 's' : '' }}</span>
+              </div>
+              <article v-for="(entry, i) in coreEntries" :key="entry.id" class="rq-entry-card">
+                <div class="rq-entry-hd">
+                  <span class="rq-entry-no">{{ i + 1 }}</span>
+                  <textarea v-model="editableEntries[entry.id].kraName" class="rq-kra-input" rows="1" placeholder="Key Result Area"></textarea>
+                  <span class="rq-period-chip">{{ entry.applicableRatingPeriod || '—' }}</span>
+                  <span class="rq-fn-tag">Core</span>
+                </div>
+                <div class="rq-entry-grid">
+                  <label class="rq-field rq-field-wide">
+                    <span>Success Indicator / Target Basis</span>
+                    <textarea :value="editableEntries[entry.id].successIndicator" rows="3" disabled></textarea>
+                  </label>
+                  <label class="rq-field rq-field-wide">
+                    <span>Accomplishment</span>
+                    <textarea v-model="editableEntries[entry.id].accomplishment" rows="3"></textarea>
+                  </label>
+
+                  <div class="rq-guide-table rq-field-wide">
+                    <div class="rq-guide-caption">Rating Guide</div>
+                    <div class="rq-guide-cols">
+                      <div class="rq-guide-col">
+                        <div class="rq-guide-colhd">Efficiency (E)</div>
+                        <div class="rq-guide-body">{{ editableEntries[entry.id].efficiencyGuide || 'N/A' }}</div>
+                      </div>
+                      <div class="rq-guide-col">
+                        <div class="rq-guide-colhd">Quality (Q)</div>
+                        <div class="rq-guide-body">{{ editableEntries[entry.id].qualityGuide || 'N/A' }}</div>
+                      </div>
+                      <div class="rq-guide-col">
+                        <div class="rq-guide-colhd">Timeliness (T)</div>
+                        <div class="rq-guide-body">{{ editableEntries[entry.id].timelinessGuide || 'N/A' }}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="rq-ratings-row rq-field-wide">
+                    <div class="rq-rate-col"><span>Efficiency</span><input v-model="editableEntries[entry.id].ratingEfficiency" inputmode="decimal"/></div>
+                    <div class="rq-rate-col"><span>Quality</span><input v-model="editableEntries[entry.id].ratingQuality" inputmode="decimal"/></div>
+                    <div class="rq-rate-col"><span>Timeliness</span><input v-model="editableEntries[entry.id].ratingTimeliness" inputmode="decimal"/></div>
+                    <div class="rq-rate-col rq-avg"><span>Average</span><input v-model="editableEntries[entry.id].ratingAverage" inputmode="decimal"/></div>
+                  </div>
+
+                  <div class="rq-mov-remarks rq-field-wide">
+                    <label class="rq-field">
+                      <span>Means of Verification</span>
+                      <textarea v-model="editableEntries[entry.id].movReferences" rows="4"></textarea>
+                    </label>
+                    <label class="rq-field">
+                      <span>Remarks</span>
+                      <textarea v-model="editableEntries[entry.id].remarks" rows="4"></textarea>
+                    </label>
+                  </div>
+                </div>
+                <label class="rq-note-field">
+                  <span>
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M2 13.5l1-3.3L11.5 1.7a1.2 1.2 0 0 1 1.7 0l1.1 1.1a1.2 1.2 0 0 1 0 1.7L5.8 12.9l-3.3 1z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+                    Your Review Notes
+                  </span>
+                  <textarea v-model="reviewComments[entry.id]" rows="2" placeholder="Add a note for this indicator..."></textarea>
+                </label>
+              </article>
+            </section>
+
+            <section v-if="supportEntries.length" class="rq-fn-section rq-fn-support">
+              <div class="rq-fn-hd">
+                <span class="rq-fn-label">Support Functions</span>
+                <span class="rq-fn-weight">{{ selectedForm.supportFunctionWeight }}%</span>
+                <span class="rq-fn-count">{{ supportEntries.length }} indicator{{ supportEntries.length !== 1 ? 's' : '' }}</span>
+              </div>
+              <article v-for="(entry, i) in supportEntries" :key="entry.id" class="rq-entry-card">
+                <div class="rq-entry-hd">
+                  <span class="rq-entry-no">{{ i + 1 }}</span>
+                  <textarea v-model="editableEntries[entry.id].kraName" class="rq-kra-input" rows="1" placeholder="Key Result Area"></textarea>
+                  <span class="rq-period-chip">{{ entry.applicableRatingPeriod || '—' }}</span>
+                  <span class="rq-fn-tag">Support</span>
+                </div>
+                <div class="rq-entry-grid">
+                  <label class="rq-field rq-field-wide">
+                    <span>Success Indicator / Target Basis</span>
+                    <textarea :value="editableEntries[entry.id].successIndicator" rows="3" disabled></textarea>
+                  </label>
+                  <label class="rq-field rq-field-wide">
+                    <span>Accomplishment</span>
+                    <textarea v-model="editableEntries[entry.id].accomplishment" rows="3"></textarea>
+                  </label>
+
+                  <div class="rq-guide-table rq-field-wide">
+                    <div class="rq-guide-caption">Rating Guide</div>
+                    <div class="rq-guide-cols">
+                      <div class="rq-guide-col">
+                        <div class="rq-guide-colhd">Efficiency (E)</div>
+                        <div class="rq-guide-body">{{ editableEntries[entry.id].efficiencyGuide || 'N/A' }}</div>
+                      </div>
+                      <div class="rq-guide-col">
+                        <div class="rq-guide-colhd">Quality (Q)</div>
+                        <div class="rq-guide-body">{{ editableEntries[entry.id].qualityGuide || 'N/A' }}</div>
+                      </div>
+                      <div class="rq-guide-col">
+                        <div class="rq-guide-colhd">Timeliness (T)</div>
+                        <div class="rq-guide-body">{{ editableEntries[entry.id].timelinessGuide || 'N/A' }}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="rq-ratings-row rq-field-wide">
+                    <div class="rq-rate-col"><span>Efficiency</span><input v-model="editableEntries[entry.id].ratingEfficiency" inputmode="decimal"/></div>
+                    <div class="rq-rate-col"><span>Quality</span><input v-model="editableEntries[entry.id].ratingQuality" inputmode="decimal"/></div>
+                    <div class="rq-rate-col"><span>Timeliness</span><input v-model="editableEntries[entry.id].ratingTimeliness" inputmode="decimal"/></div>
+                    <div class="rq-rate-col rq-avg"><span>Average</span><input v-model="editableEntries[entry.id].ratingAverage" inputmode="decimal"/></div>
+                  </div>
+
+                  <div class="rq-mov-remarks rq-field-wide">
+                    <label class="rq-field">
+                      <span>Means of Verification</span>
+                      <textarea v-model="editableEntries[entry.id].movReferences" rows="4"></textarea>
+                    </label>
+                    <label class="rq-field">
+                      <span>Remarks</span>
+                      <textarea v-model="editableEntries[entry.id].remarks" rows="4"></textarea>
+                    </label>
+                  </div>
+                </div>
+                <label class="rq-note-field">
+                  <span>
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M2 13.5l1-3.3L11.5 1.7a1.2 1.2 0 0 1 1.7 0l1.1 1.1a1.2 1.2 0 0 1 0 1.7L5.8 12.9l-3.3 1z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+                    Your Review Notes
+                  </span>
+                  <textarea v-model="reviewComments[entry.id]" rows="2" placeholder="Add a note for this indicator..."></textarea>
+                </label>
+              </article>
+            </section>
+
+            <div class="rq-feedback-card">
+              <div class="rq-feedback-hd">Part II · Feedback and Proposed Intervention</div>
+              <div class="rq-feedback-grid">
+                <div><span>Strengths</span><p>{{ selectedForm.feedbackStrengths || 'For Division Chief input' }}</p></div>
+                <div><span>Areas for Improvement</span><p>{{ selectedForm.feedbackAreasForImprovement || 'For Division Chief input' }}</p></div>
+                <div><span>Comments / Recommendations</span><p>{{ selectedForm.feedbackComments || selectedForm.feedbackRecommendations || 'For Division Chief input' }}</p></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ===== COMMENTS ===== -->
+          <div v-else-if="activeWorkbookTab === 'comments'" class="rq-comments">
+            <div v-if="!entries.length" class="rq-empty-state"><p>No indicators to comment on.</p></div>
+            <div v-for="entry in entries" :key="entry.id" class="rq-comment-row">
+              <div class="rq-comment-ref">
+                <strong>{{ entry.kraName }}</strong>
+                <p>{{ entry.successIndicator }}</p>
+              </div>
+              <textarea v-model="reviewComments[entry.id]" rows="3" placeholder="Add clarification, correction, or note for this row..."></textarea>
+            </div>
+          </div>
+
+          <!-- ===== ROUTING ===== -->
+          <div v-else class="rq-routing">
+            <div class="rq-routing-grid">
+              <div><span>Employee</span><strong>{{ selectedForm.employeeName }}</strong></div>
+              <div><span>Form Type</span><strong>{{ selectedForm.type }}</strong></div>
+              <div><span>Period</span><strong>{{ semesterText(selectedForm.semester) }}, CY {{ selectedForm.year }}</strong></div>
+              <div><span>Current Review Type</span><strong>{{ selectedReviewType }}</strong></div>
+              <div><span>Current Stage</span><strong>{{ currentRouteStage }}</strong></div>
+              <div><span>Currently With</span><strong>{{ currentAssigneeName || '—' }}</strong></div>
+              <div><span>Targets Submitted</span><strong>{{ formatDate(selectedForm.submittedAt) }}</strong></div>
+              <div><span>Targets Approved</span><strong>{{ formatDate(selectedForm.approvedAt) }}</strong></div>
+              <div><span>Ratings Completed</span><strong>{{ formatDate(selectedForm.ratingCompletedAt || selectedForm.ratedAt) }}</strong></div>
+            </div>
+          </div>
+
+        </template>
+      </main>
+    </div>
 
     <teleport to="body">
       <transition name="toast-slide">
@@ -264,6 +523,10 @@ const reviewTypeFilter = ref('targets')
 const semesterFilter = ref('')
 const activeWorkbookTab = ref('targets')
 const toast = ref({ show: false, msg: '', type: 'success' })
+const showAssignPanel = ref(false)
+const assigneeSearch = ref('')
+const assigneeResults = ref([])
+const assigneeLoading = ref(false)
 
 const workbookTabs = [
   { value: 'targets', label: 'Targets' },
@@ -289,16 +552,15 @@ const currentRouteStage = computed(() => {
     ? (selectedForm.value.targetReviewStage || 'Division Focal')
     : (selectedForm.value.ratingReviewStage || 'Division Focal')
 })
-const routeButtonLabel = computed(() => {
-  if (!selectedForm.value) return 'Route Forward'
-  if (isTargetsReview.value) {
-    return currentRouteStage.value === 'Division Focal'
-      ? 'Route to Bureau Focal'
-      : 'Approve Targets & Notify Staff'
-  }
-  if (currentRouteStage.value === 'Division Focal') return 'Route to Bureau Focal'
-  if (currentRouteStage.value === 'Bureau Focal') return 'Route to Division Chief'
-  return 'Complete Ratings Review'
+const completeButtonLabel = computed(() => {
+  if (!selectedForm.value) return 'Mark Complete'
+  return isTargetsReview.value ? 'Approve Targets & Notify Staff' : 'Complete Ratings Review'
+})
+const currentAssigneeName = computed(() => {
+  if (!selectedForm.value) return ''
+  return isTargetsReview.value
+    ? (selectedForm.value.targetRoutedToName || '')
+    : (selectedForm.value.ratingRoutedToName || '')
 })
 const emptyMessage = computed(() => reviewTypeFilter.value === 'ratings'
   ? 'No ratings forms assigned yet. Ratings review appears after targets are approved and accomplishments/ratings are ready.'
@@ -310,6 +572,8 @@ const activeInstruction = computed(() => {
   if (activeWorkbookTab.value === 'comments') return 'Use row-level comments for clarifications, corrections, or instructions before routing.'
   return 'Route this document to the next reviewer once the current review stage is complete.'
 })
+const coreEntries = computed(() => entries.value.filter(e => e.functionType === 'Core'))
+const supportEntries = computed(() => entries.value.filter(e => e.functionType === 'Support'))
 
 onMounted(loadQueue)
 watch([reviewTypeFilter, semesterFilter], loadQueue)
@@ -415,17 +679,17 @@ async function saveComments() {
   }
 }
 
-async function routeSelected() {
+async function completeSelected() {
   if (!selectedForm.value) return
   const ok = await confirm({
-    type: isTargetsReview.value && currentRouteStage.value !== 'Division Focal' ? 'approve' : 'submit',
-    title: routeButtonLabel.value,
-    message: `This will save edits and comments, then route ${selectedForm.value.employeeName}'s ${selectedForm.value.type} ${selectedReviewType.value.toLowerCase()} from ${authStore.fullName || 'you'} to the next step.`,
+    type: 'approve',
+    title: completeButtonLabel.value,
+    message: `This will save edits and comments, then mark ${selectedForm.value.employeeName}'s ${selectedForm.value.type} ${selectedReviewType.value.toLowerCase()} as complete. No further routing will happen automatically.`,
     details: [
-      { label: 'Current stage', value: currentRouteStage.value },
+      { label: 'Currently with', value: currentAssigneeName.value || authStore.fullName || 'you' },
       { label: 'Review type', value: selectedReviewType.value }
     ],
-    confirmLabel: routeButtonLabel.value,
+    confirmLabel: completeButtonLabel.value,
     cancelLabel: 'Cancel'
   })
   if (!ok) return
@@ -435,10 +699,75 @@ async function routeSelected() {
     await saveEntryEditsSilently()
     await saveCommentsSilently()
     const updated = await ipcrfApi.routeForm(selectedForm.value.id, {
-      reviewType: reviewTypeForForm(selectedForm.value)
+      reviewType: reviewTypeForForm(selectedForm.value),
+      action: 'complete'
     })
     syncSelected(updated)
-    showToast('Form routed successfully.')
+    showToast('Marked complete.')
+    await loadQueue()
+  } catch (e) {
+    showToast(e.message, 'error')
+  } finally {
+    routing.value = false
+  }
+}
+
+async function openAssignPanel() {
+  showAssignPanel.value = true
+  assigneeSearch.value = ''
+  await searchAssignees('')
+}
+
+function closeAssignPanel() {
+  showAssignPanel.value = false
+}
+
+let assigneeSearchTimer = null
+watch(assigneeSearch, (value) => {
+  clearTimeout(assigneeSearchTimer)
+  assigneeSearchTimer = setTimeout(() => searchAssignees(value), 250)
+})
+
+async function searchAssignees(query) {
+  if (!selectedForm.value) return
+  assigneeLoading.value = true
+  try {
+    const result = await ipcrfApi.assignableUsers(selectedForm.value.id, query)
+    assigneeResults.value = result?.items || (Array.isArray(result) ? result : [])
+  } catch (e) {
+    assigneeResults.value = []
+  } finally {
+    assigneeLoading.value = false
+  }
+}
+
+async function confirmAssign(person) {
+  if (!selectedForm.value) return
+  const ok = await confirm({
+    type: 'submit',
+    title: 'Assign for Review',
+    message: `This will save edits and comments, then route ${selectedForm.value.employeeName}'s ${selectedForm.value.type} ${selectedReviewType.value.toLowerCase()} to ${person.fullName}.`,
+    details: [
+      { label: 'Assign to', value: `${person.fullName}${person.tag ? ' — ' + person.tag : ''}` },
+      { label: 'Review type', value: selectedReviewType.value }
+    ],
+    confirmLabel: 'Assign',
+    cancelLabel: 'Cancel'
+  })
+  if (!ok) return
+
+  closeAssignPanel()
+  routing.value = true
+  try {
+    await saveEntryEditsSilently()
+    await saveCommentsSilently()
+    const updated = await ipcrfApi.routeForm(selectedForm.value.id, {
+      reviewType: reviewTypeForForm(selectedForm.value),
+      action: 'assign',
+      assignToUserId: person.id
+    })
+    syncSelected(updated)
+    showToast(`Routed to ${person.fullName}.`)
     await loadQueue()
   } catch (e) {
     showToast(e.message, 'error')
@@ -538,90 +867,315 @@ function showToast(msg, type = 'success') {
   toast.value = { show: true, msg, type }
   setTimeout(() => { toast.value.show = false }, 3500)
 }
+
+const vClickOutside = {
+  mounted(el, binding) {
+    el._onClickOutside = (e) => { if (!el.contains(e.target)) binding.value(e) }
+    document.addEventListener('click', el._onClickOutside)
+  },
+  unmounted(el) {
+    document.removeEventListener('click', el._onClickOutside)
+  }
+}
+
+// ── Presentational-only helpers (added for the redesign — no state/behavior change) ──
+function initials(name) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean)
+  if (!parts.length) return '?'
+  return parts.slice(0, 2).map(p => p[0]).join('').toUpperCase()
+}
+
+function stageTone(stage) {
+  const map = { 'Division Focal': 'blue', 'Bureau Focal': 'note', 'Division Chief': 'warn', 'Completed': 'good' }
+  return map[stage] || 'slate'
+}
+
+// Sizes the three Targets rating-guide boxes off whichever of the three has
+// the most lines, so all three grow together as one block instead of each
+// needing its own scroll/resize.
+function guideRows(entry) {
+  const lineCount = (text) => String(text || '').split('\n').length
+  const longest = Math.max(
+    lineCount(entry?.efficiencyGuide),
+    lineCount(entry?.qualityGuide),
+    lineCount(entry?.timelinessGuide),
+    1
+  )
+  return Math.min(Math.max(longest, 4), 14)
+}
+
+const routeSteps = computed(() => {
+  if (!selectedForm.value) return []
+  const stage = currentRouteStage.value
+  const sequence = isTargetsReview.value
+    ? [
+        { key: 'Division Focal', label: 'Division Focal' },
+        { key: 'Bureau Focal', label: 'Bureau Focal' },
+        { key: 'Completed', label: 'Approved' }
+      ]
+    : [
+        { key: 'Division Focal', label: 'Division Focal' },
+        { key: 'Bureau Focal', label: 'Bureau Focal' },
+        { key: 'Division Chief', label: 'Division Chief' },
+        { key: 'Completed', label: 'Rated' }
+      ]
+  const idx = sequence.findIndex(s => s.key === stage)
+  return sequence.map((step, i) => ({
+    ...step,
+    // idx === -1 means this form is currently assigned to someone outside the
+    // usual three (a manual "assign to" pick) — don't falsely light up step 1,
+    // the "Currently With" line above is the source of truth in that case.
+    state: idx === -1 ? 'upcoming' : (i < idx ? 'done' : i === idx ? 'current' : 'upcoming')
+  }))
+})
 </script>
 
 <style scoped>
-.review-page{min-height:100%;padding:16px;background:#EEF2F7;color:#0F172A;}
-.review-shell{background:#fff;border:1px solid #DDE7F3;border-radius:14px;overflow:hidden;}
-.review-hd{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding:20px 22px;border-bottom:1px solid #E7EEF7;}
-.review-hd h2{font-size:22px;margin:0 0 4px;}
-.review-hd p{margin:0;color:#8A9AB5;}
-.review-filters{display:flex;gap:8px;align-items:center;}
-.review-type-tabs{display:flex;border:1px solid #D7E2EF;border-radius:9px;background:#F8FAFC;padding:3px;}
-.review-type-tab{height:30px;border:0;border-radius:7px;background:transparent;padding:0 12px;font:inherit;font-weight:700;color:#52657F;cursor:pointer;}
-.review-type-tab.active{background:#08213D;color:#fff;box-shadow:0 1px 3px rgba(15,23,42,.12);}
-.review-type-tab:not(.active):hover{background:#EEF4FB;color:#0F172A;}
-.filter{height:36px;border:1px solid #D7E2EF;border-radius:8px;background:#fff;padding:0 10px;font:inherit;color:#0F172A;}
-.btn{height:34px;border:1px solid #D7E2EF;border-radius:8px;background:#fff;padding:0 14px;font:inherit;font-weight:600;cursor:pointer;color:#0F172A;white-space:nowrap;}
-.btn:hover{background:#F8FAFC;}
-.btn:disabled{opacity:.55;cursor:not-allowed;}
-.approve{border-color:#86EFAC;color:#15803D;background:#F0FDF4;}
-.return{border-color:#FCD34D;color:#B45309;background:#FFFBEB;}
-.empty{padding:32px;text-align:center;color:#8A9AB5;}
-.queue-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;padding:16px 22px;border-bottom:1px solid #E7EEF7;}
-.queue-card{text-align:left;border:1px solid #DDE7F3;background:#fff;border-radius:10px;padding:12px;display:grid;grid-template-columns:1fr auto;gap:6px;cursor:pointer;}
-.queue-card.active{border-color:#2F80ED;box-shadow:0 0 0 3px rgba(47,128,237,.12);}
-.queue-card strong{grid-column:1/-1;font-size:14px;}
-.queue-card small{grid-column:1/-1;color:#7B8CA8;}
-.type-chip,.status,.period{font-size:11px;font-weight:700;border-radius:999px;padding:3px 8px;width:max-content;}
-.type-chip.ipcrf{background:#E8F1FF;color:#1A56B0;}
-.type-chip.ccef{background:#F3E8FF;color:#7E3BB2;}
-.period{color:#47617E;background:#F2F6FB;}
-.status{grid-column:1/-1;color:#B45309;background:#FFFBEB;}
-.route-stage{grid-column:1/-1;color:#52657F;font-size:11px;font-weight:700;}
-.workbook{padding:18px 22px 24px;}
-.sheet-title{display:flex;justify-content:space-between;gap:16px;text-align:center;margin-bottom:14px;}
-.sheet-title>div:first-child{flex:1;}
-.agency{font-weight:800;font-size:13px;}
-.form-name{margin-top:10px;font-size:13px;}
-.period-title{font-weight:800;margin-top:4px;}
-.division-title{font-weight:800;margin-top:16px;}
-.sheet-actions{display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
-.workbook-tabs{display:flex;gap:4px;border-bottom:1px solid #DDE7F3;margin:0 0 10px;}
-.workbook-tab{border:1px solid transparent;border-bottom:0;background:transparent;padding:9px 16px;font:inherit;font-weight:800;color:#64748B;cursor:pointer;border-radius:8px 8px 0 0;}
-.workbook-tab.active{background:#fff;border-color:#DDE7F3;color:#0F172A;box-shadow:0 -2px 0 #2F80ED inset;}
-.cert-text{border:2px solid #111;border-bottom:none;padding:8px;font-size:12px;}
-.sheet-table-wrap{overflow:auto;border:2px solid #111;}
-.sheet-table{width:100%;border-collapse:collapse;min-width:1480px;font-size:11px;line-height:1.35;}
-.targets-table{min-width:1420px;}
-.ratings-table{min-width:1560px;}
-.sheet-table th,.sheet-table td{border:1px dotted #777;padding:6px;vertical-align:top;}
-.sheet-table th{background:#D9D9D9;text-align:center;font-weight:800;}
-.sheet-table .band th{background:#4F95AE;color:#fff;text-align:left;font-size:12px;border:1px solid #111;}
-.cell-input,.review-note,.comment-input{width:100%;border:1px solid #C8D4E3;border-radius:6px;background:#fff;padding:6px;font:inherit;font-size:11px;line-height:1.35;color:#0F172A;resize:vertical;}
-.cell-input{min-height:72px;}
-.cell-input.tall{min-height:96px;}
-.cell-input.guide{min-height:128px;}
-.cell-input.strong{font-weight:800;}
-.cell-select{width:100%;border:1px solid #C8D4E3;border-radius:6px;background:#fff;padding:6px;font:inherit;font-size:11px;color:#0F172A;}
-.rating-input{width:70px;border:1px solid #C8D4E3;border-radius:6px;background:#fff;padding:6px;text-align:center;font:inherit;font-size:11px;color:#0F172A;}
-.review-note{min-width:150px;min-height:86px;}
-.cell-input:focus,.review-note:focus,.comment-input:focus,.cell-select:focus,.rating-input:focus{outline:2px solid rgba(47,128,237,.28);border-color:#2F80ED;}
-.basis-box{margin-top:6px;border:1px solid #DDE7F3;background:#F8FAFC;border-radius:6px;padding:6px;display:grid;gap:4px;color:#475569;}
-.basis-box strong{color:#0F172A;}
-.empty-cell{text-align:center;color:#7B8CA8;padding:20px!important;}
-.comments-panel,.routing-panel{border:2px solid #111;border-top:none;padding:12px;background:#fff;}
-.panel-title{font-weight:800;margin-bottom:10px;}
-.comment-row{display:grid;grid-template-columns:minmax(260px,420px) 1fr;gap:14px;border-bottom:1px dotted #CBD5E1;padding:12px 0;}
-.comment-row:last-child{border-bottom:0;}
-.comment-row p{margin:4px 0 0;color:#475569;font-size:12px;}
-.comment-input{min-height:90px;}
-.routing-grid{display:grid;grid-template-columns:220px 1fr;border:1px solid #DDE7F3;}
-.routing-grid>div{padding:9px;border-bottom:1px dotted #CBD5E1;}
-.routing-grid>div:nth-child(odd){font-weight:800;background:#F8FAFC;}
-.feedback-block{border:2px solid #111;border-top:none;}
-.feedback-title{background:#4F95AE;color:#fff;font-weight:800;font-size:12px;padding:6px 8px;}
-.feedback-grid{display:grid;grid-template-columns:220px 1fr;font-size:12px;}
-.feedback-grid>div{border-top:1px dotted #777;padding:8px;}
-.feedback-grid>div:nth-child(odd){font-weight:700;background:#F8FAFC;}
-.toast{position:fixed;right:24px;bottom:24px;background:#0F172A;color:#fff;border-radius:10px;padding:10px 16px;z-index:999;font-size:13px;box-shadow:0 10px 30px rgba(0,0,0,.18);}
-.toast-error{background:#EB5757;}
-.toast-warning{background:#E9A840;}
-.toast-slide-enter-active,.toast-slide-leave-active{transition:all .2s;}
-.toast-slide-enter-from,.toast-slide-leave-to{opacity:0;transform:translateY(8px);}
-@media (max-width: 900px){
-  .review-hd,.sheet-title{flex-direction:column;text-align:left;}
-  .review-filters,.sheet-actions{flex-wrap:wrap;}
-  .comment-row,.routing-grid{grid-template-columns:1fr;}
+* { box-sizing: border-box; }
+.review-page {
+  --ink: #0B1626;
+  --ink-soft: #3B4863;
+  --muted: #6B7A99;
+  --faint: #9AA7C0;
+  --bg: #F2F5FA;
+  --surface: #FFFFFF;
+  --surface-2: #F7F9FC;
+  --border: #E1E7F0;
+  --accent: #2454E0;
+  --accent-soft: #EAF0FF;
+  --accent-strong: #15348C;
+  --good: #1A9A5C;
+  --good-soft: #E9F8EF;
+  --warn: #C2780B;
+  --warn-soft: #FFF3DF;
+  --danger: #D1455A;
+  --danger-soft: #FDEEF0;
+  --note: #6E4FCC;
+  --note-soft: #F1ECFC;
+  --slate: #64748B;
+  --slate-soft: #F1F4F9;
+
+  min-height: 100%;
+  padding: 18px;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
+}
+
+/* ── Toolbar ── */
+.rq-toolbar { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 14px; flex-wrap: wrap; }
+.rq-toolbar-title h1 { font-size: 21px; font-weight: 800; margin: 0 0 2px; letter-spacing: -.3px; }
+.rq-toolbar-title p { margin: 0; color: var(--muted); font-size: 12.5px; }
+.rq-toolbar-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rq-segmented { display: flex; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); padding: 3px; }
+.rq-seg-btn { height: 30px; border: 0; border-radius: 7px; background: transparent; padding: 0 14px; font: inherit; font-size: 12.5px; font-weight: 700; color: var(--muted); cursor: pointer; transition: all .15s; }
+.rq-seg-btn.active { background: var(--ink); color: #fff; }
+.rq-seg-btn:not(.active):hover { background: var(--slate-soft); color: var(--ink); }
+.rq-select { height: 36px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); padding: 0 10px; font: inherit; font-size: 12.5px; color: var(--ink); }
+.rq-btn { display: inline-flex; align-items: center; gap: 6px; height: 36px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); padding: 0 14px; font: inherit; font-size: 12.5px; font-weight: 700; color: var(--ink-soft); cursor: pointer; transition: all .15s; white-space: nowrap; }
+.rq-btn:hover:not(:disabled) { background: var(--slate-soft); border-color: #CBD5E1; }
+.rq-btn:disabled { opacity: .5; cursor: not-allowed; }
+.rq-btn-ghost { background: var(--surface); }
+.rq-btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.rq-btn-primary:hover:not(:disabled) { background: var(--accent-strong); border-color: var(--accent-strong); }
+.rq-btn-outline-warn { color: var(--warn); border-color: #F3D399; background: var(--warn-soft); }
+.rq-btn-outline-warn:hover { background: #FCE7BE; }
+.rq-spin { animation: rq-spin 1s linear infinite; }
+@keyframes rq-spin { to { transform: rotate(360deg); } }
+
+/* ── Body: two-pane layout ── */
+.rq-body { display: flex; gap: 16px; align-items: flex-start; }
+
+/* ── Left: queue list ── */
+.rq-list { width: 320px; flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; max-height: calc(100vh - 160px); overflow-y: auto; padding-right: 4px; }
+.rq-item { display: flex; flex-direction: column; gap: 8px; text-align: left; border: 1px solid var(--border); background: var(--surface); border-radius: 12px; padding: 12px; cursor: pointer; font: inherit; transition: all .15s; }
+.rq-item:hover { border-color: #C7D3E6; }
+.rq-item.active { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.rq-item-top { display: flex; align-items: flex-start; gap: 9px; }
+.rq-item-id { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.rq-item-id strong { font-size: 13px; font-weight: 700; color: var(--ink); line-height: 1.3; }
+.rq-item-id span { font-size: 11px; color: var(--muted); }
+.rq-item-bottom { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.rq-item-status { font-size: 10.5px; color: var(--muted); margin-right: auto; }
+.rq-period { font-size: 10.5px; font-weight: 700; color: var(--ink-soft); background: var(--slate-soft); border-radius: 6px; padding: 2px 7px; }
+
+.rq-avatar { width: 30px; height: 30px; border-radius: 9px; background: var(--accent-soft); color: var(--accent-strong); display: flex; align-items: center; justify-content: center; font-size: 11.5px; font-weight: 800; flex-shrink: 0; }
+.rq-avatar.lg { width: 44px; height: 44px; border-radius: 12px; font-size: 15px; }
+
+.rq-chip { font-size: 9.5px; font-weight: 800; letter-spacing: .3px; border-radius: 6px; padding: 3px 7px; flex-shrink: 0; }
+.rq-stage-pill { font-size: 10px; font-weight: 700; border-radius: 999px; padding: 3px 9px; }
+.tone-blue { background: #E8F1FF; color: #1A56B0; }
+.tone-note { background: var(--note-soft); color: var(--note); }
+.tone-warn { background: var(--warn-soft); color: var(--warn); }
+.tone-good { background: var(--good-soft); color: var(--good); }
+.tone-slate { background: var(--slate-soft); color: var(--slate); }
+
+/* ── Empty states ── */
+.rq-empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 40px 20px; color: var(--faint); text-align: center; font-size: 12.5px; }
+.rq-empty-detail { background: var(--surface); border: 1px dashed var(--border); border-radius: 14px; min-height: 320px; }
+.rq-spinner { width: 22px; height: 22px; border: 2.5px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: rq-spin .7s linear infinite; }
+
+/* ── Right: detail panel ── */
+.rq-detail { flex: 1; min-width: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 20px 22px; }
+
+.rq-doc-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
+.rq-doc-id { display: flex; align-items: center; gap: 12px; }
+.rq-doc-name { font-size: 17px; font-weight: 800; letter-spacing: -.2px; }
+.rq-doc-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.rq-doc-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.rq-avatar.sm { width: 26px; height: 26px; border-radius: 8px; font-size: 10px; }
+
+/* ── Assign-to picker ── */
+.rq-assign-wrap { position: relative; }
+.rq-assign-panel { position: absolute; top: calc(100% + 6px); right: 0; width: 300px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 12px 32px rgba(15,23,42,.16); z-index: 40; overflow: hidden; }
+.rq-assign-search { width: 100%; border: 0; border-bottom: 1px solid var(--border); padding: 11px 14px; font: inherit; font-size: 13px; color: var(--ink); outline: none; }
+.rq-assign-search:focus { background: var(--surface-2); }
+.rq-assign-results { max-height: 280px; overflow-y: auto; padding: 6px; }
+.rq-assign-empty { padding: 18px; text-align: center; font-size: 12px; color: var(--faint); }
+.rq-assign-row { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; border: 0; background: transparent; padding: 8px; border-radius: 9px; cursor: pointer; font: inherit; }
+.rq-assign-row:hover { background: var(--slate-soft); }
+.rq-assign-info { display: flex; flex-direction: column; min-width: 0; }
+.rq-assign-info strong { font-size: 12.5px; color: var(--ink); }
+.rq-assign-info span { font-size: 11px; color: var(--muted); }
+
+.rq-assignee-line { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.rq-assignee-line strong { color: var(--ink-soft); font-weight: 700; }
+
+/* ── Stepper (signature element) ── */
+.rq-stepper { display: flex; align-items: center; padding: 14px 6px 18px; }
+.rq-step { display: flex; flex-direction: column; align-items: center; gap: 6px; flex-shrink: 0; }
+.rq-step-dot { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; border: 2px solid var(--border); color: var(--faint); background: var(--surface); transition: all .2s; }
+.rq-step-dot.is-done { background: var(--good); border-color: var(--good); color: #fff; }
+.rq-step-dot.is-current { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 0 0 4px var(--accent-soft); }
+.rq-step-label { font-size: 10.5px; font-weight: 700; color: var(--faint); white-space: nowrap; }
+.rq-step-label.is-done { color: var(--good); }
+.rq-step-label.is-current { color: var(--accent-strong); }
+.rq-step-line { height: 2px; flex: 1; min-width: 24px; background: var(--border); margin: 0 6px; margin-bottom: 19px; border-radius: 2px; }
+.rq-step-line.filled { background: var(--good); }
+
+/* ── Tabs ── */
+.rq-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
+.rq-tab { border: 0; background: transparent; padding: 9px 16px; font: inherit; font-size: 12.5px; font-weight: 700; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all .15s; }
+.rq-tab.active { color: var(--accent-strong); border-color: var(--accent); }
+.rq-tab:not(.active):hover { color: var(--ink); }
+
+.rq-hint { display: flex; align-items: center; gap: 8px; background: var(--accent-soft); color: var(--accent-strong); border-radius: 9px; padding: 9px 12px; font-size: 12px; margin-bottom: 16px; }
+.rq-hint svg { flex-shrink: 0; }
+
+/* ── Core / Support grouping ── */
+.rq-fn-section { display: flex; flex-direction: column; gap: 14px; margin-bottom: 22px; }
+.rq-fn-section:last-of-type { margin-bottom: 0; }
+.rq-fn-hd { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 10px; }
+.rq-fn-label { font-size: 12.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+.rq-fn-weight { font-size: 10.5px; font-weight: 800; border-radius: 999px; padding: 3px 10px; }
+.rq-fn-count { font-size: 11.5px; margin-left: auto; }
+
+.rq-fn-core .rq-fn-hd { background: #1A56B0; }
+.rq-fn-core .rq-fn-label { color: #fff; }
+.rq-fn-core .rq-fn-weight { background: rgba(255,255,255,.22); color: #fff; }
+.rq-fn-core .rq-fn-count { color: rgba(255,255,255,.8); }
+.rq-fn-core .rq-entry-card { border-left: 5px solid #1A56B0; background: #F6F9FE; }
+.rq-fn-core .rq-fn-tag { background: #1A56B0; color: #fff; }
+
+.rq-fn-support .rq-fn-hd { background: #6B3FA0; }
+.rq-fn-support .rq-fn-label { color: #fff; }
+.rq-fn-support .rq-fn-weight { background: rgba(255,255,255,.22); color: #fff; }
+.rq-fn-support .rq-fn-count { color: rgba(255,255,255,.8); }
+.rq-fn-support .rq-entry-card { border-left: 5px solid #6B3FA0; background: #FAF7FD; }
+.rq-fn-support .rq-fn-tag { background: #6B3FA0; color: #fff; }
+
+.rq-fn-tag { font-size: 9.5px; font-weight: 800; letter-spacing: .4px; text-transform: uppercase; border-radius: 6px; padding: 4px 8px; flex-shrink: 0; }
+
+/* ── Entry cards ── */
+.rq-entries { display: flex; flex-direction: column; gap: 14px; }
+.rq-entry-card { border: 1px solid var(--border); border-radius: 13px; padding: 14px 16px; background: var(--surface-2); }
+.rq-entry-hd { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.rq-entry-no { width: 22px; height: 22px; border-radius: 7px; background: var(--ink); color: #fff; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.rq-kra-input { flex: 1; border: 1px solid transparent; background: transparent; font: inherit; font-size: 14px; font-weight: 700; color: var(--ink); padding: 4px 6px; border-radius: 6px; resize: none; min-height: 30px; }
+.rq-kra-input:focus { border-color: var(--border); background: var(--surface); outline: none; }
+.rq-period-chip { font-size: 10.5px; font-weight: 700; background: var(--slate-soft); color: var(--ink-soft); border-radius: 999px; padding: 3px 10px; flex-shrink: 0; }
+
+.rq-entry-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.rq-field-wide { grid-column: 1 / -1; }
+.rq-field { display: flex; flex-direction: column; gap: 5px; }
+.rq-field > span { font-size: 10.5px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.rq-field textarea, .rq-field select, .rq-field input { border: 1px solid var(--border); border-radius: 8px; background: var(--surface); padding: 7px 9px; font: inherit; font-size: 12.5px; color: var(--ink); resize: vertical; width: 100%; }
+.rq-field textarea:focus, .rq-field select:focus, .rq-field input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+.rq-field textarea:disabled { background: var(--surface-2); color: var(--ink-soft); cursor: not-allowed; resize: none; }
+
+/* Rating Guide — three-column reference table (Efficiency / Quality / Timeliness) */
+.rq-guide-table { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.rq-guide-caption { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--ink); color: #fff; font-size: 11px; font-weight: 800; letter-spacing: .03em; text-transform: uppercase; padding: 7px 10px 7px 12px; }
+.rq-guide-period { height: 24px; border: 1px solid rgba(255,255,255,.25); border-radius: 6px; background: rgba(255,255,255,.12); color: #fff; font-size: 10.5px; font-weight: 700; text-transform: none; letter-spacing: 0; padding: 0 6px; }
+.rq-guide-period option { color: var(--ink); }
+.rq-guide-cols { display: grid; grid-template-columns: repeat(3, 1fr); }
+.rq-guide-col { border-left: 1px solid var(--border); }
+.rq-guide-col:first-child { border-left: 0; }
+.rq-guide-colhd { background: #DCE7EC; color: var(--ink-soft); font-size: 11px; font-weight: 800; text-align: center; padding: 7px 8px; border-bottom: 1px solid var(--border); }
+.rq-guide-body { font-size: 11.5px; line-height: 1.5; color: var(--ink-soft); padding: 10px; white-space: pre-line; min-height: 60px; }
+.rq-guide-input { width: 100%; border: 0; background: transparent; padding: 9px 10px; font: inherit; font-size: 11.5px; line-height: 1.5; color: var(--ink-soft); resize: none; overflow-y: auto; }
+.rq-guide-input:focus { outline: none; background: var(--accent-soft); color: var(--ink); }
+
+/* Ratings figures — even 4-column grid, easy to scan at a glance */
+.rq-ratings-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.rq-rate-col { display: flex; flex-direction: column; gap: 5px; }
+.rq-rate-col > span { font-size: 10.5px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; text-align: center; }
+.rq-rate-col input { text-align: center; border: 1px solid var(--border); border-radius: 8px; padding: 9px 4px; font: inherit; font-size: 15px; font-weight: 700; color: var(--ink); width: 100%; }
+.rq-rate-col input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.rq-rate-col.rq-avg input { background: var(--accent-soft); border-color: #BFD3FA; color: var(--accent-strong); }
+
+/* MOV / Remarks — full-width, even two columns, tall textareas */
+.rq-mov-remarks { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.rq-mov-remarks textarea { min-height: 110px; }
+
+.rq-note-field { display: block; margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border); }
+.rq-note-field > span { display: flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 700; color: var(--note); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 5px; }
+.rq-note-field textarea { width: 100%; border: 1px solid #DCD3F5; background: var(--note-soft); border-radius: 8px; padding: 7px 9px; font: inherit; font-size: 12.5px; color: var(--ink); resize: vertical; }
+.rq-note-field textarea:focus { outline: none; border-color: var(--note); }
+
+/* ── Feedback (Part II) ── */
+.rq-feedback-card { border: 1px solid var(--border); border-radius: 13px; overflow: hidden; }
+.rq-feedback-hd { background: var(--ink); color: #fff; font-weight: 800; font-size: 12px; padding: 9px 14px; }
+.rq-feedback-grid { display: grid; grid-template-columns: 200px 1fr; }
+.rq-feedback-grid > div { display: contents; }
+.rq-feedback-grid span { padding: 11px 14px; font-size: 11.5px; font-weight: 700; color: var(--muted); background: var(--surface-2); border-top: 1px solid var(--border); }
+.rq-feedback-grid p { margin: 0; padding: 11px 14px; font-size: 12.5px; color: var(--ink-soft); border-top: 1px solid var(--border); }
+
+/* ── Comments tab ── */
+.rq-comments { display: flex; flex-direction: column; gap: 10px; }
+.rq-comment-row { display: grid; grid-template-columns: minmax(220px, 360px) 1fr; gap: 14px; border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; background: var(--surface-2); }
+.rq-comment-ref strong { font-size: 13px; }
+.rq-comment-ref p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+.rq-comment-row textarea { border: 1px solid var(--border); border-radius: 8px; background: var(--surface); padding: 8px 10px; font: inherit; font-size: 12.5px; resize: vertical; }
+.rq-comment-row textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+/* ── Routing tab ── */
+.rq-routing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.rq-routing-grid > div { background: var(--surface); padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
+.rq-routing-grid span { font-size: 10.5px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.rq-routing-grid strong { font-size: 13px; color: var(--ink); }
+
+/* ── Toast ── */
+.toast { position: fixed; right: 24px; bottom: 24px; background: var(--ink); color: #fff; border-radius: 10px; padding: 10px 16px; z-index: 999; font-size: 13px; box-shadow: 0 10px 30px rgba(0,0,0,.18); }
+.toast-error { background: var(--danger); }
+.toast-warning { background: var(--warn); }
+.toast-slide-enter-active, .toast-slide-leave-active { transition: all .2s; }
+.toast-slide-enter-from, .toast-slide-leave-to { opacity: 0; transform: translateY(8px); }
+
+/* ── Responsive ── */
+@media (max-width: 980px) {
+  .rq-body { flex-direction: column; }
+  .rq-list { width: 100%; max-height: 320px; }
+  .rq-detail { width: 100%; }
+  .rq-stepper { overflow-x: auto; }
+}
+@media (max-width: 640px) {
+  .rq-guide-cols { grid-template-columns: 1fr; }
+  .rq-guide-col { border-left: 0; border-top: 1px solid var(--border); }
+  .rq-guide-col:first-child { border-top: 0; }
+  .rq-ratings-row { grid-template-columns: repeat(2, 1fr); }
+  .rq-mov-remarks { grid-template-columns: 1fr; }
 }
 </style>

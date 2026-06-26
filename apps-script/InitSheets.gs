@@ -38,6 +38,7 @@ function initializeSheets() {
     ],
     FocalAssignments: [
       'id', 'assignmentType', 'divisionId', 'divisionName',
+      'focalRole',
       'userId', 'userName', 'userEmail', 'active',
       'assignedBy', 'assignedByName', 'assignedAt', 'updatedAt'
     ],

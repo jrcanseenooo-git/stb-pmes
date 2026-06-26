@@ -157,6 +157,37 @@ const IpcrfService = (() => {
     return listReviewComments(formId, { reviewType }, user)
   }
 
+  function listAssignableReviewers(formId, params, user) {
+    const profile = AuthService.getProfile(user)
+    const form = _getForm(formId)
+    _assertApproverScope(form, profile)
+
+    const q = String(params.search || '').toLowerCase().trim()
+    const rows = SpreadsheetService.getAllRows(SpreadsheetService.getSheet(SHEET.USERS))
+      .filter(u => u.id && u.id !== form.userId)
+      .filter(u => u.active !== false && String(u.active).toLowerCase() !== 'false')
+      .filter(u => _canReviewForm(form, u))
+      .map(u => ({
+        id: u.id,
+        fullName: _profileEmployeeName(u),
+        email: u.email || '',
+        role: u.role || '',
+        divisionId: u.divisionId || '',
+        divisionName: u.divisionName || '',
+        tag: _reviewerTag(u, form)
+      }))
+      .filter(u => !q ||
+        String(u.fullName || '').toLowerCase().includes(q) ||
+        String(u.email || '').toLowerCase().includes(q) ||
+        String(u.role || '').toLowerCase().includes(q) ||
+        String(u.divisionName || '').toLowerCase().includes(q) ||
+        String(u.tag || '').toLowerCase().includes(q)
+      )
+      .sort((a, b) => String(a.tag || a.role).localeCompare(String(b.tag || b.role)) || String(a.fullName).localeCompare(String(b.fullName)))
+
+    return { items: rows.slice(0, 25), total: rows.length }
+  }
+
   function create(body, user) {
     const profile = AuthService.getProfile(user)
     const now     = new Date().toISOString()
@@ -280,6 +311,8 @@ const IpcrfService = (() => {
     const now = new Date().toISOString()
 
     if (action === 'return') return return_(id, body, user)
+    if (action === 'assign') return _assignReviewRoute(sheet, row, body, profile, user, now)
+    if (action === 'complete') return _completeReviewRoute(sheet, row, reviewType, profile, user, now)
 
     if (reviewType === 'targets') {
       if (row.status !== 'Submitted') throw HttpError('Only submitted targets can be routed.', 400)
@@ -790,6 +823,65 @@ const IpcrfService = (() => {
     _notifyUser(recipientId, 'submission', message, formId, 'IPCRF')
   }
 
+  function _assignReviewRoute(sheet, row, body, profile, user, now) {
+    const reviewType = body.reviewType || _reviewTypeForForm(row)
+    _assertCurrentRouteReviewer(row, reviewType, profile)
+    const assignee = SpreadsheetService.getRow(SpreadsheetService.getSheet(SHEET.USERS), body.assignToUserId || '')
+    if (!assignee) throw HttpError('Assignee not found', 404)
+    if (!_canReviewForm(row, assignee)) throw HttpError('Selected user cannot review this form', 403)
+
+    const stage = _reviewerTag(assignee, row)
+    const updates = reviewType === 'targets'
+      ? {
+          targetReviewStage: stage,
+          targetRoutedToUserId: assignee.id,
+          targetRoutedToName: _profileEmployeeName(assignee),
+          targetRoutedAt: now,
+          updatedAt: now
+        }
+      : {
+          ratingReviewStage: stage,
+          ratingRoutedToUserId: assignee.id,
+          ratingRoutedToName: _profileEmployeeName(assignee),
+          ratingRoutedAt: now,
+          updatedAt: now
+        }
+
+    const updated = SpreadsheetService.updateRow(sheet, row.id, updates)
+    _notifyRouteRecipient(assignee.id, `${row.employeeName}'s ${row.type} ${reviewType} review was assigned to you.`, row.id)
+    AuditService.log('ASSIGN_REVIEW', 'IPCRF', `Assigned ${reviewType} review for ${row.id} to ${_profileEmployeeName(assignee)}`, user)
+    return updated
+  }
+
+  function _completeReviewRoute(sheet, row, reviewType, profile, user, now) {
+    _assertCurrentRouteReviewer(row, reviewType, profile)
+    if (reviewType === 'targets') {
+      if (row.status !== 'Submitted') throw HttpError('Only submitted targets can be completed.', 400)
+      const updated = SpreadsheetService.updateRow(sheet, row.id, {
+        status: 'Approved',
+        targetReviewStage: 'Completed',
+        targetCompletedAt: now,
+        approvedAt: now,
+        updatedAt: now
+      })
+      _notifyUser(row.userId, 'approval', `Your ${row.type} targets were approved. You may prepare accomplishments and ratings for the rating period.`, row.id, 'IPCRF')
+      AuditService.log('COMPLETE_TARGET_REVIEW', 'IPCRF', `Completed targets review for ${row.id}`, user)
+      return updated
+    }
+
+    if (!['Approved', 'Rated'].includes(row.status)) throw HttpError('Ratings review is available after targets are approved.', 400)
+    const updated = SpreadsheetService.updateRow(sheet, row.id, {
+      status: 'Rated',
+      ratingReviewStage: 'Completed',
+      ratingCompletedAt: now,
+      ratedAt: row.ratedAt || now,
+      updatedAt: now
+    })
+    _notifyUser(row.userId, 'approval', `Your ${row.type} ratings review is complete. Please coordinate for printing, signing, and physical submission.`, row.id, 'IPCRF')
+    AuditService.log('COMPLETE_RATING_REVIEW', 'IPCRF', `Completed ratings review for ${row.id}`, user)
+    return updated
+  }
+
   function _routeStage(row, reviewType) {
     if (reviewType === 'targets') return row.targetReviewStage || 'Division Focal'
     return row.ratingReviewStage || 'Division Focal'
@@ -797,6 +889,8 @@ const IpcrfService = (() => {
 
   function _isRoutedToReviewer(row, reviewType, profile) {
     if (['System Administrator', 'Bureau Director', 'Assistant Bureau Director'].includes(profile.role)) return true
+    const routedTo = reviewType === 'targets' ? row.targetRoutedToUserId : row.ratingRoutedToUserId
+    if (routedTo && String(routedTo) === String(profile.id)) return true
     const stage = _routeStage(row, reviewType)
     if (stage === 'Completed') return false
     if (stage === 'Division Focal') return FocalAssignmentService.isDivisionFocal(profile, row.divisionId)
@@ -833,6 +927,13 @@ const IpcrfService = (() => {
       u.active !== false &&
       String(u.active).toLowerCase() !== 'false'
     ) || null
+  }
+
+  function _reviewerTag(profile, row) {
+    if (FocalAssignmentService.isDivisionFocal(profile, row.divisionId)) return 'Division Focal'
+    if (FocalAssignmentService.isBureauFocal(profile)) return 'Bureau Focal'
+    if (profile.role === 'Division Chief') return 'Division Chief'
+    return profile.role || 'Reviewer'
   }
 
   function _ipcrfFormsSheet() {
@@ -942,6 +1043,6 @@ const IpcrfService = (() => {
     submit, route, approve, return_, rate, finalize, computeScore,
     listEntries, addEntry, updateEntry, deleteEntry,
     getFinalRatingForUser, getPeriodStatus,
-    listReviewComments, saveReviewComments
+    listReviewComments, saveReviewComments, listAssignableReviewers
   }
 })()

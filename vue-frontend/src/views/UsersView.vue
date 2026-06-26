@@ -30,12 +30,13 @@
         <span class="card-title">Focal Assignments</span>
         <span class="badge badge-blue">{{ focalLoading ? 'Loading...' : 'Review routing' }}</span>
       </div>
+      <p class="focal-intro">Each division (and the bureau) can have a Primary and an Alternate focal. Both have full reviewer rights — Alternate is just a backup, not a lesser role. Changing either one immediately replaces the previous assignment.</p>
 
       <div class="focal-grid">
         <div class="field focal-bureau">
-          <label class="field-label">Bureau Focal</label>
+          <div class="focal-bureau-title">Bureau Focal</div>
           <div class="focal-slot">
-            <span>Primary</span>
+            <span class="focal-slot-label"><i class="dot"></i>Primary</span>
             <SearchSelect
               v-model="bureauFocals.primaryUserId"
               :options="focalUsers"
@@ -43,7 +44,7 @@
             />
           </div>
           <div class="focal-slot">
-            <span>Alternate</span>
+            <span class="focal-slot-label is-alt"><i class="dot"></i>Alternate</span>
             <SearchSelect
               v-model="bureauFocals.alternateUserId"
               :options="focalUsers"
@@ -60,7 +61,7 @@
             </div>
             <div class="focal-row-slots">
               <div class="focal-slot">
-                <span>Primary</span>
+                <span class="focal-slot-label"><i class="dot"></i>Primary</span>
                 <SearchSelect
                   v-model="item.primaryUserId"
                   :options="focalUsersForDivision(item.divisionId)"
@@ -68,7 +69,7 @@
                 />
               </div>
               <div class="focal-slot">
-                <span>Alternate</span>
+                <span class="focal-slot-label is-alt"><i class="dot"></i>Alternate</span>
                 <SearchSelect
                   v-model="item.alternateUserId"
                   :options="focalUsersForDivision(item.divisionId)"
@@ -489,17 +490,20 @@ const SearchSelect = {
         .slice(0, 40)
     })
 
+    // Closed-state text is just the name — full role/division shows in the
+    // tooltip and in the dropdown itself, so a long title never has to be
+    // crammed into a ~200px box.
     watch(() => props.modelValue, () => {
-      query.value = selected.value ? labelFor(selected.value) : ''
+      query.value = selected.value ? selected.value.fullName : ''
     }, { immediate: true })
 
-    function labelFor(option) {
-      return option ? `${option.fullName} - ${option.role}${option.divisionName ? ' - ' + option.divisionName : ''}` : ''
+    function metaFor(option) {
+      return `${option.role}${option.divisionName ? ' · ' + option.divisionName : ''}`
     }
 
     function choose(option) {
       emit('update:modelValue', option.id)
-      query.value = labelFor(option)
+      query.value = option.fullName
       open.value = false
     }
 
@@ -512,16 +516,31 @@ const SearchSelect = {
     function onBlur() {
       setTimeout(() => {
         open.value = false
-        query.value = selected.value ? labelFor(selected.value) : ''
+        query.value = selected.value ? selected.value.fullName : ''
       }, 120)
     }
 
+    function initials(name) {
+      const parts = String(name || '').trim().split(/\s+/).filter(Boolean)
+      if (!parts.length) return '?'
+      return parts.slice(0, 2).map(p => p[0]).join('').toUpperCase()
+    }
+
     return () => h('div', { class: 'search-select' }, [
+      h('div', { class: 'search-select-icon' },
+        selected.value
+          ? h('span', { class: 'search-select-avatar' }, initials(selected.value.fullName))
+          : h('svg', { width: 12, height: 12, viewBox: '0 0 13 13', fill: 'none' }, [
+              h('circle', { cx: 5.5, cy: 5.5, r: 4, stroke: '#94A3B8', 'stroke-width': 1.3 }),
+              h('path', { d: 'M9 9l2.5 2.5', stroke: '#94A3B8', 'stroke-width': 1.3, 'stroke-linecap': 'round' })
+            ])
+      ),
       h('input', {
         value: query.value,
         class: 'field-input search-select-input',
         type: 'text',
         placeholder: props.placeholder,
+        title: selected.value ? `${selected.value.fullName} — ${metaFor(selected.value)}` : '',
         onFocus: () => { open.value = true },
         onInput: event => {
           query.value = event.target.value
@@ -533,11 +552,12 @@ const SearchSelect = {
         ? h('button', {
             type: 'button',
             class: 'search-select-clear',
+            title: 'Clear assignment',
             onMousedown: event => {
               event.preventDefault()
               clear()
             }
-          }, 'x')
+          }, '×')
         : null,
       open.value
         ? h('div', { class: 'search-select-menu' },
@@ -545,14 +565,17 @@ const SearchSelect = {
               ? filtered.value.map(option => h('button', {
                   key: option.id,
                   type: 'button',
-                  class: 'search-select-option',
+                  class: ['search-select-option', option.id === props.modelValue && 'is-selected'],
                   onMousedown: event => {
                     event.preventDefault()
                     choose(option)
                   }
                 }, [
-                  h('strong', option.fullName),
-                  h('span', `${option.role}${option.divisionName ? ' - ' + option.divisionName : ''}`)
+                  h('span', { class: 'search-select-option-avatar' }, initials(option.fullName)),
+                  h('div', { class: 'search-select-option-text' }, [
+                    h('strong', option.fullName),
+                    h('span', metaFor(option))
+                  ])
                 ]))
               : [h('div', { class: 'search-select-empty' }, 'No matching user')]
           )
@@ -906,24 +929,38 @@ function showToast(msg, type='success') {
 
 /* Focal assignments */
 .focal-card{margin-bottom:12px;}
-.focal-grid{display:grid;grid-template-columns:360px 1fr;gap:16px;padding:16px;}
-.focal-bureau{align-self:start;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;padding:14px;}
-.focal-list{display:flex;flex-direction:column;border:1px solid #E2E8F0;border-radius:10px;overflow:hidden;}
-.focal-row{display:grid;grid-template-columns:minmax(220px,1fr) minmax(360px,560px);gap:14px;align-items:center;padding:12px 14px;border-bottom:1px solid #F1F5F9;}
+.focal-intro{padding:0 16px 14px;margin:-2px 0 0;font-size:12px;color:#94A3B8;line-height:1.5;}
+.focal-grid{display:grid;grid-template-columns:300px 1fr;gap:16px;padding:0 16px 16px;}
+.focal-bureau{align-self:start;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:14px;}
+.focal-bureau-title{font-size:13px;font-weight:700;color:#0F172A;}
+.focal-list{display:flex;flex-direction:column;border:1px solid #E2E8F0;border-radius:12px;overflow:hidden;}
+.focal-row{display:grid;grid-template-columns:minmax(170px,1fr) minmax(360px,520px);gap:16px;align-items:center;padding:14px 16px;border-bottom:1px solid #F1F5F9;background:#fff;}
 .focal-row:last-child{border-bottom:none;}
-.focal-division{font-weight:700;color:#0F172A;}
-.focal-row-slots{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-.focal-slot{display:grid;gap:5px;margin-top:8px;}
-.focal-slot>span{font-size:10px;font-weight:800;text-transform:uppercase;color:#94A3B8;letter-spacing:.05em;}
+.focal-division{font-weight:700;color:#0F172A;font-size:13px;}
+.focal-row-slots{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.focal-slot{display:flex;flex-direction:column;gap:6px;}
+.focal-slot-label{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#475569;}
+.focal-slot-label.is-alt{color:#94A3B8;}
+.focal-slot-label .dot{width:5px;height:5px;border-radius:50%;background:#3B82F6;flex-shrink:0;}
+.focal-slot-label.is-alt .dot{background:#CBD5E1;}
+
 .search-select{position:relative;}
-.search-select-input{padding-right:28px;}
-.search-select-clear{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:18px;height:18px;border:0;background:#E2E8F0;color:#64748B;border-radius:999px;font-size:12px;line-height:18px;cursor:pointer;}
-.search-select-menu{position:absolute;z-index:30;left:0;right:0;top:calc(100% + 4px);max-height:220px;overflow:auto;border:1px solid #CBD5E1;background:#fff;border-radius:8px;box-shadow:0 12px 30px rgba(15,23,42,.14);padding:4px;}
-.search-select-option{width:100%;display:grid;gap:2px;text-align:left;border:0;background:#fff;border-radius:6px;padding:8px;cursor:pointer;color:#0F172A;}
-.search-select-option:hover{background:#EFF6FF;}
-.search-select-option strong{font-size:12px;}
-.search-select-option span{font-size:11px;color:#64748B;}
-.search-select-empty{padding:10px;color:#94A3B8;font-size:12px;text-align:center;}
+.search-select-icon{position:absolute;left:9px;top:50%;transform:translateY(-50%);display:flex;align-items:center;justify-content:center;pointer-events:none;}
+.search-select-avatar{width:18px;height:18px;border-radius:6px;background:#EBF4FF;color:#1A56B0;font-size:8.5px;font-weight:800;display:flex;align-items:center;justify-content:center;}
+.search-select-input{width:100%;height:38px;padding:0 32px 0 32px;border:1.5px solid #E2E8F0;border-radius:9px;font-size:12.5px;color:#0F172A;background:#fff;text-overflow:ellipsis;transition:border-color .15s;}
+.search-select-input:focus{outline:none;border-color:#3B82F6;box-shadow:0 0 0 3px rgba(59,130,246,.1);}
+.search-select-input::placeholder{color:#B6C2D4;}
+.search-select-clear{position:absolute;right:7px;top:50%;transform:translateY(-50%);width:20px;height:20px;border:0;background:#F1F5F9;color:#94A3B8;border-radius:7px;font-size:13px;line-height:18px;cursor:pointer;transition:all .15s;}
+.search-select-clear:hover{background:#FEE2E2;color:#DC2626;}
+.search-select-menu{position:absolute;z-index:30;left:0;right:0;top:calc(100% + 6px);max-height:240px;overflow:auto;border:1px solid #E2E8F0;background:#fff;border-radius:10px;box-shadow:0 16px 36px rgba(15,23,42,.16);padding:5px;}
+.search-select-option{width:100%;display:flex;align-items:center;gap:9px;text-align:left;border:0;background:#fff;border-radius:8px;padding:7px 8px;cursor:pointer;color:#0F172A;}
+.search-select-option:hover{background:#F1F5F9;}
+.search-select-option.is-selected{background:#EFF6FF;}
+.search-select-option-avatar{width:24px;height:24px;border-radius:7px;background:#EBF4FF;color:#1A56B0;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.search-select-option-text{display:flex;flex-direction:column;min-width:0;}
+.search-select-option-text strong{font-size:12.5px;line-height:1.3;}
+.search-select-option-text span{font-size:10.5px;color:#64748B;}
+.search-select-empty{padding:14px;color:#94A3B8;font-size:12px;text-align:center;}
 .focal-actions{display:flex;justify-content:flex-end;gap:8px;padding:0 16px 16px;}
 @media (max-width: 980px){
   .focal-grid,.focal-row,.focal-row-slots{grid-template-columns:1fr;}

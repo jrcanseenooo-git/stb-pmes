@@ -1,40 +1,86 @@
 ﻿<template>
   <div class="content">
 
-    <!-- Top bar -->
-    <div class="top-bar">
-      <div class="search-box">
-        <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-          <circle cx="5.5" cy="5.5" r="4" stroke="#94A3B8" stroke-width="1.3"/>
-          <path d="M9 9l2.5 2.5" stroke="#94A3B8" stroke-width="1.3" stroke-linecap="round"/>
-        </svg>
-        <input v-model="search" type="text" placeholder="Search users…"/>
+    <section class="page-panel">
+      <div class="page-heading">
+        <div>
+          <p class="eyebrow">Administration</p>
+          <h1>User Management</h1>
+          <p class="page-subtitle">Maintain accounts, reviewer routing, and temporary access credentials.</p>
+        </div>
+        <div class="top-actions">
+          <button v-if="isSystemAdmin" class="btn btn-secondary" @click="toggleFocalPanel">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M2 3.5h10M4 7h6M6 10.5h2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            Focal Assignments
+          </button>
+          <button class="btn btn-primary" @click="openAddModal">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+              <circle cx="6.5" cy="5" r="2.5" stroke="currentColor" stroke-width="1.3"/>
+              <path d="M1 12c0-3 2.5-5 5.5-5s5.5 2 5.5 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+              <path d="M10 3v4M12 5H8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+            </svg>
+            Add User
+          </button>
+        </div>
       </div>
-      <div class="top-actions">
-        <button v-if="isSystemAdmin" class="btn btn-secondary" @click="toggleFocalPanel">
-          Focal Assignments
-        </button>
-        <button class="btn btn-primary" @click="openAddModal">
+
+      <div class="summary-grid">
+        <div class="summary-item">
+          <span>Total users</span>
+          <strong>{{ users.length }}</strong>
+        </div>
+        <div class="summary-item">
+          <span>Active</span>
+          <strong>{{ activeUsersCount }}</strong>
+        </div>
+        <div class="summary-item">
+          <span>Review roles</span>
+          <strong>{{ reviewerUsersCount }}</strong>
+        </div>
+        <div class="summary-item">
+          <span>Inactive</span>
+          <strong>{{ inactiveUsersCount }}</strong>
+        </div>
+      </div>
+
+      <div class="control-strip">
+        <div class="search-box">
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-            <circle cx="6.5" cy="5" r="2.5" stroke="currentColor" stroke-width="1.3"/>
-            <path d="M1 12c0-3 2.5-5 5.5-5s5.5 2 5.5 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-            <path d="M10 3v4M12 5H8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+            <circle cx="5.5" cy="5.5" r="4" stroke="#94A3B8" stroke-width="1.3"/>
+            <path d="M9 9l2.5 2.5" stroke="#94A3B8" stroke-width="1.3" stroke-linecap="round"/>
           </svg>
-          Add User
-        </button>
+          <input v-model="search" type="text" placeholder="Search name, email, role, division..."/>
+        </div>
+        <select v-model="roleFilter" class="filter-select">
+          <option value="">All roles</option>
+          <option v-for="role in roleOptions" :key="role" :value="role">{{ role }}</option>
+        </select>
+        <select v-model="statusFilter" class="filter-select">
+          <option value="">All status</option>
+          <option value="Active">Active</option>
+          <option value="Inactive">Inactive</option>
+        </select>
       </div>
-    </div>
+    </section>
 
     <div v-if="isSystemAdmin && showFocalPanel" class="card focal-card">
-      <div class="card-hd">
-        <span class="card-title">Focal Assignments</span>
-        <span class="badge badge-blue">{{ focalLoading ? 'Loading...' : 'Review routing' }}</span>
+      <div class="focal-panel-hd">
+        <div>
+          <span class="card-title">Review Routing</span>
+        </div>
+        <span class="badge badge-blue">{{ focalLoading ? 'Loading...' : 'Focal Assignments' }}</span>
       </div>
-      <p class="focal-intro">Each division (and the bureau) can have a Primary and an Alternate focal. Both have full reviewer rights — Alternate is just a backup, not a lesser role. Changing either one immediately replaces the previous assignment.</p>
 
-      <div class="focal-grid">
-        <div class="field focal-bureau">
-          <div class="focal-bureau-title">Bureau Focal</div>
+      <div class="focal-routing-shell">
+        <aside class="focal-route-card focal-bureau">
+          <div class="route-card-top">
+            <div>
+              <h3>Bureau Focal</h3>
+              <p>Bureau-wide review focal</p>
+            </div>
+          </div>
           <div class="focal-slot">
             <span class="focal-slot-label"><i class="dot"></i>Primary</span>
             <SearchSelect
@@ -51,17 +97,25 @@
               placeholder="Search alternate bureau focal..."
             />
           </div>
-        </div>
+        </aside>
 
-        <div class="focal-list">
-          <div v-for="item in divisionFocalRows" :key="item.divisionId" class="focal-row">
-            <div>
-              <div class="focal-division">{{ item.divisionName }}</div>
-              <div class="text-xs muted">Division IPCRF/CCEF checker and reviewer</div>
-            </div>
-            <div class="focal-row-slots">
+        <section class="division-route-panel">
+          <div class="route-table-head">
+            <span>Division</span>
+            <span>Primary Focal</span>
+            <span>Alternate Focal</span>
+          </div>
+          <div class="division-route-list">
+            <div v-for="item in divisionFocalRows" :key="item.divisionId" class="division-route-row">
+              <div class="division-route-name">
+                <div class="route-icon route-icon-sm">{{ divisionInitials(item.divisionName) }}</div>
+                <div>
+                  <div class="focal-division">{{ item.divisionName }}</div>
+                  <div class="text-xs muted">IPCRF/CCEF checker and reviewer</div>
+                </div>
+              </div>
               <div class="focal-slot">
-                <span class="focal-slot-label"><i class="dot"></i>Primary</span>
+                <span class="focal-slot-label compact"><i class="dot"></i>Primary</span>
                 <SearchSelect
                   v-model="item.primaryUserId"
                   :options="focalUsersForDivision(item.divisionId)"
@@ -69,7 +123,7 @@
                 />
               </div>
               <div class="focal-slot">
-                <span class="focal-slot-label is-alt"><i class="dot"></i>Alternate</span>
+                <span class="focal-slot-label compact is-alt"><i class="dot"></i>Alternate</span>
                 <SearchSelect
                   v-model="item.alternateUserId"
                   :options="focalUsersForDivision(item.divisionId)"
@@ -78,7 +132,7 @@
               </div>
             </div>
           </div>
-        </div>
+        </section>
       </div>
 
       <div class="focal-actions">
@@ -90,10 +144,13 @@
     </div>
 
     <!-- Table card -->
-    <div class="card">
-      <div class="card-hd">
-        <span class="card-title">User Management</span>
-        <span class="badge badge-blue">{{ loading ? '…' : filteredUsers.length + ' users' }}</span>
+    <div class="card user-card">
+      <div class="card-hd user-card-hd">
+        <div>
+          <span class="card-title">Accounts</span>
+          <p class="card-subtitle">Showing {{ loading ? '...' : filteredUsers.length }} of {{ users.length }} users</p>
+        </div>
+        <span class="badge badge-blue">{{ loading ? 'Loading...' : filteredUsers.length + ' shown' }}</span>
       </div>
       <div class="table-wrap">
         <table class="tbl">
@@ -139,11 +196,11 @@
             <template v-else>
               <tr v-for="(u, i) in filteredUsers" :key="u.email" :class="i % 2 === 1 ? 'stripe' : ''">
                 <td>
-                  <div class="flex-row gap-8">
+                  <div class="user-cell">
                     <div class="av" :style="{ background: u.avatarColor }">{{ u.initials }}</div>
                     <div>
-                      <div class="fw-500">{{ u.name }}</div>
-                      <div class="text-xs muted">{{ u.employeeNo || '—' }}</div>
+                      <div class="user-name">{{ u.name }}</div>
+                      <div class="user-meta">{{ u.employeeNo || 'No employee no.' }}</div>
                     </div>
                   </div>
                 </td>
@@ -177,7 +234,7 @@
                 </td>
                 <!-- <td class="text-xs muted">{{ u.lastLogin }}</td> -->
                 <td>
-                  <div class="flex-row gap-4">
+                  <div class="action-group">
                     <button class="icon-btn-sm" @click="openEditModal(u)" title="Edit">
                       <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                         <path d="M1 9.5L7.5 3l1.5 1.5L2.5 11H1V9.5z" stroke="#64748B" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -446,6 +503,8 @@ const DIVISION_IDS = {
 }
 
 const search        = ref('')
+const roleFilter    = ref('')
+const statusFilter  = ref('')
 const showModal     = ref(false)
 const showResetModal = ref(false)
 const showFocalPanel = ref(false)
@@ -466,6 +525,12 @@ const bureauFocals = ref({ primaryUserId: '', alternateUserId: '' })
 const authStore = useAuthStore()
 const { confirm } = useConfirm()
 const isSystemAdmin = computed(() => authStore.role === 'System Administrator')
+const activeUsersCount = computed(() => users.value.filter(u => u.status === 'Active').length)
+const inactiveUsersCount = computed(() => users.value.filter(u => u.status === 'Inactive').length)
+const reviewerUsersCount = computed(() => users.value.filter(u =>
+  ['System Administrator', 'Bureau Director', 'Assistant Bureau Director', 'Division Chief', 'Section Head'].includes(u.role)
+).length)
+const roleOptions = computed(() => [...new Set(users.value.map(u => u.role).filter(Boolean))].sort())
 
 const SearchSelect = {
   props: {
@@ -704,6 +769,16 @@ function focalAssignmentDuplicateMessage() {
   return duplicate ? `${duplicate.divisionName}: primary and alternate focal must be different users.` : ''
 }
 
+function divisionInitials(name) {
+  return String(name || '')
+    .split(/\s+/)
+    .filter(word => !['and', 'of', 'the'].includes(word.toLowerCase()))
+    .map(word => word[0])
+    .join('')
+    .slice(0, 4)
+    .toUpperCase()
+}
+
 // ── Map sheet row → display object ──
 function mapUser(row) {
   const colors = ['#3B82F6','#22C55E','#F59E0B','#EF4444','#8B5CF6','#06B6D4','#0D2137','#1e3f61','#27AE60','#E9A840','#EB5757']
@@ -762,15 +837,19 @@ function regeneratePassword() { form.value.tempPassword = generatePassword() }
 
 // ── Filter ──
 const filteredUsers = computed(() => {
-  const q = search.value.toLowerCase()
-  if (!q) return users.value
-  return users.value.filter(u =>
-    u.name.toLowerCase().includes(q) ||
-    u.email.toLowerCase().includes(q) ||
-    u.role.toLowerCase().includes(q) ||
-    (u.division||'').toLowerCase().includes(q) ||
-    (u.section||'').toLowerCase().includes(q)
-  )
+  const q = search.value.toLowerCase().trim()
+  return users.value.filter(u => {
+    const matchesSearch = !q ||
+      u.name.toLowerCase().includes(q) ||
+      u.email.toLowerCase().includes(q) ||
+      u.role.toLowerCase().includes(q) ||
+      (u.division || '').toLowerCase().includes(q) ||
+      (u.section || '').toLowerCase().includes(q) ||
+      (u.employeeNo || '').toLowerCase().includes(q)
+    const matchesRole = !roleFilter.value || u.role === roleFilter.value
+    const matchesStatus = !statusFilter.value || u.status === statusFilter.value
+    return matchesSearch && matchesRole && matchesStatus
+  })
 })
 
 // ── Modal ──
@@ -897,13 +976,25 @@ function showToast(msg, type='success') {
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
 *{box-sizing:border-box;}
-.content{padding:16px 20px 20px;font-family:'DM Sans',sans-serif;font-size:13px;color:#1A2332;background:#EEF2F7;min-height:100%;}
+.content{padding:20px;font-family:'DM Sans',sans-serif;font-size:13px;color:#1A2332;background:#EEF2F7;min-height:100%;}
 
-/* Top bar */
-.top-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
-.top-actions{display:flex;align-items:center;gap:8px;}
-.search-box{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #E2E8F0;border-radius:8px;padding:7px 12px;width:260px;}
-.search-box input{border:none;outline:none;font-size:13px;font-family:'DM Sans',sans-serif;color:#1A2332;width:100%;}
+/* Page header */
+.page-panel{background:#fff;border:1px solid #DDE7F3;border-radius:12px;box-shadow:0 1px 3px rgba(15,23,42,.05);padding:18px;margin-bottom:14px;}
+.page-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px;}
+.eyebrow{font-size:10px;text-transform:uppercase;letter-spacing:.08em;font-weight:800;color:#2F80ED;margin:0 0 4px;}
+.page-heading h1{margin:0;font-size:22px;line-height:1.15;color:#071A2F;font-weight:800;letter-spacing:0;}
+.page-subtitle{margin:5px 0 0;color:#7183A3;font-size:13px;}
+.top-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
+.summary-grid{display:grid;grid-template-columns:repeat(4,minmax(140px,1fr));gap:10px;margin-bottom:14px;}
+.summary-item{border:1px solid #E2E8F0;background:#F8FAFC;border-radius:10px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.summary-item span{font-size:11px;color:#7183A3;font-weight:700;text-transform:uppercase;letter-spacing:.05em;}
+.summary-item strong{font-size:20px;color:#0D2137;line-height:1;}
+.control-strip{display:grid;grid-template-columns:minmax(260px,1fr) 190px 150px;gap:10px;align-items:center;}
+.search-box{display:flex;align-items:center;gap:8px;background:#fff;border:1.5px solid #DDE7F3;border-radius:9px;padding:9px 12px;min-width:0;}
+.search-box:focus-within{border-color:#2F80ED;box-shadow:0 0 0 3px rgba(47,128,237,.09);}
+.search-box input{border:none;outline:none;font-size:13px;font-family:'DM Sans',sans-serif;color:#1A2332;width:100%;min-width:0;}
+.filter-select{height:39px;border:1.5px solid #DDE7F3;background:#fff;border-radius:9px;padding:0 12px;color:#1A2332;font-family:'DM Sans',sans-serif;font-size:13px;outline:none;}
+.filter-select:focus{border-color:#2F80ED;box-shadow:0 0 0 3px rgba(47,128,237,.09);}
 
 /* Buttons */
 .btn{display:inline-flex;align-items:center;gap:5px;padding:7px 13px;border-radius:8px;font-size:12px;cursor:pointer;border:1px solid #E2E8F0;background:#fff;color:#374151;transition:all .15s;font-family:'DM Sans',sans-serif;font-weight:500;}
@@ -921,67 +1012,97 @@ function showToast(msg, type='success') {
 .deactivate:hover{background:#FFE4E6;}
 
 /* Card */
-.card{background:#fff;border:1px solid #E2E8F0;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.04);}
-.card-hd{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #F1F5F9;}
+.card{background:#fff;border:1px solid #DDE7F3;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(15,23,42,.05);}
+.card-hd{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #EFF3F8;}
 .card-title{font-size:12px;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:.5px;}
+.card-subtitle{margin:3px 0 0;color:#94A3B8;font-size:12px;}
 .badge{display:inline-flex;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;}
 .badge-blue{background:#EBF4FF;color:#1A56B0;}
 
 /* Focal assignments */
-.focal-card{margin-bottom:12px;}
-.focal-intro{padding:0 16px 14px;margin:-2px 0 0;font-size:12px;color:#94A3B8;line-height:1.5;}
-.focal-grid{display:grid;grid-template-columns:300px 1fr;gap:16px;padding:0 16px 16px;}
-.focal-bureau{align-self:start;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:14px;}
-.focal-bureau-title{font-size:13px;font-weight:700;color:#0F172A;}
-.focal-list{display:flex;flex-direction:column;border:1px solid #E2E8F0;border-radius:12px;overflow:hidden;}
-.focal-row{display:grid;grid-template-columns:minmax(170px,1fr) minmax(360px,520px);gap:16px;align-items:center;padding:14px 16px;border-bottom:1px solid #F1F5F9;background:#fff;}
-.focal-row:last-child{border-bottom:none;}
-.focal-division{font-weight:700;color:#0F172A;font-size:13px;}
-.focal-row-slots{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
-.focal-slot{display:flex;flex-direction:column;gap:6px;}
-.focal-slot-label{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#475569;}
-.focal-slot-label.is-alt{color:#94A3B8;}
-.focal-slot-label .dot{width:5px;height:5px;border-radius:50%;background:#3B82F6;flex-shrink:0;}
+.focal-card{margin-bottom:14px;overflow:visible;}
+.focal-panel-hd{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:16px 18px;border-bottom:1px solid #EFF3F8;background:#FBFCFE;}
+.focal-panel-hd h2{font-size:18px;line-height:1.2;margin:3px 0 0;color:#071A2F;font-weight:800;}
+.focal-routing-shell{display:grid;grid-template-columns:minmax(250px,300px) minmax(0,1fr);gap:14px;padding:16px 18px;min-width:0;}
+.focal-route-card{border:1px solid #DDE7F3;background:#F8FAFC;border-radius:12px;padding:15px;display:flex;flex-direction:column;gap:14px;min-width:0;}
+.route-card-top{display:flex;align-items:center;gap:10px;padding-bottom:2px;}
+.route-card-top h3{font-size:14px;line-height:1.2;margin:0;color:#0F172A;font-weight:800;}
+.route-card-top p{margin:2px 0 0;color:#8BA0C0;font-size:11.5px;}
+.division-route-panel{border:1px solid #DDE7F3;border-radius:12px;overflow:visible;background:#fff;min-width:0;}
+.route-table-head{display:grid;grid-template-columns:minmax(210px,.9fr) minmax(0,1fr) minmax(0,1fr);gap:14px;padding:10px 14px;background:#F8FAFC;border-bottom:1px solid #E8EEF6;color:#8BA0C0;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.06em;}
+.route-table-head>*{min-width:0;}
+.division-route-list{display:flex;flex-direction:column;}
+.division-route-row{display:grid;grid-template-columns:minmax(210px,.9fr) minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:center;padding:13px 14px;border-bottom:1px solid #EEF3F8;min-width:0;}
+.division-route-row>*{min-width:0;}
+.division-route-row:last-child{border-bottom:none;}
+.division-route-row:hover{background:#F8FBFF;}
+.division-route-name{display:flex;align-items:center;gap:10px;min-width:0;}
+.focal-division{font-weight:800;color:#0F172A;font-size:13px;line-height:1.25;}
+.focal-slot{display:flex;flex-direction:column;gap:6px;min-width:0;}
+.focal-slot-label{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.06em;color:#475569;}
+.focal-slot-label.compact{display:none;}
+.focal-slot-label.is-alt{color:#8BA0C0;}
+.focal-slot-label .dot{width:5px;height:5px;border-radius:50%;background:#2F80ED;flex-shrink:0;}
 .focal-slot-label.is-alt .dot{background:#CBD5E1;}
 
-.search-select{position:relative;}
-.search-select-icon{position:absolute;left:9px;top:50%;transform:translateY(-50%);display:flex;align-items:center;justify-content:center;pointer-events:none;}
-.search-select-avatar{width:18px;height:18px;border-radius:6px;background:#EBF4FF;color:#1A56B0;font-size:8.5px;font-weight:800;display:flex;align-items:center;justify-content:center;}
-.search-select-input{width:100%;height:38px;padding:0 32px 0 32px;border:1.5px solid #E2E8F0;border-radius:9px;font-size:12.5px;color:#0F172A;background:#fff;text-overflow:ellipsis;transition:border-color .15s;}
-.search-select-input:focus{outline:none;border-color:#3B82F6;box-shadow:0 0 0 3px rgba(59,130,246,.1);}
-.search-select-input::placeholder{color:#B6C2D4;}
-.search-select-clear{position:absolute;right:7px;top:50%;transform:translateY(-50%);width:20px;height:20px;border:0;background:#F1F5F9;color:#94A3B8;border-radius:7px;font-size:13px;line-height:18px;cursor:pointer;transition:all .15s;}
-.search-select-clear:hover{background:#FEE2E2;color:#DC2626;}
-.search-select-menu{position:absolute;z-index:30;left:0;right:0;top:calc(100% + 6px);max-height:240px;overflow:auto;border:1px solid #E2E8F0;background:#fff;border-radius:10px;box-shadow:0 16px 36px rgba(15,23,42,.16);padding:5px;}
-.search-select-option{width:100%;display:flex;align-items:center;gap:9px;text-align:left;border:0;background:#fff;border-radius:8px;padding:7px 8px;cursor:pointer;color:#0F172A;}
-.search-select-option:hover{background:#F1F5F9;}
-.search-select-option.is-selected{background:#EFF6FF;}
-.search-select-option-avatar{width:24px;height:24px;border-radius:7px;background:#EBF4FF;color:#1A56B0;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-.search-select-option-text{display:flex;flex-direction:column;min-width:0;}
-.search-select-option-text strong{font-size:12.5px;line-height:1.3;}
-.search-select-option-text span{font-size:10.5px;color:#64748B;}
-.search-select-empty{padding:14px;color:#94A3B8;font-size:12px;text-align:center;}
-.focal-actions{display:flex;justify-content:flex-end;gap:8px;padding:0 16px 16px;}
+:deep(.search-select){position:relative;width:100%;min-width:0;}
+:deep(.search-select-icon){position:absolute;left:10px;top:50%;transform:translateY(-50%);display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:1;}
+:deep(.search-select-avatar){width:19px;height:19px;border-radius:6px;background:#EBF4FF;color:#1A56B0;font-size:8.5px;font-weight:900;display:flex;align-items:center;justify-content:center;}
+:deep(.search-select-input){display:block;box-sizing:border-box;width:100%;max-width:100%;height:40px;padding:0 34px 0 36px;border:1.5px solid #DDE7F3;border-radius:10px;font-size:12.5px;font-family:'DM Sans',sans-serif;color:#0F172A;background:#fff;text-overflow:ellipsis;transition:border-color .15s,box-shadow .15s;}
+:deep(.search-select-input:focus){outline:none;border-color:#2F80ED;box-shadow:0 0 0 3px rgba(47,128,237,.1);}
+:deep(.search-select-input::placeholder){color:#AAB8CD;}
+:deep(.search-select-clear){position:absolute;right:8px;top:50%;transform:translateY(-50%);width:20px;height:20px;border:0;background:#F1F5F9;color:#7183A3;border-radius:7px;font-size:13px;line-height:18px;cursor:pointer;transition:all .15s;}
+:deep(.search-select-clear:hover){background:#FEE2E2;color:#DC2626;}
+:deep(.search-select-menu){position:absolute;z-index:80;left:0;right:0;top:calc(100% + 6px);max-height:240px;overflow:auto;border:1px solid #DDE7F3;background:#fff;border-radius:10px;box-shadow:0 18px 38px rgba(15,23,42,.16);padding:5px;}
+:deep(.search-select-option){width:100%;display:flex;align-items:center;gap:9px;text-align:left;border:0;background:#fff;border-radius:8px;padding:8px;cursor:pointer;color:#0F172A;}
+:deep(.search-select-option:hover){background:#F1F5F9;}
+:deep(.search-select-option.is-selected){background:#EFF6FF;}
+:deep(.search-select-option-avatar){width:24px;height:24px;border-radius:7px;background:#EBF4FF;color:#1A56B0;font-size:10px;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+:deep(.search-select-option-text){display:flex;flex-direction:column;min-width:0;}
+:deep(.search-select-option-text strong){font-size:12.5px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+:deep(.search-select-option-text span){font-size:10.5px;color:#64748B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+:deep(.search-select-empty){padding:14px;color:#94A3B8;font-size:12px;text-align:center;}
+.focal-actions{display:flex;justify-content:flex-end;gap:8px;padding:0 18px 16px;}
 @media (max-width: 980px){
-  .focal-grid,.focal-row,.focal-row-slots{grid-template-columns:1fr;}
+  .page-heading{flex-direction:column;align-items:stretch;}
+  .top-actions{justify-content:flex-start;}
+  .summary-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .control-strip{grid-template-columns:1fr;}
+  .focal-routing-shell,.route-table-head,.division-route-row{grid-template-columns:1fr;}
+  .route-table-head{display:none;}
+  .focal-slot-label.compact{display:inline-flex;}
+}
+@media (max-width: 560px){
+  .content{padding:12px;}
+  .page-panel{padding:14px;}
+  .summary-grid{grid-template-columns:1fr;}
+  .page-heading h1{font-size:20px;}
+  .top-actions .btn{width:100%;justify-content:center;}
 }
 
 /* Table */
+.user-card{border-color:#DDE7F3;}
+.user-card-hd{background:#FBFCFE;}
 .table-wrap{overflow-x:auto;}
-.tbl{width:100%;border-collapse:collapse;}
-.tbl th{padding:9px 14px;text-align:left;font-size:10px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap;border-bottom:1px solid #F1F5F9;}
-.tbl td{padding:11px 14px;border-bottom:1px solid #F8FAFC;vertical-align:middle;}
+.tbl{width:100%;border-collapse:separate;border-spacing:0;}
+.tbl th{padding:11px 14px;text-align:left;font-size:10px;font-weight:800;color:#8BA0C0;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;border-bottom:1px solid #E8EEF6;background:#F8FAFC;}
+.tbl td{padding:13px 14px;border-bottom:1px solid #EEF3F8;vertical-align:middle;}
 .tbl tr:last-child td{border-bottom:none;}
-.tbl tr:hover td{background:#FAFAFA;}
-.stripe td{background:rgba(59,130,246,.02);}
+.tbl tbody tr{transition:background .12s;}
+.tbl tbody tr:hover td{background:#F8FBFF;}
+.stripe td{background:#FCFDFF;}
 .empty-row{text-align:center;color:#94A3B8;padding:40px !important;font-size:13px;}
 .flex-row{display:flex;align-items:center;}
 .gap-4{gap:4px;} .gap-6{gap:6px;} .gap-8{gap:8px;}
 .fw-500{font-weight:500;font-size:13px;}
 .text-xs{font-size:11px;} .muted{color:#94A3B8;}
+.user-cell{display:flex;align-items:center;gap:10px;min-width:190px;}
+.user-name{font-size:13px;font-weight:800;color:#0F172A;line-height:1.25;}
+.user-meta{font-size:11px;color:#8BA0C0;margin-top:2px;}
+.action-group{display:flex;align-items:center;gap:6px;justify-content:flex-start;white-space:nowrap;}
 
 /* Avatar */
-.av{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0;}
+.av{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff;flex-shrink:0;box-shadow:inset 0 -10px 20px rgba(0,0,0,.08);}
 
 /* Badges */
 .role-badge{display:inline-flex;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;}

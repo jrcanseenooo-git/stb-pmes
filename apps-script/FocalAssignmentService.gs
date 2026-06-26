@@ -6,6 +6,7 @@ const FocalAssignmentService = (() => {
   }
   const HEADERS = [
     'id', 'assignmentType', 'divisionId', 'divisionName',
+    'focalRole',
     'userId', 'userName', 'userEmail', 'active',
     'assignedBy', 'assignedByName', 'assignedAt', 'updatedAt'
   ]
@@ -17,20 +18,31 @@ const FocalAssignmentService = (() => {
     const users = _activeUsers()
     const divisions = _activeDivisions()
 
+    const bureauPrimary = _findAssignment(assignments, TYPES.BUREAU, '', 'Primary')
+    const bureauAlternate = _findAssignment(assignments, TYPES.BUREAU, '', 'Alternate')
     return {
-      bureauFocal: assignments.find(a => a.assignmentType === TYPES.BUREAU) || null,
+      bureauFocal: bureauPrimary || assignments.find(a => a.assignmentType === TYPES.BUREAU) || null,
+      bureauFocals: {
+        primary: bureauPrimary || null,
+        alternate: bureauAlternate || null
+      },
       divisionFocals: divisions.map(division => {
-        const found = assignments.find(a =>
-          a.assignmentType === TYPES.DIVISION &&
-          String(a.divisionId || '') === String(division.id || '')
-        )
+        const primary = _findAssignment(assignments, TYPES.DIVISION, division.id, 'Primary')
+        const alternate = _findAssignment(assignments, TYPES.DIVISION, division.id, 'Alternate')
+        const found = primary || alternate
         return {
           divisionId: division.id,
           divisionName: division.name,
           assignmentId: found ? found.id : '',
           userId: found ? found.userId : '',
           userName: found ? found.userName : '',
-          userEmail: found ? found.userEmail : ''
+          userEmail: found ? found.userEmail : '',
+          primaryUserId: primary ? primary.userId : '',
+          primaryUserName: primary ? primary.userName : '',
+          primaryUserEmail: primary ? primary.userEmail : '',
+          alternateUserId: alternate ? alternate.userId : '',
+          alternateUserName: alternate ? alternate.userName : '',
+          alternateUserEmail: alternate ? alternate.userEmail : ''
         }
       }),
       users: users.map(_safeUser),
@@ -45,11 +57,33 @@ const FocalAssignmentService = (() => {
     const usersById = _indexBy(_activeUsers(), 'id')
     const divisionsById = _indexBy(_activeDivisions(), 'id')
 
-    if (body.bureauFocalUserId !== undefined) {
+    if (body.bureauFocals !== undefined) {
+      const bureau = _parseFocalPair(body.bureauFocals)
+      _assertDistinctPair(bureau.primaryUserId, bureau.alternateUserId, 'Bureau focal')
       _replaceAssignment(sheet, {
         assignmentType: TYPES.BUREAU,
         divisionId: '',
         divisionName: '',
+        focalRole: 'Primary',
+        user: usersById[String(bureau.primaryUserId || '')],
+        profile,
+        now
+      })
+      _replaceAssignment(sheet, {
+        assignmentType: TYPES.BUREAU,
+        divisionId: '',
+        divisionName: '',
+        focalRole: 'Alternate',
+        user: usersById[String(bureau.alternateUserId || '')],
+        profile,
+        now
+      })
+    } else if (body.bureauFocalUserId !== undefined) {
+      _replaceAssignment(sheet, {
+        assignmentType: TYPES.BUREAU,
+        divisionId: '',
+        divisionName: '',
+        focalRole: 'Primary',
         user: usersById[String(body.bureauFocalUserId || '')],
         profile,
         now
@@ -59,11 +93,22 @@ const FocalAssignmentService = (() => {
     _parseDivisionFocals(body.divisionFocals).forEach(item => {
       const division = divisionsById[String(item.divisionId || '')]
       if (!division) throw HttpError('Division not found: ' + item.divisionId, 404)
+      _assertDistinctPair(item.primaryUserId || item.userId, item.alternateUserId, division.name + ' focal')
       _replaceAssignment(sheet, {
         assignmentType: TYPES.DIVISION,
         divisionId: division.id,
         divisionName: division.name,
-        user: usersById[String(item.userId || '')],
+        focalRole: 'Primary',
+        user: usersById[String(item.primaryUserId || item.userId || '')],
+        profile,
+        now
+      })
+      _replaceAssignment(sheet, {
+        assignmentType: TYPES.DIVISION,
+        divisionId: division.id,
+        divisionName: division.name,
+        focalRole: 'Alternate',
+        user: usersById[String(item.alternateUserId || '')],
         profile,
         now
       })
@@ -79,28 +124,34 @@ const FocalAssignmentService = (() => {
   }
 
   function getDivisionFocal(divisionId) {
-    return _activeAssignments().find(a =>
+    return getDivisionFocals(divisionId)[0] || null
+  }
+
+  function getDivisionFocals(divisionId) {
+    return _sortFocals(_activeAssignments().filter(a =>
       a.assignmentType === TYPES.DIVISION &&
       String(a.divisionId || '') === String(divisionId || '')
-    ) || null
+    ))
   }
 
   function getBureauFocal() {
-    return _activeAssignments().find(a => a.assignmentType === TYPES.BUREAU) || null
+    return getBureauFocals()[0] || null
+  }
+
+  function getBureauFocals() {
+    return _sortFocals(_activeAssignments().filter(a => a.assignmentType === TYPES.BUREAU))
   }
 
   function isDivisionFocal(profile, divisionId) {
-    const focal = getDivisionFocal(divisionId)
-    return !!(focal && profile && String(focal.userId) === String(profile.id))
+    return getDivisionFocals(divisionId).some(focal => profile && String(focal.userId) === String(profile.id))
   }
 
   function isBureauFocal(profile) {
-    const focal = getBureauFocal()
-    return !!(focal && profile && String(focal.userId) === String(profile.id))
+    return getBureauFocals().some(focal => profile && String(focal.userId) === String(profile.id))
   }
 
   function _replaceAssignment(sheet, data) {
-    _deactivateExisting(sheet, data.assignmentType, data.divisionId, data.now)
+    _deactivateExisting(sheet, data.assignmentType, data.divisionId, data.focalRole, data.now)
     if (!data.user) return
 
     SpreadsheetService.appendRow(sheet, {
@@ -108,6 +159,7 @@ const FocalAssignmentService = (() => {
       assignmentType: data.assignmentType,
       divisionId: data.divisionId || '',
       divisionName: data.divisionName || '',
+      focalRole: data.focalRole || 'Primary',
       userId: data.user.id,
       userName: _userName(data.user),
       userEmail: data.user.email || '',
@@ -119,12 +171,13 @@ const FocalAssignmentService = (() => {
     })
   }
 
-  function _deactivateExisting(sheet, assignmentType, divisionId, now) {
+  function _deactivateExisting(sheet, assignmentType, divisionId, focalRole, now) {
     _allAssignments().forEach(row => {
       const sameType = row.assignmentType === assignmentType
       const sameDivision = String(row.divisionId || '') === String(divisionId || '')
+      const sameRole = String(row.focalRole || 'Primary') === String(focalRole || 'Primary')
       const isActive = row.active === true || String(row.active).toLowerCase() === 'true'
-      if (sameType && sameDivision && isActive) {
+      if (sameType && sameDivision && sameRole && isActive) {
         SpreadsheetService.updateRow(sheet, row.id, { active: false, updatedAt: now })
       }
     })
@@ -188,6 +241,39 @@ const FocalAssignmentService = (() => {
     return []
   }
 
+  function _parseFocalPair(value) {
+    if (!value) return {}
+    if (typeof value === 'object' && !Array.isArray(value)) return value
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value)
+        return parsed && typeof parsed === 'object' ? parsed : {}
+      } catch (e) {
+        return {}
+      }
+    }
+    return {}
+  }
+
+  function _assertDistinctPair(primaryUserId, alternateUserId, label) {
+    if (primaryUserId && alternateUserId && String(primaryUserId) === String(alternateUserId)) {
+      throw HttpError(`${label}: primary and alternate focal must be different users.`, 400)
+    }
+  }
+
+  function _findAssignment(assignments, assignmentType, divisionId, focalRole) {
+    return assignments.find(a =>
+      a.assignmentType === assignmentType &&
+      String(a.divisionId || '') === String(divisionId || '') &&
+      String(a.focalRole || 'Primary') === focalRole
+    ) || null
+  }
+
+  function _sortFocals(rows) {
+    const order = { Primary: 1, Alternate: 2 }
+    return rows.sort((a, b) => (order[a.focalRole || 'Primary'] || 9) - (order[b.focalRole || 'Primary'] || 9))
+  }
+
   function _indexBy(rows, field) {
     return rows.reduce((acc, row) => {
       acc[String(row[field] || '')] = row
@@ -211,5 +297,5 @@ const FocalAssignmentService = (() => {
     return row.fullName || [row.firstName, row.lastName].filter(Boolean).join(' ').trim() || row.email || ''
   }
 
-  return { list, save, getDivisionFocal, getBureauFocal, isDivisionFocal, isBureauFocal }
+  return { list, save, getDivisionFocal, getDivisionFocals, getBureauFocal, getBureauFocals, isDivisionFocal, isBureauFocal }
 })()

@@ -95,6 +95,7 @@ export const focalAssignmentsApi = {
   list: (p = {}) => gasGet('focal-assignments', p),
   save: (data)   => gasWrite('POST', 'focal-assignments', {
     ...data,
+    bureauFocals: JSON.stringify(data.bureauFocals || {}),
     divisionFocals: JSON.stringify(data.divisionFocals || [])
   })
 }
@@ -241,6 +242,7 @@ export const ipcrfApi = {
   rate:         (id, data)             => gasWrite('PATCH', `ipcrf/${id}/rate`,        data),
   finalize:     (id, data = {})        => gasWrite('PATCH', `ipcrf/${id}/finalize`,    data),
   computeScore: (id)                   => gasWrite('POST',  `ipcrf/${id}/compute-score`),
+  assignableUsers: (formId, search = '') => gasGet(`ipcrf/${formId}/assignable-users`, { search }),
   reviewComments: (formId, reviewType) => gasGet(`ipcrf/${formId}/review-comments`, { reviewType }),
   saveReviewComments: (formId, data)   => gasWrite('POST', `ipcrf/${formId}/review-comments`, {
     ...data,

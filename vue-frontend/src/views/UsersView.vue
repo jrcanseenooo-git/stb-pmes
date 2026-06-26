@@ -34,12 +34,22 @@
       <div class="focal-grid">
         <div class="field focal-bureau">
           <label class="field-label">Bureau Focal</label>
-          <select v-model="bureauFocalUserId" class="field-select">
-            <option value="">No bureau focal assigned</option>
-            <option v-for="u in focalUsers" :key="u.id" :value="u.id">
-              {{ u.fullName }} — {{ u.divisionName || u.role }}
-            </option>
-          </select>
+          <div class="focal-slot">
+            <span>Primary</span>
+            <SearchSelect
+              v-model="bureauFocals.primaryUserId"
+              :options="focalUsers"
+              placeholder="Search primary bureau focal..."
+            />
+          </div>
+          <div class="focal-slot">
+            <span>Alternate</span>
+            <SearchSelect
+              v-model="bureauFocals.alternateUserId"
+              :options="focalUsers"
+              placeholder="Search alternate bureau focal..."
+            />
+          </div>
         </div>
 
         <div class="focal-list">
@@ -48,12 +58,24 @@
               <div class="focal-division">{{ item.divisionName }}</div>
               <div class="text-xs muted">Division IPCRF/CCEF checker and reviewer</div>
             </div>
-            <select v-model="item.userId" class="field-select">
-              <option value="">No division focal assigned</option>
-              <option v-for="u in focalUsersForDivision(item.divisionId)" :key="u.id" :value="u.id">
-                {{ u.fullName }} — {{ u.role }}
-              </option>
-            </select>
+            <div class="focal-row-slots">
+              <div class="focal-slot">
+                <span>Primary</span>
+                <SearchSelect
+                  v-model="item.primaryUserId"
+                  :options="focalUsersForDivision(item.divisionId)"
+                  placeholder="Search primary focal..."
+                />
+              </div>
+              <div class="focal-slot">
+                <span>Alternate</span>
+                <SearchSelect
+                  v-model="item.alternateUserId"
+                  :options="focalUsersForDivision(item.divisionId)"
+                  placeholder="Search alternate focal..."
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -405,7 +427,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, h, onMounted, watch } from 'vue'
 import { usersApi, focalAssignmentsApi } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
 import { useConfirm, CONFIRMS } from '@/composables/useConfirm'
@@ -439,10 +461,105 @@ const toast         = ref({ show: false, msg: '', type: 'success' })
 const users         = ref([])
 const focalUsers    = ref([])
 const divisionFocalRows = ref([])
-const bureauFocalUserId = ref('')
+const bureauFocals = ref({ primaryUserId: '', alternateUserId: '' })
 const authStore = useAuthStore()
 const { confirm } = useConfirm()
 const isSystemAdmin = computed(() => authStore.role === 'System Administrator')
+
+const SearchSelect = {
+  props: {
+    modelValue: { type: String, default: '' },
+    options: { type: Array, default: () => [] },
+    placeholder: { type: String, default: 'Search and select...' }
+  },
+  emits: ['update:modelValue'],
+  setup(props, { emit }) {
+    const query = ref('')
+    const open = ref(false)
+    const selected = computed(() => props.options.find(o => o.id === props.modelValue) || null)
+    const filtered = computed(() => {
+      const q = query.value.toLowerCase().trim()
+      return props.options
+        .filter(o => !q ||
+          String(o.fullName || '').toLowerCase().includes(q) ||
+          String(o.role || '').toLowerCase().includes(q) ||
+          String(o.divisionName || '').toLowerCase().includes(q) ||
+          String(o.email || '').toLowerCase().includes(q)
+        )
+        .slice(0, 40)
+    })
+
+    watch(() => props.modelValue, () => {
+      query.value = selected.value ? labelFor(selected.value) : ''
+    }, { immediate: true })
+
+    function labelFor(option) {
+      return option ? `${option.fullName} - ${option.role}${option.divisionName ? ' - ' + option.divisionName : ''}` : ''
+    }
+
+    function choose(option) {
+      emit('update:modelValue', option.id)
+      query.value = labelFor(option)
+      open.value = false
+    }
+
+    function clear() {
+      emit('update:modelValue', '')
+      query.value = ''
+      open.value = false
+    }
+
+    function onBlur() {
+      setTimeout(() => {
+        open.value = false
+        query.value = selected.value ? labelFor(selected.value) : ''
+      }, 120)
+    }
+
+    return () => h('div', { class: 'search-select' }, [
+      h('input', {
+        value: query.value,
+        class: 'field-input search-select-input',
+        type: 'text',
+        placeholder: props.placeholder,
+        onFocus: () => { open.value = true },
+        onInput: event => {
+          query.value = event.target.value
+          open.value = true
+        },
+        onBlur
+      }),
+      props.modelValue
+        ? h('button', {
+            type: 'button',
+            class: 'search-select-clear',
+            onMousedown: event => {
+              event.preventDefault()
+              clear()
+            }
+          }, 'x')
+        : null,
+      open.value
+        ? h('div', { class: 'search-select-menu' },
+            filtered.value.length
+              ? filtered.value.map(option => h('button', {
+                  key: option.id,
+                  type: 'button',
+                  class: 'search-select-option',
+                  onMousedown: event => {
+                    event.preventDefault()
+                    choose(option)
+                  }
+                }, [
+                  h('strong', option.fullName),
+                  h('span', `${option.role}${option.divisionName ? ' - ' + option.divisionName : ''}`)
+                ]))
+              : [h('div', { class: 'search-select-empty' }, 'No matching user')]
+          )
+        : null
+    ])
+  }
+}
 
 // ── Load users on mount ──
 onMounted(async () => {
@@ -470,11 +587,16 @@ async function loadFocalAssignments() {
   try {
     const data = await focalAssignmentsApi.list()
     focalUsers.value = data.users || []
-    bureauFocalUserId.value = data.bureauFocal?.userId || ''
+    bureauFocals.value = {
+      primaryUserId: data.bureauFocals?.primary?.userId || data.bureauFocal?.userId || '',
+      alternateUserId: data.bureauFocals?.alternate?.userId || ''
+    }
     divisionFocalRows.value = (data.divisionFocals || []).map(row => ({
       divisionId: row.divisionId,
       divisionName: row.divisionName,
-      userId: row.userId || ''
+      userId: row.userId || '',
+      primaryUserId: row.primaryUserId || row.userId || '',
+      alternateUserId: row.alternateUserId || ''
     }))
   } catch (e) {
     showToast(`Could not load focal assignments: ${e.message}`, 'error')
@@ -493,15 +615,22 @@ function focalUsersForDivision(divisionId) {
 }
 
 async function saveFocalAssignments() {
+  const duplicateMessage = focalAssignmentDuplicateMessage()
+  if (duplicateMessage) {
+    showToast(duplicateMessage, 'error')
+    return
+  }
+
   const ok = await confirm({
     type: 'submit',
     title: 'Save Focal Assignments',
     message: 'These assignments will control who receives and checks submitted IPCRF/CCEF forms.',
     details: [
-      { label: 'Bureau Focal', value: focalUsers.value.find(u => u.id === bureauFocalUserId.value)?.fullName || 'Not assigned' },
+      { label: 'Bureau Primary', value: focalUsers.value.find(u => u.id === bureauFocals.value.primaryUserId)?.fullName || 'Not assigned' },
+      { label: 'Bureau Alternate', value: focalUsers.value.find(u => u.id === bureauFocals.value.alternateUserId)?.fullName || 'Not assigned' },
       { label: 'Divisions', value: `${divisionFocalRows.value.length} division routing records` }
     ],
-    note: 'A submitted form will be routed to the assigned Division Focal for the staff member’s division.',
+    note: 'Saving overwrites the active focal slots. Replaced focals will lose review access.',
     confirmLabel: 'Save Assignments',
     cancelLabel: 'Cancel'
   })
@@ -510,18 +639,27 @@ async function saveFocalAssignments() {
   focalSaving.value = true
   try {
     const data = await focalAssignmentsApi.save({
-      bureauFocalUserId: bureauFocalUserId.value,
+      bureauFocals: {
+        primaryUserId: bureauFocals.value.primaryUserId,
+        alternateUserId: bureauFocals.value.alternateUserId
+      },
       divisionFocals: divisionFocalRows.value.map(row => ({
         divisionId: row.divisionId,
-        userId: row.userId
+        primaryUserId: row.primaryUserId,
+        alternateUserId: row.alternateUserId
       }))
     })
     focalUsers.value = data.users || focalUsers.value
-    bureauFocalUserId.value = data.bureauFocal?.userId || ''
+    bureauFocals.value = {
+      primaryUserId: data.bureauFocals?.primary?.userId || data.bureauFocal?.userId || '',
+      alternateUserId: data.bureauFocals?.alternate?.userId || ''
+    }
     divisionFocalRows.value = (data.divisionFocals || []).map(row => ({
       divisionId: row.divisionId,
       divisionName: row.divisionName,
-      userId: row.userId || ''
+      userId: row.userId || '',
+      primaryUserId: row.primaryUserId || row.userId || '',
+      alternateUserId: row.alternateUserId || ''
     }))
     showToast('Focal assignments saved.')
   } catch (e) {
@@ -529,6 +667,18 @@ async function saveFocalAssignments() {
   } finally {
     focalSaving.value = false
   }
+}
+
+function focalAssignmentDuplicateMessage() {
+  if (bureauFocals.value.primaryUserId &&
+      bureauFocals.value.alternateUserId &&
+      bureauFocals.value.primaryUserId === bureauFocals.value.alternateUserId) {
+    return 'Bureau primary and alternate focal must be different users.'
+  }
+  const duplicate = divisionFocalRows.value.find(row =>
+    row.primaryUserId && row.alternateUserId && row.primaryUserId === row.alternateUserId
+  )
+  return duplicate ? `${duplicate.divisionName}: primary and alternate focal must be different users.` : ''
 }
 
 // ── Map sheet row → display object ──
@@ -756,13 +906,28 @@ function showToast(msg, type='success') {
 
 /* Focal assignments */
 .focal-card{margin-bottom:12px;}
-.focal-grid{display:grid;grid-template-columns:320px 1fr;gap:16px;padding:16px;}
+.focal-grid{display:grid;grid-template-columns:360px 1fr;gap:16px;padding:16px;}
 .focal-bureau{align-self:start;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;padding:14px;}
 .focal-list{display:flex;flex-direction:column;border:1px solid #E2E8F0;border-radius:10px;overflow:hidden;}
-.focal-row{display:grid;grid-template-columns:minmax(220px,1fr) minmax(260px,360px);gap:14px;align-items:center;padding:12px 14px;border-bottom:1px solid #F1F5F9;}
+.focal-row{display:grid;grid-template-columns:minmax(220px,1fr) minmax(360px,560px);gap:14px;align-items:center;padding:12px 14px;border-bottom:1px solid #F1F5F9;}
 .focal-row:last-child{border-bottom:none;}
 .focal-division{font-weight:700;color:#0F172A;}
+.focal-row-slots{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.focal-slot{display:grid;gap:5px;margin-top:8px;}
+.focal-slot>span{font-size:10px;font-weight:800;text-transform:uppercase;color:#94A3B8;letter-spacing:.05em;}
+.search-select{position:relative;}
+.search-select-input{padding-right:28px;}
+.search-select-clear{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:18px;height:18px;border:0;background:#E2E8F0;color:#64748B;border-radius:999px;font-size:12px;line-height:18px;cursor:pointer;}
+.search-select-menu{position:absolute;z-index:30;left:0;right:0;top:calc(100% + 4px);max-height:220px;overflow:auto;border:1px solid #CBD5E1;background:#fff;border-radius:8px;box-shadow:0 12px 30px rgba(15,23,42,.14);padding:4px;}
+.search-select-option{width:100%;display:grid;gap:2px;text-align:left;border:0;background:#fff;border-radius:6px;padding:8px;cursor:pointer;color:#0F172A;}
+.search-select-option:hover{background:#EFF6FF;}
+.search-select-option strong{font-size:12px;}
+.search-select-option span{font-size:11px;color:#64748B;}
+.search-select-empty{padding:10px;color:#94A3B8;font-size:12px;text-align:center;}
 .focal-actions{display:flex;justify-content:flex-end;gap:8px;padding:0 16px 16px;}
+@media (max-width: 980px){
+  .focal-grid,.focal-row,.focal-row-slots{grid-template-columns:1fr;}
+}
 
 /* Table */
 .table-wrap{overflow-x:auto;}

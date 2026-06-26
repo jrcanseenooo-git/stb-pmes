@@ -150,6 +150,7 @@ const Router = (() => {
         if (id && !sub && method === 'GET') return IpcrfService.get(id, user)
         if (id && !sub && method === 'PUT') return IpcrfService.update(id, body, user)
         if (id && sub === 'submit') return IpcrfService.submit(id, body, user)
+        if (id && sub === 'route') return IpcrfService.route(id, body, user)
         if (id && sub === 'approve') return IpcrfService.approve(id, body, user)
         if (id && sub === 'return') return IpcrfService.return_(id, body, user)
         if (id && sub === 'rate') return IpcrfService.rate(id, body, user)
@@ -157,6 +158,8 @@ const Router = (() => {
         if (id && sub === 'compute-score') return IpcrfService.computeScore(id, user)
         if (id && sub === 'generate-targets') return PmesDocGenService.generateTargetsDoc(id, user)
         if (id && sub === 'generate-ratings') return PmesDocGenService.generateRatingsDoc(id, user)
+        if (id && sub === 'review-comments' && method === 'GET') return IpcrfService.listReviewComments(id, params, user)
+        if (id && sub === 'review-comments' && method === 'POST') return IpcrfService.saveReviewComments(id, body, user)
         if (id && sub === 'entries') {
           if (!subId && method === 'GET') return IpcrfService.listEntries(id, user)
           if (!subId && method === 'POST') return IpcrfService.addEntry(id, body, user)

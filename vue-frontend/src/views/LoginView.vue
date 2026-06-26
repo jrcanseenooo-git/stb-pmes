@@ -1,6 +1,23 @@
 <template>
   <div class="login-root">
     <div class="bg-texture" aria-hidden="true"></div>
+    <div class="ambient-panels" aria-hidden="true">
+      <div class="ambient-card card-a">
+        <span></span><span></span><span></span>
+      </div>
+      <div class="ambient-card card-b">
+        <span></span><span></span><span></span>
+      </div>
+      <div class="ambient-card card-c">
+        <span></span><span></span><span></span>
+      </div>
+      <div class="orbit-ring ring-a"></div>
+      <div class="orbit-ring ring-b"></div>
+      <div class="route-node node-a"></div>
+      <div class="route-node node-b"></div>
+      <div class="status-chip chip-a">Ehh kasi namaaan...</div>
+      <div class="status-chip chip-b">Anooo 'to ?</div>
+    </div>
 
     <!-- Center stage -->
     <main class="stage">
@@ -221,6 +238,205 @@ async function handleGoogleLogin() {
   background-size: 22px 22px;
   pointer-events: none;
   z-index: 0;
+}
+
+.bg-texture::after {
+  content: '';
+  position: absolute;
+  inset: -20%;
+  background:
+    linear-gradient(115deg, transparent 18%, rgba(255,255,255,.045) 38%, transparent 58%),
+    linear-gradient(25deg, transparent 35%, rgba(47,128,237,.06) 48%, transparent 62%);
+  transform: translateX(-12%);
+  animation: gridSweep 18s ease-in-out infinite alternate;
+}
+
+.ambient-panels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  overflow: hidden;
+}
+
+.ambient-card {
+  position: absolute;
+  width: 164px;
+  min-height: 92px;
+  border: 1px solid rgba(226,232,240,.14);
+  border-radius: 14px;
+  background: rgba(255,255,255,.055);
+  box-shadow: 0 18px 60px rgba(0,0,0,.16);
+  backdrop-filter: blur(6px);
+  padding: 18px 16px;
+  opacity: .54;
+}
+
+.ambient-card span {
+  display: block;
+  height: 7px;
+  border-radius: 99px;
+  background: rgba(226,232,240,.42);
+}
+
+.ambient-card span + span { margin-top: 10px; }
+.ambient-card span:nth-child(1) { width: 72%; background: rgba(255,255,255,.58); }
+.ambient-card span:nth-child(2) { width: 100%; }
+.ambient-card span:nth-child(3) { width: 48%; background: rgba(47,128,237,.48); }
+
+.card-a {
+  left: 13%;
+  top: 22%;
+  animation: floatPanelA 16s ease-in-out infinite;
+}
+
+.card-b {
+  right: 12%;
+  top: 29%;
+  transform: scale(.92);
+  animation: floatPanelB 19s ease-in-out infinite;
+}
+
+.card-c {
+  left: 18%;
+  bottom: 14%;
+  transform: scale(.82);
+  animation: floatPanelC 22s ease-in-out infinite;
+}
+
+.orbit-ring {
+  position: absolute;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 50%;
+  opacity: .46;
+}
+
+.ring-a {
+  width: 360px;
+  height: 360px;
+  left: 9%;
+  top: 13%;
+  animation: pulseRing 10s ease-in-out infinite;
+}
+
+.ring-b {
+  width: 430px;
+  height: 430px;
+  right: 5%;
+  bottom: 3%;
+  animation: pulseRing 13s ease-in-out infinite reverse;
+}
+
+.route-node {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #7DB2FF;
+  box-shadow: 0 0 0 7px rgba(125,178,255,.1), 0 0 24px rgba(125,178,255,.45);
+  opacity: .78;
+}
+
+.node-a {
+  left: 27%;
+  top: 35%;
+  background: #FCD116;
+  box-shadow: 0 0 0 7px rgba(252,209,22,.09), 0 0 24px rgba(252,209,22,.35);
+  animation: nodePathC 16s ease-in-out infinite;
+}
+
+.node-b {
+  right: 27%;
+  top: 43%;
+  animation: nodePathB 14s ease-in-out infinite;
+}
+
+.status-chip {
+  position: absolute;
+  padding: 7px 12px;
+  border: 1px solid rgba(226,232,240,.14);
+  border-radius: 999px;
+  background: rgba(255,255,255,.07);
+  backdrop-filter: blur(8px);
+  color: rgba(241,245,249,.76);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .2px;
+  box-shadow: 0 18px 60px rgba(0,0,0,.12);
+}
+
+.chip-a {
+  right: 18%;
+  top: 18%;
+  animation: chipFloatA 15s ease-in-out infinite;
+}
+
+.chip-b {
+  left: 16%;
+  bottom: 27%;
+  animation: chipFloatB 17s ease-in-out infinite;
+}
+
+@keyframes gridSweep {
+  from { transform: translateX(-14%) translateY(0); opacity: .62; }
+  to { transform: translateX(10%) translateY(3%); opacity: .9; }
+}
+
+@keyframes floatPanelA {
+  0%,100% { transform: translate3d(0,0,0) rotate(-3deg); }
+  50% { transform: translate3d(18px,-18px,0) rotate(2deg); }
+}
+
+@keyframes floatPanelB {
+  0%,100% { transform: translate3d(0,0,0) scale(.92) rotate(3deg); }
+  50% { transform: translate3d(-18px,16px,0) scale(.92) rotate(-2deg); }
+}
+
+@keyframes floatPanelC {
+  0%,100% { transform: translate3d(0,0,0) scale(.82) rotate(2deg); }
+  50% { transform: translate3d(20px,14px,0) scale(.82) rotate(-2deg); }
+}
+
+@keyframes routeDrift {
+  0%,100% { transform: translateX(0); opacity: .25; }
+  50% { transform: translateX(34px); opacity: .62; }
+}
+
+@keyframes pulseRing {
+  0%,100% { transform: scale(.95); opacity: .2; }
+  50% { transform: scale(1.04); opacity: .48; }
+}
+
+@keyframes nodePathA {
+  0%,100% { transform: translate3d(0,0,0); opacity: .35; }
+  40% { transform: translate3d(58px,-20px,0); opacity: .85; }
+  70% { transform: translate3d(26px,34px,0); opacity: .55; }
+}
+
+@keyframes nodePathB {
+  0%,100% { transform: translate3d(0,0,0); opacity: .32; }
+  45% { transform: translate3d(-46px,24px,0); opacity: .78; }
+  75% { transform: translate3d(-14px,-34px,0); opacity: .5; }
+}
+
+@keyframes nodePathC {
+  0%,100% { transform: translate3d(0,0,0); opacity: .28; }
+  50% { transform: translate3d(34px,-28px,0); opacity: .74; }
+}
+
+@keyframes chipFloatA {
+  0%,100% { transform: translate3d(0,0,0); opacity: .36; }
+  50% { transform: translate3d(-18px,18px,0); opacity: .7; }
+}
+
+@keyframes chipFloatB {
+  0%,100% { transform: translate3d(0,0,0); opacity: .32; }
+  50% { transform: translate3d(22px,-18px,0); opacity: .66; }
+}
+
+@keyframes tickFloat {
+  0%,100% { transform: translate3d(0,0,0) rotate(0deg); opacity: .28; }
+  50% { transform: translate3d(14px,-18px,0) rotate(4deg); opacity: .62; }
 }
 
 .seal-wrap {
@@ -599,5 +815,19 @@ async function handleGoogleLogin() {
   .stage { padding: 16px 18px 28px; gap: 22px; }
   .hero-headline { font-size: 24px; }
   .form-shell { padding: 26px 22px 22px; border-radius: 16px; }
+  .ambient-card, .orbit-ring, .route-node, .status-chip { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bg-texture::after,
+  .ambient-card,
+  .orbit-ring,
+  .route-node,
+  .status-chip,
+  .sun-rays,
+  .spin,
+  .spin-dark {
+    animation: none !important;
+  }
 }
 </style>

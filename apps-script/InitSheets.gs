@@ -41,6 +41,11 @@ function initializeSheets() {
       'userId', 'userName', 'userEmail', 'active',
       'assignedBy', 'assignedByName', 'assignedAt', 'updatedAt'
     ],
+    ReviewComments: [
+      'id', 'formId', 'entryId', 'reviewType',
+      'comment', 'reviewerId', 'reviewerName',
+      'createdAt', 'updatedAt'
+    ],
     MOVFiles: [
       'id', 'driveFileId', 'driveUrl', 'fileName', 'mimeType', 'sizeBytes',
       'description', 'accomplishmentId', 'kraId', 'siId', 'divisionId',
@@ -82,6 +87,10 @@ function initializeSheets() {
       'feedbackStrengths', 'feedbackAreasForImprovement',
       'feedbackComments', 'feedbackRecommendations',
       'submittedAt', 'approvedAt', 'ratedAt', 'finalizedAt',
+      'targetReviewStage', 'targetRoutedToUserId', 'targetRoutedToName',
+      'targetRoutedAt', 'targetCompletedAt',
+      'ratingReviewStage', 'ratingRoutedToUserId', 'ratingRoutedToName',
+      'ratingRoutedAt', 'ratingCompletedAt',
       'docFileId', 'targetsGeneratedAt', 'ratingsGeneratedAt',
       'createdAt', 'updatedAt'
     ],

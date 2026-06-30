@@ -1,5 +1,32 @@
 # PMES Operating Rules
 
+## Typography — Font Family
+
+The system font is set **once** in `vue-frontend/src/assets/main.css` using two rules:
+
+```css
+/* Sets the Inter stack for the whole app */
+html, body, #app {
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
+}
+
+/* Forces ALL elements — including button/input/select — to inherit it */
+* {
+  font-family: inherit;
+}
+```
+
+These two rules together mean every element in the entire system automatically uses the correct font, including form elements that browsers normally do not inherit font on.
+
+**Rules — apply to every new module, view, component, or feature:**
+
+- **Never add `font-family` to any new CSS.** Not to page wrappers, modals, buttons, inputs, or anything. The global `* { font-family: inherit }` handles it automatically.
+- **Monospace exception** — password fields, code snippets, and formula text may use `font-family: 'DM Mono', monospace` or `'SF Mono', 'Fira Mono', monospace`. These are intentional overrides.
+- **Login module** (`LoginView.vue`) is exempt — it uses its own font design intentionally.
+- **SVG `<text>` attributes** may keep a short inline stack (e.g. `font-family="Inter,system-ui,sans-serif"`) since SVG attributes bypass CSS cascade.
+
+If you find yourself typing `-apple-system` or `BlinkMacSystemFont` anywhere outside `main.css`, **stop and delete it**.
+
 ## Apps Script Updates
 
 - For every Apps Script change, run the appropriate clasp command before considering the change complete.

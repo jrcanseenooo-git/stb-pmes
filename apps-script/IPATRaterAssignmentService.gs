@@ -60,54 +60,64 @@ const IPATRaterAssignmentService = (() => {
   // ── Position-specific assignment builders ────────────────────────────────
 
   function _assignForStaff(ratee, allUsers, prevAssign) {
-    const div  = ratee.divisionId || ''
-    const sec  = ratee.section    || ''
+    const div = ratee.divisionId || ''
+    const sec = (ratee.section  || '').trim()
 
-    const sectionPeers = allUsers.filter(u =>
-      u.id !== ratee.id && isStaff(u.role) && u.divisionId === div && u.section === sec
-    )
-    const divPeers = allUsers.filter(u =>
-      u.id !== ratee.id && isStaff(u.role) && u.divisionId === div && u.section !== sec
+    // All technical staff co-workers in same division (excluding ratee)
+    const divStaff = allUsers.filter(u =>
+      u.id !== ratee.id && isStaff(u.role) && (u.divisionId || '') === div
     )
 
-    // Peer1 — same section
+    // Same-section pool — if ratee has no section set, treat whole division as the section
+    const sectionPeers = sec
+      ? divStaff.filter(u => (u.section || '').trim() === sec)
+      : divStaff
+
+    // Peer1: from same section (or division when no section data exists)
     const peer1 = _selectRandom(sectionPeers, [ratee.id], _prevRaterId(prevAssign, ratee.id, 'Peer1'))
 
-    // Peer2 — 70% same section (excluding peer1), 30% same division different section
-    const peer2ExcludeIds = [ratee.id, peer1?.id].filter(Boolean)
+    // Peer2: 70% same section, 30% whole division; must differ from peer1
+    const excludePeer2      = [ratee.id, peer1?.id].filter(Boolean)
+    const peer2SectionPool  = sectionPeers.filter(u => u.id !== peer1?.id)
+    const peer2DivPool      = divStaff.filter(u => u.id !== peer1?.id)
+
     let peer2 = null
-    if (Math.random() < 0.70 || !divPeers.length) {
-      const secPool = sectionPeers.filter(u => u.id !== peer1?.id)
-      peer2 = _selectRandom(secPool, peer2ExcludeIds, _prevRaterId(prevAssign, ratee.id, 'Peer2'))
+    if (Math.random() < 0.70 && peer2SectionPool.length) {
+      peer2 = _selectRandom(peer2SectionPool, excludePeer2, _prevRaterId(prevAssign, ratee.id, 'Peer2'))
     }
-    if (!peer2) {
-      peer2 = _selectRandom(divPeers, peer2ExcludeIds, _prevRaterId(prevAssign, ratee.id, 'Peer2'))
+    if (!peer2 && peer2DivPool.length) {
+      peer2 = _selectRandom(peer2DivPool, excludePeer2, _prevRaterId(prevAssign, ratee.id, 'Peer2'))
     }
 
-    // Supervisor — Section Head in same section + division
-    const supervisor = allUsers.find(u => isSectionHead(u.role) && u.divisionId === div && u.section === sec)
+    // Supervisor: Section Head in same section + division; fallback to any SH in division
+    let supervisor = sec
+      ? allUsers.find(u => isSectionHead(u.role) && (u.divisionId || '') === div && (u.section || '').trim() === sec)
+      : null
+    if (!supervisor) supervisor = allUsers.find(u => isSectionHead(u.role) && (u.divisionId || '') === div)
 
-    // Skip Supervisor — Division Chief of same division
-    const skipSupervisor = allUsers.find(u => isDivisionChief(u.role) && u.divisionId === div)
+    // Skip Supervisor: Division Chief of same division
+    const skipSupervisor = allUsers.find(u => isDivisionChief(u.role) && (u.divisionId || '') === div)
 
     const result = [{ raterId: ratee.id, raterName: ratee.fullName, raterType: 'Self' }]
-    if (peer1)         result.push({ raterId: peer1.id,         raterName: peer1.fullName,         raterType: 'Peer1' })
-    if (peer2)         result.push({ raterId: peer2.id,         raterName: peer2.fullName,         raterType: 'Peer2' })
-    if (supervisor)    result.push({ raterId: supervisor.id,    raterName: supervisor.fullName,    raterType: 'Supervisor' })
+    if (peer1)          result.push({ raterId: peer1.id,          raterName: peer1.fullName,          raterType: 'Peer1' })
+    if (peer2)          result.push({ raterId: peer2.id,          raterName: peer2.fullName,          raterType: 'Peer2' })
+    if (supervisor)     result.push({ raterId: supervisor.id,     raterName: supervisor.fullName,     raterType: 'Supervisor' })
     if (skipSupervisor) result.push({ raterId: skipSupervisor.id, raterName: skipSupervisor.fullName, raterType: 'SkipSupervisor' })
     return result
   }
 
   function _assignForSectionHead(ratee, allUsers, prevAssign) {
     const div = ratee.divisionId || ''
-    const sec = ratee.section    || ''
+    const sec = (ratee.section  || '').trim()
 
     // Peer — co-Section Head in same division
-    const shPeers = allUsers.filter(u => u.id !== ratee.id && isSectionHead(u.role) && u.divisionId === div)
+    const shPeers = allUsers.filter(u => u.id !== ratee.id && isSectionHead(u.role) && (u.divisionId || '') === div)
     const peer = _selectRandom(shPeers, [ratee.id], _prevRaterId(prevAssign, ratee.id, 'Peer'))
 
-    // Subordinate — random Staff in same section
-    const subordinates = allUsers.filter(u => isStaff(u.role) && u.divisionId === div && u.section === sec)
+    // Subordinate — Technical Staff in same section; fallback to any staff in division
+    const subordinates = sec
+      ? allUsers.filter(u => isStaff(u.role) && (u.divisionId || '') === div && (u.section || '').trim() === sec)
+      : allUsers.filter(u => isStaff(u.role) && (u.divisionId || '') === div)
     const subordinate = _selectRandom(subordinates, [], _prevRaterId(prevAssign, ratee.id, 'Subordinate'))
 
     // Supervisor — Division Chief of same division
@@ -192,7 +202,7 @@ const IPATRaterAssignmentService = (() => {
 
     const assignSheet = SpreadsheetService.getSheet(SHEET.IPAT_ASSIGNMENTS)
     const existing = SpreadsheetService.getAllRows(assignSheet).filter(r =>
-      r.semester === semester && String(r.year) === year
+      String(r.semester) === semester && String(r.year) === year
     )
     if (existing.length) {
       throw HttpError(
@@ -310,7 +320,7 @@ const IPATRaterAssignmentService = (() => {
     const assignSheet = SpreadsheetService.getSheet(SHEET.IPAT_ASSIGNMENTS)
 
     let rows = SpreadsheetService.getAllRows(assignSheet).filter(r => r.raterId === profile.id)
-    if (params.semester) rows = rows.filter(r => r.semester === String(params.semester))
+    if (params.semester) rows = rows.filter(r => String(r.semester) === String(params.semester))
     if (params.year)     rows = rows.filter(r => String(r.year) === String(params.year))
     if (params.status)   rows = rows.filter(r => r.status === params.status)
 
@@ -337,7 +347,7 @@ const IPATRaterAssignmentService = (() => {
 
     const assignSheet = SpreadsheetService.getSheet(SHEET.IPAT_ASSIGNMENTS)
     let rows = SpreadsheetService.getAllRows(assignSheet).filter(r => r.rateeId === rateeId)
-    if (params.semester) rows = rows.filter(r => r.semester === String(params.semester))
+    if (params.semester) rows = rows.filter(r => String(r.semester) === String(params.semester))
     if (params.year)     rows = rows.filter(r => String(r.year) === String(params.year))
     return rows
   }
@@ -351,7 +361,7 @@ const IPATRaterAssignmentService = (() => {
 
     const assignSheet = SpreadsheetService.getSheet(SHEET.IPAT_ASSIGNMENTS)
     let rows = SpreadsheetService.getAllRows(assignSheet)
-    if (params.semester) rows = rows.filter(r => r.semester === String(params.semester))
+    if (params.semester) rows = rows.filter(r => String(r.semester) === String(params.semester))
     if (params.year)     rows = rows.filter(r => String(r.year) === String(params.year))
     if (params.rateeId)  rows = rows.filter(r => r.rateeId === params.rateeId)
     return rows
@@ -372,6 +382,36 @@ const IPATRaterAssignmentService = (() => {
     return { updated: true }
   }
 
+  // ── GET MY OWN RESULTS (ratee views their final score) ───────────────────
+  // Section 2: "The person being rated shall be able to view the final ratings."
+
+  function getMyResults(params, user) {
+    const profile  = AuthService.getProfile(user)
+    const recSheet = SpreadsheetService.getSheet(SHEET.IPAT_RECORDS)
+    let rows = SpreadsheetService.getAllRows(recSheet).filter(r => r.rateeId === profile.id)
+
+    if (params.semester) rows = rows.filter(r => String(r.semester) === String(params.semester))
+    if (params.year)     rows = rows.filter(r => String(r.year)     === String(params.year))
+
+    // Only expose Final records to the ratee — drafts and computed are internal
+    return rows
+      .filter(r => r.status === 'Final')
+      .map(r => ({
+        id:           r.id,
+        semester:     r.semester,
+        year:         r.year,
+        rateeName:    r.rateeName,
+        divisionName: r.divisionName,
+        positionLevel: r.positionLevel,
+        cbcScore:     r.cbcScore,
+        fpoScore:     r.fpoScore,
+        jfScore:      r.jfScore,
+        overallScore: r.overallScore,
+        descriptor:   r.descriptor,
+        status:       r.status
+      }))
+  }
+
   // ── DELETE ALL ASSIGNMENTS FOR A PERIOD (admin, to regenerate) ────────────
 
   function deleteForPeriod(semester, year, user) {
@@ -380,7 +420,7 @@ const IPATRaterAssignmentService = (() => {
 
     const assignSheet = SpreadsheetService.getSheet(SHEET.IPAT_ASSIGNMENTS)
     const toDelete = SpreadsheetService.getAllRows(assignSheet).filter(r =>
-      r.semester === String(semester) && String(r.year) === String(year)
+      String(r.semester) === String(semester) && String(r.year) === String(year)
     )
     toDelete.forEach(r => SpreadsheetService.hardDeleteRow(assignSheet, r.id))
 
@@ -392,6 +432,7 @@ const IPATRaterAssignmentService = (() => {
   return {
     generateAssignments,
     getMyRatees,
+    getMyResults,
     getRateeAssignments,
     list,
     markCompleted,

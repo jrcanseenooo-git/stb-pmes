@@ -148,6 +148,23 @@ const IPATService = (() => {
     if (!row) throw HttpError('IPAT record not found', 404)
     row.cbcRatings = getCBCRatings(id)
     row.jfRatings  = getJFRatings(id)
+
+    // Section 11: Detect significant variance between Self and Supervisor in JF
+    // Flag for Skip Supervisor review if |selfAvg - supervisorAvg| >= 1.0
+    if (row.jfRatings.length) {
+      const selfJF = row.jfRatings.filter(r => r.raterType === 'Self')
+      const supJF  = row.jfRatings.filter(r => r.raterType === 'Supervisor')
+      if (selfJF.length && supJF.length) {
+        const avg = (arr) => arr.reduce((s, r) => s + Number(r.rating || 0), 0) / arr.length
+        const gap = Math.abs(avg(selfJF) - avg(supJF))
+        row.jfVarianceFlagged = gap >= 1.0
+        row.jfVarianceGap     = Math.round(gap * 100) / 100
+      } else {
+        row.jfVarianceFlagged = false
+        row.jfVarianceGap     = null
+      }
+    }
+
     return row
   }
 
@@ -413,11 +430,23 @@ const IPATService = (() => {
       indicatorScores.reduce((s, i) => s + i.score, 0) / JOB_FITNESS_INDICATORS.length
     )
 
+    // Section 11: Flag significant variance between Self and Supervisor averages
+    const selfRatings = ratings.filter(r => r.raterType === 'Self')
+    const supRatings  = ratings.filter(r => r.raterType === 'Supervisor')
+    let jfVarianceFlagged = false
+    let jfVarianceGap     = null
+    if (selfRatings.length && supRatings.length) {
+      const avg = (arr) => arr.reduce((s, r) => s + Number(r.rating || 0), 0) / arr.length
+      const gap = Math.abs(avg(selfRatings) - avg(supRatings))
+      jfVarianceFlagged = gap >= 1.0
+      jfVarianceGap     = Math.round(gap * 100) / 100
+    }
+
     const recSheet = SpreadsheetService.getSheet(SHEET.IPAT_RECORDS)
     SpreadsheetService.updateRow(recSheet, ipatId, { jfScore, updatedAt: new Date().toISOString() })
 
     AuditService.log('COMPUTE_JF', 'IPAT', `JF=${jfScore} for ${ipatId}`, user)
-    return { jfScore, indicatorScores }
+    return { jfScore, indicatorScores, jfVarianceFlagged, jfVarianceGap }
   }
 
   // ─────────────────────────────────────────────

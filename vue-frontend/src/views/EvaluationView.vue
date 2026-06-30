@@ -54,6 +54,9 @@
         My Rating Tasks
         <span v-if="pendingTaskCount > 0" class="view-tab-badge">{{ pendingTaskCount }}</span>
       </button>
+      <button :class="['view-tab', activeView === 'my-results' && 'active']" @click="switchToMyResults">
+        My Results
+      </button>
       <button v-if="canAdmin" :class="['view-tab', activeView === 'all' && 'active']" @click="switchToAll">
         All Assessments
       </button>
@@ -100,6 +103,7 @@
             <span :class="['status-badge', task.status === 'Completed' ? 'st-green' : 'st-draft']">{{ task.status }}</span>
           </div>
           <div class="tc-name">{{ task.rateeName }}</div>
+          <div class="tc-role-desc">{{ raterRoleDesc(task.raterType) }}</div>
           <div class="tc-meta">S{{ task.semester }} {{ task.year }}{{ task.rateeDivisionId ? ' · ' + task.rateeDivisionId : '' }}</div>
           <div v-if="task.ipatStatus === 'Final'" class="tc-final">
             <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
@@ -107,6 +111,74 @@
               <path d="M3.5 5.5l1.5 1.5 2.5-2.5" stroke="#fff" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
             Assessment finalized
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- ══ MY RESULTS VIEW (ratee sees own final scores) ══ -->
+    <template v-if="activeView === 'my-results'">
+      <div class="tasks-period-bar">
+        <label class="tasks-period-label">Period:</label>
+        <select v-model="tasksSemester" class="filter-select" style="width:180px">
+          <option value="1">1st Semester (Jan–Jun)</option>
+          <option value="2">2nd Semester (Jul–Dec)</option>
+        </select>
+        <select v-model="tasksYear" class="filter-select" style="width:90px">
+          <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}</option>
+        </select>
+        <button class="btn btn-sm" @click="loadMyResults" :disabled="loadingResults">
+          <span v-if="loadingResults" class="spinner-sm"></span>
+          {{ loadingResults ? '' : 'Load' }}
+        </button>
+      </div>
+
+      <div v-if="loadingResults" class="records-grid">
+        <div v-for="i in 2" :key="i" class="record-card sk-card">
+          <div class="sk-hd"><div class="sk-badge"></div></div>
+          <div class="sk-line" style="width:60%;margin-bottom:6px"></div>
+          <div class="sk-line" style="width:40%"></div>
+        </div>
+      </div>
+
+      <div v-else-if="!myResults.length" class="empty-state">
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+          <circle cx="24" cy="24" r="18" stroke="#E2E8F0" stroke-width="2"/>
+          <path d="M16 28l4-4 3 3 6-6" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <p class="empty-title">No finalized results yet</p>
+        <p class="empty-sub">Your results will appear here once your assessment has been finalized for this period.</p>
+      </div>
+
+      <div v-else class="results-grid">
+        <div v-for="res in myResults" :key="res.id" class="result-card">
+          <div class="rc-hd">
+            <span class="rc-period">S{{ res.semester }} {{ res.year }}</span>
+            <span class="status-badge st-green">Final</span>
+          </div>
+          <div class="rc-name">{{ res.rateeName }}</div>
+          <div class="rc-division">{{ res.divisionName }}</div>
+          <div class="rc-scores">
+            <div class="rc-score-item">
+              <span class="rc-score-label">CBC</span>
+              <span class="rc-score-val">{{ res.cbcScore || '—' }}</span>
+              <span class="rc-score-pct">30%</span>
+            </div>
+            <div class="rc-score-item">
+              <span class="rc-score-label">FPO</span>
+              <span class="rc-score-val">{{ res.fpoScore || '—' }}</span>
+              <span class="rc-score-pct">55%</span>
+            </div>
+            <div class="rc-score-item">
+              <span class="rc-score-label">JF</span>
+              <span class="rc-score-val">{{ res.jfScore || '—' }}</span>
+              <span class="rc-score-pct">15%</span>
+            </div>
+          </div>
+          <div class="rc-overall">
+            <span class="rc-overall-label">Overall</span>
+            <span class="rc-overall-score">{{ res.overallScore || '—' }}</span>
+            <span v-if="res.descriptor" class="rc-descriptor">{{ res.descriptor }}</span>
           </div>
         </div>
       </div>
@@ -432,8 +504,9 @@
               <circle cx="6.5" cy="6.5" r="5.5" stroke="#1A56B0" stroke-width="1.3"/>
               <path d="M6.5 4v3.5M6.5 9.5v.1" stroke="#1A56B0" stroke-width="1.3" stroke-linecap="round"/>
             </svg>
-            Rating as: <strong>{{ raterTypeLabel(activeAssignment.raterType) }}</strong>
-            <span v-if="!showJFTab"> · CBC only (JF not rated by this rater type)</span>
+            Your role: <strong>{{ raterTypeLabel(activeAssignment.raterType) }}</strong>
+            <span class="banner-desc"> — {{ raterRoleDesc(activeAssignment.raterType) }}</span>
+            <span v-if="!showJFTab"> · CBC only</span>
           </div>
 
           <!-- Tabs -->
@@ -576,6 +649,19 @@
                 </select>
               </template>
               <span v-else class="assignment-rtype-chip">{{ raterTypeLabel(activeAssignment.raterType) }}</span>
+            </div>
+
+            <!-- Section 11: Significant variance warning -->
+            <div v-if="loadedRec?.jfVarianceFlagged" class="variance-banner">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M8 1L1 14h14L8 1z" fill="#FEF9C3" stroke="#CA8A04" stroke-width="1.2"/>
+                <path d="M8 6v4M8 11.5v.5" stroke="#CA8A04" stroke-width="1.4" stroke-linecap="round"/>
+              </svg>
+              <div>
+                <strong>Significant variance detected</strong> — the Self-rating and Supervisor rating differ by
+                {{ loadedRec.jfVarianceGap }} points. This record is flagged for Skip Supervisor review
+                per Section 11 of the evaluation guidelines.
+              </div>
             </div>
 
             <div class="jf-list">
@@ -853,6 +939,10 @@ const yearOptions   = computed(() => {
 })
 const pendingTaskCount = computed(() => myTasks.value.filter(t => t.status === 'Pending').length)
 
+// My Results (ratee views own Final records)
+const myResults     = ref([])
+const loadingResults = ref(false)
+
 // Generate Assignments
 const showGenerateModal = ref(false)
 const generateForm  = ref({ semester: String(new Date().getMonth() < 6 ? 1 : 2), year: currentYear })
@@ -1019,6 +1109,23 @@ async function loadMyTasks() {
   finally { loadingTasks.value = false }
 }
 
+async function switchToMyResults() {
+  activeView.value = 'my-results'
+  if (!myResults.value.length) loadMyResults()
+}
+
+async function loadMyResults() {
+  loadingResults.value = true
+  try {
+    const data = await ipatAssignmentsApi.getMyResults({ semester: tasksSemester.value, year: tasksYear.value })
+    myResults.value = data || []
+  } catch (e) {
+    showToast(`Could not load results: ${e.message}`, 'error')
+  } finally {
+    loadingResults.value = false
+  }
+}
+
 async function switchToAll() {
   activeView.value = 'all'
   if (!records.value.length) loadRecords()
@@ -1060,15 +1167,28 @@ async function generateAssignments() {
 // ── Rater type helpers ──
 function raterTypeLabel(type) {
   const labels = {
-    Self:          'Self Assessment',
-    Peer:          'Peer Rater',
+    Self:          'Self',
+    Peer:          'Peer',
     Peer1:         'Peer 1',
     Peer2:         'Peer 2',
-    Subordinate:   'Subordinate Rater',
-    Supervisor:    'Immediate Supervisor',
+    Subordinate:   'Subordinate',
+    Supervisor:    'Supervisor',
     SkipSupervisor:'Skip Supervisor'
   }
   return labels[type] || type
+}
+
+function raterRoleDesc(type) {
+  const desc = {
+    Self:          'You are rating yourself',
+    Peer:          'You are their same-level peer',
+    Peer1:         'You are their same-level peer',
+    Peer2:         'You are their same-level peer',
+    Subordinate:   'You report to this person',
+    Supervisor:    'You are the immediate supervisor of this staff',
+    SkipSupervisor:'You are their skip-level supervisor'
+  }
+  return desc[type] || ''
 }
 
 function rterTypeCls(type) {
@@ -1545,8 +1665,10 @@ function _resetEdap() {
 .task-card{background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:16px;cursor:pointer;transition:all .15s;}
 .task-card:hover{border-color:#CBD5E1;box-shadow:0 4px 12px rgba(0,0,0,.07);transform:translateY(-1px);}
 .tc-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
-.tc-name{font-size:14px;font-weight:600;color:#0F172A;margin-bottom:4px;}
+.tc-name{font-size:14px;font-weight:600;color:#0F172A;margin-bottom:2px;}
+.tc-role-desc{font-size:11px;color:#64748B;margin-bottom:4px;font-style:italic;}
 .tc-meta{font-size:11px;color:#94A3B8;margin-bottom:8px;}
+.banner-desc{font-weight:400;opacity:.85;}
 .tc-final{display:flex;align-items:center;gap:4px;font-size:11px;color:#15803D;font-weight:500;}
 .rtype-badge{padding:2px 8px;border-radius:12px;font-size:10px;font-weight:600;}
 .rt-self{background:#F0F9FF;color:#0369A1;}
@@ -1572,4 +1694,25 @@ function _resetEdap() {
 .btn-outline{border-color:#CBD5E1;color:#374151;}
 .btn-outline:hover{background:#F8FAFC;}
 .btn-sm{padding:5px 10px;font-size:11px;}
+
+/* My Results */
+.results-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-bottom:16px;}
+.result-card{background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:18px;}
+.rc-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.rc-period{font-size:11px;font-weight:600;color:#64748B;}
+.rc-name{font-size:15px;font-weight:700;color:#0F172A;margin-bottom:2px;}
+.rc-division{font-size:11px;color:#94A3B8;margin-bottom:12px;}
+.rc-scores{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;}
+.rc-score-item{background:#F8FAFC;border-radius:8px;padding:8px;text-align:center;}
+.rc-score-label{display:block;font-size:10px;font-weight:600;color:#64748B;margin-bottom:2px;}
+.rc-score-val{display:block;font-size:18px;font-weight:700;color:#0F172A;}
+.rc-score-pct{display:block;font-size:10px;color:#94A3B8;}
+.rc-overall{display:flex;align-items:center;gap:8px;padding:10px;background:#EBF4FF;border-radius:8px;}
+.rc-overall-label{font-size:11px;font-weight:600;color:#1A56B0;}
+.rc-overall-score{font-size:20px;font-weight:800;color:#1A56B0;}
+.rc-descriptor{font-size:11px;color:#1A56B0;font-style:italic;}
+
+/* JF Variance flag (Section 11) */
+.variance-banner{display:flex;align-items:flex-start;gap:10px;background:#FEFCE8;border:1px solid #FDE047;border-radius:8px;padding:10px 14px;font-size:12px;color:#713F12;margin-bottom:16px;line-height:1.5;}
+.variance-banner strong{color:#92400E;}
 </style>

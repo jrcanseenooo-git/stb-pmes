@@ -202,7 +202,8 @@ export const ipatApi = {
 export const ipatAssignmentsApi = {
   list:           (p = {})          => gasGet('ipat-assignments', p),
   generate:       (data)            => gasWrite('POST',   'ipat-assignments/generate', data),
-  getMyRatees:    (p = {})          => gasGet('ipat-assignments/my-ratees', p),
+  getMyRatees:    (p = {})          => gasGet('ipat-assignments/my-ratees',  p),
+  getMyResults:   (p = {})          => gasGet('ipat-assignments/my-results', p),
   getRateeAssign: (rateeId, p = {}) => gasGet(`ipat-assignments/${rateeId}/ratee-assignments`, p),
   markCompleted:  (id)              => gasWrite('POST',   `ipat-assignments/${id}/complete`),
   deleteForPeriod:(semester, year)  => gasWrite('DELETE', 'ipat-assignments', { semester, year })

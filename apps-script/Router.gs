@@ -187,6 +187,16 @@ const Router = (() => {
         if (id === 'jf-indicators') return IPATService.getJFIndicators(params, user)
         break
 
+      // IPAT Rater Assignments
+      case 'ipat-assignments':
+        if (!id && method === 'GET')                     return IPATRaterAssignmentService.list(params, user)
+        if (!id && method === 'DELETE')                  return IPATRaterAssignmentService.deleteForPeriod(params.semester, params.year, user)
+        if (id === 'generate'  && method === 'POST')     return IPATRaterAssignmentService.generateAssignments(body, user)
+        if (id === 'my-ratees' && method === 'GET')      return IPATRaterAssignmentService.getMyRatees(params, user)
+        if (id && sub === 'ratee-assignments' && method === 'GET') return IPATRaterAssignmentService.getRateeAssignments(id, params, user)
+        if (id && sub === 'complete' && method === 'POST') return IPATRaterAssignmentService.markCompleted(id, user)
+        break
+
       // ─────────────────────────────────────────
       // Generated documents — print/export
       // docgen/{fileId}/print — id = the generated Drive file's id

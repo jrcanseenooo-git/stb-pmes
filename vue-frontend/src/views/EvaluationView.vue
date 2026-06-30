@@ -7,15 +7,18 @@
     <!-- Header -->
     <div class="page-hd">
       <div>
-        <h2 class="page-title">Evaluation Results</h2>
-        <p class="page-sub">Innovations Performance Assessment Tool — CBC 30% · FPO 50% · JF 20%</p>
+        <h2 class="page-title">Evaluation</h2>
+        <p class="page-sub">Innovations Performance Assessment Tool — CBC 30% · FPO 55% · JF 15%</p>
       </div>
-      <button v-if="canCreate" class="btn btn-primary" @click="openCreateModal">
-        <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-          <path d="M6.5 1v11M1 6.5h11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-        </svg>
-        New Assessment
-      </button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button v-if="canAdmin" class="btn btn-outline" @click="openGenerateModal">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <circle cx="6.5" cy="6.5" r="5.5" stroke="currentColor" stroke-width="1.4"/>
+            <path d="M6.5 3.5v3l2 1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+          </svg>
+          Generate Assignments
+        </button>
+      </div>
     </div>
 
     <!-- Domain weight bar -->
@@ -27,13 +30,13 @@
       </div>
       <div class="domain-sep">+</div>
       <div class="domain-item d-fpo">
-        <div class="domain-pct">50%</div>
+        <div class="domain-pct">55%</div>
         <div class="domain-label">Functional Performance Output</div>
         <div class="domain-sub">IPCRF/DPCR Final Numerical Rating</div>
       </div>
       <div class="domain-sep">+</div>
       <div class="domain-item d-jf">
-        <div class="domain-pct">20%</div>
+        <div class="domain-pct">15%</div>
         <div class="domain-label">Job Fitness</div>
         <div class="domain-sub">7 Indicators · Self + Immediate Supervisor</div>
       </div>
@@ -45,90 +48,153 @@
       </div>
     </div>
 
-    <!-- Filters -->
-    <div class="filter-bar">
-      <div class="status-tabs">
-        <button v-for="t in statusTabs" :key="t.value"
-          :class="['status-tab', activeStatus === t.value && 'active']"
-          @click="activeStatus = t.value">
-          {{ t.label }}
+    <!-- View toggle -->
+    <div class="view-tabs">
+      <button :class="['view-tab', activeView === 'my-tasks' && 'active']" @click="activeView = 'my-tasks'">
+        My Rating Tasks
+        <span v-if="pendingTaskCount > 0" class="view-tab-badge">{{ pendingTaskCount }}</span>
+      </button>
+      <button v-if="canAdmin" :class="['view-tab', activeView === 'all' && 'active']" @click="switchToAll">
+        All Assessments
+      </button>
+    </div>
+
+    <!-- ══ MY RATING TASKS VIEW ══ -->
+    <template v-if="activeView === 'my-tasks'">
+      <div class="tasks-period-bar">
+        <label class="tasks-period-label">Period:</label>
+        <select v-model="tasksSemester" class="filter-select" style="width:180px">
+          <option value="1">1st Semester (Jan–Jun)</option>
+          <option value="2">2nd Semester (Jul–Dec)</option>
+        </select>
+        <select v-model="tasksYear" class="filter-select" style="width:90px">
+          <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}</option>
+        </select>
+        <button class="btn btn-sm" @click="loadMyTasks" :disabled="loadingTasks">
+          <span v-if="loadingTasks" class="spinner-sm"></span>
+          {{ loadingTasks ? '' : 'Load' }}
         </button>
       </div>
-      <div class="filter-right">
-        <div class="srch-wrap">
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" class="srch-icon">
-            <circle cx="5" cy="5" r="4" stroke="#94A3B8" stroke-width="1.2"/>
-            <path d="M8.5 8.5l2 2" stroke="#94A3B8" stroke-width="1.2" stroke-linecap="round"/>
-          </svg>
-          <input v-model="search" type="text" class="srch-inp" placeholder="Search employee…"/>
-        </div>
-        <select v-model="filterDiv" class="filter-select">
-          <option value="">All Divisions</option>
-          <option v-for="d in availableDivisions" :key="d.id" :value="d.id">{{ d.name }}</option>
-        </select>
-      </div>
-    </div>
 
-    <!-- Skeleton -->
-    <div v-if="loading" class="records-grid">
-      <div v-for="i in 3" :key="i" class="record-card sk-card">
-        <div class="sk-hd"><div class="sk-badge"></div><div class="sk-line" style="width:60px"></div></div>
-        <div class="sk-line" style="width:80%;margin-bottom:6px"></div>
-        <div class="sk-line" style="width:55%;margin-bottom:16px"></div>
-        <div class="sk-scores">
-          <div class="sk-line" style="width:40px;height:32px"></div>
-          <div class="sk-line" style="width:40px;height:32px"></div>
-          <div class="sk-line" style="width:40px;height:32px"></div>
-          <div class="sk-line" style="width:40px;height:32px"></div>
+      <div v-if="loadingTasks" class="records-grid">
+        <div v-for="i in 4" :key="i" class="record-card sk-card">
+          <div class="sk-hd"><div class="sk-badge"></div></div>
+          <div class="sk-line" style="width:70%;margin-bottom:6px"></div>
+          <div class="sk-line" style="width:45%"></div>
         </div>
       </div>
-    </div>
 
-    <!-- Empty -->
-    <div v-else-if="!filteredRecords.length" class="empty-state">
-      <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-        <circle cx="24" cy="24" r="18" stroke="#E2E8F0" stroke-width="2"/>
-        <path d="M24 14v10l6 4" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round"/>
-      </svg>
-      <p class="empty-title">{{ records.length === 0 ? 'No assessments yet' : 'No matching assessments' }}</p>
-      <p class="empty-sub">{{ records.length === 0 ? 'Click New Assessment to start.' : 'Try adjusting your filters.' }}</p>
-    </div>
+      <div v-else-if="!myTasks.length" class="empty-state">
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+          <circle cx="24" cy="24" r="18" stroke="#E2E8F0" stroke-width="2"/>
+          <path d="M16 24h16M24 16v16" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <p class="empty-title">No rating tasks found</p>
+        <p class="empty-sub">{{ canAdmin ? 'Use Generate Assignments to create rater assignments for this period.' : 'You have no assigned evaluations for this period.' }}</p>
+      </div>
 
-    <!-- Records grid -->
-    <div v-else class="records-grid">
-      <div v-for="rec in filteredRecords" :key="rec.id" class="record-card" @click="openDetailModal(rec)">
-        <div class="rc-hd">
-          <span :class="['status-badge', statusClass(rec.status)]">{{ rec.status }}</span>
-          <span class="rc-period">S{{ rec.semester }} {{ rec.year }}</span>
+      <div v-else class="tasks-grid">
+        <div v-for="task in myTasks" :key="task.id" class="task-card" @click="openFromAssignment(task)">
+          <div class="tc-hd">
+            <span :class="['rtype-badge', rterTypeCls(task.raterType)]">{{ raterTypeLabel(task.raterType) }}</span>
+            <span :class="['status-badge', task.status === 'Completed' ? 'st-green' : 'st-draft']">{{ task.status }}</span>
+          </div>
+          <div class="tc-name">{{ task.rateeName }}</div>
+          <div class="tc-meta">S{{ task.semester }} {{ task.year }}{{ task.rateeDivisionId ? ' · ' + task.rateeDivisionId : '' }}</div>
+          <div v-if="task.ipatStatus === 'Final'" class="tc-final">
+            <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+              <path d="M5.5 1L1 3.25V6c0 2.3 1.67 4.35 4.5 4.75 2.83-.4 4.5-2.45 4.5-4.75V3.25L5.5 1z" fill="#15803D" stroke="#15803D" stroke-width=".4"/>
+              <path d="M3.5 5.5l1.5 1.5 2.5-2.5" stroke="#fff" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Assessment finalized
+          </div>
         </div>
-        <div class="rc-name">{{ rec.rateeName }}</div>
-        <div class="rc-div">{{ rec.divisionName || '—' }} · {{ rec.position || '—' }}</div>
-        <div class="rc-scores">
-          <div class="score-block">
-            <div class="score-lbl">CBC (30%)</div>
-            <div :class="['score-val', rec.cbcScore ? 'has-score' : '']">{{ rec.cbcScore || '—' }}</div>
+      </div>
+    </template>
+
+    <!-- ══ ALL ASSESSMENTS VIEW (admin) ══ -->
+    <template v-if="activeView === 'all'">
+      <div class="filter-bar">
+        <div class="status-tabs">
+          <button v-for="t in statusTabs" :key="t.value"
+            :class="['status-tab', activeStatus === t.value && 'active']"
+            @click="activeStatus = t.value">
+            {{ t.label }}
+          </button>
+        </div>
+        <div class="filter-right">
+          <div class="srch-wrap">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" class="srch-icon">
+              <circle cx="5" cy="5" r="4" stroke="#94A3B8" stroke-width="1.2"/>
+              <path d="M8.5 8.5l2 2" stroke="#94A3B8" stroke-width="1.2" stroke-linecap="round"/>
+            </svg>
+            <input v-model="search" type="text" class="srch-inp" placeholder="Search employee…"/>
           </div>
-          <div class="score-block">
-            <div class="score-lbl">FPO (50%)</div>
-            <div :class="['score-val', rec.fpoScore ? 'has-score' : '']">{{ rec.fpoScore || '—' }}</div>
+          <select v-model="filterDiv" class="filter-select">
+            <option value="">All Divisions</option>
+            <option v-for="d in availableDivisions" :key="d.id" :value="d.id">{{ d.name }}</option>
+          </select>
+        </div>
+      </div>
+
+      <div v-if="loading" class="records-grid">
+        <div v-for="i in 3" :key="i" class="record-card sk-card">
+          <div class="sk-hd"><div class="sk-badge"></div><div class="sk-line" style="width:60px"></div></div>
+          <div class="sk-line" style="width:80%;margin-bottom:6px"></div>
+          <div class="sk-line" style="width:55%;margin-bottom:16px"></div>
+          <div class="sk-scores">
+            <div class="sk-line" style="width:40px;height:32px"></div>
+            <div class="sk-line" style="width:40px;height:32px"></div>
+            <div class="sk-line" style="width:40px;height:32px"></div>
+            <div class="sk-line" style="width:40px;height:32px"></div>
           </div>
-          <div class="score-block">
-            <div class="score-lbl">JF (20%)</div>
-            <div :class="['score-val', rec.jfScore ? 'has-score' : '']">{{ rec.jfScore || '—' }}</div>
+        </div>
+      </div>
+
+      <div v-else-if="!filteredRecords.length" class="empty-state">
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+          <circle cx="24" cy="24" r="18" stroke="#E2E8F0" stroke-width="2"/>
+          <path d="M24 14v10l6 4" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <p class="empty-title">{{ records.length === 0 ? 'No assessments yet' : 'No matching assessments' }}</p>
+        <p class="empty-sub">{{ records.length === 0 ? 'Use Generate Assignments to create assessment records.' : 'Try adjusting your filters.' }}</p>
+      </div>
+
+      <div v-else class="records-grid">
+        <div v-for="rec in filteredRecords" :key="rec.id" class="record-card" @click="openDetailModal(rec)">
+          <div class="rc-hd">
+            <span :class="['status-badge', statusClass(rec.status)]">{{ rec.status }}</span>
+            <span class="rc-period">S{{ rec.semester }} {{ rec.year }}</span>
           </div>
-          <div class="score-block score-block-overall">
-            <div class="score-lbl">Overall</div>
-            <div v-if="rec.overallScore" :class="['score-val score-val-overall', descriptorClass(rec.descriptor)]">
-              {{ rec.overallScore }}
+          <div class="rc-name">{{ rec.rateeName }}</div>
+          <div class="rc-div">{{ rec.divisionName || '—' }} · {{ rec.position || '—' }}</div>
+          <div class="rc-scores">
+            <div class="score-block">
+              <div class="score-lbl">CBC (30%)</div>
+              <div :class="['score-val', rec.cbcScore ? 'has-score' : '']">{{ rec.cbcScore || '—' }}</div>
             </div>
-            <div v-else class="score-val">—</div>
+            <div class="score-block">
+              <div class="score-lbl">FPO (55%)</div>
+              <div :class="['score-val', rec.fpoScore ? 'has-score' : '']">{{ rec.fpoScore || '—' }}</div>
+            </div>
+            <div class="score-block">
+              <div class="score-lbl">JF (15%)</div>
+              <div :class="['score-val', rec.jfScore ? 'has-score' : '']">{{ rec.jfScore || '—' }}</div>
+            </div>
+            <div class="score-block score-block-overall">
+              <div class="score-lbl">Overall</div>
+              <div v-if="rec.overallScore" :class="['score-val score-val-overall', descriptorClass(rec.descriptor)]">
+                {{ rec.overallScore }}
+              </div>
+              <div v-else class="score-val">—</div>
+            </div>
+          </div>
+          <div v-if="rec.descriptor" :class="['rc-descriptor', descriptorClass(rec.descriptor)]">
+            {{ rec.descriptor }}
           </div>
         </div>
-        <div v-if="rec.descriptor" :class="['rc-descriptor', descriptorClass(rec.descriptor)]">
-          {{ rec.descriptor }}
-        </div>
       </div>
-    </div>
+    </template>
 
     <!-- Rating scale reference -->
     <div class="scale-card">
@@ -137,9 +203,9 @@
         <div class="scale-row">
           <div class="scale-label">Rating Scale (1–4)</div>
           <div class="scale-items">
-            <span class="scale-item"><strong>1</strong> = Rarely/Never</span>
-            <span class="scale-item"><strong>2</strong> = Sometimes</span>
-            <span class="scale-item"><strong>3</strong> = Most of the Time</span>
+            <span class="scale-item"><strong>1</strong> = Never</span>
+            <span class="scale-item"><strong>2</strong> = Rarely</span>
+            <span class="scale-item"><strong>3</strong> = Frequently</span>
             <span class="scale-item"><strong>4</strong> = Always</span>
           </div>
         </div>
@@ -156,8 +222,8 @@
           <div class="scale-label">CBC Raters &amp; Weights</div>
           <div class="scale-items">
             <span class="scale-item">Self 15%</span>
-            <span class="scale-item">Peer 15% (or 30% if no subordinate)</span>
-            <span class="scale-item">Subordinate 15%</span>
+            <span class="scale-item">Peer1 15% + Peer2 15% (Technical Staff, no subordinate)</span>
+            <span class="scale-item">Peer 15% + Subordinate 15% (with subordinates)</span>
             <span class="scale-item">Supervisor 30%</span>
             <span class="scale-item">Skip Supervisor 25%</span>
           </div>
@@ -240,6 +306,72 @@
       </div>
     </teleport>
 
+    <!-- ══════════════════════ GENERATE ASSIGNMENTS MODAL ══════════════════════ -->
+    <teleport to="body">
+      <div v-if="showGenerateModal" class="modal-overlay" @click.self="showGenerateModal = false">
+        <div class="modal" style="max-width:480px">
+          <div class="modal-hd">
+            <div class="modal-icon">
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                <circle cx="9" cy="9" r="7" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M9 5v4.5l3 2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <div>
+              <h3 class="modal-title">Generate Rater Assignments</h3>
+              <p class="modal-sub">Automatically assigns peer, subordinate, supervisor, and skip-supervisor raters</p>
+            </div>
+            <button class="modal-close" @click="showGenerateModal = false">
+              <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M2 2l11 11M13 2L2 13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+            </button>
+          </div>
+          <div class="modal-body">
+            <div v-if="generateResult" class="gen-result">
+              <div class="gen-result-title">Assignments Generated</div>
+              <div class="gen-result-stat">{{ generateResult.generated }} assignments · {{ generateResult.ratees }} employees</div>
+              <div class="gen-result-breakdown">
+                <span v-for="(count, type) in generateResult.breakdown" :key="type" class="gen-chip">
+                  {{ type }}: {{ count }}
+                </span>
+              </div>
+              <p class="gen-result-note">Users can now open the Evaluation module to view and submit their assigned ratings.</p>
+            </div>
+            <div v-else class="form-grid">
+              <div class="field">
+                <label class="field-label">Semester <span class="req">*</span></label>
+                <select v-model="generateForm.semester" class="field-input">
+                  <option value="1">1st Semester (Jan–Jun)</option>
+                  <option value="2">2nd Semester (Jul–Dec)</option>
+                </select>
+              </div>
+              <div class="field">
+                <label class="field-label">Year <span class="req">*</span></label>
+                <input v-model.number="generateForm.year" type="number" class="field-input" min="2020" max="2099"/>
+              </div>
+              <div class="field full">
+                <div class="gen-info-box">
+                  <strong>What this does:</strong>
+                  <ul style="margin:6px 0 0 18px;padding:0;font-size:12px;line-height:1.7">
+                    <li>Creates IPAT records for all active employees</li>
+                    <li>Assigns Self, Peer1/Peer2 (or Peer+Subordinate), Supervisor, and Skip Supervisor raters based on position and section</li>
+                    <li>Avoids repeating same Peer/Subordinate from the previous cycle</li>
+                    <li>Employees will see their assigned ratees in <em>My Rating Tasks</em></li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn" @click="showGenerateModal = false; generateResult = null">{{ generateResult ? 'Close' : 'Cancel' }}</button>
+            <button v-if="!generateResult" class="btn btn-primary" :disabled="generating" @click="generateAssignments">
+              <span v-if="generating" class="spinner-sm"></span>
+              {{ generating ? 'Generating…' : 'Generate Assignments' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </teleport>
+
     <!-- ══════════════════════ DETAIL MODAL ══════════════════════ -->
     <teleport to="body">
       <div v-if="showDetailModal" class="modal-overlay" @click.self="closeDetailModal">
@@ -273,12 +405,12 @@
             </div>
             <div class="sscore-op">+</div>
             <div class="sscore">
-              <div class="sscore-lbl">FPO (50%)</div>
+              <div class="sscore-lbl">FPO (55%)</div>
               <div :class="['sscore-val', activeRecord?.fpoScore ? 'has-val' : '']">{{ activeRecord?.fpoScore || '—' }}</div>
             </div>
             <div class="sscore-op">+</div>
             <div class="sscore">
-              <div class="sscore-lbl">JF (20%)</div>
+              <div class="sscore-lbl">JF (15%)</div>
               <div :class="['sscore-val', activeRecord?.jfScore ? 'has-val' : '']">{{ activeRecord?.jfScore || '—' }}</div>
             </div>
             <div class="sscore-op">=</div>
@@ -294,12 +426,22 @@
             </div>
           </div>
 
+          <!-- Assignment context banner -->
+          <div v-if="activeAssignment" class="assignment-banner">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+              <circle cx="6.5" cy="6.5" r="5.5" stroke="#1A56B0" stroke-width="1.3"/>
+              <path d="M6.5 4v3.5M6.5 9.5v.1" stroke="#1A56B0" stroke-width="1.3" stroke-linecap="round"/>
+            </svg>
+            Rating as: <strong>{{ raterTypeLabel(activeAssignment.raterType) }}</strong>
+            <span v-if="!showJFTab"> · CBC only (JF not rated by this rater type)</span>
+          </div>
+
           <!-- Tabs -->
           <div class="dtabs">
             <button :class="['dtab', activeTab === 'cbc' && 'active']" @click="activeTab = 'cbc'">A. Core Behavioral Competencies</button>
-            <button :class="['dtab', activeTab === 'fpo' && 'active']" @click="activeTab = 'fpo'">B. Functional Performance Output</button>
-            <button :class="['dtab', activeTab === 'jf'  && 'active']" @click="activeTab = 'jf'">C. Job Fitness</button>
-            <button :class="['dtab', activeTab === 'edap' && 'active', edapRequired && 'dtab-alert']" @click="activeTab = 'edap'">
+            <button v-if="!activeAssignment" :class="['dtab', activeTab === 'fpo' && 'active']" @click="activeTab = 'fpo'">B. Functional Performance Output</button>
+            <button v-if="showJFTab" :class="['dtab', activeTab === 'jf'  && 'active']" @click="activeTab = 'jf'">C. Job Fitness</button>
+            <button v-if="!activeAssignment" :class="['dtab', activeTab === 'edap' && 'active', edapRequired && 'dtab-alert']" @click="activeTab = 'edap'">
               <svg v-if="edapRequired" width="11" height="11" viewBox="0 0 11 11" fill="none" style="margin-right:4px;flex-shrink:0">
                 <path d="M5.5 1L1 10h9L5.5 1z" fill="#F59E0B" stroke="#F59E0B" stroke-width=".5" stroke-linejoin="round"/>
                 <path d="M5.5 4.5v2.5M5.5 8.5v.1" stroke="#fff" stroke-width="1" stroke-linecap="round"/>
@@ -312,23 +454,28 @@
           <div v-if="activeTab === 'cbc'" class="modal-body-scroll">
             <div class="tab-intro">
               Rate each behavioral indicator using the <strong>1–4 Likert scale</strong>:
-              <span class="scale-hint">1 = Rarely/Never · 2 = Sometimes · 3 = Most of the Time · 4 = Always</span>
+              <span class="scale-hint">1 = Never · 2 = Rarely · 3 = Frequently · 4 = Always</span>
             </div>
 
             <div class="rater-row">
               <div class="rater-selector">
                 <span class="rater-label">Rating as:</span>
-                <select v-model="cbcRaterType" class="field-input" style="width:220px">
-                  <option value="Self">Self (15%)</option>
-                  <option value="Peer">Peer (15% or 30% if no subordinate)</option>
-                  <option value="Subordinate">Subordinate (15%)</option>
-                  <option value="Supervisor">Immediate Supervisor (30%)</option>
-                  <option value="SkipSupervisor">Skip Supervisor (25%)</option>
-                </select>
+                <template v-if="!activeAssignment">
+                  <select v-model="cbcRaterType" class="field-input" style="width:220px">
+                    <option value="Self">Self (15%)</option>
+                    <option value="Peer">Peer (15%)</option>
+                    <option value="Peer1">Peer 1 (15%)</option>
+                    <option value="Peer2">Peer 2 (15%)</option>
+                    <option value="Subordinate">Subordinate (15%)</option>
+                    <option value="Supervisor">Immediate Supervisor (30%)</option>
+                    <option value="SkipSupervisor">Skip Supervisor (25%)</option>
+                  </select>
+                </template>
+                <span v-else class="assignment-rtype-chip">{{ raterTypeLabel(activeAssignment.raterType) }}</span>
               </div>
               <div class="has-sub-note">
                 Subordinates: <strong>{{ activeRecord?.hasSubordinate ? 'Yes' : 'No' }}</strong>
-                {{ !activeRecord?.hasSubordinate ? '— Peer weight is 30%' : '' }}
+                {{ !activeRecord?.hasSubordinate ? '— Peer1 + Peer2 each 15%' : '' }}
               </div>
             </div>
 
@@ -369,7 +516,7 @@
             <div class="tab-intro">
               The <strong>Functional Performance Output</strong> domain uses the employee's
               <strong>IPCRF/DPCR Final Numerical Rating</strong> (1–5 scale) as the basis.
-              It constitutes <strong>50%</strong> of the overall IPAT score.
+              It constitutes <strong>55%</strong> of the overall IPAT score.
               This score is pulled directly from the employee's own rated IPCRF/CCEF for the same period — it is never entered by hand here.
             </div>
 
@@ -415,17 +562,20 @@
           <!-- ── JF TAB ── -->
           <div v-if="activeTab === 'jf'" class="modal-body-scroll">
             <div class="tab-intro">
-              <strong>Job Fitness</strong> is rated by <strong>three raters</strong>:
-              the Ratee (Self), Immediate Supervisor, and Skip Supervisor, in coordination with HR.
-              Indicator Score = (Self + Supervisor + Skip Supervisor) ÷ 3
+              <strong>Job Fitness</strong> is rated by the Ratee (Self) and Immediate Supervisor only.
+              JF Indicator Score = (Self + Supervisor) ÷ 2
+              <span class="scale-hint">1 = Never · 2 = Rarely · 3 = Frequently · 4 = Always</span>
             </div>
 
             <div class="rater-selector" style="margin-bottom:16px">
               <span class="rater-label">Rating as:</span>
-              <select v-model="jfRaterType" class="field-input" style="width:220px">
-                <option value="Self">Self (Ratee)</option>
-                <option value="Supervisor">Immediate Supervisor</option>
-              </select>
+              <template v-if="!activeAssignment">
+                <select v-model="jfRaterType" class="field-input" style="width:220px">
+                  <option value="Self">Self (Ratee)</option>
+                  <option value="Supervisor">Immediate Supervisor</option>
+                </select>
+              </template>
+              <span v-else class="assignment-rtype-chip">{{ raterTypeLabel(activeAssignment.raterType) }}</span>
             </div>
 
             <div class="jf-list">
@@ -600,7 +750,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
-import { ipatApi, usersApi } from '@/services/api'
+import { ipatApi, ipatAssignmentsApi, usersApi } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
 
 const authStore = useAuthStore()
@@ -684,6 +834,31 @@ const activeStatus = ref('All')
 const search       = ref('')
 const filterDiv    = ref('')
 
+// View toggle
+const ADMIN_ROLES = ['System Administrator', 'Bureau Director', 'Assistant Bureau Director', 'Division Chief']
+const canAdmin    = computed(() => ADMIN_ROLES.includes(authStore.role))
+const activeView  = ref('my-tasks')
+
+// My Tasks state
+const myTasks         = ref([])
+const loadingTasks    = ref(false)
+const activeAssignment = ref(null)  // set when a task card is clicked
+const currentYear = new Date().getFullYear()
+const tasksSemester = ref(String(new Date().getMonth() < 6 ? 1 : 2))
+const tasksYear     = ref(currentYear)
+const yearOptions   = computed(() => {
+  const years = []
+  for (let y = currentYear + 1; y >= 2023; y--) years.push(y)
+  return years
+})
+const pendingTaskCount = computed(() => myTasks.value.filter(t => t.status === 'Pending').length)
+
+// Generate Assignments
+const showGenerateModal = ref(false)
+const generateForm  = ref({ semester: String(new Date().getMonth() < 6 ? 1 : 2), year: currentYear })
+const generating    = ref(false)
+const generateResult = ref(null)
+
 const showCreateModal = ref(false)
 const showDetailModal = ref(false)
 const activeRecord    = ref(null)
@@ -748,11 +923,14 @@ const statusTabs = [
 ]
 
 // ── Computed ──
-const ADMIN_ROLES = ['System Administrator', 'Bureau Director', 'Assistant Bureau Director', 'Division Chief']
+const canCreate = computed(() => canAdmin.value)
+const canSelectRatee = computed(() => canAdmin.value)
 
-const canCreate = computed(() => ADMIN_ROLES.includes(authStore.role))
-
-const canSelectRatee = computed(() => ADMIN_ROLES.includes(authStore.role))
+// JF tab visible when admin view or when assignment rater type can rate JF (Self / Supervisor)
+const showJFTab = computed(() => {
+  if (!activeAssignment.value) return true
+  return ['Self', 'Supervisor'].includes(activeAssignment.value.raterType)
+})
 
 const availableDivisions = computed(() => {
   const seen = new Map()
@@ -822,7 +1000,83 @@ function _populateJFRatings(raterType, ratings) {
 watch(cbcRaterType, (type) => { if (loadedRec.value) _populateCBCRatings(type, loadedRec.value.cbcRatings) })
 watch(jfRaterType,  (type) => { if (loadedRec.value) _populateJFRatings(type,  loadedRec.value.jfRatings) })
 
-onMounted(loadRecords)
+onMounted(() => { loadMyTasks() })
+
+// ── My Tasks ──
+async function loadMyTasks() {
+  loadingTasks.value = true
+  myTasks.value = []
+  try {
+    const data = await ipatAssignmentsApi.getMyRatees({ semester: tasksSemester.value, year: tasksYear.value })
+    myTasks.value = Array.isArray(data) ? data : (data?.items || [])
+  } catch (e) { showToast(`Could not load tasks: ${e.message}`, 'error') }
+  finally { loadingTasks.value = false }
+}
+
+async function switchToAll() {
+  activeView.value = 'all'
+  if (!records.value.length) loadRecords()
+}
+
+async function openFromAssignment(task) {
+  activeAssignment.value = task
+  cbcRaterType.value = task.raterType
+  jfRaterType.value  = ['Self', 'Supervisor'].includes(task.raterType) ? task.raterType : 'Self'
+  if (task.ipatRecordId) {
+    await openDetailModal({ id: task.ipatRecordId, rateeName: task.rateeName, semester: task.semester, year: task.year })
+  }
+}
+
+function closeDetailModal() {
+  showDetailModal.value = false
+  activeRecord.value   = null
+  activeAssignment.value = null
+}
+
+// ── Generate Assignments ──
+function openGenerateModal() {
+  generateResult.value = null
+  generateForm.value   = { semester: String(new Date().getMonth() < 6 ? 1 : 2), year: currentYear }
+  showGenerateModal.value = true
+}
+
+async function generateAssignments() {
+  if (!generateForm.value.semester || !generateForm.value.year) { showToast('Semester and year required', 'error'); return }
+  generating.value = true
+  try {
+    const result = await ipatAssignmentsApi.generate(generateForm.value)
+    generateResult.value = result
+    showToast(`Generated ${result.generated} assignments`)
+  } catch (e) { showToast(e.message, 'error') }
+  finally { generating.value = false }
+}
+
+// ── Rater type helpers ──
+function raterTypeLabel(type) {
+  const labels = {
+    Self:          'Self Assessment',
+    Peer:          'Peer Rater',
+    Peer1:         'Peer 1',
+    Peer2:         'Peer 2',
+    Subordinate:   'Subordinate Rater',
+    Supervisor:    'Immediate Supervisor',
+    SkipSupervisor:'Skip Supervisor'
+  }
+  return labels[type] || type
+}
+
+function rterTypeCls(type) {
+  const cls = {
+    Self:          'rt-self',
+    Peer:          'rt-peer',
+    Peer1:         'rt-peer',
+    Peer2:         'rt-peer',
+    Subordinate:   'rt-sub',
+    Supervisor:    'rt-sup',
+    SkipSupervisor:'rt-skip'
+  }
+  return cls[type] || ''
+}
 
 async function loadRecords() {
   loading.value = true
@@ -887,16 +1141,7 @@ async function openDetailModal(rec) {
   try {
     const full = await ipatApi.get(rec.id)
     loadedRec.value = full
-    activeRecord.value = {
-      ...rec,
-      cbcScore:      full.cbcScore,
-      fpoScore:      full.fpoScore,
-      jfScore:       full.jfScore,
-      overallScore:  full.overallScore,
-      descriptor:    full.descriptor,
-      status:        full.status,
-      hasSubordinate: full.hasSubordinate
-    }
+    activeRecord.value = { ...rec, ...full }
     _populateCBCRatings(cbcRaterType.value, full.cbcRatings)
     _populateJFRatings(jfRaterType.value,   full.jfRatings)
     // Load existing EDAP if any
@@ -917,8 +1162,6 @@ async function openDetailModal(rec) {
   }
 }
 
-function closeDetailModal() { showDetailModal.value = false; activeRecord.value = null }
-
 function _syncRecord(updated) {
   activeRecord.value = { ...activeRecord.value, ...updated }
   const i = records.value.findIndex(r => r.id === activeRecord.value.id)
@@ -933,7 +1176,8 @@ async function saveCBCRatings() {
       const rating = getCBCRating(theme.id, idx)
       if (rating !== null) {
         // Only send minimal fields — full indicator text causes URL to exceed GAS limits
-        ratings.push({ themeId: theme.id, themeName: theme.label, indicatorIdx: idx, rating, raterType: cbcRaterType.value })
+        const effectiveType = activeAssignment.value?.raterType || cbcRaterType.value
+        ratings.push({ themeId: theme.id, themeName: theme.label, indicatorIdx: idx, rating, raterType: effectiveType })
       }
     })
   })
@@ -977,7 +1221,7 @@ async function saveJFRatings() {
     indicatorIdx: idx,
     rating: getJFRating(idx) || 1,
     evidence: jfEvidence.value[idx] || '',
-    raterType: jfRaterType.value
+    raterType: activeAssignment.value?.raterType || jfRaterType.value
   })).filter((_, idx) => getJFRating(idx) !== null)
   if (!ratings.length) { showToast('Please rate at least one indicator', 'error'); return }
   savingJF.value = true
@@ -1026,7 +1270,7 @@ async function saveEdap() {
   savingEdap.value = true
   try {
     await ipatApi.saveEdap(activeRecord.value.id, {
-      rows:      filled,
+      rows:      JSON.stringify(filled),
       sem1Status: edapSem1Status.value,
       sem1Notes:  edapSem1Notes.value,
       sem2Status: edapSem2Status.value,
@@ -1281,4 +1525,45 @@ function _resetEdap() {
 .toast-error{background:#EB5757;}
 .toast-slide-enter-active,.toast-slide-leave-active{transition:all .25s;}
 .toast-slide-enter-from,.toast-slide-leave-to{opacity:0;transform:translateY(8px);}
+
+/* View tabs */
+.view-tabs{display:flex;gap:4px;margin-bottom:16px;}
+.view-tab{display:inline-flex;align-items:center;gap:6px;padding:7px 16px;border-radius:20px;font-size:12px;font-weight:500;border:1px solid #E2E8F0;background:#fff;color:#64748B;cursor:pointer;font-family:inherit;transition:all .15s;}
+.view-tab.active{background:#0D2137;color:#fff;border-color:#0D2137;}
+.view-tab-badge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#EF4444;color:#fff;font-size:10px;font-weight:700;}
+
+/* My Tasks */
+.tasks-period-bar{display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+.tasks-period-label{font-size:12px;font-weight:600;color:#374151;}
+.tasks-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-bottom:16px;}
+.task-card{background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:16px;cursor:pointer;transition:all .15s;}
+.task-card:hover{border-color:#CBD5E1;box-shadow:0 4px 12px rgba(0,0,0,.07);transform:translateY(-1px);}
+.tc-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.tc-name{font-size:14px;font-weight:600;color:#0F172A;margin-bottom:4px;}
+.tc-meta{font-size:11px;color:#94A3B8;margin-bottom:8px;}
+.tc-final{display:flex;align-items:center;gap:4px;font-size:11px;color:#15803D;font-weight:500;}
+.rtype-badge{padding:2px 8px;border-radius:12px;font-size:10px;font-weight:600;}
+.rt-self{background:#F0F9FF;color:#0369A1;}
+.rt-peer{background:#F5F3FF;color:#6D28D9;}
+.rt-sub{background:#FEF9C3;color:#92400E;}
+.rt-sup{background:#F0FDF4;color:#15803D;}
+.rt-skip{background:#FFF7ED;color:#C2410C;}
+
+/* Generate modal */
+.gen-info-box{background:#F0F9FF;border:1px solid #BAE6FD;border-radius:8px;padding:12px 14px;font-size:12px;color:#0369A1;}
+.gen-result{text-align:center;padding:20px 0;}
+.gen-result-title{font-size:16px;font-weight:700;color:#15803D;margin-bottom:6px;}
+.gen-result-stat{font-size:13px;color:#374151;margin-bottom:12px;}
+.gen-result-breakdown{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:12px;}
+.gen-chip{background:#EBF4FF;color:#1A56B0;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;}
+.gen-result-note{font-size:12px;color:#64748B;max-width:320px;margin:0 auto;}
+
+/* Assignment context */
+.assignment-banner{display:flex;align-items:center;gap:8px;background:#EBF4FF;border:1px solid #BFDBFE;border-radius:8px;padding:8px 14px;margin:12px 0 0;font-size:12px;color:#1A56B0;flex-shrink:0;}
+.assignment-rtype-chip{display:inline-block;background:#EBF4FF;color:#1A56B0;border:1px solid #BFDBFE;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;}
+
+/* Outline button */
+.btn-outline{border-color:#CBD5E1;color:#374151;}
+.btn-outline:hover{background:#F8FAFC;}
+.btn-sm{padding:5px 10px;font-size:11px;}
 </style>

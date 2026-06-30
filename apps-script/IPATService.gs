@@ -10,13 +10,13 @@
  *      Multi-rater: Self(15%) + Peer(15%) + Sub(15%) + Supervisor(30%) + Skip(25%)
  *      If no subordinate: Peer becomes 30%
  *
- *   B. Functional Performance Output (FPO) — 50%
+ *   B. Functional Performance Output (FPO) — 55%
  *      IPCRF/DPCR final numerical rating (1–5 scale, converted to 1–4)
  *
- *   C. Job Fitness (JF) — 20%
+ *   C. Job Fitness (JF) — 15%
  *      7 indicators · Self + Immediate Supervisor ÷ 2
  *
- * FORMULA: Overall = (CBCI × 0.30) + (FPOI × 0.50) + (JFI × 0.20)
+ * FORMULA: Overall = (CBCI × 0.30) + (FPOI × 0.55) + (JFI × 0.15)
  *
  * DESCRIPTORS:
  *   3.50–4.00 → Excellent Alignment
@@ -287,11 +287,13 @@ const IPATService = (() => {
           return r ? Number(r.rating) : null
         }
 
-        const self = get('Self')
-        const peer = get('Peer')
-        const sub  = get('Subordinate')
-        const sup  = get('Supervisor')
-        const skip = get('SkipSupervisor')
+        const self  = get('Self')
+        const peer  = get('Peer')
+        const peer1 = get('Peer1')
+        const peer2 = get('Peer2')
+        const sub   = get('Subordinate')
+        const sup   = get('Supervisor')
+        const skip  = get('SkipSupervisor')
 
         // Apply weights per formula
         let score = 0, totalWeight = 0
@@ -301,8 +303,14 @@ const IPATService = (() => {
         if (skip !== null) { score += skip * 0.25; totalWeight += 0.25 }
 
         if (!hasSubordinate) {
-          // Subordinate 15% redistributed to Peer → Peer = 30%
-          if (peer !== null) { score += peer * 0.30; totalWeight += 0.30 }
+          // Technical Staff: Peer1 15% + Peer2 15%
+          // Legacy single-Peer path: redistributed to 30%
+          if (peer1 !== null || peer2 !== null) {
+            if (peer1 !== null) { score += peer1 * 0.15; totalWeight += 0.15 }
+            if (peer2 !== null) { score += peer2 * 0.15; totalWeight += 0.15 }
+          } else if (peer !== null) {
+            score += peer * 0.30; totalWeight += 0.30
+          }
         } else {
           if (peer !== null) { score += peer * 0.15; totalWeight += 0.15 }
           if (sub  !== null) { score += sub  * 0.15; totalWeight += 0.15 }
@@ -455,7 +463,7 @@ const IPATService = (() => {
 
   // ─────────────────────────────────────────────
   // COMPUTE FINAL OVERALL SCORE
-  // Overall = (CBCI × 0.30) + (FPOI × 0.50) + (JFI × 0.20)
+  // Overall = (CBCI × 0.30) + (FPOI × 0.55) + (JFI × 0.15)
   // ─────────────────────────────────────────────
 
   function computeOverall(ipatId, user) {
@@ -473,8 +481,8 @@ const IPATService = (() => {
       fpo = round2((fpo - 1) / 4 * 3 + 1)
     }
 
-    // Overall = (CBCI × 0.30) + (FPOI × 0.50) + (JFI × 0.20)
-    const overall    = round2((cbc * 0.30) + (fpo * 0.50) + (jf * 0.20))
+    // Overall = (CBCI × 0.30) + (FPOI × 0.55) + (JFI × 0.15)
+    const overall    = round2((cbc * 0.30) + (fpo * 0.55) + (jf * 0.15))
     const descriptor = qualitativeDescriptor(overall)
 
     SpreadsheetService.updateRow(recSheet, ipatId, {

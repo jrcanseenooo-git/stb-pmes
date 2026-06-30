@@ -197,6 +197,17 @@ export const ipatApi = {
   getJFIndicators:  ()          => gasGet('ipat/jf-indicators')
 }
 
+// ── IPAT Rater Assignments ─────────────────────────────────────────────────
+
+export const ipatAssignmentsApi = {
+  list:           (p = {})          => gasGet('ipat-assignments', p),
+  generate:       (data)            => gasWrite('POST',   'ipat-assignments/generate', data),
+  getMyRatees:    (p = {})          => gasGet('ipat-assignments/my-ratees', p),
+  getRateeAssign: (rateeId, p = {}) => gasGet(`ipat-assignments/${rateeId}/ratee-assignments`, p),
+  markCompleted:  (id)              => gasWrite('POST',   `ipat-assignments/${id}/complete`),
+  deleteForPeriod:(semester, year)  => gasWrite('DELETE', 'ipat-assignments', { semester, year })
+}
+
 // ── Reports ────────────────────────────────────
 
 export const reportsApi = {

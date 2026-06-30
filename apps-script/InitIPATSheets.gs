@@ -38,6 +38,16 @@ function initIPATSheets() {
     'createdAt','updatedAt'
   ])
 
+  // 5. IPATRaterAssignments — auto-generated rater assignments per period
+  _createSheetIfMissing(ss, 'IPATRaterAssignments', [
+    'id','semester','year',
+    'rateeId','rateeName','rateeDivisionId','rateeRole','rateeSection',
+    'raterId','raterName','raterType',
+    'ipatRecordId',
+    'status',
+    'createdAt','updatedAt'
+  ])
+
   Logger.log('IPAT sheets initialized successfully.')
 }
 

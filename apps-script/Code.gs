@@ -21,10 +21,11 @@ const SHEET = {
   MASTER_KRA_LIBRARY: 'MasterKRALibrary',
 
   // ── IPAT (Innovations Performance Assessment Tool) ──
-  IPAT_RECORDS:     'IPATRecords',
-  IPAT_CBC_RATINGS: 'IPATCBCRatings',
-  IPAT_JF_RATINGS:  'IPATJFRatings',
-  IPAT_EDAP:        'IPATEdap'
+  IPAT_RECORDS:      'IPATRecords',
+  IPAT_CBC_RATINGS:  'IPATCBCRatings',
+  IPAT_JF_RATINGS:   'IPATJFRatings',
+  IPAT_EDAP:         'IPATEdap',
+  IPAT_ASSIGNMENTS:  'IPATRaterAssignments'
 }
 
 // ── Entry point: HTTP GET ──

@@ -417,6 +417,19 @@ const IPATRaterAssignmentService = (() => {
       const totalRaters     = assignments.length
       const completedRaters = assignments.filter(a => a.status === 'Completed').length
       const pendingRaters   = assignments.filter(a => a.status !== 'Completed').map(a => a.raterType)
+      const allComplete     = totalRaters > 0 && completedRaters === totalRaters
+
+      // Auto-compute on first view if all raters are done but scores haven't been saved yet
+      if (allComplete && !r.cbcScore) {
+        try {
+          IPATService.computeCBC(r.id, user)
+          IPATService.computeOverall(r.id, user)
+          const freshRec = SpreadsheetService.getRow(recSheet, r.id)
+          if (freshRec) r = freshRec
+        } catch (e) {
+          Logger.log('[PMES] getMyResults auto-compute failed for ' + r.id + ': ' + e.message)
+        }
+      }
 
       return {
         id:             r.id,
@@ -434,7 +447,7 @@ const IPATRaterAssignmentService = (() => {
         totalRaters,
         completedRaters,
         pendingRaters,
-        allComplete:    totalRaters > 0 && completedRaters === totalRaters
+        allComplete
       }
     })
   }

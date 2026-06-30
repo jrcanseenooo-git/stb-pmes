@@ -4,7 +4,7 @@ function initializeSheets() {
   const SHEETS = {
     // ── Core ──
     Users: [
-      'id', 'uid', 'email', 'fullName', 'firstName', 'lastName',
+      'id', 'uid', 'email', 'fullName',
       'role', 'divisionId', 'divisionName', 'section', 'position', 'employeeNo',
       'type', 'positionLevel', 'sgLevel',
       'tempPassword', 'tempPasswordHash', 'mustChangePassword',

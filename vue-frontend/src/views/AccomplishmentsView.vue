@@ -420,14 +420,14 @@ async function saveEntry() {
 .page-title { font-size: 20px; font-weight: 700; color: #0F172A; margin: 0 0 3px; letter-spacing: -.3px; }
 .page-sub { font-size: 12px; color: #94A3B8; margin: 0; }
 .filter-bar { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
-.filter-select { padding: 7px 28px 7px 11px; border: 1px solid #E2E8F0; border-radius: 8px; font-size: 12px; font-family: inherit; color: #0F172A; outline: none; background: #fff; min-width: 135px; }
+.filter-select { padding: 7px 28px 7px 11px; border: 1px solid #E2E8F0; border-radius: 8px; font-size: 12px; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif; color: #0F172A; outline: none; background: #fff; min-width: 135px; }
 .filter-select:focus { border-color: #3B82F6; }
 .link-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; margin-bottom: 14px; background: #F5F9FF; border: 1px solid #DCE9FB; border-radius: 9px; font-size: 12px; color: #1A56B0; flex-wrap: wrap; }
 .readonly-input { background: #F8FAFC; color: #64748B; cursor: not-allowed; }
 .linked-note { font-size: 11px; color: #94A3B8; grid-column: span 2; margin: -4px 0 4px; }
 .srch-wrap { position: relative; }
 .srch-icon { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); pointer-events: none; }
-.srch-inp { padding: 7px 11px 7px 28px; border: 1px solid #E2E8F0; border-radius: 8px; font-size: 12px; font-family: inherit; color: #0F172A; outline: none; width: 260px; background: #fff; }
+.srch-inp { padding: 7px 11px 7px 28px; border: 1px solid #E2E8F0; border-radius: 8px; font-size: 12px; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif; color: #0F172A; outline: none; width: 260px; background: #fff; }
 .srch-inp:focus { border-color: #3B82F6; }
 .acc-table { border: 1px solid #E2E8F0; border-radius: 12px; overflow-x: auto; }
 .table-hd, .table-row { display: grid; grid-template-columns: minmax(150px, 1.05fr) minmax(86px, .55fr) minmax(110px, .85fr) minmax(180px, 1.3fr) minmax(180px, 1.3fr) 80px 90px; align-items: center; column-gap: 10px; }
@@ -451,7 +451,7 @@ async function saveEntry() {
 .empty-sub { font-size: 13px; color: #94A3B8; margin: 0 0 8px; }
 @keyframes shimmer { 0% { background-position: 200% 0 } 100% { background-position: -200% 0 } }
 .sk-line { background: linear-gradient(90deg,#E2E8F0 25%,#F1F5F9 50%,#E2E8F0 75%); background-size: 200%; animation: shimmer 1.4s infinite; border-radius: 4px; height: 12px; display: block; }
-.btn { display: inline-flex; align-items: center; gap: 5px; padding: 7px 13px; border-radius: 8px; font-size: 12px; cursor: pointer; border: 1px solid #E2E8F0; background: #fff; color: #374151; transition: all .15s; font-family: inherit; font-weight: 500; }
+.btn { display: inline-flex; align-items: center; gap: 5px; padding: 7px 13px; border-radius: 8px; font-size: 12px; cursor: pointer; border: 1px solid #E2E8F0; background: #fff; color: #374151; transition: all .15s; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif; font-weight: 500; }
 .btn:hover { border-color: #CBD5E1; background: #F8FAFC; }
 .btn:disabled { opacity: .55; cursor: not-allowed; }
 .btn-primary { background: #0D2137; color: #fff; border-color: #0D2137; }
@@ -478,7 +478,7 @@ async function saveEntry() {
 .field { display: flex; flex-direction: column; gap: 5px; }
 .full { grid-column: span 2; }
 .field-label { font-size: 11px; font-weight: 600; color: #374151; }
-.field-input { padding: 9px 12px; border: 1.5px solid #E2E8F0; border-radius: 9px; font-size: 13px; font-family: inherit; color: #0F172A; background: #fff; outline: none; transition: border-color .15s; resize: vertical; }
+.field-input { padding: 9px 12px; border: 1.5px solid #E2E8F0; border-radius: 9px; font-size: 13px; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif; color: #0F172A; background: #fff; outline: none; transition: border-color .15s; resize: vertical; }
 .field-input:focus { border-color: #3B82F6; box-shadow: 0 0 0 3px rgba(59,130,246,.1); }
 .spinner-sm { display: inline-block; width: 11px; height: 11px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .6s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg) } }

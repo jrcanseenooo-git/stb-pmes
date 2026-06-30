@@ -56,9 +56,7 @@ const UsersService = (() => {
       id,
       uid:                '',   // will be set after Firebase creation
       email:              body.email        || '',
-      fullName:           body.fullName     || `${body.firstName || ''} ${body.lastName || ''}`.trim(),
-      firstName:          body.firstName    || '',
-      lastName:           body.lastName     || '',
+      fullName:           body.fullName     || '',
       role:               body.role         || 'Staff',
       positionLevel:      body.positionLevel || resolvePositionLevel(body.position || ''),
       divisionId:         body.divisionId   || '',
@@ -290,9 +288,7 @@ const UsersService = (() => {
 
     const sheet   = _usersSheet()
     const updated = SpreadsheetService.updateRow(sheet, id, {
-      firstName:  body.firstName  || '',
-      lastName:   body.lastName   || '',
-      fullName:   `${body.firstName || ''} ${body.lastName || ''}`.trim(),
+      fullName:   body.fullName   || '',
       position:   body.position   || '',
       employeeNo: body.employeeNo || '',
       updatedAt:  new Date().toISOString()

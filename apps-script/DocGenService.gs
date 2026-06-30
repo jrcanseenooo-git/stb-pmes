@@ -217,8 +217,7 @@ const PmesDocGenService = (() => {
     const profileName = String(owner.fullName || '').trim()
     if (profileName && !_sameText(profileName, owner.position)) return profileName
 
-    const partsName = [owner.firstName, owner.lastName].filter(Boolean).join(' ').trim()
-    if (partsName) return partsName
+    if (profileName) return profileName
 
     return formName || profileName || ''
   }

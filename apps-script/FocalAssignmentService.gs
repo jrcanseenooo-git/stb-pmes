@@ -294,7 +294,7 @@ const FocalAssignmentService = (() => {
   }
 
   function _userName(row) {
-    return row.fullName || [row.firstName, row.lastName].filter(Boolean).join(' ').trim() || row.email || ''
+    return row.fullName || row.email || ''
   }
 
   return { list, save, getDivisionFocal, getDivisionFocals, getBureauFocal, getBureauFocals, isDivisionFocal, isBureauFocal }

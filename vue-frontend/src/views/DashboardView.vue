@@ -239,7 +239,7 @@ const notifications = computed(() =>
 
 .content {
   padding: 16px 20px 20px;
-  font-family: 'DM Sans', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
   font-size: 13px;
   color: #1A2332;
 }
@@ -407,7 +407,7 @@ const notifications = computed(() =>
   font-size: 11px;
   color: #4A5568;
   cursor: pointer;
-  font-family: 'DM Sans', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
   transition: all .15s;
 }
 

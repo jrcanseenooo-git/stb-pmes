@@ -955,12 +955,13 @@ const routeSteps = computed(() => {
   --slate: #64748B;
   --slate-soft: #F1F4F9;
 
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
   min-height: 100%;
   padding: 18px;
   background: var(--bg);
   color: var(--ink);
-  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
 }
+
 
 /* ── Toolbar ── */
 .rq-toolbar { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 14px; flex-wrap: wrap; }

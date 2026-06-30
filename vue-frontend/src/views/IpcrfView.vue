@@ -1376,12 +1376,12 @@ async function doPrint(fileId, tab) {
 .btn-active-ok{background:#F0FDF4;color:#15803D;border-color:#BBF7D0;}
 .btn-active-ok:hover{background:#DCFCE7;}
 .status-tabs{display:flex;gap:4px;flex-wrap:wrap;}
-.status-tab{padding:5px 14px;border-radius:20px;font-size:12px;font-weight:500;border:1px solid #E2E8F0;background:#fff;color:#64748B;cursor:pointer;transition:all .15s;font-family:inherit;}
+.status-tab{padding:5px 14px;border-radius:20px;font-size:12px;font-weight:500;border:1px solid #E2E8F0;background:#fff;color:#64748B;cursor:pointer;transition:all .15s;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;}
 .status-tab:hover{border-color:#CBD5E1;}
 .status-tab.active{background:#0D2137;color:#fff;border-color:#0D2137;}
 .tab-badge{background:#3B82F6;color:#fff;border-radius:10px;font-size:10px;padding:1px 5px;margin-left:3px;}
 .filter-selects{display:flex;gap:8px;}
-.filter-select{padding:6px 10px;border:1px solid #E2E8F0;border-radius:7px;font-size:12px;font-family:inherit;color:#374151;background:#fff;outline:none;cursor:pointer;}
+.filter-select{padding:6px 10px;border:1px solid #E2E8F0;border-radius:7px;font-size:12px;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;color:#374151;background:#fff;outline:none;cursor:pointer;}
 .filter-select:focus{border-color:#3B82F6;}
 
 /* Forms grid */
@@ -1435,7 +1435,7 @@ async function doPrint(fileId, tab) {
 .st-finalized{background:#F0FDF4;color:#15803D;}
 
 /* Buttons */
-.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 13px;border-radius:8px;font-size:12px;cursor:pointer;border:1px solid #E2E8F0;background:#fff;color:#374151;transition:all .15s;font-family:inherit;font-weight:500;}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 13px;border-radius:8px;font-size:12px;cursor:pointer;border:1px solid #E2E8F0;background:#fff;color:#374151;transition:all .15s;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;font-weight:500;}
 .btn:hover{border-color:#CBD5E1;background:#F8FAFC;}
 .btn:disabled{opacity:.55;cursor:not-allowed;}
 .btn-primary{background:#0D2137;color:#fff;border-color:#0D2137;}
@@ -1492,7 +1492,7 @@ async function doPrint(fileId, tab) {
 
 /* Tabs */
 .dtabs{display:flex;padding:0 24px;border-bottom:1px solid #E8EDF3;flex-shrink:0;}
-.dtab{flex:1 1 0;padding:13px 14px;font-size:13px;font-weight:500;cursor:pointer;border:none;background:transparent;color:#64748B;border-bottom:3px solid transparent;margin-bottom:-1px;font-family:inherit;transition:all .15s;display:inline-flex;align-items:center;justify-content:center;gap:6px;}
+.dtab{flex:1 1 0;padding:13px 14px;font-size:13px;font-weight:500;cursor:pointer;border:none;background:transparent;color:#64748B;border-bottom:3px solid transparent;margin-bottom:-1px;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;transition:all .15s;display:inline-flex;align-items:center;justify-content:center;gap:6px;}
 .dtab:hover{color:#374151;background:#FAFBFF;}
 .dtab.active{color:#1A56B0;border-bottom-color:#1A56B0;font-weight:700;background:#F5F9FF;}
 .dtab-cnt{background:#EBF4FF;color:#1A56B0;border-radius:9px;font-size:10px;padding:1px 6px;font-weight:600;}
@@ -1519,7 +1519,7 @@ async function doPrint(fileId, tab) {
 .fn-empty{text-align:center;padding:14px;font-size:11px;color:#94A3B8;border:1.5px dashed #E2E8F0;border-radius:8px;}
 
 /* Add pills */
-.add-pill{display:inline-flex;align-items:center;gap:4px;padding:4px 11px;border-radius:12px;font-size:10px;font-weight:600;border:1px solid #BFDBFE;background:#EFF6FF;color:#1A56B0;cursor:pointer;font-family:inherit;transition:all .12s;}
+.add-pill{display:inline-flex;align-items:center;gap:4px;padding:4px 11px;border-radius:12px;font-size:10px;font-weight:600;border:1px solid #BFDBFE;background:#EFF6FF;color:#1A56B0;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;transition:all .12s;}
 .add-pill:hover{background:#1A56B0;color:#fff;border-color:#1A56B0;}
 .add-pill-ghost{border-color:#E2E8F0;background:#fff;color:#475569;}
 .add-pill-ghost:hover{background:#F8FAFC;border-color:#CBD5E1;color:#1A56B0;}
@@ -1554,7 +1554,7 @@ async function doPrint(fileId, tab) {
 .wf-info{font-size:11px;color:#64748B;}
 
 /* Document generation bar */
-.btn-link{background:none;border:none;color:#94A3B8;font-size:11px;cursor:pointer;text-decoration:underline;padding:0 4px;font-family:inherit;}
+.btn-link{background:none;border:none;color:#94A3B8;font-size:11px;cursor:pointer;text-decoration:underline;padding:0 4px;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;}
 .btn-link:hover{color:#475569;}
 .btn-link:disabled{opacity:.5;cursor:not-allowed;}
 .rate-panel{margin-top:18px;padding:14px;background:#F8FAFC;border:1px solid #F1F5F9;border-radius:9px;text-align:left;}
@@ -1594,11 +1594,11 @@ async function doPrint(fileId, tab) {
 .lib-filters{display:flex;gap:8px;padding:12px 24px;border-bottom:1px solid #F1F5F9;flex-shrink:0;flex-wrap:wrap;}
 .srch-wrap{flex:1;position:relative;min-width:200px;}
 .srch-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);pointer-events:none;}
-.srch-inp{width:100%;padding:8px 11px 8px 30px;border:1.5px solid #E2E8F0;border-radius:7px;font-size:12px;font-family:inherit;color:#0F172A;outline:none;}
+.srch-inp{width:100%;padding:8px 11px 8px 30px;border:1.5px solid #E2E8F0;border-radius:7px;font-size:12px;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;color:#0F172A;outline:none;}
 .srch-inp:focus{border-color:#3B82F6;box-shadow:0 0 0 3px rgba(59,130,246,.1);}
 .sel-strip{display:flex;align-items:center;justify-content:space-between;padding:7px 24px;background:#EBF4FF;border-bottom:1px solid #BFDBFE;flex-shrink:0;}
 .sel-cnt{font-size:12px;font-weight:600;color:#1A56B0;}
-.sel-clr{font-size:11px;color:#64748B;background:none;border:none;cursor:pointer;text-decoration:underline;font-family:inherit;}
+.sel-clr{font-size:11px;color:#64748B;background:none;border:none;cursor:pointer;text-decoration:underline;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;}
 .lib-scroll{flex:1;overflow-y:auto;padding:12px 24px;max-height:50vh;}
 .lib-list{display:flex;flex-direction:column;gap:6px;}
 .lib-item{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border:1.5px solid #E8EDF3;border-radius:9px;cursor:pointer;transition:all .12s;user-select:none;}
@@ -1661,7 +1661,7 @@ async function doPrint(fileId, tab) {
 .field{display:flex;flex-direction:column;gap:5px;}
 .full{grid-column:span 2;}
 .field-label{font-size:11px;font-weight:600;color:#374151;}
-.field-input{padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:9px;font-size:13px;font-family:inherit;color:#0F172A;background:#fff;outline:none;transition:border-color .15s;resize:vertical;}
+.field-input{padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:9px;font-size:13px;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;color:#0F172A;background:#fff;outline:none;transition:border-color .15s;resize:vertical;}
 .field-input:focus{border-color:#3B82F6;box-shadow:0 0 0 3px rgba(59,130,246,.1);}
 .field-input::placeholder{color:#CBD5E1;}
 .avg-box{background:#F0FDF4;color:#15803D;font-weight:600;cursor:default;pointer-events:none;}
@@ -1672,7 +1672,7 @@ async function doPrint(fileId, tab) {
 .type-opt-locked{cursor:default;}
 .type-opt-locked:hover{border-color:#3B82F6;}
 .type-auto-hint{font-size:10.5px;color:#94A3B8;margin:6px 0 0;}
-.type-opt{padding:12px;border:1.5px solid #E2E8F0;border-radius:10px;cursor:pointer;text-align:left;background:#fff;transition:all .15s;font-family:inherit;}
+.type-opt{padding:12px;border:1.5px solid #E2E8F0;border-radius:10px;cursor:pointer;text-align:left;background:#fff;transition:all .15s;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;}
 .type-opt strong{display:block;font-size:13px;font-weight:700;color:#0F172A;margin-bottom:3px;}
 .type-opt span{font-size:10px;color:#94A3B8;line-height:1.4;}
 .type-opt:hover{border-color:#CBD5E1;}

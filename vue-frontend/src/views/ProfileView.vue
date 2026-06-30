@@ -411,9 +411,6 @@ async function saveProfile() {
   saveError.value = ''
   try {
     const fullName  = form.value.fullName.trim()
-    const nameParts = fullName.split(/\s+/)
-    const firstName = nameParts[0] || ''
-    const lastName  = nameParts.slice(1).join(' ') || ''
 
     // Map display value back to what the DB stores in the `type` column
     const typeMap = { Regular: 'Regular', COS: 'Contract of Service (COS)', 'Co-Term': 'Co-Term' }
@@ -421,15 +418,13 @@ async function saveProfile() {
 
     await usersApi.update(authStore.profileId, {
       fullName,
-      firstName,
-      lastName,
       position:   form.value.position,
       employeeNo: form.value.employeeNo,
       type:       typeVal
     })
 
     // Patch the local store immediately so header + tags update
-    authStore.patchProfile({ fullName, firstName, lastName, position: form.value.position, employeeNo: form.value.employeeNo, type: typeVal })
+    authStore.patchProfile({ fullName, position: form.value.position, employeeNo: form.value.employeeNo, type: typeVal })
 
     editMode.value    = false
     saveSuccess.value = true
@@ -491,9 +486,8 @@ function handleSetting(label) {
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
 *{box-sizing:border-box;}
-.content{padding:20px 24px 24px;font-family:'DM Sans',sans-serif;font-size:13px;color:#1A2332;background:#EEF2F7;min-height:100%;}
+.content{padding:20px 24px 24px;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;font-size:13px;color:#1A2332;background:#EEF2F7;min-height:100%;}
 
 /* Profile header */
 .profile-header{display:flex;align-items:center;gap:20px;background:#fff;border:1px solid #E2E8F0;border-radius:14px;padding:20px 24px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.04);}
@@ -531,7 +525,7 @@ function handleSetting(label) {
 .info-item--full{grid-column:1 / -1;}
 .info-label{font-size:10px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:3px;}
 .info-val{font-size:13px;color:#0F172A;font-weight:500;line-height:1.5;word-break:break-word;}
-.field-input{width:100%;padding:6px 10px;border:1px solid #E2E8F0;border-radius:7px;font-size:13px;color:#0F172A;font-family:inherit;background:#F8FAFC;outline:none;transition:border-color .15s;}
+.field-input{width:100%;padding:6px 10px;border:1px solid #E2E8F0;border-radius:7px;font-size:13px;color:#0F172A;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;background:#F8FAFC;outline:none;transition:border-color .15s;}
 .field-input:focus{border-color:#2F80ED;background:#fff;}
 .save-row{display:flex;gap:8px;margin-top:16px;}
 .save-error{margin-top:8px;font-size:12px;color:#EB5757;}
@@ -574,7 +568,7 @@ function handleSetting(label) {
 
 /* Quick actions */
 .quick-actions{display:flex;flex-direction:column;}
-.quick-btn{display:flex;align-items:center;gap:10px;padding:11px 18px;background:none;border:none;cursor:pointer;font-size:12px;font-weight:500;color:#1A2332;font-family:inherit;border-bottom:1px solid #F1F5F9;transition:background .12s;text-align:left;}
+.quick-btn{display:flex;align-items:center;gap:10px;padding:11px 18px;background:none;border:none;cursor:pointer;font-size:12px;font-weight:500;color:#1A2332;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;border-bottom:1px solid #F1F5F9;transition:background .12s;text-align:left;}
 .quick-btn:last-child{border-bottom:none;}
 .quick-btn:hover{background:#F8FAFC;}
 .quick-btn.logout{color:#EB5757;}
@@ -586,7 +580,7 @@ function handleSetting(label) {
 @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 
 /* Buttons */
-.btn{padding:7px 14px;border-radius:8px;border:1px solid #E2E8F0;background:#fff;font-size:12px;font-weight:500;color:#1A2332;cursor:pointer;font-family:inherit;transition:all .15s;}
+.btn{padding:7px 14px;border-radius:8px;border:1px solid #E2E8F0;background:#fff;font-size:12px;font-weight:500;color:#1A2332;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;transition:all .15s;}
 .btn:hover{border-color:#CBD5E1;}
 .btn-primary{background:#0D2137;color:#fff;border-color:#0D2137;}
 .btn-primary:hover{background:#1e3f61;border-color:#1e3f61;}

@@ -768,8 +768,7 @@ const IpcrfService = (() => {
     const fullName = String(profile.fullName || '').trim()
     if (fullName && !_sameText(fullName, profile.position)) return fullName
 
-    const partsName = [profile.firstName, profile.lastName].filter(Boolean).join(' ').trim()
-    return partsName || fullName || ''
+    return fullName || ''
   }
 
   function _sameText(a, b) {

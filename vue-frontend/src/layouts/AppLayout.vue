@@ -442,13 +442,13 @@ onUnmounted(() => {
   --text: #0f172a;
   --muted: #64748b;
 
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
   position: fixed;
   inset: 0;
   display: flex;
   width: 100%;
   height: 100%;
   overflow: hidden;
-  font-family: Inter, system-ui, sans-serif;
   color: var(--text);
   background: var(--bg);
 }
@@ -913,7 +913,7 @@ onUnmounted(() => {
   font-weight: 600;
   color: var(--blue);
   padding: 0;
-  font-family: inherit;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
 }
 .notif-mark-all:hover { text-decoration: underline; }
 

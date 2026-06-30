@@ -146,40 +146,59 @@
           <circle cx="24" cy="24" r="18" stroke="#E2E8F0" stroke-width="2"/>
           <path d="M16 28l4-4 3 3 6-6" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
-        <p class="empty-title">No finalized results yet</p>
-        <p class="empty-sub">Your results will appear here once your assessment has been finalized for this period.</p>
+        <p class="empty-title">No assessment records found</p>
+        <p class="empty-sub">No assessment has been generated for this period yet.</p>
       </div>
 
       <div v-else class="results-grid">
         <div v-for="res in myResults" :key="res.id" class="result-card">
           <div class="rc-hd">
             <span class="rc-period">S{{ res.semester }} {{ res.year }}</span>
-            <span class="status-badge st-green">Final</span>
+            <span v-if="res.allComplete && res.overallScore" class="rc-status-badge rc-done">Computed</span>
+            <span v-else class="rc-status-badge rc-pending">In Progress</span>
           </div>
           <div class="rc-name">{{ res.rateeName }}</div>
           <div class="rc-division">{{ res.divisionName }}</div>
-          <div class="rc-scores">
-            <div class="rc-score-item">
-              <span class="rc-score-label">CBC</span>
-              <span class="rc-score-val">{{ res.cbcScore || '—' }}</span>
-              <span class="rc-score-pct">30%</span>
+
+          <!-- Rater progress when not all done -->
+          <div v-if="!res.allComplete" class="rc-progress-wrap">
+            <div class="rc-progress-meta">
+              <span class="rc-progress-label">Rating Progress</span>
+              <span class="rc-progress-count">{{ res.completedRaters }} / {{ res.totalRaters }} raters done</span>
             </div>
-            <div class="rc-score-item">
-              <span class="rc-score-label">FPO</span>
-              <span class="rc-score-val">{{ res.fpoScore || '—' }}</span>
-              <span class="rc-score-pct">55%</span>
+            <div class="rc-progress-bar">
+              <div class="rc-progress-fill" :style="{ width: res.totalRaters ? (res.completedRaters / res.totalRaters * 100) + '%' : '0%' }"></div>
             </div>
-            <div class="rc-score-item">
-              <span class="rc-score-label">JF</span>
-              <span class="rc-score-val">{{ res.jfScore || '—' }}</span>
-              <span class="rc-score-pct">15%</span>
+            <div v-if="res.pendingRaters && res.pendingRaters.length" class="rc-pending-list">
+              Waiting for: {{ res.pendingRaters.join(', ') }}
             </div>
           </div>
-          <div class="rc-overall">
-            <span class="rc-overall-label">Overall</span>
-            <span class="rc-overall-score">{{ res.overallScore || '—' }}</span>
-            <span v-if="res.descriptor" class="rc-descriptor">{{ res.descriptor }}</span>
-          </div>
+
+          <!-- Scores when all raters are done and computed -->
+          <template v-else>
+            <div class="rc-scores">
+              <div class="rc-score-item">
+                <span class="rc-score-label">CBC</span>
+                <span class="rc-score-val">{{ res.cbcScore ?? '—' }}</span>
+                <span class="rc-score-pct">30%</span>
+              </div>
+              <div class="rc-score-item">
+                <span class="rc-score-label">FPO</span>
+                <span class="rc-score-val">{{ res.fpoScore ?? '—' }}</span>
+                <span class="rc-score-pct">55%</span>
+              </div>
+              <div class="rc-score-item">
+                <span class="rc-score-label">JF</span>
+                <span class="rc-score-val">{{ res.jfScore ?? '—' }}</span>
+                <span class="rc-score-pct">15%</span>
+              </div>
+            </div>
+            <div class="rc-overall">
+              <span class="rc-overall-label">Overall</span>
+              <span class="rc-overall-score">{{ res.overallScore ?? '—' }}</span>
+              <span v-if="res.descriptor" class="rc-descriptor">{{ res.descriptor }}</span>
+            </div>
+          </template>
         </div>
       </div>
     </template>
@@ -463,14 +482,14 @@
             </button>
           </div>
 
-          <!-- Loading indicator -->
-          <div v-if="loadingDetail" class="detail-loading">
+          <!-- Loading indicator (admin view only — rater mode loads silently in background) -->
+          <div v-if="loadingDetail && !activeAssignment" class="detail-loading">
             <span class="spinner-sm" style="border-color:rgba(0,0,0,.12);border-top-color:#1A56B0"></span>
             Loading assessment data…
           </div>
 
-          <!-- Score summary -->
-          <div class="score-summary-bar">
+          <!-- Score summary (admin/self view only — raters don't see the ratee's scores) -->
+          <div v-if="!activeAssignment" class="score-summary-bar">
             <div class="sscore">
               <div class="sscore-lbl">CBC (30%)</div>
               <div :class="['sscore-val', activeRecord?.cbcScore ? 'has-val' : '']">{{ activeRecord?.cbcScore || '—' }}</div>
@@ -525,15 +544,44 @@
 
           <!-- ── CBC TAB ── -->
           <div v-if="activeTab === 'cbc'" class="modal-body-scroll">
-            <div class="tab-intro">
-              Rate each behavioral indicator using the <strong>1–4 Likert scale</strong>:
-              <span class="scale-hint">1 = Never · 2 = Rarely · 3 = Frequently · 4 = Always</span>
-            </div>
+            <!-- Rater mode: progress bar + scale legend -->
+            <template v-if="activeAssignment">
+              <div class="rating-progress-wrap">
+                <div class="rating-progress-label">
+                  <span>Core Behavioral Competencies</span>
+                  <span :class="['rating-progress-count', cbcAnsweredCount >= cbcTotalCount ? 'all-done' : '']">
+                    {{ cbcAnsweredCount }} / {{ cbcTotalCount }} answered
+                    <svg v-if="cbcAnsweredCount >= cbcTotalCount" width="14" height="14" viewBox="0 0 14 14" fill="none" style="vertical-align:-2px;margin-left:3px">
+                      <circle cx="7" cy="7" r="6" fill="#16A34A"/>
+                      <path d="M4 7l2 2 4-4" stroke="#fff" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                  </span>
+                </div>
+                <div class="rating-progress-bar">
+                  <div class="rating-progress-fill" :style="{ width: cbcProgress + '%' }"></div>
+                </div>
+              </div>
+              <div class="scale-legend">
+                <span class="scale-pill"><strong>1</strong> Never</span>
+                <span class="scale-pill"><strong>2</strong> Rarely</span>
+                <span class="scale-pill"><strong>3</strong> Frequently</span>
+                <span class="scale-pill"><strong>4</strong> Always</span>
+              </div>
+              <div v-if="showValidation && cbcAnsweredCount < cbcTotalCount" class="validation-banner">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" fill="#FEF2F2" stroke="#EF4444" stroke-width="1.2"/><path d="M7 4v4M7 9.5v.5" stroke="#EF4444" stroke-width="1.3" stroke-linecap="round"/></svg>
+                Please answer all <strong>{{ cbcTotalCount - cbcAnsweredCount }}</strong> remaining question{{ cbcTotalCount - cbcAnsweredCount !== 1 ? 's' : '' }} before submitting.
+              </div>
+            </template>
 
-            <div class="rater-row">
-              <div class="rater-selector">
-                <span class="rater-label">Rating as:</span>
-                <template v-if="!activeAssignment">
+            <!-- Admin mode: intro + rater selector -->
+            <template v-else>
+              <div class="tab-intro">
+                Rate each behavioral indicator using the <strong>1–4 Likert scale</strong>:
+                <span class="scale-hint">1 = Never · 2 = Rarely · 3 = Frequently · 4 = Always</span>
+              </div>
+              <div class="rater-row">
+                <div class="rater-selector">
+                  <span class="rater-label">Rating as:</span>
                   <select v-model="cbcRaterType" class="field-input" style="width:220px">
                     <option value="Self">Self (15%)</option>
                     <option value="Peer">Peer (15%)</option>
@@ -543,14 +591,13 @@
                     <option value="Supervisor">Immediate Supervisor (30%)</option>
                     <option value="SkipSupervisor">Skip Supervisor (25%)</option>
                   </select>
-                </template>
-                <span v-else class="assignment-rtype-chip">{{ raterTypeLabel(activeAssignment.raterType) }}</span>
+                </div>
+                <div class="has-sub-note">
+                  Subordinates: <strong>{{ activeRecord?.hasSubordinate ? 'Yes' : 'No' }}</strong>
+                  {{ !activeRecord?.hasSubordinate ? '— Peer1 + Peer2 each 15%' : '' }}
+                </div>
               </div>
-              <div class="has-sub-note">
-                Subordinates: <strong>{{ activeRecord?.hasSubordinate ? 'Yes' : 'No' }}</strong>
-                {{ !activeRecord?.hasSubordinate ? '— Peer1 + Peer2 each 15%' : '' }}
-              </div>
-            </div>
+            </template>
 
             <div v-for="theme in HEARTWORK_THEMES" :key="theme.id" class="theme-section">
               <div class="theme-hd">
@@ -558,22 +605,28 @@
                   <span class="theme-badge">{{ theme.label }}</span>
                   <span class="theme-desc">{{ theme.description }}</span>
                 </div>
-                <span v-if="themeAvg(theme.id)" class="theme-avg">Avg: {{ themeAvg(theme.id) }}</span>
+                <span v-if="activeAssignment" :class="['theme-progress-chip', themeAnsweredCount(theme) === theme.indicators.length ? 'chip-done' : '']">
+                  {{ themeAnsweredCount(theme) }}/{{ theme.indicators.length }}
+                </span>
+                <span v-else-if="themeAvg(theme.id)" class="theme-avg">Avg: {{ themeAvg(theme.id) }}</span>
               </div>
               <div class="indicator-list">
-                <div v-for="(ind, idx) in theme.indicators" :key="idx" class="indicator-row">
+                <div v-for="(ind, idx) in theme.indicators" :key="idx"
+                  :class="['indicator-row', showValidation && getCBCRating(theme.id, idx) === null ? 'unanswered' : '']">
                   <div class="ind-num">{{ idx + 1 }}</div>
                   <div class="ind-text">{{ ind }}</div>
                   <div class="ind-rating">
                     <button v-for="n in [1,2,3,4]" :key="n"
                       :class="['rating-btn', getCBCRating(theme.id, idx) === n && 'selected']"
+                      :title="['Never','Rarely','Frequently','Always'][n-1]"
                       @click="setCBCRating(theme.id, idx, n)">{{ n }}</button>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div class="action-bar">
+            <!-- Admin-only action bar -->
+            <div v-if="!activeAssignment" class="action-bar">
               <button class="btn btn-primary" :disabled="savingCBC" @click="saveCBCRatings">
                 <span v-if="savingCBC" class="spinner-sm"></span>
                 {{ savingCBC ? 'Saving…' : 'Save CBC Ratings' }}
@@ -634,25 +687,53 @@
 
           <!-- ── JF TAB ── -->
           <div v-if="activeTab === 'jf'" class="modal-body-scroll">
-            <div class="tab-intro">
-              <strong>Job Fitness</strong> is rated by the Ratee (Self) and Immediate Supervisor only.
-              JF Indicator Score = (Self + Supervisor) ÷ 2
-              <span class="scale-hint">1 = Never · 2 = Rarely · 3 = Frequently · 4 = Always</span>
-            </div>
+            <!-- Rater mode -->
+            <template v-if="activeAssignment">
+              <div class="rating-progress-wrap">
+                <div class="rating-progress-label">
+                  <span>Job Fitness</span>
+                  <span :class="['rating-progress-count', jfAnsweredCount >= JF_INDICATORS.length ? 'all-done' : '']">
+                    {{ jfAnsweredCount }} / {{ JF_INDICATORS.length }} answered
+                    <svg v-if="jfAnsweredCount >= JF_INDICATORS.length" width="14" height="14" viewBox="0 0 14 14" fill="none" style="vertical-align:-2px;margin-left:3px">
+                      <circle cx="7" cy="7" r="6" fill="#16A34A"/>
+                      <path d="M4 7l2 2 4-4" stroke="#fff" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                  </span>
+                </div>
+                <div class="rating-progress-bar">
+                  <div class="rating-progress-fill" :style="{ width: (jfAnsweredCount / JF_INDICATORS.length * 100) + '%' }"></div>
+                </div>
+              </div>
+              <div class="scale-legend">
+                <span class="scale-pill"><strong>1</strong> Never</span>
+                <span class="scale-pill"><strong>2</strong> Rarely</span>
+                <span class="scale-pill"><strong>3</strong> Frequently</span>
+                <span class="scale-pill"><strong>4</strong> Always</span>
+              </div>
+              <div v-if="showValidation && jfAnsweredCount < JF_INDICATORS.length" class="validation-banner">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" fill="#FEF2F2" stroke="#EF4444" stroke-width="1.2"/><path d="M7 4v4M7 9.5v.5" stroke="#EF4444" stroke-width="1.3" stroke-linecap="round"/></svg>
+                Please answer all <strong>{{ JF_INDICATORS.length - jfAnsweredCount }}</strong> remaining question{{ JF_INDICATORS.length - jfAnsweredCount !== 1 ? 's' : '' }} before submitting.
+              </div>
+            </template>
 
-            <div class="rater-selector" style="margin-bottom:16px">
-              <span class="rater-label">Rating as:</span>
-              <template v-if="!activeAssignment">
+            <!-- Admin mode -->
+            <template v-else>
+              <div class="tab-intro">
+                <strong>Job Fitness</strong> is rated by the Ratee (Self) and Immediate Supervisor only.
+                JF Indicator Score = (Self + Supervisor) ÷ 2
+                <span class="scale-hint">1 = Never · 2 = Rarely · 3 = Frequently · 4 = Always</span>
+              </div>
+              <div class="rater-selector" style="margin-bottom:16px">
+                <span class="rater-label">Rating as:</span>
                 <select v-model="jfRaterType" class="field-input" style="width:220px">
                   <option value="Self">Self (Ratee)</option>
                   <option value="Supervisor">Immediate Supervisor</option>
                 </select>
-              </template>
-              <span v-else class="assignment-rtype-chip">{{ raterTypeLabel(activeAssignment.raterType) }}</span>
-            </div>
+              </div>
+            </template>
 
-            <!-- Section 11: Significant variance warning -->
-            <div v-if="loadedRec?.jfVarianceFlagged" class="variance-banner">
+            <!-- Section 11: Significant variance warning (admin only) -->
+            <div v-if="!activeAssignment && loadedRec?.jfVarianceFlagged" class="variance-banner">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <path d="M8 1L1 14h14L8 1z" fill="#FEF9C3" stroke="#CA8A04" stroke-width="1.2"/>
                 <path d="M8 6v4M8 11.5v.5" stroke="#CA8A04" stroke-width="1.4" stroke-linecap="round"/>
@@ -665,7 +746,8 @@
             </div>
 
             <div class="jf-list">
-              <div v-for="(ind, idx) in JF_INDICATORS" :key="idx" class="jf-row">
+              <div v-for="(ind, idx) in JF_INDICATORS" :key="idx"
+                :class="['jf-row', showValidation && getJFRating(idx) === null ? 'unanswered' : '']">
                 <div class="jf-num">{{ idx + 1 }}</div>
                 <div class="jf-info">
                   <div class="jf-label">{{ ind }}</div>
@@ -674,12 +756,14 @@
                 <div class="ind-rating">
                   <button v-for="n in [1,2,3,4]" :key="n"
                     :class="['rating-btn', getJFRating(idx) === n && 'selected']"
+                    :title="['Never','Rarely','Frequently','Always'][n-1]"
                     @click="setJFRating(idx, n)">{{ n }}</button>
                 </div>
               </div>
             </div>
 
-            <div class="action-bar">
+            <!-- Admin-only action bar -->
+            <div v-if="!activeAssignment" class="action-bar">
               <button class="btn btn-primary" :disabled="savingJF" @click="saveJFRatings">
                 <span v-if="savingJF" class="spinner-sm"></span>
                 {{ savingJF ? 'Saving…' : 'Save Job Fitness Ratings' }}
@@ -795,7 +879,20 @@
           <!-- Footer -->
           <div class="modal-footer">
             <button class="btn" @click="closeDetailModal">Close</button>
-            <template v-if="activeRecord?.status !== 'Final'">
+
+            <!-- Rater mode: single Submit button -->
+            <template v-if="activeAssignment">
+              <button class="btn btn-submit-rating" :disabled="submittingRating" @click="submitRatings">
+                <span v-if="submittingRating" class="spinner-sm" style="border-top-color:#fff"></span>
+                <svg v-else width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <path d="M2 7l3.5 3.5L12 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                {{ submittingRating ? 'Submitting…' : 'Submit Ratings' }}
+              </button>
+            </template>
+
+            <!-- Admin mode: Compute + Finalize -->
+            <template v-else-if="activeRecord?.status !== 'Final'">
               <button
                 v-if="activeRecord?.status === 'Computed'"
                 class="btn btn-finalize"
@@ -812,7 +909,7 @@
                 {{ computingOverall ? 'Computing…' : 'Compute Overall Score' }}
               </button>
             </template>
-            <span v-else class="finalized-badge">
+            <span v-else-if="!activeAssignment" class="finalized-badge">
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                 <path d="M6 1L1.5 3.25V6c0 2.5 1.8 4.65 4.5 5 2.7-.35 4.5-2.5 4.5-5V3.25L6 1z" fill="#15803D" stroke="#15803D" stroke-width=".5" stroke-linejoin="round"/>
                 <path d="M3.75 6l1.5 1.5L9 4.5" stroke="#fff" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -973,7 +1070,9 @@ const jfEvidence  = ref({})
 const savingJF    = ref(false)
 const computingJF = ref(false)
 
-const computingOverall = ref(false)
+const computingOverall  = ref(false)
+const showValidation    = ref(false)
+const submittingRating  = ref(false)
 
 // EDAP state
 const EDAP_STATUSES = [
@@ -1037,6 +1136,15 @@ const filteredRecords = computed(() => {
   if (search.value) { const q = search.value.toLowerCase(); r = r.filter(x => (x.rateeName || '').toLowerCase().includes(q)) }
   return r
 })
+
+// Rater progress computeds
+const cbcTotalCount    = computed(() => HEARTWORK_THEMES.reduce((s, t) => s + t.indicators.length, 0))
+const cbcAnsweredCount = computed(() => Object.keys(cbcRatings.value).length)
+const cbcProgress      = computed(() => Math.round(cbcAnsweredCount.value / cbcTotalCount.value * 100))
+const jfAnsweredCount  = computed(() => JF_INDICATORS.filter((_, idx) => getJFRating(idx) !== null).length)
+function themeAnsweredCount(theme) {
+  return theme.indicators.filter((_, idx) => getCBCRating(theme.id, idx) !== null).length
+}
 
 // ── Helpers ──
 function showToast(msg, type = 'success') { toast.value = { show: true, msg, type }; setTimeout(() => { toast.value.show = false }, 3500) }
@@ -1133,17 +1241,67 @@ async function switchToAll() {
 
 async function openFromAssignment(task) {
   activeAssignment.value = task
-  cbcRaterType.value = task.raterType
-  jfRaterType.value  = ['Self', 'Supervisor'].includes(task.raterType) ? task.raterType : 'Self'
+  cbcRaterType.value     = task.raterType
+  jfRaterType.value      = ['Self', 'Supervisor'].includes(task.raterType) ? task.raterType : 'Self'
+  showValidation.value   = false
   if (task.ipatRecordId) {
     await openDetailModal({ id: task.ipatRecordId, rateeName: task.rateeName, semester: task.semester, year: task.year })
   }
 }
 
 function closeDetailModal() {
-  showDetailModal.value = false
-  activeRecord.value   = null
+  showDetailModal.value  = false
+  activeRecord.value     = null
   activeAssignment.value = null
+  showValidation.value   = false
+}
+
+async function submitRatings() {
+  const assignment = activeAssignment.value
+  if (!assignment) return
+
+  const cbcOk = cbcAnsweredCount.value >= cbcTotalCount.value
+  const jfOk  = !showJFTab.value || jfAnsweredCount.value >= JF_INDICATORS.length
+
+  if (!cbcOk || !jfOk) {
+    showValidation.value = true
+    if (!cbcOk) { activeTab.value = 'cbc' }
+    else if (!jfOk) { activeTab.value = 'jf' }
+    const missing = (!cbcOk ? cbcTotalCount.value - cbcAnsweredCount.value : 0) +
+                    (!jfOk  ? JF_INDICATORS.length - jfAnsweredCount.value : 0)
+    showToast(`Please answer all ${missing} remaining question${missing !== 1 ? 's' : ''} before submitting.`, 'error')
+    return
+  }
+
+  submittingRating.value = true
+  try {
+    // Save CBC ratings
+    const cbcPayload = []
+    HEARTWORK_THEMES.forEach(theme => {
+      theme.indicators.forEach((_, idx) => {
+        const rating = getCBCRating(theme.id, idx)
+        if (rating !== null) cbcPayload.push({ themeId: theme.id, themeName: theme.label, indicatorIdx: idx, rating, raterType: assignment.raterType })
+      })
+    })
+    await ipatApi.saveCBCRatings(activeRecord.value.id, cbcPayload)
+
+    // Save JF ratings if applicable
+    if (showJFTab.value) {
+      const jfPayload = JF_INDICATORS.map((_, idx) => ({
+        indicatorIdx: idx, rating: getJFRating(idx), evidence: jfEvidence.value[idx] || '', raterType: assignment.raterType
+      })).filter(r => r.rating !== null)
+      await ipatApi.saveJFRatings(activeRecord.value.id, jfPayload)
+    }
+
+    await ipatAssignmentsApi.markCompleted(assignment.id)
+    showToast('Ratings submitted successfully!')
+    closeDetailModal()
+    loadMyTasks()
+  } catch (e) {
+    showToast(e.message || 'Failed to submit ratings. Please try again.', 'error')
+  } finally {
+    submittingRating.value = false
+  }
 }
 
 // ── Generate Assignments ──
@@ -1440,13 +1598,13 @@ function _resetEdap() {
 /* Filters */
 .filter-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap;}
 .status-tabs{display:flex;gap:4px;}
-.status-tab{padding:5px 14px;border-radius:20px;font-size:12px;font-weight:500;border:1px solid #E2E8F0;background:#fff;color:#64748B;cursor:pointer;transition:all .15s;font-family:inherit;}
+.status-tab{padding:5px 14px;border-radius:20px;font-size:12px;font-weight:500;border:1px solid #E2E8F0;background:#fff;color:#64748B;cursor:pointer;transition:all .15s;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;}
 .status-tab.active{background:#0D2137;color:#fff;border-color:#0D2137;}
 .filter-right{display:flex;gap:8px;align-items:center;}
 .srch-wrap{position:relative;}
 .srch-icon{position:absolute;left:9px;top:50%;transform:translateY(-50%);pointer-events:none;}
-.srch-inp{padding:7px 11px 7px 28px;border:1px solid #E2E8F0;border-radius:8px;font-size:12px;font-family:inherit;outline:none;width:200px;background:#fff;}
-.filter-select{padding:7px 10px;border:1px solid #E2E8F0;border-radius:7px;font-size:12px;font-family:inherit;color:#374151;background:#fff;outline:none;cursor:pointer;}
+.srch-inp{padding:7px 11px 7px 28px;border:1px solid #E2E8F0;border-radius:8px;font-size:12px;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;outline:none;width:200px;background:#fff;}
+.filter-select{padding:7px 10px;border:1px solid #E2E8F0;border-radius:7px;font-size:12px;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;color:#374151;background:#fff;outline:none;cursor:pointer;}
 
 /* Records grid */
 .records-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-bottom:16px;}
@@ -1499,7 +1657,7 @@ function _resetEdap() {
 .sk-scores{display:flex;gap:8px;}
 
 /* Buttons */
-.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 13px;border-radius:8px;font-size:12px;cursor:pointer;border:1px solid #E2E8F0;background:#fff;color:#374151;transition:all .15s;font-family:inherit;font-weight:500;}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 13px;border-radius:8px;font-size:12px;cursor:pointer;border:1px solid #E2E8F0;background:#fff;color:#374151;transition:all .15s;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;font-weight:500;}
 .btn:hover{border-color:#CBD5E1;background:#F8FAFC;}
 .btn:disabled{opacity:.55;cursor:not-allowed;}
 .btn-primary{background:#0D2137;color:#fff;border-color:#0D2137;}
@@ -1531,8 +1689,9 @@ function _resetEdap() {
 .sscore-op{font-size:18px;font-weight:700;color:#CBD5E1;flex-shrink:0;}
 
 /* Tabs */
-.dtabs{display:flex;padding:0 24px;border-bottom:1px solid #E8EDF3;flex-shrink:0;overflow-x:auto;}
-.dtab{padding:10px 14px;font-size:12px;font-weight:500;cursor:pointer;border:none;background:transparent;color:#64748B;border-bottom:2px solid transparent;margin-bottom:-1px;font-family:inherit;transition:all .15s;white-space:nowrap;}
+.dtabs{display:flex;padding:0 24px;border-bottom:1px solid #E8EDF3;flex-shrink:0;overflow-x:auto;scrollbar-width:none;}
+.dtabs::-webkit-scrollbar{display:none;}
+.dtab{padding:10px 14px;font-size:12px;font-weight:500;cursor:pointer;border:none;background:transparent;color:#64748B;border-bottom:2px solid transparent;margin-bottom:-1px;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;transition:all .15s;white-space:nowrap;}
 .dtab.active{color:#1A56B0;border-bottom-color:#1A56B0;font-weight:600;}
 
 /* Tab content */
@@ -1556,9 +1715,36 @@ function _resetEdap() {
 .ind-num{width:22px;height:22px;border-radius:50%;background:#F1F5F9;color:#64748B;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .ind-text{flex:1;font-size:12px;color:#374151;line-height:1.5;}
 .ind-rating{display:flex;gap:4px;flex-shrink:0;}
-.rating-btn{width:32px;height:32px;border-radius:6px;border:1.5px solid #E2E8F0;background:#fff;font-size:12px;font-weight:600;color:#94A3B8;cursor:pointer;transition:all .12s;font-family:inherit;}
-.rating-btn:hover{border-color:#1A56B0;color:#1A56B0;}
-.rating-btn.selected{background:#1A56B0;color:#fff;border-color:#1A56B0;}
+.rating-btn{min-width:38px;height:38px;padding:0 10px;border-radius:8px;border:1.5px solid #E2E8F0;background:#fff;font-size:13px;font-weight:700;color:#64748B;cursor:pointer;transition:all .12s;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;display:flex;align-items:center;justify-content:center;}
+.rating-btn:hover:not(.selected){background:#EFF6FF;border-color:#93C5FD;color:#1A56B0;}
+.rating-btn.selected{background:#1A56B0;border-color:#1A56B0;color:#fff;box-shadow:0 2px 8px rgba(26,86,176,.25);}
+
+/* Rater mode progress */
+.rating-progress-wrap{padding:14px 16px 10px;background:#F8FAFC;border-bottom:1px solid #F1F5F9;margin:-16px -24px 16px;}
+.rating-progress-label{display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:600;color:#374151;margin-bottom:7px;}
+.rating-progress-count{font-size:12px;font-weight:500;color:#64748B;}
+.rating-progress-count.all-done{color:#16A34A;font-weight:600;}
+.rating-progress-bar{height:5px;background:#E2E8F0;border-radius:99px;overflow:hidden;}
+.rating-progress-fill{height:100%;background:linear-gradient(90deg,#1A56B0,#3B82F6);border-radius:99px;transition:width .3s ease;}
+
+/* Scale legend */
+.scale-legend{display:flex;gap:8px;margin-bottom:16px;}
+.scale-pill{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:9px 12px;border-radius:10px;background:#F1F5F9;font-size:12px;color:#475569;text-align:center;border:1px solid #E2E8F0;}
+.scale-pill strong{color:#0F172A;font-size:14px;}
+
+/* Theme progress chip */
+.theme-progress-chip{font-size:11px;font-weight:600;color:#64748B;background:#F1F5F9;padding:2px 8px;border-radius:10px;flex-shrink:0;}
+.theme-progress-chip.chip-done{color:#16A34A;background:#F0FDF4;}
+
+/* Validation */
+.validation-banner{display:flex;align-items:center;gap:8px;padding:9px 12px;background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;font-size:12px;color:#DC2626;margin-bottom:14px;}
+.indicator-row.unanswered{background:#FFF5F5;border-left:3px solid #FCA5A5;padding-left:calc(12px - 3px);}
+.jf-row.unanswered{background:#FFF5F5;border-left:3px solid #FCA5A5;padding-left:calc(12px - 3px);}
+
+/* Submit button */
+.btn-submit-rating{display:inline-flex;align-items:center;gap:7px;padding:9px 20px;border-radius:10px;border:none;background:linear-gradient(135deg,#16A34A,#15803D);color:#fff;font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;box-shadow:0 2px 8px rgba(22,163,74,.3);}
+.btn-submit-rating:hover:not(:disabled){background:linear-gradient(135deg,#15803D,#166534);box-shadow:0 4px 12px rgba(22,163,74,.4);}
+.btn-submit-rating:disabled{opacity:.6;cursor:not-allowed;}
 .action-bar{display:flex;gap:8px;padding-top:14px;border-top:1px solid #F1F5F9;margin-top:8px;}
 
 /* FPO tab */
@@ -1582,7 +1768,7 @@ function _resetEdap() {
 .jf-num{width:22px;height:22px;border-radius:50%;background:#F3EEFF;color:#6B3FA0;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;}
 .jf-info{flex:1;min-width:0;}
 .jf-label{font-size:12px;font-weight:600;color:#374151;margin-bottom:5px;line-height:1.4;}
-.jf-evidence{width:100%;padding:5px 9px;border:1px solid #E2E8F0;border-radius:6px;font-size:11px;font-family:inherit;color:#64748B;outline:none;}
+.jf-evidence{width:100%;padding:5px 9px;border:1px solid #E2E8F0;border-radius:6px;font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;color:#64748B;outline:none;}
 .jf-evidence:focus{border-color:#6B3FA0;}
 
 /* Form fields */
@@ -1590,10 +1776,10 @@ function _resetEdap() {
 .field{display:flex;flex-direction:column;gap:5px;}
 .full{grid-column:span 2;}
 .field-label{font-size:11px;font-weight:600;color:#374151;}
-.field-input{padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:9px;font-size:13px;font-family:inherit;color:#0F172A;background:#fff;outline:none;transition:border-color .15s;}
+.field-input{padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:9px;font-size:13px;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;color:#0F172A;background:#fff;outline:none;transition:border-color .15s;}
 .field-input:focus{border-color:#3B82F6;box-shadow:0 0 0 3px rgba(59,130,246,.1);}
 .toggle-row{display:flex;gap:8px;}
-.toggle-btn{flex:1;padding:10px;border:1.5px solid #E2E8F0;border-radius:9px;cursor:pointer;font-size:12px;font-family:inherit;background:#fff;color:#374151;transition:all .15s;}
+.toggle-btn{flex:1;padding:10px;border:1.5px solid #E2E8F0;border-radius:9px;cursor:pointer;font-size:12px;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;background:#fff;color:#374151;transition:all .15s;}
 .toggle-btn.active{border-color:#3B82F6;background:#EBF4FF;color:#1A56B0;font-weight:600;}
 
 /* Detail loading */
@@ -1654,7 +1840,7 @@ function _resetEdap() {
 
 /* View tabs */
 .view-tabs{display:flex;gap:4px;margin-bottom:16px;}
-.view-tab{display:inline-flex;align-items:center;gap:6px;padding:7px 16px;border-radius:20px;font-size:12px;font-weight:500;border:1px solid #E2E8F0;background:#fff;color:#64748B;cursor:pointer;font-family:inherit;transition:all .15s;}
+.view-tab{display:inline-flex;align-items:center;gap:6px;padding:7px 16px;border-radius:20px;font-size:12px;font-weight:500;border:1px solid #E2E8F0;background:#fff;color:#64748B;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;transition:all .15s;}
 .view-tab.active{background:#0D2137;color:#fff;border-color:#0D2137;}
 .view-tab-badge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#EF4444;color:#fff;font-size:10px;font-weight:700;}
 
@@ -1700,8 +1886,18 @@ function _resetEdap() {
 .result-card{background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:18px;}
 .rc-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
 .rc-period{font-size:11px;font-weight:600;color:#64748B;}
+.rc-status-badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;}
+.rc-done{background:#F0FDF4;color:#15803D;border:1px solid #BBF7D0;}
+.rc-pending{background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE;}
 .rc-name{font-size:15px;font-weight:700;color:#0F172A;margin-bottom:2px;}
 .rc-division{font-size:11px;color:#94A3B8;margin-bottom:12px;}
+.rc-progress-wrap{margin-bottom:4px;}
+.rc-progress-meta{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+.rc-progress-label{font-size:11px;font-weight:600;color:#64748B;}
+.rc-progress-count{font-size:11px;font-weight:700;color:#0F172A;}
+.rc-progress-bar{height:6px;background:#E2E8F0;border-radius:99px;overflow:hidden;margin-bottom:6px;}
+.rc-progress-fill{height:100%;background:linear-gradient(90deg,#3B82F6,#2563EB);border-radius:99px;transition:width .4s ease;}
+.rc-pending-list{font-size:10px;color:#94A3B8;font-style:italic;}
 .rc-scores{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;}
 .rc-score-item{background:#F8FAFC;border-radius:8px;padding:8px;text-align:center;}
 .rc-score-label{display:block;font-size:10px;font-weight:600;color:#64748B;margin-bottom:2px;}

@@ -379,6 +379,22 @@ const IPATRaterAssignmentService = (() => {
       if (!isAdmin) throw HttpError('Unauthorized', 403)
     }
     SpreadsheetService.updateRow(assignSheet, assignmentId, { status: 'Completed', updatedAt: new Date().toISOString() })
+
+    // Auto-compute scores when every rater for this IPAT record has submitted
+    const ipatRecordId = row.ipatRecordId
+    if (ipatRecordId) {
+      const allForRecord = SpreadsheetService.getAllRows(assignSheet).filter(r => r.ipatRecordId === ipatRecordId)
+      const allDone = allForRecord.every(r => r.status === 'Completed' || r.id === assignmentId)
+      if (allDone) {
+        try {
+          IPATService.computeCBC(ipatRecordId, user)
+          IPATService.computeOverall(ipatRecordId, user)
+        } catch (e) {
+          Logger.log('[PMES] Auto-compute failed for ' + ipatRecordId + ': ' + e.message)
+        }
+      }
+    }
+
     return { updated: true }
   }
 
@@ -386,30 +402,41 @@ const IPATRaterAssignmentService = (() => {
   // Section 2: "The person being rated shall be able to view the final ratings."
 
   function getMyResults(params, user) {
-    const profile  = AuthService.getProfile(user)
-    const recSheet = SpreadsheetService.getSheet(SHEET.IPAT_RECORDS)
-    let rows = SpreadsheetService.getAllRows(recSheet).filter(r => r.rateeId === profile.id)
+    const profile     = AuthService.getProfile(user)
+    const recSheet    = SpreadsheetService.getSheet(SHEET.IPAT_RECORDS)
+    const assignSheet = SpreadsheetService.getSheet(SHEET.IPAT_ASSIGNMENTS)
 
+    let rows = SpreadsheetService.getAllRows(recSheet).filter(r => r.rateeId === profile.id)
     if (params.semester) rows = rows.filter(r => String(r.semester) === String(params.semester))
     if (params.year)     rows = rows.filter(r => String(r.year)     === String(params.year))
 
-    // Only expose Final records to the ratee — drafts and computed are internal
-    return rows
-      .filter(r => r.status === 'Final')
-      .map(r => ({
-        id:           r.id,
-        semester:     r.semester,
-        year:         r.year,
-        rateeName:    r.rateeName,
-        divisionName: r.divisionName,
-        positionLevel: r.positionLevel,
-        cbcScore:     r.cbcScore,
-        fpoScore:     r.fpoScore,
-        jfScore:      r.jfScore,
-        overallScore: r.overallScore,
-        descriptor:   r.descriptor,
-        status:       r.status
-      }))
+    const allAssignments = SpreadsheetService.getAllRows(assignSheet)
+
+    return rows.map(r => {
+      const assignments     = allAssignments.filter(a => a.ipatRecordId === r.id)
+      const totalRaters     = assignments.length
+      const completedRaters = assignments.filter(a => a.status === 'Completed').length
+      const pendingRaters   = assignments.filter(a => a.status !== 'Completed').map(a => a.raterType)
+
+      return {
+        id:             r.id,
+        semester:       r.semester,
+        year:           r.year,
+        rateeName:      r.rateeName,
+        divisionName:   r.divisionName,
+        positionLevel:  r.positionLevel,
+        cbcScore:       r.cbcScore     || null,
+        fpoScore:       r.fpoScore     || null,
+        jfScore:        r.jfScore      || null,
+        overallScore:   r.overallScore || null,
+        descriptor:     r.descriptor   || null,
+        status:         r.status,
+        totalRaters,
+        completedRaters,
+        pendingRaters,
+        allComplete:    totalRaters > 0 && completedRaters === totalRaters
+      }
+    })
   }
 
   // ── DELETE ALL ASSIGNMENTS FOR A PERIOD (admin, to regenerate) ────────────

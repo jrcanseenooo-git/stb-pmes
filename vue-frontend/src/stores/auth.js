@@ -49,8 +49,6 @@ export const useAuthStore = defineStore('auth', () => {
   const employmentType  = computed(() => profile.value?.type           || 'Regular')
   const isActive        = computed(() => profile.value?.active !== false && profile.value?.active !== 'false')
   const createdAt       = computed(() => profile.value?.createdAt      || '')
-  const firstName       = computed(() => profile.value?.firstName      || '')
-  const lastName        = computed(() => profile.value?.lastName       || '')
   const profileId       = computed(() => profile.value?.id             || '')
 
   // ── Domain check ──
@@ -75,8 +73,6 @@ export const useAuthStore = defineStore('auth', () => {
           uid:          user.value.uid,
           email:        user.value.email,
           fullName:     user.value.displayName || user.value.email?.split('@')[0] || 'User',
-          firstName:    '',
-          lastName:     '',
           role:         'Staff',
           divisionId:   '',
           divisionName: '',
@@ -184,7 +180,7 @@ export const useAuthStore = defineStore('auth', () => {
     // Computed – auth
     isAuthenticated, role, fullName, initials,
     // Computed – profile fields (FIX: previously missing)
-    profileId, firstName, lastName, employeeNo,
+    profileId, employeeNo,
     position, divisionName, divisionId,
     positionLevel, sgLevel, employmentType,
     isActive, createdAt,

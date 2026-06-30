@@ -56,7 +56,7 @@ async function handleConfirm() {
   background: rgba(9, 19, 38, .6);
   display: flex; align-items: center; justify-content: center;
   z-index: 600; padding: 16px;
-  font-family: Inter, system-ui, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
 }
 
 .modal {
@@ -109,7 +109,7 @@ async function handleConfirm() {
   border-radius: 8px;
   font-size: 13px;
   font-weight: 600;
-  font-family: Inter, system-ui, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
   cursor: pointer;
   transition: background-color .15s, border-color .15s;
 }

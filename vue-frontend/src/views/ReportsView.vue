@@ -178,7 +178,7 @@ function downloadReport(r) {
 .panel-empty { padding: 36px 18px; text-align: center; color: #94A3B8; font-size: 12px; }
 .field { display: flex; flex-direction: column; gap: 5px; }
 .field-label { font-size: 11px; font-weight: 600; color: #374151; }
-.field-input { padding: 9px 12px; border: 1.5px solid #E2E8F0; border-radius: 9px; font-size: 13px; font-family: inherit; color: #0F172A; background: #fff; outline: none; transition: border-color .15s; }
+.field-input { padding: 9px 12px; border: 1.5px solid #E2E8F0; border-radius: 9px; font-size: 13px; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif; color: #0F172A; background: #fff; outline: none; transition: border-color .15s; }
 .field-input:focus { border-color: #3B82F6; box-shadow: 0 0 0 3px rgba(59,130,246,.1); }
 .form-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
 .format-row { display: flex; gap: 8px; }
@@ -197,7 +197,7 @@ function downloadReport(r) {
 .report-info { flex: 1; min-width: 0; }
 .report-name { font-size: 12px; font-weight: 600; color: #0F172A; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .report-meta { font-size: 10px; color: #94A3B8; }
-.btn { display: inline-flex; align-items: center; gap: 5px; padding: 7px 13px; border-radius: 8px; font-size: 12px; cursor: pointer; border: 1px solid #E2E8F0; background: #fff; color: #374151; transition: all .15s; font-family: inherit; font-weight: 500; }
+.btn { display: inline-flex; align-items: center; gap: 5px; padding: 7px 13px; border-radius: 8px; font-size: 12px; cursor: pointer; border: 1px solid #E2E8F0; background: #fff; color: #374151; transition: all .15s; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif; font-weight: 500; }
 .btn:hover { border-color: #CBD5E1; background: #F8FAFC; }
 .btn:disabled { opacity: .55; cursor: not-allowed; }
 .btn-primary { background: #0D2137; color: #fff; border-color: #0D2137; }

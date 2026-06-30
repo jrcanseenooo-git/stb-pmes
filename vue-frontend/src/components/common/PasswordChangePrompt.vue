@@ -216,7 +216,7 @@ async function handleSave() {
   display: flex; align-items: center; justify-content: center;
   z-index: 500; padding: 16px;
   backdrop-filter: blur(6px);
-  font-family: 'DM Sans', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
 }
 
 .modal {
@@ -261,7 +261,7 @@ async function handleSave() {
 .field-input {
   width: 100%; padding: 10px 38px 10px 12px;
   border: 1.5px solid #E2E8F0; border-radius: 9px;
-  font-size: 14px; font-family: 'DM Sans', sans-serif;
+  font-size: 14px; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
   color: #0F172A; outline: none;
   transition: border-color .15s, box-shadow .15s;
 }
@@ -309,7 +309,7 @@ async function handleSave() {
 .btn-skip {
   display: flex; align-items: center; gap: 5px;
   background: none; border: none; cursor: pointer;
-  font-size: 12px; color: #94A3B8; font-family: 'DM Sans', sans-serif;
+  font-size: 12px; color: #94A3B8; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
   padding: 6px 4px; transition: color .15s;
 }
 .btn-skip:hover { color: #64748B; }
@@ -320,7 +320,7 @@ async function handleSave() {
   background: #2563EB; color: #fff;
   border: none; border-radius: 9px;
   font-size: 13px; font-weight: 600;
-  font-family: 'DM Sans', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
   cursor: pointer; transition: all .15s;
   box-shadow: 0 3px 10px rgba(37,99,235,.3);
 }

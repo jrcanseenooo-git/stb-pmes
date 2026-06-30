@@ -5,7 +5,7 @@
       <circle cx="60" cy="60" r="45" fill="none" stroke="#27AE60" stroke-width="16"
         :stroke-dasharray="`${completed} ${circumference}`" stroke-dashoffset="0"/>
       <text x="60" y="55" text-anchor="middle" font-size="18" font-weight="bold" fill="#1A2332" font-family="DM Mono,monospace">{{ total }}</text>
-      <text x="60" y="70" text-anchor="middle" font-size="9" fill="#718096" font-family="DM Sans,sans-serif">targets</text>
+      <text x="60" y="70" text-anchor="middle" font-size="9" fill="#718096" font-family="Inter,system-ui,sans-serif">targets</text>
     </svg>
     <div class="space-y-2">
       <div v-for="item in data" :key="item.status" class="flex items-center gap-2 text-xs text-gray-600">

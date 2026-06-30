@@ -1009,7 +1009,13 @@ async function loadMyTasks() {
   try {
     const data = await ipatAssignmentsApi.getMyRatees({ semester: tasksSemester.value, year: tasksYear.value })
     myTasks.value = Array.isArray(data) ? data : (data?.items || [])
-  } catch (e) { showToast(`Could not load tasks: ${e.message}`, 'error') }
+  } catch (e) {
+    if (String(e.message || '').includes('Route not found: ipat-assignments/my-ratees')) {
+      myTasks.value = []
+      return
+    }
+    showToast(`Could not load tasks: ${e.message}`, 'error')
+  }
   finally { loadingTasks.value = false }
 }
 

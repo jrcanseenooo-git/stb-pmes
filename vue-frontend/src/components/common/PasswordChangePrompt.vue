@@ -91,7 +91,7 @@
 
         <!-- Footer -->
         <div class="modal-footer">
-          <button class="btn-skip" @click="$emit('skip')">
+          <button v-if="!props.force" class="btn-skip" @click="$emit('skip')">
             <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
               <path d="M2 6.5h9M8 3.5l3 3-3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
@@ -112,7 +112,7 @@
         </div>
 
         <!-- Skip warning -->
-        <div class="skip-warning">
+        <div v-if="!props.force" class="skip-warning">
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
             <path d="M6 1L1 11h10L6 1z" stroke="#F59E0B" stroke-width="1.1" stroke-linejoin="round"/>
             <path d="M6 5v2.5M6 9v.1" stroke="#F59E0B" stroke-width="1.1" stroke-linecap="round"/>
@@ -127,9 +127,14 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import { updatePassword } from 'firebase/auth'
+import { auth } from '@/firebase'
+import { usersApi } from '@/services/api'
+import { useAuthStore } from '@/stores/auth'
 
-const props = defineProps({ show: Boolean })
+const props = defineProps({ show: Boolean, force: Boolean })
 const emit  = defineEmits(['changed', 'skip'])
+const authStore = useAuthStore()
 
 const newPw     = ref('')
 const confirmPw = ref('')
@@ -181,10 +186,20 @@ async function handleSave() {
   if (!canSave.value) return
   saving.value = true
   try {
-    await new Promise(r => setTimeout(r, 800)) // Replace with Firebase updatePassword()
+    if (!auth.currentUser) {
+      throw new Error('Your login session was not found. Please sign in again.')
+    }
+    await updatePassword(auth.currentUser, newPw.value)
+    await usersApi.update(authStore.profileId, {
+      tempPassword: '',
+      mustChangePassword: false
+    })
+    authStore.patchProfile({ mustChangePassword: false })
     emit('changed')
   } catch (e) {
-    error.value = 'Failed to update password. Please try again.'
+    error.value = e.code === 'auth/requires-recent-login'
+      ? 'For security, please sign out and sign in again using your temporary password, then change it immediately.'
+      : (e.message || 'Failed to update password. Please try again.')
   } finally {
     saving.value = false
   }

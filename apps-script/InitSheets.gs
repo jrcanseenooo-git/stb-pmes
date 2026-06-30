@@ -6,7 +6,9 @@ function initializeSheets() {
     Users: [
       'id', 'uid', 'email', 'fullName', 'firstName', 'lastName',
       'role', 'divisionId', 'divisionName', 'section', 'position', 'employeeNo',
-      'type', 'positionLevel', 'sgLevel', 'active', 'createdAt', 'updatedAt', 'lastLoginAt'
+      'type', 'positionLevel', 'sgLevel',
+      'tempPassword', 'tempPasswordHash', 'mustChangePassword',
+      'active', 'createdAt', 'updatedAt', 'lastLoginAt'
     ],
     Divisions: [
       'id', 'name', 'code', 'chiefId', 'chiefName', 'parentId', 'color', 'active', 'createdAt'

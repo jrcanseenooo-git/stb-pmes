@@ -30,6 +30,14 @@ function initIPATSheets() {
     'semester','year','createdAt','updatedAt'
   ])
 
+  // 4. IPATEdap
+  _createSheetIfMissing(ss, 'IPATEdap', [
+    'id','ipatId','rateeId','rateeName',
+    'rows',
+    'sem1Status','sem1Notes','sem2Status','sem2Notes',
+    'createdAt','updatedAt'
+  ])
+
   Logger.log('IPAT sheets initialized successfully.')
 }
 

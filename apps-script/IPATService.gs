@@ -10,13 +10,13 @@
  *      Multi-rater: Self(15%) + Peer(15%) + Sub(15%) + Supervisor(30%) + Skip(25%)
  *      If no subordinate: Peer becomes 30%
  *
- *   B. Functional Performance Output (FPO) — 55%
+ *   B. Functional Performance Output (FPO) — 50%
  *      IPCRF/DPCR final numerical rating (1–5 scale, converted to 1–4)
  *
- *   C. Job Fitness (JF) — 15%
- *      7 indicators · Self + Immediate Supervisor + Skip Supervisor ÷ 3
+ *   C. Job Fitness (JF) — 20%
+ *      7 indicators · Self + Immediate Supervisor ÷ 2
  *
- * FORMULA: Overall = (CBCI × 0.30) + (FPOI × 0.55) + (JFI × 0.15)
+ * FORMULA: Overall = (CBCI × 0.30) + (FPOI × 0.50) + (JFI × 0.20)
  *
  * DESCRIPTORS:
  *   3.50–4.00 → Excellent Alignment
@@ -330,7 +330,8 @@ const IPATService = (() => {
 
   // ─────────────────────────────────────────────
   // JOB FITNESS RATINGS
-  // Raters: Self + Immediate Supervisor + Skip Supervisor (average of 3)
+  // Raters: Self + Immediate Supervisor only (average of 2)
+  // Per updated spec: only ratee and immediate supervisor rate JF.
   // ─────────────────────────────────────────────
 
   function saveJFRatings(ipatId, body, user) {
@@ -383,16 +384,16 @@ const IPATService = (() => {
     const ratings = getJFRatings(ipatId)
     if (!ratings.length) throw HttpError('No Job Fitness ratings found', 400)
 
-    // JF Indicator Score = (Self + Supervisor + SkipSupervisor) ÷ 3
+    // JF Indicator Score = (Self + Supervisor) ÷ 2
     // JF Score = Sum of Indicator Scores ÷ 7
     const indicatorScores = JOB_FITNESS_INDICATORS.map((label, idx) => {
       const indRatings = ratings.filter(r => Number(r.indicatorIdx) === idx)
 
+      // JF Indicator Score = (Self-Rating + Immediate Supervisor Rating) ÷ 2
       const self = indRatings.find(r => r.raterType === 'Self')
       const sup  = indRatings.find(r => r.raterType === 'Supervisor')
-      const skip = indRatings.find(r => r.raterType === 'SkipSupervisor')
 
-      const values = [self, sup, skip].filter(Boolean).map(r => Number(r.rating))
+      const values = [self, sup].filter(Boolean).map(r => Number(r.rating))
       const score  = values.length > 0
         ? round2(values.reduce((s, v) => s + v, 0) / values.length)
         : 0
@@ -454,7 +455,7 @@ const IPATService = (() => {
 
   // ─────────────────────────────────────────────
   // COMPUTE FINAL OVERALL SCORE
-  // Overall = (CBCI × 0.30) + (FPOI × 0.55) + (JFI × 0.15)
+  // Overall = (CBCI × 0.30) + (FPOI × 0.50) + (JFI × 0.20)
   // ─────────────────────────────────────────────
 
   function computeOverall(ipatId, user) {
@@ -472,8 +473,8 @@ const IPATService = (() => {
       fpo = round2((fpo - 1) / 4 * 3 + 1)
     }
 
-    // Overall = (CBCI × 0.30) + (FPOI × 0.55) + (JFI × 0.15)
-    const overall    = round2((cbc * 0.30) + (fpo * 0.55) + (jf * 0.15))
+    // Overall = (CBCI × 0.30) + (FPOI × 0.50) + (JFI × 0.20)
+    const overall    = round2((cbc * 0.30) + (fpo * 0.50) + (jf * 0.20))
     const descriptor = qualitativeDescriptor(overall)
 
     SpreadsheetService.updateRow(recSheet, ipatId, {
@@ -513,12 +514,61 @@ const IPATService = (() => {
     return row
   }
 
+  // ─────────────────────────────────────────────
+  // EDAP — Employee Development and Action Plan
+  // Stored as one row per IPAT record (upsert)
+  // ─────────────────────────────────────────────
+
+  function saveEdap(ipatId, body, user) {
+    const record = _getRecord(ipatId)
+    const sheet  = SpreadsheetService.getSheet(SHEET.IPAT_EDAP)
+    const now    = new Date().toISOString()
+
+    let rows = body.rows || []
+    if (typeof rows === 'string') { try { rows = JSON.parse(rows) } catch(e) { rows = [] } }
+
+    const existing = SpreadsheetService.getAllRows(sheet).find(r => r.ipatId === ipatId)
+    const edapData = {
+      ipatId,
+      rateeId:    record.rateeId,
+      rateeName:  record.rateeName,
+      rows:       JSON.stringify(rows),
+      sem1Status: body.sem1Status || 'not-started',
+      sem1Notes:  body.sem1Notes  || '',
+      sem2Status: body.sem2Status || 'not-started',
+      sem2Notes:  body.sem2Notes  || '',
+      updatedAt:  now
+    }
+
+    if (existing) {
+      SpreadsheetService.updateRow(sheet, existing.id, edapData)
+    } else {
+      SpreadsheetService.appendRow(sheet, {
+        id: SpreadsheetService.generateId('EDAP-'),
+        ...edapData,
+        createdAt: now
+      })
+    }
+
+    AuditService.log('SAVE_EDAP', 'IPAT', `EDAP saved for ${ipatId}`, user)
+    return { saved: true }
+  }
+
+  function getEdap(ipatId, user) {
+    const sheet   = SpreadsheetService.getSheet(SHEET.IPAT_EDAP)
+    const existing = SpreadsheetService.getAllRows(sheet).find(r => r.ipatId === ipatId)
+    if (!existing) return null
+    try { existing.rows = JSON.parse(existing.rows) } catch(e) { existing.rows = [] }
+    return existing
+  }
+
   return {
     list, get, create, updateRecord, updateStatus,
     saveCBCRatings, computeCBC,
     saveJFRatings,  computeJF,
     syncFPO,
     computeOverall,
+    saveEdap, getEdap,
     getThemes, getJFIndicators,
     getCBCRatings, getJFRatings
   }

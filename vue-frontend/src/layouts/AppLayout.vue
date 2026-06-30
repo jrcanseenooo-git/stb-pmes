@@ -231,26 +231,39 @@
               <path d="M8 1.5a4.5 4.5 0 014.5 4.5v3l1.5 2.5H2L3.5 9V6A4.5 4.5 0 018 1.5zM6.5 12.5a1.5 1.5 0 003 0"
                 stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
             </svg>
-            <span class="badge-dot">2</span>
+            <span v-if="notifStore.unreadCount > 0" class="badge-dot">{{ notifStore.unreadCount }}</span>
           </div>
 
           <div v-if="showNotifs" class="notif-dropdown" v-click-outside="() => showNotifs = false">
             <div class="notif-hd">
               <span class="notif-title">Notifications</span>
-              <span class="notif-count">5 new</span>
+              <div class="notif-hd-right">
+                <span v-if="notifStore.unreadCount > 0" class="notif-count">{{ notifStore.unreadCount }} new</span>
+                <button v-if="notifStore.unreadCount > 0" class="notif-mark-all" @click.stop="notifStore.markAllRead()">Mark all read</button>
+              </div>
             </div>
 
-            <div v-for="n in notifs" :key="n.msg" class="notif-row">
-              <div class="notif-icon-wrap" :style="{ background: n.bg }">
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                  <circle cx="6" cy="6" r="5" :stroke="n.color" stroke-width="1.2" />
-                </svg>
+            <div v-if="notifStore.loading" class="notif-empty">Loading…</div>
+            <div v-else-if="!notifStore.notifications.length" class="notif-empty">No notifications</div>
+            <template v-else>
+              <div
+                v-for="n in notifStore.notifications"
+                :key="n.id"
+                class="notif-row"
+                :class="{ 'notif-unread': !n.read }"
+                @click="n.read || notifStore.markRead(n.id)"
+              >
+                <div class="notif-icon-wrap" :style="{ background: notifStyle(n.type).bg }">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                    <circle cx="6" cy="6" r="5" :stroke="notifStyle(n.type).color" stroke-width="1.2" />
+                  </svg>
+                </div>
+                <div class="notif-body">
+                  <div class="notif-msg"><b>{{ notifTypeLabel(n.type) }}:</b> {{ n.message }}</div>
+                  <div class="notif-time">{{ relativeTime(n.createdAt) }}</div>
+                </div>
               </div>
-              <div>
-                <div class="notif-msg"><b>{{ n.type }}:</b> {{ n.msg }}</div>
-                <div class="notif-time">{{ n.time }}</div>
-              </div>
-            </div>
+            </template>
           </div>
 
           <button class="export-btn" @click="handleExport">
@@ -274,7 +287,7 @@
 
     <div v-if="!collapsed && isMobile" class="overlay" @click="collapsed = true"></div>
 
-    <PasswordChangePrompt :show="showPwPrompt" @changed="onPasswordChanged" @skip="showPwPrompt = false" />
+    <PasswordChangePrompt :show="showPwPrompt" :force="authStore.profile?.mustChangePassword === true" @changed="onPasswordChanged" @skip="showPwPrompt = false" />
     <LogoutConfirmModal :show="showLogoutConfirm" @confirm="confirmLogout" @cancel="showLogoutConfirm = false" />
   </div>
 </template>
@@ -284,11 +297,13 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { RouterView, RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { usePermissions } from '@/composables/usePermissions'
+import { useNotificationsStore } from '@/stores/notifications'
 import PasswordChangePrompt from '@/components/common/PasswordChangePrompt.vue'
 import LogoutConfirmModal from '@/components/common/LogoutConfirmModal.vue'
 
 const authStore = useAuthStore()
 const { canManageUsers } = usePermissions()
+const notifStore = useNotificationsStore()
 const route = useRoute()
 const router = useRouter()
 
@@ -324,17 +339,35 @@ const currentSemester = computed(() => {
   return `${sem} · ${year}`
 })
 
-const notifs = [
-  { type: 'Deadline', msg: 'Q1 IPCR ends in 2 days', time: 'May 11 · 8:00 AM', bg: '#FEF2F2', color: '#EF4444' },
-  { type: 'Approved', msg: 'M. Santos – Q1 IPCR approved', time: 'May 10 · 2:14 PM', bg: '#F0FDF4', color: '#22C55E' },
-  { type: 'Revision', msg: 'J. Cruz – CCEF MOV missing', time: 'May 9 · 10:30 AM', bg: '#FFFBEB', color: '#F59E0B' },
-  { type: 'Upload', msg: 'R. Dela Cruz submitted 3 files', time: 'May 8 · 4:00 PM', bg: '#EFF6FF', color: '#3B82F6' }
-]
+const NOTIF_STYLES = {
+  approval: { bg: '#F0FDF4', color: '#22C55E' },
+  revision:  { bg: '#FFFBEB', color: '#F59E0B' },
+  deadline:  { bg: '#FEF2F2', color: '#EF4444' },
+  alert:     { bg: '#EFF6FF', color: '#3B82F6' },
+}
+const NOTIF_LABELS = { approval: 'Approved', revision: 'Revision', deadline: 'Deadline', alert: 'Alert' }
+
+function notifStyle(type) {
+  return NOTIF_STYLES[type] || { bg: '#F8FAFC', color: '#94A3B8' }
+}
+function notifTypeLabel(type) {
+  return NOTIF_LABELS[type] || (type ? type.charAt(0).toUpperCase() + type.slice(1) : 'Notice')
+}
+function relativeTime(iso) {
+  if (!iso) return ''
+  const diff = Date.now() - new Date(iso).getTime()
+  const minutes = Math.floor(diff / 60000)
+  if (minutes < 1) return 'just now'
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.floor(hours / 24)}d ago`
+}
 
 watch(
   () => authStore.profile,
   (profile) => {
-    if (profile?.mustChangePassword || profile?.tempPassword) {
+    if (profile?.mustChangePassword === true) {
       showPwPrompt.value = true
     }
   },
@@ -379,6 +412,7 @@ const vClickOutside = {
 onMounted(() => {
   checkMobile()
   window.addEventListener('resize', checkMobile)
+  notifStore.fetchAll()
 })
 
 onUnmounted(() => {
@@ -856,6 +890,12 @@ onUnmounted(() => {
   font-weight: 800;
 }
 
+.notif-hd-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .notif-count {
   padding: 3px 8px;
   border-radius: 999px;
@@ -865,12 +905,39 @@ onUnmounted(() => {
   font-weight: 800;
 }
 
+.notif-mark-all {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--blue);
+  padding: 0;
+  font-family: inherit;
+}
+.notif-mark-all:hover { text-decoration: underline; }
+
+.notif-empty {
+  padding: 20px 13px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
 .notif-row {
   display: flex;
   gap: 9px;
   padding: 10px 13px;
   border-bottom: 1px solid #eef2f7;
+  cursor: default;
+  transition: background .12s;
 }
+
+.notif-row.notif-unread {
+  background: #f8faff;
+  cursor: pointer;
+}
+.notif-row.notif-unread:hover { background: #eef4ff; }
 
 .notif-icon-wrap {
   width: 28px;
@@ -881,9 +948,12 @@ onUnmounted(() => {
   border-radius: 50%;
 }
 
+.notif-body { min-width: 0; }
+
 .notif-msg {
   color: var(--text);
   font-size: 12px;
+  line-height: 1.4;
 }
 
 .notif-time {

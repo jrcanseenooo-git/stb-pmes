@@ -181,6 +181,8 @@ const Router = (() => {
         if (id && sub === 'jf' && !subId && method === 'POST')   return IPATService.saveJFRatings(id, body, user)
         if (id && sub === 'jf' && subId === 'compute')           return IPATService.computeJF(id, user)
         if (id && sub === 'compute')                             return IPATService.computeOverall(id, user)
+        if (id && sub === 'edap' && method === 'GET')            return IPATService.getEdap(id, user)
+        if (id && sub === 'edap' && method === 'POST')           return IPATService.saveEdap(id, body, user)
         if (id === 'themes')        return IPATService.getThemes(params, user)
         if (id === 'jf-indicators') return IPATService.getJFIndicators(params, user)
         break

@@ -78,7 +78,7 @@ const AuthService = (() => {
   // PROFILE LOOKUP
   // ─────────────────────────────────────────────────────────────
   function getProfile(user) {
-    const sheet = SpreadsheetService.getSheet(SHEET.USERS)
+    const sheet = _usersSheet()
     const rows  = SpreadsheetService.getAllRows(sheet)
 
     Logger.log('[Auth] Looking up profile for uid=' + user.uid + ' email=' + user.email)
@@ -124,9 +124,13 @@ const AuthService = (() => {
       }
     }
 
-    // Return all fields except sensitive ones
-    const { passwordHash, tempPassword, mustChangePassword, ...safe } = row
-    return safe
+    // Return all fields except the actual temporary password. The flag is
+    // intentionally returned so the frontend can force the user to replace it.
+    const { passwordHash, tempPassword, tempPasswordHash, mustChangePassword, ...safe } = row
+    return {
+      ...safe,
+      mustChangePassword: mustChangePassword === true || String(mustChangePassword).toLowerCase() === 'true'
+    }
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -168,6 +172,17 @@ const AuthService = (() => {
       Logger.log('❌ Token decode failed: ' + e.message)
       return null
     }
+  }
+
+  function _usersSheet() {
+    const sheet = SpreadsheetService.getSheet(SHEET.USERS)
+    const lastCol = Math.max(sheet.getLastColumn(), 1)
+    const existing = sheet.getRange(1, 1, 1, lastCol).getValues()[0].filter(Boolean)
+    const missing = ['tempPassword', 'tempPasswordHash', 'mustChangePassword'].filter(h => !existing.includes(h))
+    if (missing.length) {
+      sheet.getRange(1, existing.length + 1, 1, missing.length).setValues([missing])
+    }
+    return sheet
   }
 
   return { verifyToken, getProfile, requireRole, debugDecodeToken }

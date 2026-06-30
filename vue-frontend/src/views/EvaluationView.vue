@@ -8,7 +8,7 @@
     <div class="page-hd">
       <div>
         <h2 class="page-title">Evaluation Results</h2>
-        <p class="page-sub">Innovations Performance Assessment Tool — CBC 30% · FPO 55% · JF 15%</p>
+        <p class="page-sub">Innovations Performance Assessment Tool — CBC 30% · FPO 50% · JF 20%</p>
       </div>
       <button v-if="canCreate" class="btn btn-primary" @click="openCreateModal">
         <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
@@ -27,15 +27,15 @@
       </div>
       <div class="domain-sep">+</div>
       <div class="domain-item d-fpo">
-        <div class="domain-pct">55%</div>
+        <div class="domain-pct">50%</div>
         <div class="domain-label">Functional Performance Output</div>
         <div class="domain-sub">IPCRF/DPCR Final Numerical Rating</div>
       </div>
       <div class="domain-sep">+</div>
       <div class="domain-item d-jf">
-        <div class="domain-pct">15%</div>
+        <div class="domain-pct">20%</div>
         <div class="domain-label">Job Fitness</div>
-        <div class="domain-sub">7 Indicators · Self + Supervisor + Skip Supervisor</div>
+        <div class="domain-sub">7 Indicators · Self + Immediate Supervisor</div>
       </div>
       <div class="domain-sep">=</div>
       <div class="domain-item d-overall">
@@ -64,10 +64,7 @@
         </div>
         <select v-model="filterDiv" class="filter-select">
           <option value="">All Divisions</option>
-          <option value="dfd">Design Formulation</option>
-          <option value="pid">Pilot Implementation</option>
-          <option value="staed">STAE Division</option>
-          <option value="admin-pool">Admin Pool</option>
+          <option v-for="d in availableDivisions" :key="d.id" :value="d.id">{{ d.name }}</option>
         </select>
       </div>
     </div>
@@ -112,11 +109,11 @@
             <div :class="['score-val', rec.cbcScore ? 'has-score' : '']">{{ rec.cbcScore || '—' }}</div>
           </div>
           <div class="score-block">
-            <div class="score-lbl">FPO (55%)</div>
+            <div class="score-lbl">FPO (50%)</div>
             <div :class="['score-val', rec.fpoScore ? 'has-score' : '']">{{ rec.fpoScore || '—' }}</div>
           </div>
           <div class="score-block">
-            <div class="score-lbl">JF (15%)</div>
+            <div class="score-lbl">JF (20%)</div>
             <div :class="['score-val', rec.jfScore ? 'has-score' : '']">{{ rec.jfScore || '—' }}</div>
           </div>
           <div class="score-block score-block-overall">
@@ -168,7 +165,7 @@
         <div class="scale-row">
           <div class="scale-label">JF Raters</div>
           <div class="scale-items">
-            <span class="scale-item">Self + Immediate Supervisor + Skip Supervisor ÷ 3</span>
+            <span class="scale-item">Self + Immediate Supervisor ÷ 2</span>
           </div>
         </div>
       </div>
@@ -198,6 +195,13 @@
           </div>
           <div class="modal-body">
             <div class="form-grid">
+              <div v-if="canSelectRatee" class="field full">
+                <label class="field-label">Employee (Ratee) <span class="req">*</span></label>
+                <select v-model="createForm.rateeId" class="field-input" :disabled="loadingUsers">
+                  <option value="">{{ loadingUsers ? 'Loading employees…' : 'Select employee…' }}</option>
+                  <option v-for="u in allUsers" :key="u.id" :value="u.id">{{ u.fullName }}{{ u.divisionName ? ' · ' + u.divisionName : '' }}</option>
+                </select>
+              </div>
               <div class="field">
                 <label class="field-label">Semester <span class="req">*</span></label>
                 <select v-model="createForm.semester" class="field-input">
@@ -255,6 +259,12 @@
             </button>
           </div>
 
+          <!-- Loading indicator -->
+          <div v-if="loadingDetail" class="detail-loading">
+            <span class="spinner-sm" style="border-color:rgba(0,0,0,.12);border-top-color:#1A56B0"></span>
+            Loading assessment data…
+          </div>
+
           <!-- Score summary -->
           <div class="score-summary-bar">
             <div class="sscore">
@@ -263,12 +273,12 @@
             </div>
             <div class="sscore-op">+</div>
             <div class="sscore">
-              <div class="sscore-lbl">FPO (55%)</div>
+              <div class="sscore-lbl">FPO (50%)</div>
               <div :class="['sscore-val', activeRecord?.fpoScore ? 'has-val' : '']">{{ activeRecord?.fpoScore || '—' }}</div>
             </div>
             <div class="sscore-op">+</div>
             <div class="sscore">
-              <div class="sscore-lbl">JF (15%)</div>
+              <div class="sscore-lbl">JF (20%)</div>
               <div :class="['sscore-val', activeRecord?.jfScore ? 'has-val' : '']">{{ activeRecord?.jfScore || '—' }}</div>
             </div>
             <div class="sscore-op">=</div>
@@ -289,6 +299,13 @@
             <button :class="['dtab', activeTab === 'cbc' && 'active']" @click="activeTab = 'cbc'">A. Core Behavioral Competencies</button>
             <button :class="['dtab', activeTab === 'fpo' && 'active']" @click="activeTab = 'fpo'">B. Functional Performance Output</button>
             <button :class="['dtab', activeTab === 'jf'  && 'active']" @click="activeTab = 'jf'">C. Job Fitness</button>
+            <button :class="['dtab', activeTab === 'edap' && 'active', edapRequired && 'dtab-alert']" @click="activeTab = 'edap'">
+              <svg v-if="edapRequired" width="11" height="11" viewBox="0 0 11 11" fill="none" style="margin-right:4px;flex-shrink:0">
+                <path d="M5.5 1L1 10h9L5.5 1z" fill="#F59E0B" stroke="#F59E0B" stroke-width=".5" stroke-linejoin="round"/>
+                <path d="M5.5 4.5v2.5M5.5 8.5v.1" stroke="#fff" stroke-width="1" stroke-linecap="round"/>
+              </svg>
+              D. Employee Development &amp; Action Plan
+            </button>
           </div>
 
           <!-- ── CBC TAB ── -->
@@ -352,7 +369,7 @@
             <div class="tab-intro">
               The <strong>Functional Performance Output</strong> domain uses the employee's
               <strong>IPCRF/DPCR Final Numerical Rating</strong> (1–5 scale) as the basis.
-              It constitutes <strong>55%</strong> of the overall IPAT score.
+              It constitutes <strong>50%</strong> of the overall IPAT score.
               This score is pulled directly from the employee's own rated IPCRF/CCEF for the same period — it is never entered by hand here.
             </div>
 
@@ -408,7 +425,6 @@
               <select v-model="jfRaterType" class="field-input" style="width:220px">
                 <option value="Self">Self (Ratee)</option>
                 <option value="Supervisor">Immediate Supervisor</option>
-                <option value="SkipSupervisor">Skip Supervisor</option>
               </select>
             </div>
 
@@ -438,13 +454,135 @@
             </div>
           </div>
 
+          <!-- ── EDAP TAB ── -->
+          <div v-if="activeTab === 'edap'" class="modal-body-scroll">
+            <div class="tab-intro">
+              The <strong>Employee Development and Action Plan (EDAP)</strong> documents learning interventions when any domain score falls at
+              <strong>Level 1 (1.00–1.49)</strong> or <strong>Level 2 (1.50–2.49)</strong>. It follows the 70-20-10 Learning Framework.
+            </div>
+
+            <div v-if="!edapRequired" class="edap-ok">
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                <circle cx="9" cy="9" r="8" fill="#F0FDF4" stroke="#22C55E" stroke-width="1.3"/>
+                <path d="M5.5 9l2.5 2.5 4.5-4.5" stroke="#22C55E" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              No EDAP required. All domain scores are above Level 2.
+            </div>
+
+            <template v-else>
+              <!-- Competency Action Matrix -->
+              <div class="edap-section-title">Competency Action Matrix</div>
+              <p class="edap-hint">Identify top 2–3 priority competency areas below target levels.</p>
+
+              <div v-for="(row, i) in edapRows" :key="i" class="edap-row">
+                <div class="edap-row-hd">
+                  <span class="edap-row-num">{{ i + 1 }}</span>
+                  <button class="edap-row-remove" v-if="edapRows.length > 1" @click="edapRows.splice(i, 1)">×</button>
+                </div>
+                <div class="edap-fields">
+                  <div class="edap-field full">
+                    <label class="field-label">Priority Development Area <span class="req">*</span></label>
+                    <input v-model="row.area" class="field-input" placeholder="Specify competency gap (e.g., Technical Mastery — Marunong)"/>
+                  </div>
+                  <div class="edap-field">
+                    <label class="field-label">Target Level</label>
+                    <select v-model="row.targetLevel" class="field-input">
+                      <option value="2">Level 2 (Intermediate)</option>
+                      <option value="3">Level 3 (Advanced)</option>
+                      <option value="4">Level 4 (Expert)</option>
+                    </select>
+                  </div>
+                  <div class="edap-field">
+                    <label class="field-label">Target Completion Date</label>
+                    <input v-model="row.targetDate" type="date" class="field-input"/>
+                  </div>
+                  <div class="edap-field full">
+                    <label class="field-label">Proposed Learning Interventions <span class="edap-framework-hint">(70% Experience · 20% Relationship · 10% Formal)</span></label>
+                    <textarea v-model="row.interventions" class="field-input" rows="2" placeholder="Describe specific learning activities aligned with the 70-20-10 framework…"></textarea>
+                  </div>
+                  <div class="edap-field full">
+                    <label class="field-label">Expected Output / Success Indicators</label>
+                    <input v-model="row.successIndicators" class="field-input" placeholder="e.g., Complete policy brief, demonstrate improved facilitation in next quarter"/>
+                  </div>
+                </div>
+              </div>
+
+              <button class="btn edap-add-btn" @click="edapRows.push({ area:'', targetLevel:'3', targetDate:'', interventions:'', successIndicators:'' })">
+                + Add Development Area
+              </button>
+
+              <!-- Commitment section -->
+              <div class="edap-section-title" style="margin-top:20px">Commitments</div>
+              <div class="edap-commit-box">
+                <div class="edap-commit-label">Employee Commitment</div>
+                <p class="edap-commit-text">I commit to actively pursuing the learning interventions detailed above, allocating the necessary focus, and applying newly gained proficiencies directly to my assigned targets.</p>
+              </div>
+              <div class="edap-commit-box">
+                <div class="edap-commit-label">Supervisor Support Commitment</div>
+                <p class="edap-commit-text">I commit to supporting this development pathway by providing regular coaching, facilitating access to the necessary workplace assignments, and monitoring progress milestones.</p>
+              </div>
+
+              <!-- Semester tracking -->
+              <div class="edap-section-title" style="margin-top:20px">Monitoring & Catch-up Tracker</div>
+              <div class="edap-tracker">
+                <div class="edap-tracker-row">
+                  <div class="edap-tracker-sem">1st Semester</div>
+                  <div class="edap-status-group">
+                    <label v-for="s in EDAP_STATUSES" :key="s.val" class="edap-status-opt">
+                      <input type="radio" v-model="edapSem1Status" :value="s.val"/>
+                      <span :class="['edap-status-chip', `chip-${s.cls}`]">{{ s.label }}</span>
+                    </label>
+                  </div>
+                  <textarea v-model="edapSem1Notes" class="field-input edap-notes" rows="2" placeholder="Supervisor feedback / progress notes…"></textarea>
+                </div>
+                <div class="edap-tracker-row">
+                  <div class="edap-tracker-sem">2nd Semester</div>
+                  <div class="edap-status-group">
+                    <label v-for="s in EDAP_STATUSES" :key="s.val" class="edap-status-opt">
+                      <input type="radio" v-model="edapSem2Status" :value="s.val"/>
+                      <span :class="['edap-status-chip', `chip-${s.cls}`]">{{ s.label }}</span>
+                    </label>
+                  </div>
+                  <textarea v-model="edapSem2Notes" class="field-input edap-notes" rows="2" placeholder="Supervisor feedback / progress notes…"></textarea>
+                </div>
+              </div>
+
+              <div class="modal-actions" style="padding:16px 0 0">
+                <button class="btn btn-primary" :disabled="savingEdap" @click="saveEdap">
+                  <span v-if="savingEdap" class="spinner-sm"></span>
+                  {{ savingEdap ? 'Saving…' : 'Save EDAP' }}
+                </button>
+              </div>
+            </template>
+          </div>
+
           <!-- Footer -->
           <div class="modal-footer">
             <button class="btn" @click="closeDetailModal">Close</button>
-            <button class="btn btn-primary" :disabled="computingOverall" @click="computeOverall">
-              <span v-if="computingOverall" class="spinner-sm"></span>
-              {{ computingOverall ? 'Computing…' : 'Compute Overall Score' }}
-            </button>
+            <template v-if="activeRecord?.status !== 'Final'">
+              <button
+                v-if="activeRecord?.status === 'Computed'"
+                class="btn btn-finalize"
+                @click="finalizeRecord"
+              >
+                <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                  <path d="M6.5 1L2 3.5V6.5c0 2.76 2 5.15 4.5 5.5C9 11.65 11 9.26 11 6.5V3.5L6.5 1z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+                  <path d="M4.5 6.5l1.5 1.5 2.5-2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Finalize Assessment
+              </button>
+              <button class="btn btn-primary" :disabled="computingOverall" @click="computeOverall">
+                <span v-if="computingOverall" class="spinner-sm"></span>
+                {{ computingOverall ? 'Computing…' : 'Compute Overall Score' }}
+              </button>
+            </template>
+            <span v-else class="finalized-badge">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M6 1L1.5 3.25V6c0 2.5 1.8 4.65 4.5 5 2.7-.35 4.5-2.5 4.5-5V3.25L6 1z" fill="#15803D" stroke="#15803D" stroke-width=".5" stroke-linejoin="round"/>
+                <path d="M3.75 6l1.5 1.5L9 4.5" stroke="#fff" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              Finalized
+            </span>
           </div>
         </div>
       </div>
@@ -461,8 +599,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { ipatApi } from '@/services/api'
+import { ref, computed, watch, onMounted } from 'vue'
+import { ipatApi, usersApi } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
 
 const authStore = useAuthStore()
@@ -551,6 +689,11 @@ const showDetailModal = ref(false)
 const activeRecord    = ref(null)
 const activeTab       = ref('cbc')
 
+const loadedRec     = ref(null)   // full record from get() — carries cbcRatings + jfRatings
+const loadingDetail = ref(false)
+const allUsers      = ref([])
+const loadingUsers  = ref(false)
+
 const cbcRaterType = ref('Self')
 const cbcRatings   = ref({})
 const savingCBC    = ref(false)
@@ -566,6 +709,29 @@ const savingJF    = ref(false)
 const computingJF = ref(false)
 
 const computingOverall = ref(false)
+
+// EDAP state
+const EDAP_STATUSES = [
+  { val: 'not-started', label: 'Not Started', cls: 'gray' },
+  { val: 'on-track',    label: 'On Track',    cls: 'green' },
+  { val: 'delayed',     label: 'Delayed',     cls: 'orange' },
+  { val: 'completed',   label: 'Completed',   cls: 'blue' }
+]
+const defaultEdapRow = () => ({ area: '', targetLevel: '3', targetDate: '', interventions: '', successIndicators: '' })
+const edapRows     = ref([defaultEdapRow()])
+const edapSem1Status = ref('not-started')
+const edapSem2Status = ref('not-started')
+const edapSem1Notes  = ref('')
+const edapSem2Notes  = ref('')
+const savingEdap     = ref(false)
+
+const edapRequired = computed(() => {
+  const rec = activeRecord.value
+  if (!rec) return false
+  const scores = [Number(rec.cbcScore), Number(rec.jfScore)].filter(s => s > 0)
+  return scores.some(s => s < 2.50)
+})
+
 const toast = ref({ show: false, msg: '', type: 'success' })
 
 const createForm = ref({
@@ -582,9 +748,19 @@ const statusTabs = [
 ]
 
 // ── Computed ──
-const canCreate = computed(() =>
-  ['System Administrator', 'Bureau Director', 'Assistant Bureau Director', 'Division Chief'].includes(authStore.role)
-)
+const ADMIN_ROLES = ['System Administrator', 'Bureau Director', 'Assistant Bureau Director', 'Division Chief']
+
+const canCreate = computed(() => ADMIN_ROLES.includes(authStore.role))
+
+const canSelectRatee = computed(() => ADMIN_ROLES.includes(authStore.role))
+
+const availableDivisions = computed(() => {
+  const seen = new Map()
+  records.value.forEach(r => {
+    if (r.divisionId && !seen.has(r.divisionId)) seen.set(r.divisionId, r.divisionName || r.divisionId)
+  })
+  return [...seen.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name))
+})
 
 const filteredRecords = computed(() => {
   let r = records.value
@@ -623,6 +799,29 @@ function themeAvg(themeId) {
 function getJFRating(idx) { return jfRatings.value[idx] || null }
 function setJFRating(idx, n) { jfRatings.value[idx] = n }
 
+// Rating population from server data
+function _populateCBCRatings(raterType, ratings) {
+  const map = {}
+  ;(ratings || []).filter(r => r.raterType === raterType).forEach(r => {
+    map[cbcKey(r.themeId, r.indicatorIdx)] = Number(r.rating)
+  })
+  cbcRatings.value = map
+}
+
+function _populateJFRatings(raterType, ratings) {
+  const rmap = {}, emap = {}
+  ;(ratings || []).filter(r => r.raterType === raterType).forEach(r => {
+    rmap[Number(r.indicatorIdx)] = Number(r.rating)
+    emap[Number(r.indicatorIdx)] = r.evidence || ''
+  })
+  jfRatings.value  = rmap
+  jfEvidence.value = emap
+}
+
+// Re-populate when the user switches which rater type they're editing
+watch(cbcRaterType, (type) => { if (loadedRec.value) _populateCBCRatings(type, loadedRec.value.cbcRatings) })
+watch(jfRaterType,  (type) => { if (loadedRec.value) _populateJFRatings(type,  loadedRec.value.jfRatings) })
+
 onMounted(loadRecords)
 
 async function loadRecords() {
@@ -634,16 +833,38 @@ async function loadRecords() {
   finally { loading.value = false }
 }
 
-function openCreateModal() {
-  createForm.value = { semester: String(new Date().getMonth() < 6 ? 1 : 2), year: new Date().getFullYear(), hasSubordinate: false }
+async function openCreateModal() {
+  createForm.value = {
+    semester: String(new Date().getMonth() < 6 ? 1 : 2),
+    year: new Date().getFullYear(),
+    hasSubordinate: false,
+    rateeId: '',
+    rateeName: ''
+  }
   showCreateModal.value = true
+  if (canSelectRatee.value && !allUsers.value.length) {
+    loadingUsers.value = true
+    try {
+      const r = await usersApi.list({ pageSize: 200 })
+      allUsers.value = (r?.items || (Array.isArray(r) ? r : [])).filter(u => u.active !== false && u.active !== 'false')
+    } catch { /* silent */ } finally { loadingUsers.value = false }
+  }
 }
 
 async function createRecord() {
   if (!createForm.value.semester) { showToast('Semester is required', 'error'); return }
+  if (canSelectRatee.value && !createForm.value.rateeId) { showToast('Please select an employee', 'error'); return }
   creating.value = true
   try {
-    const rec = await ipatApi.create(createForm.value)
+    const selectedUser = allUsers.value.find(u => u.id === createForm.value.rateeId)
+    const payload = {
+      ...createForm.value,
+      rateeName:    selectedUser?.fullName    || '',
+      divisionId:   selectedUser?.divisionId  || '',
+      divisionName: selectedUser?.divisionName || '',
+      position:     selectedUser?.position    || ''
+    }
+    const rec = await ipatApi.create(payload)
     records.value.unshift(rec)
     showCreateModal.value = false
     showToast('Assessment record created')
@@ -652,14 +873,48 @@ async function createRecord() {
   finally { creating.value = false }
 }
 
-function openDetailModal(rec) {
-  activeRecord.value = rec
-  activeTab.value    = 'cbc'
-  cbcRatings.value   = {}
-  jfRatings.value    = {}
-  jfEvidence.value   = {}
-  fpoSource.value    = null
+async function openDetailModal(rec) {
+  activeRecord.value    = rec
+  activeTab.value       = 'cbc'
+  cbcRatings.value      = {}
+  jfRatings.value       = {}
+  jfEvidence.value      = {}
+  fpoSource.value       = null
+  loadedRec.value       = null
+  loadingDetail.value   = true
   showDetailModal.value = true
+  _resetEdap()
+  try {
+    const full = await ipatApi.get(rec.id)
+    loadedRec.value = full
+    activeRecord.value = {
+      ...rec,
+      cbcScore:      full.cbcScore,
+      fpoScore:      full.fpoScore,
+      jfScore:       full.jfScore,
+      overallScore:  full.overallScore,
+      descriptor:    full.descriptor,
+      status:        full.status,
+      hasSubordinate: full.hasSubordinate
+    }
+    _populateCBCRatings(cbcRaterType.value, full.cbcRatings)
+    _populateJFRatings(jfRaterType.value,   full.jfRatings)
+    // Load existing EDAP if any
+    try {
+      const edap = await ipatApi.getEdap(rec.id)
+      if (edap) {
+        edapRows.value       = edap.rows?.length ? edap.rows : [defaultEdapRow()]
+        edapSem1Status.value = edap.sem1Status || 'not-started'
+        edapSem1Notes.value  = edap.sem1Notes  || ''
+        edapSem2Status.value = edap.sem2Status || 'not-started'
+        edapSem2Notes.value  = edap.sem2Notes  || ''
+      }
+    } catch { /* no edap yet */ }
+  } catch (e) {
+    showToast(`Could not load full record: ${e.message}`, 'error')
+  } finally {
+    loadingDetail.value = false
+  }
 }
 
 function closeDetailModal() { showDetailModal.value = false; activeRecord.value = null }
@@ -687,6 +942,8 @@ async function saveCBCRatings() {
   try {
     await ipatApi.saveCBCRatings(activeRecord.value.id, ratings)
     showToast(`${ratings.length} CBC ratings saved`)
+    const full = await ipatApi.get(activeRecord.value.id)
+    if (full) loadedRec.value = full
   } catch (e) { showToast(e.message, 'error') }
   finally { savingCBC.value = false }
 }
@@ -727,6 +984,8 @@ async function saveJFRatings() {
   try {
     await ipatApi.saveJFRatings(activeRecord.value.id, ratings)
     showToast(`${ratings.length} Job Fitness ratings saved`)
+    const full = await ipatApi.get(activeRecord.value.id)
+    if (full) loadedRec.value = full
   } catch (e) { showToast(e.message, 'error') }
   finally { savingJF.value = false }
 }
@@ -750,6 +1009,40 @@ async function computeOverall() {
     showToast(`Overall: ${r.overallScore} — ${r.descriptor}`)
   } catch (e) { showToast(e.message, 'error') }
   finally { computingOverall.value = false }
+}
+
+async function finalizeRecord() {
+  try {
+    await ipatApi.updateStatus(activeRecord.value.id, 'Final')
+    _syncRecord({ status: 'Final' })
+    showToast('Assessment finalized')
+  } catch (e) { showToast(e.message, 'error') }
+}
+
+// ── EDAP ──
+async function saveEdap() {
+  const filled = edapRows.value.filter(r => r.area.trim())
+  if (!filled.length) { showToast('Enter at least one development area', 'error'); return }
+  savingEdap.value = true
+  try {
+    await ipatApi.saveEdap(activeRecord.value.id, {
+      rows:      filled,
+      sem1Status: edapSem1Status.value,
+      sem1Notes:  edapSem1Notes.value,
+      sem2Status: edapSem2Status.value,
+      sem2Notes:  edapSem2Notes.value
+    })
+    showToast('EDAP saved')
+  } catch (e) { showToast(e.message, 'error') }
+  finally { savingEdap.value = false }
+}
+
+function _resetEdap() {
+  edapRows.value       = [defaultEdapRow()]
+  edapSem1Status.value = 'not-started'
+  edapSem2Status.value = 'not-started'
+  edapSem1Notes.value  = ''
+  edapSem2Notes.value  = ''
 }
 </script>
 
@@ -932,6 +1225,52 @@ async function computeOverall() {
 .toggle-row{display:flex;gap:8px;}
 .toggle-btn{flex:1;padding:10px;border:1.5px solid #E2E8F0;border-radius:9px;cursor:pointer;font-size:12px;font-family:inherit;background:#fff;color:#374151;transition:all .15s;}
 .toggle-btn.active{border-color:#3B82F6;background:#EBF4FF;color:#1A56B0;font-weight:600;}
+
+/* Detail loading */
+.detail-loading{display:flex;align-items:center;gap:8px;padding:10px 24px;font-size:12px;color:#64748B;background:#FAFBFF;border-bottom:1px solid #F1F5F9;flex-shrink:0;}
+
+/* EDAP tab alert */
+.dtab-alert{color:#B45309 !important;background:#FFFBEB;}
+.dtab-alert.active{background:#FEF3C7 !important;color:#92400E !important;border-bottom-color:#F59E0B !important;}
+
+/* EDAP panel */
+.edap-ok{display:flex;align-items:center;gap:10px;padding:20px 24px;font-size:13px;color:#15803D;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;margin:16px 24px;}
+.edap-section-title{font-size:12px;font-weight:700;color:#0F172A;text-transform:uppercase;letter-spacing:.04em;padding:0 24px;margin-top:16px;margin-bottom:6px;}
+.edap-hint{font-size:12px;color:#64748B;padding:0 24px;margin-bottom:12px;}
+.edap-row{border:1px solid #E2E8F0;border-radius:10px;margin:0 24px 12px;overflow:hidden;}
+.edap-row-hd{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#F8FAFC;border-bottom:1px solid #E2E8F0;}
+.edap-row-num{font-size:11px;font-weight:700;color:#475569;}
+.edap-row-remove{background:none;border:none;cursor:pointer;color:#94A3B8;font-size:16px;line-height:1;padding:0 2px;}
+.edap-row-remove:hover{color:#EF4444;}
+.edap-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px;}
+.edap-field{display:flex;flex-direction:column;gap:5px;}
+.edap-field.full{grid-column:span 2;}
+.edap-field textarea.field-input{resize:vertical;min-height:52px;}
+.edap-framework-hint{font-size:10px;color:#94A3B8;font-weight:400;margin-left:4px;}
+.edap-add-btn{margin:4px 24px 8px;font-size:12px;color:#1A56B0;background:#EFF6FF;border-color:#BFDBFE;}
+.edap-add-btn:hover{background:#DBEAFE;}
+.edap-commit-box{margin:8px 24px;padding:10px 14px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;}
+.edap-commit-label{font-size:11px;font-weight:700;color:#374151;margin-bottom:4px;}
+.edap-commit-text{font-size:12px;color:#64748B;font-style:italic;}
+.edap-tracker{margin:0 24px;border:1px solid #E2E8F0;border-radius:10px;overflow:hidden;}
+.edap-tracker-row{padding:12px;border-bottom:1px solid #F1F5F9;}
+.edap-tracker-row:last-child{border-bottom:none;}
+.edap-tracker-sem{font-size:12px;font-weight:700;color:#0F172A;margin-bottom:8px;}
+.edap-status-group{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
+.edap-status-opt{display:inline-flex;align-items:center;gap:5px;cursor:pointer;}
+.edap-status-opt input[type=radio]{display:none;}
+.edap-status-chip{font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;border:1.5px solid transparent;cursor:pointer;transition:all .12s;}
+.edap-status-opt input:checked + .edap-status-chip{border-color:currentColor;}
+.chip-gray{background:#F1F5F9;color:#64748B;}
+.chip-green{background:#F0FDF4;color:#15803D;}
+.chip-orange{background:#FFFBEB;color:#B45309;}
+.chip-blue{background:#EFF6FF;color:#1D4ED8;}
+.edap-notes{margin-top:4px;resize:vertical;min-height:52px;}
+
+/* Finalize */
+.btn-finalize{background:#F0FDF4;color:#15803D;border-color:#BBF7D0;font-weight:600;}
+.btn-finalize:hover:not(:disabled){background:#DCFCE7;border-color:#86EFAC;}
+.finalized-badge{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:#15803D;background:#F0FDF4;border:1px solid #BBF7D0;padding:6px 12px;border-radius:8px;}
 
 /* Spinner */
 .spinner-sm{display:inline-block;width:11px;height:11px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;}

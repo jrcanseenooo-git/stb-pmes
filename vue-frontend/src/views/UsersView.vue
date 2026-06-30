@@ -108,7 +108,7 @@
           <div class="division-route-list">
             <div v-for="item in divisionFocalRows" :key="item.divisionId" class="division-route-row">
               <div class="division-route-name">
-                <div class="route-icon route-icon-sm">{{ divisionInitials(item.divisionName) }}</div>
+                <!-- <div class="route-icon route-icon-sm">{{ divisionInitials(item.divisionName) }}</div> -->
                 <div>
                   <div class="focal-division">{{ item.divisionName }}</div>
                   <div class="text-xs muted">IPCRF/CCEF checker and reviewer</div>
@@ -942,7 +942,7 @@ async function confirmReset() {
   const ok = await confirm(CONFIRMS.resetPassword(resetTarget.value.name))
   if (!ok) return
   try {
-    await usersApi.update(resetTarget.value.id, { tempPassword: resetTempPw.value, mustChangePassword: true })
+    await usersApi.resetPassword(resetTarget.value.id, { tempPassword: resetTempPw.value })
     resetTarget.value.tempPassword = resetTempPw.value
     showToast(`Password reset for ${resetTarget.value.name}.`)
   } catch (e) { showToast(`Failed: ${e.message}`, 'error') }

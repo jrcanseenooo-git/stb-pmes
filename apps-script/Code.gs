@@ -23,7 +23,8 @@ const SHEET = {
   // ── IPAT (Innovations Performance Assessment Tool) ──
   IPAT_RECORDS:     'IPATRecords',
   IPAT_CBC_RATINGS: 'IPATCBCRatings',
-  IPAT_JF_RATINGS:  'IPATJFRatings'
+  IPAT_JF_RATINGS:  'IPATJFRatings',
+  IPAT_EDAP:        'IPATEdap'
 }
 
 // ── Entry point: HTTP GET ──

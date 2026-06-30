@@ -188,6 +188,10 @@ export const ipatApi = {
   // Overall
   computeOverall: (id)          => gasWrite('POST',  `ipat/${id}/compute`),
 
+  // EDAP
+  saveEdap:       (id, data)    => gasWrite('POST',  `ipat/${id}/edap`, data),
+  getEdap:        (id)          => gasGet(`ipat/${id}/edap`),
+
   // Meta
   getThemes:        ()          => gasGet('ipat/themes'),
   getJFIndicators:  ()          => gasGet('ipat/jf-indicators')

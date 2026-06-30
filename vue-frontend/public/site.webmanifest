@@ -1,0 +1,22 @@
+{
+  "name": "Performance Monitoring and Evaluation System",
+  "short_name": "PMES",
+  "description": "Social Technology Bureau performance monitoring and evaluation system.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#091326",
+  "theme_color": "#091326",
+  "icons": [
+    {
+      "src": "/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

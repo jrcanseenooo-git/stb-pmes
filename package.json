@@ -1,0 +1,8 @@
+{
+  "name": "stb-pmes",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "deploy:check": "npm audit --prefix vue-frontend --audit-level=high && npm run build --prefix vue-frontend"
+  }
+}

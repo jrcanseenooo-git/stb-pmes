@@ -1,165 +1,162 @@
-﻿<template>
+<template>
   <div class="ipcrf-page">
 
-    <!-- Content card -->
-    <div class="content-card">
+    <div class="tp-shell">
 
-    <!-- Header -->
-    <div class="page-hd">
-      <div>
-        <h2 class="page-title">IPCRF / CCEF Forms</h2>
-        <p class="page-sub">Individual Performance Commitment and Review Forms</p>
-      </div>
-      <button v-if="canSelfServe" class="btn btn-primary" @click="showNewFormModal = true">
-        <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-          <path d="M6.5 1v11M1 6.5h11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-        </svg>
-        New Form
-      </button>
-    </div>
+      <!-- ═══ LEFT PANEL ═══ -->
+      <div class="tp-left">
+        <div class="ipcrf-left-inner">
 
-    <!-- Self-service Generate Targets/Ratings -->
-    <div v-if="canSelfServe" class="generate-bar">
-      <div class="generate-period">
-        <label class="field-label">Semester</label>
-        <select v-model="periodSemester" class="filter-select">
-          <option value="1">1st Semester</option>
-          <option value="2">2nd Semester</option>
-        </select>
-        <label class="field-label">Year</label>
-        <input v-model.number="periodYear" type="number" class="filter-select" style="width:80px"/>
-      </div>
-      <div class="generate-actions">
-        <a
-          v-if="periodStatusInfo?.docFileUrl && (periodStatusInfo?.hasTargetsDoc || periodStatusInfo?.hasRatingsDoc)"
-          :href="periodStatusInfo.docFileUrl"
-          target="_blank"
-          class="btn btn-sm btn-active-ok">
-          Open Spreadsheet
-        </a>
-        <div class="generate-item">
-          <template v-if="periodStatusInfo?.hasTargetsDoc">
-            <span class="generate-label">Targets:</span>
-            <!-- <span class="doc-status-chip">{{ periodStatusInfo.formStatus || 'Generated' }}</span> -->
-            <button class="btn btn-xs btn-regenerate" :disabled="!!periodBusy" @click="doPeriodGenerate('targets')">{{ periodBusy === 'targets' ? 'Regenerating...' : 'Regenerate' }}</button>
-          </template>
-          <button v-else class="btn btn-sm" :disabled="!!periodBusy" @click="doPeriodGenerate('targets')">
-            {{ periodBusy === 'targets' ? 'Checking...' : `Generate ${myFormType} Targets` }}
-          </button>
-          <span v-if="periodStatusLoading" class="generate-hint">Checking...</span>
-        </div>
-        <div class="generate-item">
-          <template v-if="periodStatusInfo?.hasRatingsDoc">
-            <span class="generate-label">Ratings:</span>
-            <!-- <span class="doc-status-chip">Generated</span> -->
-            <button class="btn btn-xs btn-regenerate" :disabled="!!periodBusy" @click="doPeriodGenerate('ratings')">{{ periodBusy === 'ratings' ? 'Regenerating...' : 'Regenerate' }}</button>
-          </template>
-          <button v-else class="btn btn-primary btn-sm" :disabled="!!periodBusy" @click="doPeriodGenerate('ratings')">
-            {{ periodBusy === 'ratings' ? 'Checking...' : `Generate ${myFormType} Ratings` }}
-          </button>
-          <span v-if="periodStatusLoading" class="generate-hint">Checking...</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Filter bar -->
-    <div class="filter-bar">
-      <div class="status-tabs">
-        <button v-for="t in statusTabs" :key="t.value"
-          :class="['status-tab', activeStatus === t.value && 'active']"
-          @click="activeStatus = t.value">
-          {{ t.label }}
-          <span v-if="t.value !== 'All' && countByStatus(t.value)" class="tab-badge">{{ countByStatus(t.value) }}</span>
-        </button>
-      </div>
-      <div class="filter-selects">
-        <select v-model="filterType" class="filter-select">
-          <option value="">All Types</option>
-          <option value="IPCRF">IPCRF</option>
-          <option value="CCEF">CCEF</option>
-        </select>
-        <select v-model="filterSemester" class="filter-select">
-          <option value="">All Semesters</option>
-          <option value="1">Semester 1</option>
-          <option value="2">Semester 2</option>
-        </select>
-      </div>
-    </div>
-
-    <!-- Skeleton loading -->
-    <div v-if="loading" class="forms-grid">
-      <div v-for="i in 4" :key="'sk'+i" class="fc fc-sk">
-        <div class="fc-hd"><div class="sk-badge"></div><div class="sk-line" style="width:55px"></div></div>
-        <div class="sk-line" style="width:75%;margin-bottom:5px"></div>
-        <div class="sk-line" style="width:50%;margin-bottom:14px"></div>
-        <div class="sk-line" style="width:100%;height:30px;border-radius:8px"></div>
-      </div>
-    </div>
-
-    <!-- Empty state -->
-    <div v-else-if="!filteredForms.length" class="empty-state">
-      <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-        <rect x="8" y="6" width="32" height="36" rx="3" stroke="#E2E8F0" stroke-width="2"/>
-        <path d="M16 16h16M16 22h16M16 28h10" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round"/>
-      </svg>
-      <p class="empty-title">{{ activeStatus !== 'All' ? `No ${activeStatus.toLowerCase()} forms` : 'No forms yet' }}</p>
-      <p class="empty-sub">{{ activeStatus !== 'All' ? 'Try a different filter.' : 'Create your first IPCRF or CCEF form.' }}</p>
-      <button v-if="activeStatus === 'All' && canSelfServe" class="btn btn-primary" @click="showNewFormModal = true">Create New Form</button>
-    </div>
-
-    <!-- Forms grid -->
-    <div v-else class="forms-grid">
-      <div
-        v-for="form in filteredForms" :key="form.id"
-        class="fc"
-        @click="openFormModal(form)"
-      >
-        <!-- Header: type badge + period -->
-        <div class="fc-hd">
-          <span :class="['type-badge', form.type === 'IPCRF' ? 'type-ipcrf' : 'type-ccef']">{{ form.type }}</span>
-          <span class="fc-period">S{{ form.semester }} {{ form.year }}</span>
-        </div>
-
-        <!-- Employee -->
-        <div class="fc-name">{{ form.employeeName }}</div>
-        <div class="fc-sub">{{ form.divisionName || '-' }}</div>
-        <!-- <div class="fc-sub">{{ form.divisionName || '-' }}<span v-if="form.sectionName"> | {{ form.sectionName }}</span></div> -->
-
-        <!-- Status + rating -->
-        <div class="fc-mid">
-          <span :class="['status-badge', statusClass(form.status)]">{{ form.status }}</span>
-          <div v-if="form.finalNumericalRating" class="fc-score">
-            <span class="fc-score-val">{{ form.finalNumericalRating }}</span>
-            <span class="fc-score-lbl">{{ form.adjectivalRating }}</span>
+          <!-- Header -->
+          <div class="page-hd">
+            <div>
+              <h2 class="page-title">IPCRF / CCEF Forms</h2>
+              <p class="page-sub">Individual Performance Commitment and Review Forms</p>
+            </div>
+            <button v-if="canSelfServe" class="btn btn-primary" @click="showNewFormModal = true">
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                <path d="M6.5 1v11M1 6.5h11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+              </svg>
+              New Form
+            </button>
           </div>
-        </div>
 
-        <!-- Footer: date + actions -->
-        <div class="fc-foot" @click.stop>
-          <span class="fc-date">{{ fmtDate(form.updatedAt || form.createdAt) }}</span>
-          <div class="fc-actions">
-            <button v-if="(form.status === 'Draft' || form.status === 'Returned') && form.userId === authStore.profileId"
-              class="btn btn-xs btn-outline" @click.stop="quickSubmit(form)">Submit</button>
-            <button v-if="canReviewForm(form)"
-              class="btn btn-xs btn-success" @click.stop="quickApprove(form)">Approve</button>
-            <button v-if="canReviewForm(form)"
-              class="btn btn-xs btn-warn" @click.stop="quickReturn(form)">Return</button>
-            <button v-if="canReviewForm(form)"
-              class="btn btn-xs btn-info" @click.stop="openFormModal(form)" title="Open" aria-label="Open">View</button>
+          <!-- Self-service Generate Targets/Ratings -->
+          <div v-if="canSelfServe" class="generate-bar">
+            <div class="generate-period">
+              <label class="field-label">Semester</label>
+              <select v-model="periodSemester" class="filter-select">
+                <option value="1">1st Semester</option>
+                <option value="2">2nd Semester</option>
+              </select>
+              <label class="field-label">Year</label>
+              <input v-model.number="periodYear" type="number" class="filter-select" style="width:80px"/>
+            </div>
+            <div class="generate-actions">
+              <a
+                v-if="periodStatusInfo?.docFileUrl && (periodStatusInfo?.hasTargetsDoc || periodStatusInfo?.hasRatingsDoc)"
+                :href="periodStatusInfo.docFileUrl"
+                target="_blank"
+                class="btn btn-sm btn-active-ok">
+                Open Spreadsheet
+              </a>
+              <div class="generate-item">
+                <template v-if="periodStatusInfo?.hasTargetsDoc">
+                  <span class="generate-label">Targets:</span>
+                  <button class="btn btn-xs btn-regenerate" :disabled="!!periodBusy" @click="doPeriodGenerate('targets')">{{ periodBusy === 'targets' ? 'Regenerating...' : 'Regenerate' }}</button>
+                </template>
+                <button v-else class="btn btn-sm" :disabled="!!periodBusy" @click="doPeriodGenerate('targets')">
+                  {{ periodBusy === 'targets' ? 'Checking...' : `Generate ${myFormType} Targets` }}
+                </button>
+                <span v-if="periodStatusLoading" class="generate-hint">Checking...</span>
+              </div>
+              <div class="generate-item">
+                <template v-if="periodStatusInfo?.hasRatingsDoc">
+                  <span class="generate-label">Ratings:</span>
+                  <button class="btn btn-xs btn-regenerate" :disabled="!!periodBusy" @click="doPeriodGenerate('ratings')">{{ periodBusy === 'ratings' ? 'Regenerating...' : 'Regenerate' }}</button>
+                </template>
+                <button v-else class="btn btn-primary btn-sm" :disabled="!!periodBusy" @click="doPeriodGenerate('ratings')">
+                  {{ periodBusy === 'ratings' ? 'Checking...' : `Generate ${myFormType} Ratings` }}
+                </button>
+                <span v-if="periodStatusLoading" class="generate-hint">Checking...</span>
+              </div>
+            </div>
           </div>
+
+          <!-- Filter bar -->
+          <div class="filter-bar">
+            <div class="status-tabs">
+              <button v-for="t in statusTabs" :key="t.value"
+                :class="['status-tab', activeStatus === t.value && 'active']"
+                @click="activeStatus = t.value">
+                {{ t.label }}
+                <span v-if="t.value !== 'All' && countByStatus(t.value)" class="tab-badge">{{ countByStatus(t.value) }}</span>
+              </button>
+            </div>
+            <div class="filter-selects">
+              <select v-model="filterType" class="filter-select">
+                <option value="">All Types</option>
+                <option value="IPCRF">IPCRF</option>
+                <option value="CCEF">CCEF</option>
+              </select>
+              <select v-model="filterSemester" class="filter-select">
+                <option value="">All Semesters</option>
+                <option value="1">Semester 1</option>
+                <option value="2">Semester 2</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Skeleton loading -->
+          <div v-if="loading" class="forms-list">
+            <div v-for="i in 4" :key="'sk'+i" class="fli fli-sk">
+              <div class="fli-sk-top"><div class="sk-badge"></div><div class="sk-line" style="width:55px"></div></div>
+              <div class="sk-line" style="width:75%;margin-bottom:5px"></div>
+              <div class="sk-line" style="width:50%"></div>
+            </div>
+          </div>
+
+          <!-- Empty state -->
+          <div v-else-if="!filteredForms.length" class="empty-state">
+            <svg width="44" height="44" viewBox="0 0 48 48" fill="none">
+              <rect x="8" y="6" width="32" height="36" rx="3" stroke="#E2E8F0" stroke-width="2"/>
+              <path d="M16 16h16M16 22h16M16 28h10" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <p class="empty-title">{{ activeStatus !== 'All' ? `No ${activeStatus.toLowerCase()} forms` : 'No forms yet' }}</p>
+            <p class="empty-sub">{{ activeStatus !== 'All' ? 'Try a different filter.' : 'Create your first IPCRF or CCEF form.' }}</p>
+            <button v-if="activeStatus === 'All' && canSelfServe" class="btn btn-primary" @click="showNewFormModal = true">Create New Form</button>
+          </div>
+
+          <!-- Forms list -->
+          <div v-else class="forms-list">
+            <div
+              v-for="form in filteredForms" :key="form.id"
+              :class="['fli', activeForm?.id === form.id && showFormModal && 'fli-active']"
+              @click="openFormModal(form)"
+            >
+              <div class="fli-top">
+                <span :class="['type-badge', form.type === 'IPCRF' ? 'type-ipcrf' : 'type-ccef']">{{ form.type }}</span>
+                <span class="fli-period">S{{ form.semester }} {{ form.year }}</span>
+                <span :class="['status-badge', statusClass(form.status)]">{{ form.status }}</span>
+              </div>
+              <div class="fli-name">{{ form.employeeName }}</div>
+              <div class="fli-sub">{{ form.divisionName || '-' }}</div>
+              <div v-if="form.finalNumericalRating" class="fli-score">
+                <span class="fli-score-val">{{ form.finalNumericalRating }}</span>
+                <span class="fli-score-lbl">{{ form.adjectivalRating }}</span>
+              </div>
+              <div class="fli-foot" @click.stop>
+                <span class="fli-date">{{ fmtDate(form.updatedAt || form.createdAt) }}</span>
+                <div class="fli-actions">
+                  <button v-if="(form.status === 'Draft' || form.status === 'Returned') && form.userId === authStore.profileId"
+                    class="btn btn-xs btn-outline" @click.stop="quickSubmit(form)">Submit</button>
+                  <button v-if="canReviewForm(form)"
+                    class="btn btn-xs btn-success" @click.stop="quickApprove(form)">Approve</button>
+                  <button v-if="canReviewForm(form)"
+                    class="btn btn-xs btn-warn" @click.stop="quickReturn(form)">Return</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
-    </div>
 
-    </div>
-    <!-- /Content card -->
+      <!-- ═══ RIGHT PANEL ═══ -->
+      <div class="tp-right">
 
-    <!-- ==================================
-         FORM DETAIL MODAL
-    ================================== -->
-    <teleport to="body">
-      <div v-if="showFormModal" class="modal-overlay" @click.self="closeFormModal">
-        <div class="modal-xl">
+        <!-- Empty state -->
+        <div v-if="!showFormModal || !activeForm" class="rp-empty">
+          <svg width="52" height="52" viewBox="0 0 48 48" fill="none">
+            <rect x="8" y="6" width="32" height="36" rx="3" stroke="#E2E8F0" stroke-width="2"/>
+            <path d="M16 16h16M16 22h16M16 28h10" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <p class="rp-empty-title">Select a form</p>
+          <p class="rp-empty-sub">Click any form from the list to view indicators and details</p>
+        </div>
+
+        <!-- Form detail (inline, was modal-xl) -->
+        <div v-else class="rp-detail-wrap">
 
           <!-- Header -->
           <div class="dh">
@@ -187,232 +184,242 @@
             <button :class="['dtab', activeTab === 'score' && 'active']" @click="activeTab = 'score'">Score</button>
           </div>
 
-          <!-- Loading -->
-          <div v-if="entriesLoading" class="loading-state">
-            <div class="spinner-sm2"></div>
-            <span class="muted-text">Loading indicators...</span>
-          </div>
+          <!-- Body (scrollable) -->
+          <div class="rp-detail-body">
 
-          <!-- INDICATORS TAB -->
-          <div v-else-if="activeTab === 'indicators'" class="modal-body-scroll">
+            <!-- Loading -->
+            <div v-if="entriesLoading" class="loading-state">
+              <div class="spinner-sm2"></div>
+              <span class="muted-text">Loading indicators...</span>
+            </div>
 
-            <!-- Core Functions -->
-            <div class="fn-section fn-core">
-              <div class="fn-hd">
-                <div class="fn-hd-l">
-                  <span class="fn-label">Core Functions</span>
-                  <span class="fn-wt fn-wt-core">{{ activeForm?.coreFunctionWeight }}%</span>
-                  <span class="fn-cnt">{{ coreEntries.length }} indicator{{ coreEntries.length !== 1 ? 's' : '' }}</span>
+            <!-- INDICATORS TAB -->
+            <div v-else-if="activeTab === 'indicators'" class="rp-tab-content">
+
+              <!-- Core Functions -->
+              <div class="fn-section fn-core">
+                <div class="fn-hd">
+                  <div class="fn-hd-l">
+                    <span class="fn-label">Core Functions</span>
+                    <span class="fn-wt fn-wt-core">{{ activeForm?.coreFunctionWeight }}%</span>
+                    <span class="fn-cnt">{{ coreEntries.length }} indicator{{ coreEntries.length !== 1 ? 's' : '' }}</span>
+                  </div>
+                  <div class="fn-hd-r">
+                    <button class="add-pill" @click="openLibrary('Core')">+ From Library</button>
+                    <button class="add-pill add-pill-ghost" @click="openCustomEntry('Core')">+ Custom</button>
+                  </div>
                 </div>
-                <div class="fn-hd-r">
-                  <button class="add-pill" @click="openLibrary('Core')">+ From Library</button>
-                  <button class="add-pill add-pill-ghost" @click="openCustomEntry('Core')">+ Custom</button>
-                </div>
-              </div>
-              <div v-if="!coreEntries.length" class="fn-empty">No core indicators added yet</div>
-              <div v-else class="ind-list">
-                <div v-for="e in coreEntries" :key="e.id" class="ind-card ind-card-core">
-                  <div class="ind-card-hd">
-                    <span class="ind-kra ind-kra-core">{{ e.kraName }}</span>
-                    <div class="ind-acts">
-                      <button class="act" @click.stop="openEditEntry(e)" title="Edit">
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                          <path d="M8.5 1.5l2 2L4 10H2V8l6.5-6.5z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
-                        </svg>
-                      </button>
-                      <button class="act act-del" @click.stop="askDelete(e)" title="Remove">
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                          <path d="M2 3h8M5 3V2h2v1M3.5 3v6.5c0 .28.22.5.5.5h4c.28 0 .5-.22.5-.5V3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-                        </svg>
-                      </button>
+                <div v-if="!coreEntries.length" class="fn-empty">No core indicators added yet</div>
+                <div v-else class="ind-list">
+                  <div v-for="e in coreEntries" :key="e.id" class="ind-card ind-card-core">
+                    <div class="ind-card-hd">
+                      <span class="ind-kra ind-kra-core">{{ e.kraName }}</span>
+                      <div class="ind-acts">
+                        <button class="act" @click.stop="openEditEntry(e)" title="Edit">
+                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                            <path d="M8.5 1.5l2 2L4 10H2V8l6.5-6.5z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
+                          </svg>
+                        </button>
+                        <button class="act act-del" @click.stop="askDelete(e)" title="Remove">
+                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                            <path d="M2 3h8M5 3V2h2v1M3.5 3v6.5c0 .28.22.5.5.5h4c.28 0 .5-.22.5-.5V3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                    <div class="ind-si">{{ e.successIndicator }}</div>
+                    <div class="ind-tags">
+                      <span class="etag">Wt: {{ e.weight }}%</span>
+                      <span class="etag">{{ e.applicableRatingPeriod }}</span>
+                      <span class="etag">{{ e.classification }}</span>
+                      <span v-if="e.isCustom === true || e.isCustom === 'true'" class="etag etag-amber">Custom</span>
+                      <span v-if="e.ratingAverage" class="etag etag-green">Avg {{ e.ratingAverage }}</span>
+                    </div>
+                    <div v-if="e.meansOfVerification" class="ind-mov">
+                      <span class="ind-mov-lbl">MOV:</span> {{ e.meansOfVerification }}
                     </div>
                   </div>
-                  <div class="ind-si">{{ e.successIndicator }}</div>
-                  <div class="ind-tags">
-                    <span class="etag">Wt: {{ e.weight }}%</span>
-                    <span class="etag">{{ e.applicableRatingPeriod }}</span>
-                    <span class="etag">{{ e.classification }}</span>
-                    <span v-if="e.isCustom === true || e.isCustom === 'true'" class="etag etag-amber">Custom</span>
-                    <span v-if="e.ratingAverage" class="etag etag-green">Avg {{ e.ratingAverage }}</span>
-                  </div>
-                  <div v-if="e.meansOfVerification" class="ind-mov">
-                    <span class="ind-mov-lbl">MOV:</span> {{ e.meansOfVerification }}
-                  </div>
                 </div>
               </div>
-            </div>
 
-            <!-- Support Functions -->
-            <div class="fn-section fn-support">
-              <div class="fn-hd">
-                <div class="fn-hd-l">
-                  <span class="fn-label">Support Functions</span>
-                  <span class="fn-wt fn-wt-support">{{ activeForm?.supportFunctionWeight }}%</span>
-                  <span class="fn-cnt">{{ supportEntries.length }} indicator{{ supportEntries.length !== 1 ? 's' : '' }}</span>
+              <!-- Support Functions -->
+              <div class="fn-section fn-support">
+                <div class="fn-hd">
+                  <div class="fn-hd-l">
+                    <span class="fn-label">Support Functions</span>
+                    <span class="fn-wt fn-wt-support">{{ activeForm?.supportFunctionWeight }}%</span>
+                    <span class="fn-cnt">{{ supportEntries.length }} indicator{{ supportEntries.length !== 1 ? 's' : '' }}</span>
+                  </div>
+                  <div class="fn-hd-r">
+                    <button class="add-pill" @click="openLibrary('Support')">+ From Library</button>
+                    <button class="add-pill add-pill-ghost" @click="openCustomEntry('Support')">+ Custom</button>
+                  </div>
                 </div>
-                <div class="fn-hd-r">
-                  <button class="add-pill" @click="openLibrary('Support')">+ From Library</button>
-                  <button class="add-pill add-pill-ghost" @click="openCustomEntry('Support')">+ Custom</button>
-                </div>
-              </div>
-              <div v-if="!supportEntries.length" class="fn-empty">No support indicators added yet</div>
-              <div v-else class="ind-list">
-                <div v-for="e in supportEntries" :key="e.id" class="ind-card ind-card-support">
-                  <div class="ind-card-hd">
-                    <span class="ind-kra ind-kra-support">{{ e.kraName }}</span>
-                    <div class="ind-acts">
-                      <button class="act" @click.stop="openEditEntry(e)" title="Edit">
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                          <path d="M8.5 1.5l2 2L4 10H2V8l6.5-6.5z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
-                        </svg>
-                      </button>
-                      <button class="act act-del" @click.stop="askDelete(e)" title="Remove">
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                          <path d="M2 3h8M5 3V2h2v1M3.5 3v6.5c0 .28.22.5.5.5h4c.28 0 .5-.22.5-.5V3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-                        </svg>
-                      </button>
+                <div v-if="!supportEntries.length" class="fn-empty">No support indicators added yet</div>
+                <div v-else class="ind-list">
+                  <div v-for="e in supportEntries" :key="e.id" class="ind-card ind-card-support">
+                    <div class="ind-card-hd">
+                      <span class="ind-kra ind-kra-support">{{ e.kraName }}</span>
+                      <div class="ind-acts">
+                        <button class="act" @click.stop="openEditEntry(e)" title="Edit">
+                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                            <path d="M8.5 1.5l2 2L4 10H2V8l6.5-6.5z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
+                          </svg>
+                        </button>
+                        <button class="act act-del" @click.stop="askDelete(e)" title="Remove">
+                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                            <path d="M2 3h8M5 3V2h2v1M3.5 3v6.5c0 .28.22.5.5.5h4c.28 0 .5-.22.5-.5V3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                    <div class="ind-si">{{ e.successIndicator }}</div>
+                    <div class="ind-tags">
+                      <span class="etag">Wt: {{ e.weight }}%</span>
+                      <span class="etag">{{ e.applicableRatingPeriod }}</span>
+                      <span class="etag">{{ e.classification }}</span>
+                      <span v-if="e.isCustom === true || e.isCustom === 'true'" class="etag etag-amber">Custom</span>
+                      <span v-if="e.ratingAverage" class="etag etag-green">Avg {{ e.ratingAverage }}</span>
+                    </div>
+                    <div v-if="e.meansOfVerification" class="ind-mov">
+                      <span class="ind-mov-lbl">MOV:</span> {{ e.meansOfVerification }}
                     </div>
                   </div>
-                  <div class="ind-si">{{ e.successIndicator }}</div>
-                  <div class="ind-tags">
-                    <span class="etag">Wt: {{ e.weight }}%</span>
-                    <span class="etag">{{ e.applicableRatingPeriod }}</span>
-                    <span class="etag">{{ e.classification }}</span>
-                    <span v-if="e.isCustom === true || e.isCustom === 'true'" class="etag etag-amber">Custom</span>
-                    <span v-if="e.ratingAverage" class="etag etag-green">Avg {{ e.ratingAverage }}</span>
-                  </div>
-                  <div v-if="e.meansOfVerification" class="ind-mov">
-                    <span class="ind-mov-lbl">MOV:</span> {{ e.meansOfVerification }}
-                  </div>
+                </div>
+              </div>
+
+              <!-- Workflow bar -->
+              <div v-if="['Draft', 'Returned'].includes(activeForm?.status) && activeForm?.userId === authStore.profileId" class="wf-bar">
+                <span class="wf-info">{{ allEntries.length }} indicator{{ allEntries.length !== 1 ? 's' : '' }}</span>
+                <button class="btn btn-primary btn-sm" @click="doSubmit">Submit for Review</button>
+              </div>
+              <div v-else-if="['Draft', 'Returned'].includes(activeForm?.status)" class="wf-bar">
+                <span class="wf-info muted-text">Waiting on {{ activeForm?.employeeName }} to submit this for review.</span>
+              </div>
+              <div v-else-if="activeForm?.status === 'Submitted'" class="wf-bar">
+                <span class="wf-info">Pending review</span>
+                <div v-if="canReviewActiveForm" style="display:flex;gap:8px">
+                  <button class="btn btn-success btn-sm" @click="doApprove">Approve</button>
+                  <button class="btn btn-warn btn-sm" @click="doReturn">Return</button>
                 </div>
               </div>
             </div>
 
-            <!-- Workflow bar -->
-            <div v-if="['Draft', 'Returned'].includes(activeForm?.status) && activeForm?.userId === authStore.profileId" class="wf-bar">
-              <span class="wf-info">{{ allEntries.length }} indicator{{ allEntries.length !== 1 ? 's' : '' }}</span>
-              <button class="btn btn-primary btn-sm" @click="doSubmit">Submit for Review</button>
-            </div>
-            <div v-else-if="['Draft', 'Returned'].includes(activeForm?.status)" class="wf-bar">
-              <span class="wf-info muted-text">Waiting on {{ activeForm?.employeeName }} to submit this for review.</span>
-            </div>
-            <div v-else-if="activeForm?.status === 'Submitted'" class="wf-bar">
-              <span class="wf-info">Pending review</span>
-              <div v-if="canReviewActiveForm" style="display:flex;gap:8px">
-                <button class="btn btn-success btn-sm" @click="doApprove">Approve</button>
-                <button class="btn btn-warn btn-sm" @click="doReturn">Return</button>
+            <!-- DETAILS TAB -->
+            <div v-else-if="activeTab === 'details'" class="rp-tab-content">
+              <div class="det-2col">
+                <div>
+                  <div class="det-st">Period & Role</div>
+                  <div class="det-row"><span class="dk">Form Type</span><span class="dv">{{ activeForm?.type }}</span></div>
+                  <div class="det-row"><span class="dk">Semester / Year</span><span class="dv">S{{ activeForm?.semester }}, {{ activeForm?.year }}</span></div>
+                  <div class="det-row"><span class="dk">Division</span><span class="dv">{{ activeForm?.divisionName || '-' }}</span></div>
+                  <div class="det-row"><span class="dk">Section</span><span class="dv">{{ activeForm?.sectionName || '-' }}</span></div>
+                  <div class="det-st" style="margin-top:16px">Weights</div>
+                  <div class="weights-bar">
+                    <div class="wb-c" :style="{ width: activeForm?.coreFunctionWeight + '%' }">Core {{ activeForm?.coreFunctionWeight }}%</div>
+                    <div class="wb-s" :style="{ width: activeForm?.supportFunctionWeight + '%' }">Support {{ activeForm?.supportFunctionWeight }}%</div>
+                  </div>
+                  <div class="det-st" style="margin-top:16px">Timeline</div>
+                  <div class="det-row"><span class="dk">Created</span><span class="dv">{{ fmtDate(activeForm?.createdAt) || '-' }}</span></div>
+                  <div class="det-row"><span class="dk">Submitted</span><span class="dv">{{ fmtDate(activeForm?.submittedAt) || '-' }}</span></div>
+                  <div class="det-row"><span class="dk">Approved</span><span class="dv">{{ fmtDate(activeForm?.approvedAt) || '-' }}</span></div>
+                </div>
+                <div>
+                  <div class="det-st">Signatories</div>
+                  <div class="det-row"><span class="dk">Supervisor</span><span class="dv">{{ activeForm?.immediateSupervisor || '-' }}</span></div>
+                  <div class="det-row"><span class="dk">Supervisor Position</span><span class="dv">{{ activeForm?.supervisorPosition || '-' }}</span></div>
+                  <div class="det-row"><span class="dk">Approving Authority</span><span class="dv">{{ activeForm?.approvingAuthority || '-' }}</span></div>
+                  <div class="det-row"><span class="dk">Authority Position</span><span class="dv">{{ activeForm?.authorityPosition || '-' }}</span></div>
+                </div>
               </div>
             </div>
+
+            <!-- SCORE TAB -->
+            <div v-else-if="activeTab === 'score'" class="rp-tab-content">
+              <div v-if="!activeForm?.finalNumericalRating" class="score-empty">
+                <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+                  <circle cx="20" cy="20" r="16" stroke="#E2E8F0" stroke-width="2"/>
+                  <path d="M20 12v8l5 3" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                <p class="muted-text">Score not yet computed</p>
+                <button class="btn btn-primary btn-sm" @click="doCompute">Compute Score</button>
+              </div>
+              <div v-else class="score-view">
+                <div :class="['score-hero', scoreColorClass]">
+                  <span class="score-big">{{ activeForm?.finalNumericalRating }}</span>
+                  <span class="score-denom">/ 5.0</span>
+                </div>
+                <div class="score-adj">{{ activeForm?.adjectivalRating }}</div>
+                <div class="score-table">
+                  <div class="st-hd"><span>Indicator</span><span>Avg</span></div>
+                  <div v-for="e in allEntries" :key="e.id" class="st-row">
+                    <div class="st-l">
+                      <span :class="['st-fn', e.functionType === 'Core' ? 'fn-c' : 'fn-s']">{{ e.functionType[0] }}</span>
+                      <span class="st-name">{{ e.kraName }}</span>
+                    </div>
+                    <span :class="['st-val', e.ratingAverage ? '' : 'muted-text']">{{ e.ratingAverage || '-' }}</span>
+                  </div>
+                </div>
+                <button class="btn btn-sm" style="margin-top:14px" @click="doCompute">Recompute</button>
+
+                <!-- Rate / Finalize workflow -->
+                <div v-if="activeForm?.status === 'Approved'" class="rate-panel">
+                  <div class="det-st" style="text-align:left">Feedback (Part II)</div>
+                  <div class="form-grid" style="text-align:left">
+                    <div class="field full">
+                      <label class="field-label">Strengths</label>
+                      <textarea v-model="feedbackForm.feedbackStrengths" class="field-input" rows="2" placeholder="What the ratee does well..."></textarea>
+                    </div>
+                    <div class="field full">
+                      <label class="field-label">Rater's Comments &amp; Recommendations</label>
+                      <textarea v-model="feedbackForm.feedbackComments" class="field-input" rows="2" placeholder="Comments, recommendations, commendations..."></textarea>
+                    </div>
+                    <div class="field full">
+                      <label class="field-label">Areas for Improvement</label>
+                      <textarea v-model="feedbackForm.feedbackAreasForImprovement" class="field-input" rows="2" placeholder="Development needs..."></textarea>
+                    </div>
+                  </div>
+                  <button v-if="canApprove" class="btn btn-primary btn-sm" style="margin-top:10px" :disabled="ratingBusy" @click="doMarkRated">
+                    {{ ratingBusy ? 'Saving...' : 'Mark as Rated' }}
+                  </button>
+                  <p v-else class="muted-text" style="margin-top:10px;font-size:11px">Only the rater/approver can mark this form as Rated.</p>
+                </div>
+
+                <div v-else-if="activeForm?.status === 'Rated'" class="rate-panel">
+                  <div class="det-st" style="text-align:left">Sign-off Dates</div>
+                  <div class="form-grid" style="text-align:left">
+                    <div class="field">
+                      <label class="field-label">Ratee Signed</label>
+                      <input v-model="finalizeForm.dateSignedRatee" type="text" class="field-input" placeholder="e.g. 17 March 2026"/>
+                    </div>
+                    <div class="field">
+                      <label class="field-label">Supervisor Signed</label>
+                      <input v-model="finalizeForm.dateSignedSupervisor" type="text" class="field-input" placeholder="e.g. 17 March 2026"/>
+                    </div>
+                    <div class="field">
+                      <label class="field-label">Authority Signed</label>
+                      <input v-model="finalizeForm.dateSignedAuthority" type="text" class="field-input" placeholder="e.g. 17 March 2026"/>
+                    </div>
+                  </div>
+                  <button v-if="canFinalize" class="btn btn-primary btn-sm" style="margin-top:10px" :disabled="ratingBusy" @click="doFinalize">
+                    {{ ratingBusy ? 'Saving...' : 'Finalize' }}
+                  </button>
+                  <p v-else class="muted-text" style="margin-top:10px;font-size:11px">Only an Administrator/Director can finalize this form.</p>
+                </div>
+              </div>
+            </div>
+
           </div>
-
-          <!-- DETAILS TAB -->
-          <div v-else-if="activeTab === 'details'" class="modal-body-scroll">
-            <div class="det-2col">
-              <div>
-                <div class="det-st">Period & Role</div>
-                <div class="det-row"><span class="dk">Form Type</span><span class="dv">{{ activeForm?.type }}</span></div>
-                <div class="det-row"><span class="dk">Semester / Year</span><span class="dv">S{{ activeForm?.semester }}, {{ activeForm?.year }}</span></div>
-                <!-- <div class="det-row"><span class="dk">Position Level</span><span class="dv">{{ activeForm?.positionLevel || '-' }}</span></div> -->
-                <div class="det-row"><span class="dk">Division</span><span class="dv">{{ activeForm?.divisionName || '-' }}</span></div>
-                <div class="det-row"><span class="dk">Section</span><span class="dv">{{ activeForm?.sectionName || '-' }}</span></div>
-                <div class="det-st" style="margin-top:16px">Weights</div>
-                <div class="weights-bar">
-                  <div class="wb-c" :style="{ width: activeForm?.coreFunctionWeight + '%' }">Core {{ activeForm?.coreFunctionWeight }}%</div>
-                  <div class="wb-s" :style="{ width: activeForm?.supportFunctionWeight + '%' }">Support {{ activeForm?.supportFunctionWeight }}%</div>
-                </div>
-                <div class="det-st" style="margin-top:16px">Timeline</div>
-                <div class="det-row"><span class="dk">Created</span><span class="dv">{{ fmtDate(activeForm?.createdAt) || '-' }}</span></div>
-                <div class="det-row"><span class="dk">Submitted</span><span class="dv">{{ fmtDate(activeForm?.submittedAt) || '-' }}</span></div>
-                <div class="det-row"><span class="dk">Approved</span><span class="dv">{{ fmtDate(activeForm?.approvedAt) || '-' }}</span></div>
-              </div>
-              <div>
-                <div class="det-st">Signatories</div>
-                <div class="det-row"><span class="dk">Supervisor</span><span class="dv">{{ activeForm?.immediateSupervisor || '-' }}</span></div>
-                <div class="det-row"><span class="dk">Supervisor Position</span><span class="dv">{{ activeForm?.supervisorPosition || '-' }}</span></div>
-                <div class="det-row"><span class="dk">Approving Authority</span><span class="dv">{{ activeForm?.approvingAuthority || '-' }}</span></div>
-                <div class="det-row"><span class="dk">Authority Position</span><span class="dv">{{ activeForm?.authorityPosition || '-' }}</span></div>
-              </div>
-            </div>
-          </div>
-
-          <!-- SCORE TAB -->
-          <div v-else-if="activeTab === 'score'" class="modal-body-scroll">
-            <div v-if="!activeForm?.finalNumericalRating" class="score-empty">
-              <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-                <circle cx="20" cy="20" r="16" stroke="#E2E8F0" stroke-width="2"/>
-                <path d="M20 12v8l5 3" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round"/>
-              </svg>
-              <p class="muted-text">Score not yet computed</p>
-              <button class="btn btn-primary btn-sm" @click="doCompute">Compute Score</button>
-            </div>
-            <div v-else class="score-view">
-              <div :class="['score-hero', scoreColorClass]">
-                <span class="score-big">{{ activeForm?.finalNumericalRating }}</span>
-                <span class="score-denom">/ 5.0</span>
-              </div>
-              <div class="score-adj">{{ activeForm?.adjectivalRating }}</div>
-              <div class="score-table">
-                <div class="st-hd"><span>Indicator</span><span>Avg</span></div>
-                <div v-for="e in allEntries" :key="e.id" class="st-row">
-                  <div class="st-l">
-                    <span :class="['st-fn', e.functionType === 'Core' ? 'fn-c' : 'fn-s']">{{ e.functionType[0] }}</span>
-                    <span class="st-name">{{ e.kraName }}</span>
-                  </div>
-                  <span :class="['st-val', e.ratingAverage ? '' : 'muted-text']">{{ e.ratingAverage || '-' }}</span>
-                </div>
-              </div>
-              <button class="btn btn-sm" style="margin-top:14px" @click="doCompute">Recompute</button>
-
-              <!-- Rate / Finalize workflow -->
-              <div v-if="activeForm?.status === 'Approved'" class="rate-panel">
-                <div class="det-st" style="text-align:left">Feedback (Part II)</div>
-                <div class="form-grid" style="text-align:left">
-                  <div class="field full">
-                    <label class="field-label">Strengths</label>
-                    <textarea v-model="feedbackForm.feedbackStrengths" class="field-input" rows="2" placeholder="What the ratee does well..."></textarea>
-                  </div>
-                  <div class="field full">
-                    <label class="field-label">Rater's Comments &amp; Recommendations</label>
-                    <textarea v-model="feedbackForm.feedbackComments" class="field-input" rows="2" placeholder="Comments, recommendations, commendations..."></textarea>
-                  </div>
-                  <div class="field full">
-                    <label class="field-label">Areas for Improvement</label>
-                    <textarea v-model="feedbackForm.feedbackAreasForImprovement" class="field-input" rows="2" placeholder="Development needs..."></textarea>
-                  </div>
-                </div>
-                <button v-if="canApprove" class="btn btn-primary btn-sm" style="margin-top:10px" :disabled="ratingBusy" @click="doMarkRated">
-                  {{ ratingBusy ? 'Saving...' : 'Mark as Rated' }}
-                </button>
-                <p v-else class="muted-text" style="margin-top:10px;font-size:11px">Only the rater/approver can mark this form as Rated.</p>
-              </div>
-
-              <div v-else-if="activeForm?.status === 'Rated'" class="rate-panel">
-                <div class="det-st" style="text-align:left">Sign-off Dates</div>
-                <div class="form-grid" style="text-align:left">
-                  <div class="field">
-                    <label class="field-label">Ratee Signed</label>
-                    <input v-model="finalizeForm.dateSignedRatee" type="text" class="field-input" placeholder="e.g. 17 March 2026"/>
-                  </div>
-                  <div class="field">
-                    <label class="field-label">Supervisor Signed</label>
-                    <input v-model="finalizeForm.dateSignedSupervisor" type="text" class="field-input" placeholder="e.g. 17 March 2026"/>
-                  </div>
-                  <div class="field">
-                    <label class="field-label">Authority Signed</label>
-                    <input v-model="finalizeForm.dateSignedAuthority" type="text" class="field-input" placeholder="e.g. 17 March 2026"/>
-                  </div>
-                </div>
-                <button v-if="canFinalize" class="btn btn-primary btn-sm" style="margin-top:10px" :disabled="ratingBusy" @click="doFinalize">
-                  {{ ratingBusy ? 'Saving...' : 'Finalize' }}
-                </button>
-                <p v-else class="muted-text" style="margin-top:10px;font-size:11px">Only an Administrator/Director can finalize this form.</p>
-              </div>
-            </div>
-          </div>
+          <!-- /rp-detail-body -->
 
         </div>
+        <!-- /rp-detail-wrap -->
+
       </div>
-    </teleport>
+      <!-- /tp-right -->
+
+    </div>
+    <!-- /tp-shell -->
 
     <!-- ==================================
          KRA LIBRARY MODAL
@@ -806,7 +813,7 @@ const { confirm } = useConfirm()
 
 const PHASES = ['ANALYSIS', 'DESIGN', 'TESTING', 'EVALUATION', 'PROMOTION', 'PORTFOLIO', 'SOCIAL_MARKETING', 'STRATEGIC']
 
-// â”€â”€ State â”€â”€
+// ── State ──
 const forms          = ref([])
 const loading        = ref(false)
 const entriesLoading = ref(false)
@@ -858,8 +865,6 @@ const newForm = ref({
   approvingAuthority: '', authorityPosition: ''
 })
 
-// Form Type is no longer a real choice - it's locked to the employee's own
-// Employment Type. Keep it in sync no matter which entry point opened the modal.
 watch(showNewFormModal, (open) => {
   if (open) newForm.value.type = myFormType.value
 })
@@ -880,7 +885,7 @@ const statusTabs = [
   { label: 'Finalized', value: 'Finalized' }
 ]
 
-// â”€â”€ Computed â”€â”€
+// ── Computed ──
 const filteredForms = computed(() => {
   let f = forms.value
   if (activeStatus.value !== 'All') f = f.filter(x => x.status === activeStatus.value)
@@ -944,7 +949,7 @@ const periodBusy     = ref('')
 const periodStatusInfo    = ref(null)
 const periodStatusLoading = ref(false)
 
-// â”€â”€ Helpers â”€â”€
+// ── Helpers ──
 function countByStatus(s)   { return forms.value.filter(f => f.status === s).length }
 function posWeight(item)    {
   const l = activeForm.value?.positionLevel || 'III'
@@ -972,7 +977,14 @@ function defaultApplicablePeriod(item) {
 }
 function cancelLibrary()  { showLibrary.value = false; showLibConfirm.value = false; libSelected.value = [] }
 function closeEntry()     { showEntryModal.value = false; editingEntry.value = null }
-function closeFormModal() { showFormModal.value = false; libSelected.value = []; showLibrary.value = false; showLibConfirm.value = false }
+function closeFormModal() {
+  showFormModal.value = false
+  activeForm.value = null
+  allEntries.value = []
+  libSelected.value = []
+  showLibrary.value = false
+  showLibConfirm.value = false
+}
 
 function statusClass(status) {
   const map = { Draft: 'st-draft', Submitted: 'st-submitted', Returned: 'st-returned', Approved: 'st-approved', Rated: 'st-rated', Finalized: 'st-finalized' }
@@ -1000,7 +1012,7 @@ async function loadPeriodStatus() {
   }
 }
 
-// â”€â”€ API â”€â”€
+// ── API ──
 async function loadForms() {
   loading.value = true
   try {
@@ -1075,7 +1087,7 @@ async function createForm() {
   }
 }
 
-// Quick actions from card
+// Quick actions from list item
 async function quickSubmit(form)  {
   const ok = await confirm(CONFIRMS.submitForm(form.type, form.semester, form.year))
   if (!ok) return
@@ -1264,7 +1276,7 @@ async function doFinalize() {
   finally { ratingBusy.value = false }
 }
 
-// â”€â”€ Self-service period Generate (list-page entry point) â”€â”€
+// ── Self-service period Generate (list-page entry point) ──
 async function doPeriodGenerate(kind) {
   if (periodBusy.value) return
   const docName = kind === 'targets' ? 'Targets Sheet' : 'Ratings Sheet'
@@ -1324,8 +1336,6 @@ function _sync(u) {
   if (i !== -1) forms.value[i] = activeForm.value
 }
 
-// â”€â”€ Document generation (official Targets / Ratings forms) - list-page only, see doPeriodGenerate â”€â”€
-
 async function doPrint(fileId, tab) {
   if (!fileId || docGen.value.printing) return
   docGen.value.printing = true
@@ -1347,86 +1357,82 @@ async function doPrint(fileId, tab) {
 .req{color:#EF4444;font-size:11px;}
 .ml6{margin-left:6px;}
 
-/* Content card wrapper */
-.content-card { background: #fff; border: 1px solid #E2E8F0; border-radius: 14px; padding: 20px; }
+/* Two-panel shell */
+.tp-shell { display: flex; background: #fff; border: 1px solid #E2E8F0; border-radius: 14px; overflow: hidden; min-height: 560px; }
+.tp-left { width: 410px; flex-shrink: 0; border-right: 1px solid #E2E8F0; display: flex; flex-direction: column; overflow-y: auto; max-height: 84vh; scrollbar-width: thin; scrollbar-color: #E2E8F0 transparent; }
+.tp-left::-webkit-scrollbar { width: 4px; }
+.tp-left::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 4px; }
+.tp-right { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; max-height: 84vh; }
+.ipcrf-left-inner { padding: 20px; display: flex; flex-direction: column; flex: 1; }
+
+/* Right panel states */
+.rp-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: #94A3B8; padding: 40px 20px; }
+.rp-empty-title { font-size: 15px; font-weight: 600; color: #374151; margin: 4px 0 0; }
+.rp-empty-sub { font-size: 12px; color: #94A3B8; text-align: center; }
+
+/* Right panel detail */
+.rp-detail-wrap { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
+.rp-detail-body { flex: 1; overflow-y: auto; min-height: 0; padding: 20px 28px 24px; scrollbar-width: thin; scrollbar-color: #E2E8F0 transparent; }
+.rp-detail-body::-webkit-scrollbar { width: 4px; }
+.rp-detail-body::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 4px; }
+.rp-tab-content { display: flex; flex-direction: column; gap: 0; }
 
 /* Header */
-.page-hd{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;}
-.page-title{font-size:20px;font-weight:700;color:#0F172A;margin:0 0 3px;letter-spacing:-.3px;}
-.page-sub{font-size:12px;color:#94A3B8;margin:0;}
+.page-hd{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;gap:10px;}
+.page-title{font-size:18px;font-weight:700;color:#0F172A;margin:0 0 3px;letter-spacing:-.3px;}
+.page-sub{font-size:11px;color:#94A3B8;margin:0;}
 
 /* Filters */
-.filter-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:12px;flex-wrap:wrap;}
+.filter-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:10px;flex-wrap:wrap;}
 
 /* Self-service period generate bar */
-.generate-bar{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 16px;margin-bottom:16px;background:#F5F9FF;border:1px solid #DCE9FB;border-radius:10px;flex-wrap:wrap;}
-.generate-period{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
-.generate-period .field-label{margin:0;}
-.generate-actions{display:flex;gap:14px;flex-wrap:wrap;justify-content:flex-end;}
-.generate-item{display:grid;grid-template-columns:auto auto auto;align-items:center;gap:6px 8px;justify-content:flex-start;}
+.generate-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;margin-bottom:14px;background:#F5F9FF;border:1px solid #DCE9FB;border-radius:10px;flex-wrap:wrap;}
+.generate-period{display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
+.generate-period .field-label{margin:0;font-size:11px;}
+.generate-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;}
+.generate-item{display:grid;grid-template-columns:auto auto auto;align-items:center;gap:5px 7px;justify-content:flex-start;}
 .generate-label{font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;}
-.doc-status-chip{display:inline-flex;align-items:center;justify-content:center;padding:2px 7px;border-radius:999px;background:#ECFDF5;border:1px solid #BBF7D0;color:#047857;font-size:10px;font-weight:700;line-height:1.4;white-space:nowrap;}
-.generate-item > .btn,
-.generate-item > .btn-link{white-space:nowrap;}
 .generate-hint{grid-column:1 / -1;font-size:10px;color:#94A3B8;font-weight:500;line-height:1.2;}
-.generate-hint-ok{color:#15803D;font-weight:500;}
-.generate-hint-warn{color:#B45309;font-weight:500;}
 .btn-regenerate{padding:4px 9px;border-color:#CBD5E1;background:#fff;color:#334155;font-size:11px;font-weight:600;}
 .btn-regenerate:hover:not(:disabled){border-color:#3B82F6;background:#EFF6FF;color:#1D4ED8;}
 .btn-active-ok{background:#F0FDF4;color:#15803D;border-color:#BBF7D0;}
 .btn-active-ok:hover{background:#DCFCE7;}
+
 .status-tabs{display:flex;gap:4px;flex-wrap:wrap;}
-.status-tab{padding:5px 14px;border-radius:20px;font-size:12px;font-weight:500;border:1px solid #E2E8F0;background:#fff;color:#64748B;cursor:pointer;transition:all .15s;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;}
+.status-tab{padding:4px 11px;border-radius:20px;font-size:11px;font-weight:500;border:1px solid #E2E8F0;background:#fff;color:#64748B;cursor:pointer;transition:all .15s;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;}
 .status-tab:hover{border-color:#CBD5E1;}
 .status-tab.active{background:#0D2137;color:#fff;border-color:#0D2137;}
 .tab-badge{background:#3B82F6;color:#fff;border-radius:10px;font-size:10px;padding:1px 5px;margin-left:3px;}
-.filter-selects{display:flex;gap:8px;}
+.filter-selects{display:flex;gap:6px;}
 .filter-select{padding:6px 10px;border:1px solid #E2E8F0;border-radius:7px;font-size:12px;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;color:#374151;background:#fff;outline:none;cursor:pointer;}
 .filter-select:focus{border-color:#3B82F6;}
 
-/* Forms grid */
-.forms-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
-
-.fc {
-  background: #fff;
-  border: 1px solid #E2E8F0;
-  border-radius: 12px;
-  padding: 16px;
-  cursor: pointer;
-  transition: all .15s;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-.fc:hover { border-color: #CBD5E1; box-shadow: 0 4px 12px rgba(0,0,0,.07); transform: translateY(-1px); }
-.fc-sk { pointer-events: none; }
-
-.fc-hd { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-.fc-period { font-size: 11px; color: #64748B; }
-
-.fc-name { font-size: 14px; font-weight: 600; color: #0F172A; margin-bottom: 3px; }
-.fc-sub { font-size: 11px; color: #94A3B8; margin-bottom: 12px; }
-
-.fc-mid { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.fc-score { display: flex; align-items: baseline; gap: 4px; }
-.fc-score-val { font-size: 16px; font-weight: 700; color: #1A56B0; }
-.fc-score-lbl { font-size: 10px; color: #64748B; }
-
-.fc-foot { display: flex; align-items: center; justify-content: space-between; padding-top: 10px; border-top: 1px solid #F1F5F9; }
-.fc-date { font-size: 11px; color: #94A3B8; }
-.fc-actions { display: flex; align-items: center; gap: 4px; }
-
-.dot { color: #CBD5E1; }
-.btn-info { background: #EBF4FF; color: #1A56B0; border-color: #BFDBFE; }
-.btn-info:hover { background: #DBEAFE; }
+/* Forms list */
+.forms-list { display: flex; flex-direction: column; }
+.fli { padding: 14px 18px; border-bottom: 1px solid #F1F5F9; cursor: pointer; transition: background .12s; display: flex; flex-direction: column; gap: 6px; }
+.fli:last-child { border-bottom: none; }
+.fli:hover { background: #F8FBFF; }
+.fli-active { background: #EFF6FF !important; border-left: 3px solid #1A56B0; padding-left: 15px; }
+.fli-sk { pointer-events: none; }
+.fli-sk-top { display: flex; gap: 8px; margin-bottom: 6px; }
+.fli-top { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.fli-period { font-size: 11px; color: #64748B; }
+.fli-name { font-size: 14px; font-weight: 700; color: #0F172A; }
+.fli-sub { font-size: 11.5px; color: #64748B; }
+.fli-score { display: flex; align-items: baseline; gap: 4px; }
+.fli-score-val { font-size: 17px; font-weight: 800; color: #1A56B0; }
+.fli-score-lbl { font-size: 10px; color: #64748B; }
+.fli-foot { display: flex; align-items: center; justify-content: space-between; padding-top: 8px; border-top: 1px solid #F1F5F9; margin-top: 2px; }
+.fli-date { font-size: 10.5px; color: #94A3B8; }
+.fli-actions { display: flex; align-items: center; gap: 4px; }
 
 /* Type badges */
-.type-badge{display:inline-flex;padding:3px 8px;border-radius:6px;font-size:10px;font-weight:700;letter-spacing:.3px;}
+.type-badge{display:inline-flex;padding:2px 7px;border-radius:6px;font-size:10px;font-weight:700;letter-spacing:.3px;}
 .type-ipcrf{background:#EBF4FF;color:#1A56B0;}
 .type-ccef{background:#F3EEFF;color:#6B3FA0;}
 
 /* Status badges */
-.status-badge{display:inline-flex;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:500;}
+.status-badge{display:inline-flex;padding:2px 7px;border-radius:20px;font-size:10px;font-weight:500;}
 .st-draft{background:#F8FAFC;color:#64748B;border:1px solid #E2E8F0;}
 .st-submitted{background:#FEF3E2;color:#B45309;}
 .st-returned{background:#FEF2F2;color:#B91C1C;}
@@ -1450,21 +1456,21 @@ async function doPrint(fileId, tab) {
 .btn-xs{padding:4px 7px;font-size:10.5px;border-radius:6px;white-space:nowrap;}
 .btn-icon-only{padding:5px;width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;}
 .btn-outline{border-color:#CBD5E1;}
+.btn-info { background: #EBF4FF; color: #1A56B0; border-color: #BFDBFE; }
+.btn-info:hover { background: #DBEAFE; }
 
 /* Empty */
-.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:64px 20px;gap:8px;color:#94A3B8;}
-.empty-title{font-size:15px;font-weight:600;color:#374151;margin-top:4px;}
-.empty-sub{font-size:13px;margin-bottom:8px;color:#94A3B8;}
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 16px;gap:8px;color:#94A3B8;text-align:center;}
+.empty-title{font-size:14px;font-weight:600;color:#374151;margin-top:4px;}
+.empty-sub{font-size:12px;margin-bottom:8px;color:#94A3B8;}
 
 /* Skeleton */
 @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 .sk-line{background:linear-gradient(90deg,#E2E8F0 25%,#F1F5F9 50%,#E2E8F0 75%);background-size:200%;animation:shimmer 1.4s infinite;border-radius:4px;height:12px;display:block;}
+.sk-badge{background:linear-gradient(90deg,#E2E8F0 25%,#F1F5F9 50%,#E2E8F0 75%);background-size:200%;animation:shimmer 1.4s infinite;border-radius:6px;width:50px;height:20px;display:inline-block;}
 
 /* Modal overlay */
 .modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.5);display:flex;align-items:center;justify-content:center;z-index:300;padding:16px;backdrop-filter:blur(4px);font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;}
-
-/* Modal XL (form detail) */
-.modal-xl{background:#fff;border-radius:16px;width:100%;max-width:700px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.2);overflow:hidden;}
 
 /* Modal base */
 .modal{background:#fff;border-radius:16px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.2);overflow:hidden;}
@@ -1476,29 +1482,27 @@ async function doPrint(fileId, tab) {
 .modal-icon{width:36px;height:36px;border-radius:10px;background:#EBF4FF;color:#2F80ED;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .modal-title{font-size:15px;font-weight:700;color:#0F172A;margin:0 0 2px;}
 .modal-sub{font-size:12px;color:#94A3B8;margin:0;}
-.modal-close{margin-left:auto;background:none;border:none;cursor:pointer;padding:6px;border-radius:8px;color:#94A3B8;transition:all .15s;}
+.modal-close{margin-left:auto;background:none;border:none;cursor:pointer;padding:6px;border-radius:8px;color:#94A3B8;transition:all .15s;flex-shrink:0;}
 .modal-close:hover{background:#F1F5F9;color:#374151;}
 .modal-body{padding:20px 24px;overflow-y:auto;flex:1;}
 .modal-footer{display:flex;justify-content:flex-end;gap:8px;padding:14px 24px;border-top:1px solid #F1F5F9;background:#F8FAFC;flex-shrink:0;}
-.modal-body-scroll{flex:1;min-height:0;overflow-y:auto;padding:20px 28px 24px;scrollbar-width:none;-ms-overflow-style:none;}
-.modal-body-scroll::-webkit-scrollbar{width:0;height:0;display:none;}
 
-/* Form detail header */
-.dh{display:flex;align-items:flex-start;justify-content:space-between;padding:18px 24px 14px;border-bottom:1px solid #F1F5F9;flex-shrink:0;gap:12px;}
+/* Form detail header (right panel) */
+.dh{display:flex;align-items:flex-start;justify-content:space-between;padding:20px 28px 16px;border-bottom:1px solid #E8EDF3;flex-shrink:0;gap:12px;background:linear-gradient(to bottom,#FAFBFF,#F7F9FF);}
 .dh-info{flex:1;min-width:0;}
-.dh-badges{display:flex;gap:6px;margin-bottom:6px;}
-.dh-name{font-size:16px;font-weight:700;color:#0F172A;letter-spacing:-.3px;}
-.dh-sub{font-size:11px;color:#94A3B8;margin-top:2px;}
+.dh-badges{display:flex;gap:6px;margin-bottom:8px;}
+.dh-name{font-size:17px;font-weight:700;color:#0F172A;letter-spacing:-.4px;}
+.dh-sub{font-size:12px;color:#64748B;margin-top:3px;}
 
 /* Tabs */
-.dtabs{display:flex;padding:0 24px;border-bottom:1px solid #E8EDF3;flex-shrink:0;}
+.dtabs{display:flex;padding:0 24px;border-bottom:1px solid #E8EDF3;flex-shrink:0;background:#fff;}
 .dtab{flex:1 1 0;padding:13px 14px;font-size:13px;font-weight:500;cursor:pointer;border:none;background:transparent;color:#64748B;border-bottom:3px solid transparent;margin-bottom:-1px;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;transition:all .15s;display:inline-flex;align-items:center;justify-content:center;gap:6px;}
 .dtab:hover{color:#374151;background:#FAFBFF;}
 .dtab.active{color:#1A56B0;border-bottom-color:#1A56B0;font-weight:700;background:#F5F9FF;}
 .dtab-cnt{background:#EBF4FF;color:#1A56B0;border-radius:9px;font-size:10px;padding:1px 6px;font-weight:600;}
 
 /* Loading */
-.loading-state{display:flex;align-items:center;justify-content:center;gap:10px;padding:40px 0;flex:1;min-height:0;}
+.loading-state{display:flex;align-items:center;justify-content:center;gap:10px;padding:40px 0;}
 @keyframes spin{to{transform:rotate(360deg)}}
 .spinner-sm2{width:18px;height:18px;border:2px solid #E2E8F0;border-top-color:#3B82F6;border-radius:50%;animation:spin .6s linear infinite;}
 
@@ -1553,12 +1557,6 @@ async function doPrint(fileId, tab) {
 .wf-bar{display:flex;align-items:center;justify-content:space-between;padding:14px 0;margin-top:4px;border-top:1px solid #F1F5F9;}
 .wf-info{font-size:11px;color:#64748B;}
 
-/* Document generation bar */
-.btn-link{background:none;border:none;color:#94A3B8;font-size:11px;cursor:pointer;text-decoration:underline;padding:0 4px;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;}
-.btn-link:hover{color:#475569;}
-.btn-link:disabled{opacity:.5;cursor:not-allowed;}
-.rate-panel{margin-top:18px;padding:14px;background:#F8FAFC;border:1px solid #F1F5F9;border-radius:9px;text-align:left;}
-
 /* Details tab */
 .det-2col{display:grid;grid-template-columns:1fr 1fr;gap:32px;}
 .det-st{font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px;}
@@ -1589,10 +1587,11 @@ async function doPrint(fileId, tab) {
 .fn-s{background:#F3EEFF;color:#6B3FA0;}
 .st-name{font-size:12px;color:#374151;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .st-val{font-size:12px;font-weight:600;color:#0F172A;flex-shrink:0;}
+.rate-panel{margin-top:18px;padding:14px;background:#F8FAFC;border:1px solid #F1F5F9;border-radius:9px;text-align:left;}
 
 /* Library modal */
 .lib-filters{display:flex;gap:8px;padding:12px 24px;border-bottom:1px solid #F1F5F9;flex-shrink:0;flex-wrap:wrap;}
-.srch-wrap{flex:1;position:relative;min-width:200px;}
+.srch-wrap{flex:1;position:relative;min-width:160px;}
 .srch-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);pointer-events:none;}
 .srch-inp{width:100%;padding:8px 11px 8px 30px;border:1.5px solid #E2E8F0;border-radius:7px;font-size:12px;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;color:#0F172A;outline:none;}
 .srch-inp:focus{border-color:#3B82F6;box-shadow:0 0 0 3px rgba(59,130,246,.1);}

@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="eval-page">
 
     <!-- Content card -->
@@ -62,230 +62,265 @@
       </button>
     </div>
 
-    <!-- ══ MY RATING TASKS VIEW ══ -->
-    <template v-if="activeView === 'my-tasks'">
-      <div class="tasks-period-bar">
-        <label class="tasks-period-label">Period:</label>
-        <select v-model="tasksSemester" class="filter-select" style="width:180px">
-          <option value="1">1st Semester (Jan–Jun)</option>
-          <option value="2">2nd Semester (Jul–Dec)</option>
-        </select>
-        <select v-model="tasksYear" class="filter-select" style="width:90px">
-          <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}</option>
-        </select>
-        <button class="btn btn-sm" @click="loadMyTasks" :disabled="loadingTasks">
-          <span v-if="loadingTasks" class="spinner-sm"></span>
-          {{ loadingTasks ? '' : 'Load' }}
-        </button>
-      </div>
+    <!-- ══ TWO-PANEL BODY ══ -->
+    <div class="eval-tp-shell">
 
-      <div v-if="loadingTasks" class="records-grid">
-        <div v-for="i in 4" :key="i" class="record-card sk-card">
-          <div class="sk-hd"><div class="sk-badge"></div></div>
-          <div class="sk-line" style="width:70%;margin-bottom:6px"></div>
-          <div class="sk-line" style="width:45%"></div>
-        </div>
-      </div>
+      <!-- LEFT PANEL -->
+      <div class="eval-tp-left">
 
-      <div v-else-if="!myTasks.length" class="empty-state">
-        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-          <circle cx="24" cy="24" r="18" stroke="#E2E8F0" stroke-width="2"/>
-          <path d="M16 24h16M24 16v16" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round"/>
-        </svg>
-        <p class="empty-title">No rating tasks found</p>
-        <p class="empty-sub">{{ canAdmin ? 'Use Generate Assignments to create rater assignments for this period.' : 'You have no assigned evaluations for this period.' }}</p>
-      </div>
-
-      <div v-else class="tasks-grid">
-        <div v-for="task in myTasks" :key="task.id" class="task-card" @click="openFromAssignment(task)">
-          <div class="tc-hd">
-            <span :class="['rtype-badge', rterTypeCls(task.raterType)]">{{ raterTypeLabel(task.raterType) }}</span>
-            <span :class="['status-badge', task.status === 'Completed' ? 'st-green' : 'st-draft']">{{ task.status }}</span>
-          </div>
-          <div class="tc-name">{{ task.rateeName }}</div>
-          <div class="tc-role-desc">{{ raterRoleDesc(task.raterType) }}</div>
-          <div class="tc-meta">S{{ task.semester }} {{ task.year }}{{ task.rateeDivisionId ? ' · ' + task.rateeDivisionId : '' }}</div>
-          <div v-if="task.ipatStatus === 'Final'" class="tc-final">
-            <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-              <path d="M5.5 1L1 3.25V6c0 2.3 1.67 4.35 4.5 4.75 2.83-.4 4.5-2.45 4.5-4.75V3.25L5.5 1z" fill="#15803D" stroke="#15803D" stroke-width=".4"/>
-              <path d="M3.5 5.5l1.5 1.5 2.5-2.5" stroke="#fff" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            Assessment finalized
-          </div>
-        </div>
-      </div>
-    </template>
-
-    <!-- ══ MY RESULTS VIEW (ratee sees own final scores) ══ -->
-    <template v-if="activeView === 'my-results'">
-      <div class="tasks-period-bar">
-        <label class="tasks-period-label">Period:</label>
-        <select v-model="tasksSemester" class="filter-select" style="width:180px">
-          <option value="1">1st Semester (Jan–Jun)</option>
-          <option value="2">2nd Semester (Jul–Dec)</option>
-        </select>
-        <select v-model="tasksYear" class="filter-select" style="width:90px">
-          <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}</option>
-        </select>
-        <button class="btn btn-sm" @click="loadMyResults" :disabled="loadingResults">
-          <span v-if="loadingResults" class="spinner-sm"></span>
-          {{ loadingResults ? '' : 'Load' }}
-        </button>
-      </div>
-
-      <div v-if="loadingResults" class="records-grid">
-        <div v-for="i in 2" :key="i" class="record-card sk-card">
-          <div class="sk-hd"><div class="sk-badge"></div></div>
-          <div class="sk-line" style="width:60%;margin-bottom:6px"></div>
-          <div class="sk-line" style="width:40%"></div>
-        </div>
-      </div>
-
-      <div v-else-if="!myResults.length" class="empty-state">
-        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-          <circle cx="24" cy="24" r="18" stroke="#E2E8F0" stroke-width="2"/>
-          <path d="M16 28l4-4 3 3 6-6" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        <p class="empty-title">No assessment records found</p>
-        <p class="empty-sub">No assessment has been generated for this period yet.</p>
-      </div>
-
-      <div v-else class="results-grid">
-        <div v-for="res in myResults" :key="res.id" class="result-card">
-          <div class="rc-hd">
-            <span class="rc-period">S{{ res.semester }} {{ res.year }}</span>
-            <span v-if="res.allComplete && res.overallScore" class="rc-status-badge rc-done">Computed</span>
-            <span v-else class="rc-status-badge rc-pending">In Progress</span>
-          </div>
-          <div class="rc-name">{{ res.rateeName }}</div>
-          <div class="rc-division">{{ res.divisionName }}</div>
-
-          <!-- Rater progress when not all done -->
-          <div v-if="!res.allComplete" class="rc-progress-wrap">
-            <div class="rc-progress-meta">
-              <span class="rc-progress-label">Rating Progress</span>
-              <span class="rc-progress-count">{{ res.completedRaters }} / {{ res.totalRaters }} raters done</span>
-            </div>
-            <div class="rc-progress-bar">
-              <div class="rc-progress-fill" :style="{ width: res.totalRaters ? (res.completedRaters / res.totalRaters * 100) + '%' : '0%' }"></div>
-            </div>
-            <div v-if="res.pendingRaters && res.pendingRaters.length" class="rc-pending-list">
-              Waiting for: {{ res.pendingRaters.join(', ') }}
-            </div>
-          </div>
-
-          <!-- Scores when all raters are done and computed -->
-          <template v-else>
-            <div class="rc-scores">
-              <div class="rc-score-item">
-                <span class="rc-score-label">CBC</span>
-                <span class="rc-score-val">{{ res.cbcScore ?? '—' }}</span>
-                <span class="rc-score-pct">30%</span>
-              </div>
-              <div class="rc-score-item">
-                <span class="rc-score-label">FPO</span>
-                <span class="rc-score-val">{{ res.fpoScore ?? '—' }}</span>
-                <span class="rc-score-pct">55%</span>
-              </div>
-              <div class="rc-score-item">
-                <span class="rc-score-label">JF</span>
-                <span class="rc-score-val">{{ res.jfScore ?? '—' }}</span>
-                <span class="rc-score-pct">15%</span>
-              </div>
-            </div>
-            <div class="rc-overall">
-              <span class="rc-overall-label">Overall</span>
-              <span class="rc-overall-score">{{ res.overallScore ?? '—' }}</span>
-              <span v-if="res.descriptor" class="rc-descriptor">{{ res.descriptor }}</span>
-            </div>
-          </template>
-        </div>
-      </div>
-    </template>
-
-    <!-- ══ ALL ASSESSMENTS VIEW (admin) ══ -->
-    <template v-if="activeView === 'all'">
-      <div class="filter-bar">
-        <div class="status-tabs">
-          <button v-for="t in statusTabs" :key="t.value"
-            :class="['status-tab', activeStatus === t.value && 'active']"
-            @click="activeStatus = t.value">
-            {{ t.label }}
+        <!-- Period bar (Tasks & Results) -->
+        <div v-if="activeView !== 'all'" class="tasks-period-bar">
+          <label class="tasks-period-label">Period:</label>
+          <select v-model="tasksSemester" class="filter-select" style="width:160px">
+            <option value="1">1st Semester (Jan&#8211;Jun)</option>
+            <option value="2">2nd Semester (Jul&#8211;Dec)</option>
+          </select>
+          <select v-model="tasksYear" class="filter-select" style="width:82px">
+            <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}</option>
+          </select>
+          <button class="btn btn-sm" @click="activeView === 'my-tasks' ? loadMyTasks() : loadMyResults()" :disabled="loadingTasks || loadingResults">
+            <span v-if="loadingTasks || loadingResults" class="spinner-sm"></span>
+            {{ (loadingTasks || loadingResults) ? '' : 'Load' }}
           </button>
         </div>
-        <div class="filter-right">
-          <div class="srch-wrap">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" class="srch-icon">
-              <circle cx="5" cy="5" r="4" stroke="#94A3B8" stroke-width="1.2"/>
-              <path d="M8.5 8.5l2 2" stroke="#94A3B8" stroke-width="1.2" stroke-linecap="round"/>
-            </svg>
-            <input v-model="search" type="text" class="srch-inp" placeholder="Search employee…"/>
-          </div>
-          <select v-model="filterDiv" class="filter-select">
-            <option value="">All Divisions</option>
-            <option v-for="d in availableDivisions" :key="d.id" :value="d.id">{{ d.name }}</option>
-          </select>
-        </div>
-      </div>
 
-      <div v-if="loading" class="records-grid">
-        <div v-for="i in 3" :key="i" class="record-card sk-card">
-          <div class="sk-hd"><div class="sk-badge"></div><div class="sk-line" style="width:60px"></div></div>
-          <div class="sk-line" style="width:80%;margin-bottom:6px"></div>
-          <div class="sk-line" style="width:55%;margin-bottom:16px"></div>
-          <div class="sk-scores">
-            <div class="sk-line" style="width:40px;height:32px"></div>
-            <div class="sk-line" style="width:40px;height:32px"></div>
-            <div class="sk-line" style="width:40px;height:32px"></div>
-            <div class="sk-line" style="width:40px;height:32px"></div>
+        <!-- Filter bar (All view) -->
+        <div v-if="activeView === 'all'" class="filter-bar" style="margin-bottom:10px">
+          <div class="status-tabs">
+            <button v-for="t in statusTabs" :key="t.value"
+              :class="['status-tab', activeStatus === t.value && 'active']"
+              @click="activeStatus = t.value">
+              {{ t.label }}
+            </button>
+          </div>
+          <div class="filter-right">
+            <div class="srch-wrap">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" class="srch-icon">
+                <circle cx="5" cy="5" r="4" stroke="#94A3B8" stroke-width="1.2"/>
+                <path d="M8.5 8.5l2 2" stroke="#94A3B8" stroke-width="1.2" stroke-linecap="round"/>
+              </svg>
+              <input v-model="search" type="text" class="srch-inp" placeholder="Search employee..."/>
+            </div>
+            <select v-model="filterDiv" class="filter-select">
+              <option value="">All Divisions</option>
+              <option v-for="d in availableDivisions" :key="d.id" :value="d.id">{{ d.name }}</option>
+            </select>
           </div>
         </div>
-      </div>
 
-      <div v-else-if="!filteredRecords.length" class="empty-state">
-        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-          <circle cx="24" cy="24" r="18" stroke="#E2E8F0" stroke-width="2"/>
-          <path d="M24 14v10l6 4" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round"/>
-        </svg>
-        <p class="empty-title">{{ records.length === 0 ? 'No assessments yet' : 'No matching assessments' }}</p>
-        <p class="empty-sub">{{ records.length === 0 ? 'Use Generate Assignments to create assessment records.' : 'Try adjusting your filters.' }}</p>
-      </div>
-
-      <div v-else class="records-grid">
-        <div v-for="rec in filteredRecords" :key="rec.id" class="record-card" @click="openDetailModal(rec)">
-          <div class="rc-hd">
-            <span :class="['status-badge', statusClass(rec.status)]">{{ rec.status }}</span>
-            <span class="rc-period">S{{ rec.semester }} {{ rec.year }}</span>
+        <!-- MY TASKS LIST -->
+        <template v-if="activeView === 'my-tasks'">
+          <div v-if="loadingTasks" class="eli-list">
+            <div v-for="i in 4" :key="i" class="eli eli-sk">
+              <div style="display:flex;gap:6px;margin-bottom:7px"><div class="sk-badge"></div><div class="sk-badge" style="width:60px"></div></div>
+              <div class="sk-line" style="width:75%;margin-bottom:5px"></div>
+              <div class="sk-line" style="width:50%"></div>
+            </div>
           </div>
-          <div class="rc-name">{{ rec.rateeName }}</div>
-          <div class="rc-div">{{ rec.divisionName || '—' }} · {{ rec.position || '—' }}</div>
-          <div class="rc-scores">
-            <div class="score-block">
-              <div class="score-lbl">CBC (30%)</div>
-              <div :class="['score-val', rec.cbcScore ? 'has-score' : '']">{{ rec.cbcScore || '—' }}</div>
-            </div>
-            <div class="score-block">
-              <div class="score-lbl">FPO (55%)</div>
-              <div :class="['score-val', rec.fpoScore ? 'has-score' : '']">{{ rec.fpoScore || '—' }}</div>
-            </div>
-            <div class="score-block">
-              <div class="score-lbl">JF (15%)</div>
-              <div :class="['score-val', rec.jfScore ? 'has-score' : '']">{{ rec.jfScore || '—' }}</div>
-            </div>
-            <div class="score-block score-block-overall">
-              <div class="score-lbl">Overall</div>
-              <div v-if="rec.overallScore" :class="['score-val score-val-overall', descriptorClass(rec.descriptor)]">
-                {{ rec.overallScore }}
+          <div v-else-if="!myTasks.length" class="eval-lp-empty">
+            <svg width="36" height="36" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="18" stroke="#E2E8F0" stroke-width="2"/><path d="M16 24h16M24 16v16" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round"/></svg>
+            <p>No rating tasks found</p>
+            <span>{{ canAdmin ? 'Use Generate Assignments to create rater assignments.' : 'You have no assigned evaluations for this period.' }}</span>
+          </div>
+          <div v-else class="eli-list">
+            <div v-for="task in myTasks" :key="task.id"
+              :class="['eli', selectedTask && selectedTask.id === task.id ? 'eli-active' : '']"
+              @click="selectedTask = task; selectedResult = null; selectedRecord = null">
+              <div class="eli-top">
+                <span :class="['rtype-badge', rterTypeCls(task.raterType)]">{{ raterTypeLabel(task.raterType) }}</span>
+                <span :class="['status-badge', task.status === 'Completed' ? 'st-green' : 'st-draft']">{{ task.status }}</span>
               </div>
-              <div v-else class="score-val">—</div>
+              <div class="eli-name">{{ task.rateeName }}</div>
+              <div class="eli-meta">S{{ task.semester }} {{ task.year }}{{ task.rateeDivisionId ? ' · ' + task.rateeDivisionId : '' }}</div>
+              <div v-if="task.ipatStatus === 'Final'" class="eli-final">
+                <svg width="10" height="10" viewBox="0 0 11 11" fill="none"><path d="M5.5 1L1 3.25V6c0 2.3 1.67 4.35 4.5 4.75 2.83-.4 4.5-2.45 4.5-4.75V3.25L5.5 1z" fill="#15803D" stroke="#15803D" stroke-width=".4"/><path d="M3.5 5.5l1.5 1.5 2.5-2.5" stroke="#fff" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                Finalized
+              </div>
             </div>
           </div>
-          <div v-if="rec.descriptor" :class="['rc-descriptor', descriptorClass(rec.descriptor)]">
-            {{ rec.descriptor }}
+        </template>
+
+        <!-- MY RESULTS LIST -->
+        <template v-if="activeView === 'my-results'">
+          <div v-if="loadingResults" class="eli-list">
+            <div v-for="i in 2" :key="i" class="eli eli-sk">
+              <div style="display:flex;gap:6px;margin-bottom:7px"><div class="sk-badge"></div></div>
+              <div class="sk-line" style="width:65%;margin-bottom:5px"></div>
+              <div class="sk-line" style="width:40%"></div>
+            </div>
           </div>
-        </div>
+          <div v-else-if="!myResults.length" class="eval-lp-empty">
+            <svg width="36" height="36" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="18" stroke="#E2E8F0" stroke-width="2"/><path d="M16 28l4-4 3 3 6-6" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <p>No assessment records found</p>
+            <span>No assessment has been generated for this period yet.</span>
+          </div>
+          <div v-else class="eli-list">
+            <div v-for="res in myResults" :key="res.id"
+              :class="['eli', selectedResult && selectedResult.id === res.id ? 'eli-active' : '']"
+              @click="selectedResult = res; selectedTask = null; selectedRecord = null">
+              <div class="eli-top">
+                <span class="eli-period-pill">S{{ res.semester }} {{ res.year }}</span>
+                <span v-if="res.allComplete && res.overallScore" class="rc-status-badge rc-done" style="font-size:10px">Computed</span>
+                <span v-else class="rc-status-badge rc-pending" style="font-size:10px">In Progress</span>
+              </div>
+              <div class="eli-name">{{ res.rateeName }}</div>
+              <div class="eli-meta">{{ res.divisionName }}</div>
+              <div v-if="res.overallScore" class="eli-score-row">
+                <span class="eli-score-big">{{ res.overallScore }}</span>
+                <span v-if="res.descriptor" :class="['eli-desc-chip', descriptorClass(res.descriptor)]">{{ res.descriptor }}</span>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <!-- ALL RECORDS LIST -->
+        <template v-if="activeView === 'all'">
+          <div v-if="loading" class="eli-list">
+            <div v-for="i in 3" :key="i" class="eli eli-sk">
+              <div style="display:flex;gap:6px;margin-bottom:7px"><div class="sk-badge"></div><div class="sk-badge" style="width:55px"></div></div>
+              <div class="sk-line" style="width:80%;margin-bottom:5px"></div>
+              <div class="sk-line" style="width:50%"></div>
+            </div>
+          </div>
+          <div v-else-if="!filteredRecords.length" class="eval-lp-empty">
+            <svg width="36" height="36" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="18" stroke="#E2E8F0" stroke-width="2"/><path d="M24 14v10l6 4" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round"/></svg>
+            <p>{{ records.length === 0 ? 'No assessments yet' : 'No matches' }}</p>
+            <span>{{ records.length === 0 ? 'Generate assignments to start.' : 'Try adjusting your filters.' }}</span>
+          </div>
+          <div v-else class="eli-list">
+            <div v-for="rec in filteredRecords" :key="rec.id"
+              :class="['eli', selectedRecord && selectedRecord.id === rec.id ? 'eli-active' : '']"
+              @click="selectedRecord = rec; selectedTask = null; selectedResult = null">
+              <div class="eli-top">
+                <span :class="['status-badge', statusClass(rec.status)]">{{ rec.status }}</span>
+                <span class="eli-period-pill">S{{ rec.semester }} {{ rec.year }}</span>
+              </div>
+              <div class="eli-name">{{ rec.rateeName }}</div>
+              <div class="eli-meta">{{ rec.divisionName || '—' }}</div>
+              <div v-if="rec.overallScore" class="eli-score-row">
+                <span class="eli-score-big">{{ rec.overallScore }}</span>
+                <span v-if="rec.descriptor" :class="['eli-desc-chip', descriptorClass(rec.descriptor)]">{{ rec.descriptor }}</span>
+              </div>
+            </div>
+          </div>
+        </template>
+
       </div>
-    </template>
+      <!-- /eval-tp-left -->
+
+      <!-- RIGHT PANEL -->
+      <div class="eval-tp-right">
+
+        <!-- Empty state -->
+        <div v-if="!selectedTask && !selectedResult && !selectedRecord" class="eval-rp-empty">
+          <svg width="52" height="52" viewBox="0 0 48 48" fill="none">
+            <circle cx="24" cy="24" r="18" stroke="#E2E8F0" stroke-width="2"/>
+            <path d="M16 28l4-4 3 3 6-6" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <p class="eval-rp-empty-title">Select an item</p>
+          <p class="eval-rp-empty-sub">Click any item from the list to preview it here</p>
+        </div>
+
+        <!-- TASK DETAIL -->
+        <template v-else-if="activeView === 'my-tasks' && selectedTask">
+          <div class="eval-rp-hd">
+            <div class="eval-rp-hd-info">
+              <div class="eval-rp-title">{{ selectedTask.rateeName }}</div>
+              <div class="eval-rp-sub">{{ raterTypeLabel(selectedTask.raterType) }} · S{{ selectedTask.semester }} {{ selectedTask.year }}{{ selectedTask.rateeDivisionId ? ' · ' + selectedTask.rateeDivisionId : '' }}</div>
+            </div>
+            <span :class="['status-badge', selectedTask.status === 'Completed' ? 'st-green' : 'st-draft']">{{ selectedTask.status }}</span>
+          </div>
+          <div class="eval-rp-body">
+            <div class="rp-role-card">
+              <span :class="['rtype-badge', rterTypeCls(selectedTask.raterType)]" style="font-size:13px;padding:4px 12px">{{ raterTypeLabel(selectedTask.raterType) }}</span>
+              <span style="margin-left:10px;color:#64748B;font-size:13px">{{ raterRoleDesc(selectedTask.raterType) }}</span>
+            </div>
+            <div v-if="selectedTask.ipatStatus === 'Final'" class="rp-final-note">
+              <svg width="14" height="14" viewBox="0 0 11 11" fill="none"><path d="M5.5 1L1 3.25V6c0 2.3 1.67 4.35 4.5 4.75 2.83-.4 4.5-2.45 4.5-4.75V3.25L5.5 1z" fill="#15803D" stroke="#15803D" stroke-width=".4"/><path d="M3.5 5.5l1.5 1.5 2.5-2.5" stroke="#fff" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              This assessment has been finalized.
+            </div>
+            <div class="rp-what-happens">
+              <div class="rp-wh-title">What's in the form</div>
+              <div class="rp-wh-items">
+                <div class="rp-wh-item"><div class="rp-wh-badge rp-wh-cbc">CBC</div><div>5 HEARTWORK values × 5 indicators, 1–4 scale</div></div>
+                <div v-if="['Self','Supervisor'].includes(selectedTask.raterType)" class="rp-wh-item"><div class="rp-wh-badge rp-wh-jf">JF</div><div>7 Job Fitness indicators, 1–4 scale</div></div>
+              </div>
+            </div>
+            <button class="btn btn-primary btn-open-form" @click="openFromAssignment(selectedTask)">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2" y="2" width="10" height="10" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M5 7h4M7 5v4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+              {{ selectedTask.status === 'Completed' ? 'View / Edit Ratings' : 'Open Rating Form' }}
+            </button>
+          </div>
+        </template>
+
+        <!-- RESULT DETAIL -->
+        <template v-else-if="activeView === 'my-results' && selectedResult">
+          <div class="eval-rp-hd">
+            <div class="eval-rp-hd-info">
+              <div class="eval-rp-title">{{ selectedResult.rateeName }}</div>
+              <div class="eval-rp-sub">S{{ selectedResult.semester }} {{ selectedResult.year }} · {{ selectedResult.divisionName }}</div>
+            </div>
+            <span v-if="selectedResult.allComplete && selectedResult.overallScore" class="rc-status-badge rc-done">Computed</span>
+            <span v-else class="rc-status-badge rc-pending">In Progress</span>
+          </div>
+          <div class="eval-rp-body">
+            <div v-if="!selectedResult.allComplete" class="rp-progress-wrap">
+              <div class="rp-progress-meta">
+                <span class="rp-progress-label">Rating Progress</span>
+                <span class="rp-progress-count">{{ selectedResult.completedRaters }} / {{ selectedResult.totalRaters }} raters</span>
+              </div>
+              <div class="rp-progress-bar"><div class="rp-progress-fill" :style="{ width: selectedResult.totalRaters ? (selectedResult.completedRaters / selectedResult.totalRaters * 100) + '%' : '0%' }"></div></div>
+              <div v-if="selectedResult.pendingRaters && selectedResult.pendingRaters.length" class="rp-pending-list">
+                Waiting for: {{ selectedResult.pendingRaters.join(', ') }}
+              </div>
+            </div>
+            <template v-else>
+              <div :class="['rp-score-hero', descriptorClass(selectedResult.descriptor)]">
+                <div class="rp-score-big">{{ selectedResult.overallScore ?? '—' }}</div>
+                <div v-if="selectedResult.descriptor" class="rp-score-desc">{{ selectedResult.descriptor }}</div>
+              </div>
+              <div class="rp-score-grid">
+                <div class="rp-score-block"><div class="rp-score-lbl">CBC</div><div class="rp-score-val">{{ selectedResult.cbcScore ?? '—' }}</div><div class="rp-score-pct">30%</div></div>
+                <div class="rp-score-block"><div class="rp-score-lbl">FPO</div><div class="rp-score-val">{{ selectedResult.fpoScore ?? '—' }}</div><div class="rp-score-pct">55%</div></div>
+                <div class="rp-score-block"><div class="rp-score-lbl">JF</div><div class="rp-score-val">{{ selectedResult.jfScore ?? '—' }}</div><div class="rp-score-pct">15%</div></div>
+              </div>
+            </template>
+          </div>
+        </template>
+
+        <!-- RECORD DETAIL (admin) -->
+        <template v-else-if="activeView === 'all' && selectedRecord">
+          <div class="eval-rp-hd">
+            <div class="eval-rp-hd-info">
+              <div class="eval-rp-title">{{ selectedRecord.rateeName }}</div>
+              <div class="eval-rp-sub">{{ selectedRecord.divisionName || '—' }} · {{ selectedRecord.position || '—' }} · S{{ selectedRecord.semester }} {{ selectedRecord.year }}</div>
+            </div>
+            <span :class="['status-badge', statusClass(selectedRecord.status)]">{{ selectedRecord.status }}</span>
+          </div>
+          <div class="eval-rp-body">
+            <div class="rp-score-grid rp-score-grid-4">
+              <div class="rp-score-block"><div class="rp-score-lbl">CBC (30%)</div><div :class="['rp-score-val', selectedRecord.cbcScore ? 'rp-sv-has' : '']">{{ selectedRecord.cbcScore || '—' }}</div></div>
+              <div class="rp-score-block"><div class="rp-score-lbl">FPO (55%)</div><div :class="['rp-score-val', selectedRecord.fpoScore ? 'rp-sv-has' : '']">{{ selectedRecord.fpoScore || '—' }}</div></div>
+              <div class="rp-score-block"><div class="rp-score-lbl">JF (15%)</div><div :class="['rp-score-val', selectedRecord.jfScore ? 'rp-sv-has' : '']">{{ selectedRecord.jfScore || '—' }}</div></div>
+              <div class="rp-score-block rp-score-overall">
+                <div class="rp-score-lbl">Overall</div>
+                <div v-if="selectedRecord.overallScore" :class="['rp-score-val rp-sv-has', descriptorClass(selectedRecord.descriptor)]" style="font-size:28px">{{ selectedRecord.overallScore }}</div>
+                <div v-else class="rp-score-val">—</div>
+              </div>
+            </div>
+            <div v-if="selectedRecord.descriptor" :class="['rp-desc-badge', descriptorClass(selectedRecord.descriptor)]">{{ selectedRecord.descriptor }}</div>
+            <button class="btn btn-primary btn-open-form" @click="openDetailModal(selectedRecord)">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2" y="2" width="10" height="10" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M5 7h4M7 5v4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+              Open Assessment
+            </button>
+          </div>
+        </template>
+
+      </div>
+      <!-- /eval-tp-right -->
+
+    </div>
+    <!-- /eval-tp-shell -->
 
     <!-- Rating scale reference -->
     <div class="scale-card">
@@ -1026,6 +1061,9 @@ const activeView  = ref('my-tasks')
 const myTasks         = ref([])
 const loadingTasks    = ref(false)
 const activeAssignment = ref(null)  // set when a task card is clicked
+const selectedTask   = ref(null)
+const selectedResult = ref(null)
+const selectedRecord = ref(null)
 const currentYear = new Date().getFullYear()
 const tasksSemester = ref(String(new Date().getMonth() < 6 ? 1 : 2))
 const tasksYear     = ref(currentYear)
@@ -1576,6 +1614,81 @@ function _resetEdap() {
 
 <style>
 .eval-page{padding:0;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;font-size:13px;color:#1A2332;min-height:100%;}
+
+/* ── Two-panel shell ── */
+.eval-tp-shell{display:flex;min-height:520px;border:1px solid #E2E8F0;border-radius:12px;overflow:hidden;background:#fff;margin-top:12px;}
+.eval-tp-left{width:410px;flex-shrink:0;border-right:1px solid #E2E8F0;display:flex;flex-direction:column;overflow-y:auto;max-height:82vh;scrollbar-width:thin;scrollbar-color:#E2E8F0 transparent;}
+.eval-tp-left .tasks-period-bar,.eval-tp-left .filter-bar{border-bottom:1px solid #F1F5F9;padding:14px 18px;flex-shrink:0;}
+.eval-tp-right{flex:1;min-width:0;display:flex;flex-direction:column;overflow-y:auto;max-height:82vh;scrollbar-width:thin;scrollbar-color:#E2E8F0 transparent;}
+
+/* ── List items ── */
+.eli-list{flex:1;overflow-y:auto;}
+.eli{padding:14px 18px;border-bottom:1px solid #F1F5F9;cursor:pointer;transition:background .12s;}
+.eli:hover{background:#F8FAFC;}
+.eli-active{background:#EFF6FF !important;border-left:3px solid #3B82F6;padding-left:15px;}
+.eli-sk{pointer-events:none;}
+.eli-top{display:flex;gap:6px;align-items:center;margin-bottom:6px;}
+.eli-name{font-size:14px;font-weight:700;color:#1E293B;line-height:1.3;margin-bottom:4px;}
+.eli-meta{font-size:11.5px;color:#64748B;margin-bottom:3px;}
+.eli-period-pill{font-size:10px;font-weight:700;background:#F1F5F9;color:#475569;border-radius:20px;padding:2px 9px;}
+.eli-score-row{display:flex;align-items:center;gap:8px;margin-top:6px;}
+.eli-score-big{font-size:20px;font-weight:800;color:#1E293B;}
+.eli-desc-chip{font-size:10px;font-weight:700;border-radius:20px;padding:2px 9px;}
+.eli-final{display:flex;align-items:center;gap:4px;font-size:10.5px;color:#15803D;font-weight:600;margin-top:4px;}
+
+/* ── Left empty state ── */
+.eval-lp-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;gap:8px;color:#94A3B8;text-align:center;}
+.eval-lp-empty p{margin:0;font-size:13px;font-weight:600;color:#64748B;}
+.eval-lp-empty span{font-size:12px;color:#94A3B8;}
+
+/* ── Right panel ── */
+.eval-rp-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:10px;color:#94A3B8;text-align:center;padding:40px;}
+.eval-rp-empty-title{margin:0;font-size:14px;font-weight:600;color:#64748B;}
+.eval-rp-empty-sub{margin:0;font-size:12px;color:#94A3B8;}
+.eval-rp-hd{display:flex;align-items:flex-start;justify-content:space-between;padding:20px 28px 16px;border-bottom:1px solid #E8EDF3;flex-shrink:0;background:linear-gradient(to bottom,#FAFBFF,#F7F9FF);}
+.eval-rp-hd-info{flex:1;min-width:0;}
+.eval-rp-title{font-size:17px;font-weight:700;color:#1E293B;margin-bottom:4px;letter-spacing:-.3px;}
+.eval-rp-sub{font-size:12.5px;color:#64748B;}
+.eval-rp-body{padding:20px 28px 28px;display:flex;flex-direction:column;gap:18px;}
+.btn-open-form{display:inline-flex;align-items:center;gap:8px;padding:10px 22px;font-size:13.5px;font-weight:600;margin-top:4px;align-self:flex-start;}
+
+/* ── Right panel cards ── */
+.rp-role-card{display:flex;align-items:center;background:#F8FAFC;border:1px solid #E8EDF3;border-radius:10px;padding:14px 16px;gap:12px;}
+.rp-final-note{display:flex;align-items:center;gap:8px;font-size:12.5px;color:#15803D;font-weight:500;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;padding:11px 15px;}
+.rp-what-happens{background:#F8FAFC;border:1px solid #E8EDF3;border-radius:10px;padding:15px 18px;}
+.rp-wh-title{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#94A3B8;margin-bottom:11px;}
+.rp-wh-items{display:flex;flex-direction:column;gap:9px;}
+.rp-wh-item{display:flex;align-items:center;gap:10px;font-size:12.5px;color:#475569;}
+.rp-wh-badge{font-size:10px;font-weight:700;border-radius:5px;padding:3px 8px;flex-shrink:0;}
+.rp-wh-cbc{background:#DBEAFE;color:#1D4ED8;}
+.rp-wh-jf{background:#F3E8FF;color:#7C3AED;}
+
+/* ── Progress bar (results) ── */
+.rp-progress-wrap{background:#F8FAFC;border-radius:8px;padding:14px;}
+.rp-progress-meta{display:flex;justify-content:space-between;margin-bottom:8px;}
+.rp-progress-label{font-size:12px;font-weight:600;color:#374151;}
+.rp-progress-count{font-size:12px;color:#6B7280;}
+.rp-progress-bar{height:8px;background:#E5E7EB;border-radius:4px;overflow:hidden;}
+.rp-progress-fill{height:100%;background:#3B82F6;border-radius:4px;transition:width .3s;}
+.rp-pending-list{font-size:11px;color:#6B7280;margin-top:8px;}
+
+/* ── Score hero ── */
+.rp-score-hero{text-align:center;padding:24px 20px;border-radius:12px;background:#F8FAFC;border:1px solid #E8EDF3;}
+.rp-score-big{font-size:48px;font-weight:800;color:#1E293B;line-height:1;}
+.rp-score-desc{font-size:13px;font-weight:600;margin-top:8px;}
+.rp-score-grid{display:flex;gap:12px;}
+.rp-score-grid-4{flex-wrap:wrap;}
+.rp-score-block{flex:1;background:#F8FAFC;border:1px solid #E8EDF3;border-radius:10px;padding:14px 10px;text-align:center;min-width:80px;}
+.rp-score-lbl{font-size:11px;color:#64748B;font-weight:600;margin-bottom:6px;}
+.rp-score-val{font-size:22px;font-weight:800;color:#94A3B8;}
+.rp-sv-has{color:#1E293B;}
+.rp-score-pct{font-size:10.5px;color:#94A3B8;margin-top:3px;}
+.rp-score-overall{background:#EFF6FF;border-color:#BFDBFE;}
+.rp-desc-badge{display:inline-flex;align-items:center;font-size:12.5px;font-weight:600;border-radius:20px;padding:5px 16px;}
+.rp-desc-badge.desc-excellent{background:#DCFCE7;color:#15803D;}
+.rp-desc-badge.desc-satisfactory{background:#DBEAFE;color:#1D4ED8;}
+.rp-desc-badge.desc-needs{background:#FEF3C7;color:#B45309;}
+.rp-desc-badge.desc-immediate{background:#FEE2E2;color:#B91C1C;}
 .page-hd{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;}
 .page-title{font-size:20px;font-weight:700;color:#0F172A;margin:0 0 3px;}
 .page-sub{font-size:12px;color:#94A3B8;margin:0;}
@@ -1845,7 +1958,7 @@ function _resetEdap() {
 .view-tab-badge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#EF4444;color:#fff;font-size:10px;font-weight:700;}
 
 /* My Tasks */
-.tasks-period-bar{display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+.tasks-period-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
 .tasks-period-label{font-size:12px;font-weight:600;color:#374151;}
 .tasks-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-bottom:16px;}
 .task-card{background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:16px;cursor:pointer;transition:all .15s;}

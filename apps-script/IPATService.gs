@@ -500,19 +500,33 @@ const IPATService = (() => {
     const record   = SpreadsheetService.getRow(recSheet, ipatId)
     if (!record) throw HttpError('IPAT record not found', 404)
 
-    const cbc = Number(record.cbcScore) || 0
-    const jf  = Number(record.jfScore)  || 0
+    // Only include components that have actual data — missing components are excluded
+    // and the weights of present components are scaled proportionally so the formula
+    // always sums to 1.0 regardless of which sub-scores are available.
+    const rawCbc = record.cbcScore !== '' && record.cbcScore !== null && record.cbcScore !== undefined ? Number(record.cbcScore) : null
+    const rawJf  = record.jfScore  !== '' && record.jfScore  !== null && record.jfScore  !== undefined ? Number(record.jfScore)  : null
 
-    // FPO: IPCRF score is on 1–5 scale, IPAT uses 1–4
-    // Convert: ((score - 1) / 4) * 3 + 1
-    let fpo = Number(record.fpoScore) || 0
-    if (fpo > 4) {
-      fpo = round2((fpo - 1) / 4 * 3 + 1)
+    let rawFpo = record.fpoScore !== '' && record.fpoScore !== null && record.fpoScore !== undefined ? Number(record.fpoScore) : null
+    if (rawFpo !== null && rawFpo > 4) {
+      rawFpo = round2((rawFpo - 1) / 4 * 3 + 1)
     }
 
-    // Overall = (CBCI × 0.30) + (FPOI × 0.55) + (JFI × 0.15)
-    const overall    = round2((cbc * 0.30) + (fpo * 0.55) + (jf * 0.15))
+    // Build weighted sum from only the available components
+    let weightedSum  = 0
+    let totalWeight  = 0
+    if (rawCbc !== null) { weightedSum += rawCbc * 0.30; totalWeight += 0.30 }
+    if (rawFpo !== null) { weightedSum += rawFpo * 0.55; totalWeight += 0.55 }
+    if (rawJf  !== null) { weightedSum += rawJf  * 0.15; totalWeight += 0.15 }
+
+    if (totalWeight === 0) throw HttpError('No component scores available to compute overall', 400)
+
+    // Normalize so missing components don't drag the score down
+    const overall    = round2(weightedSum / totalWeight)
     const descriptor = qualitativeDescriptor(overall)
+
+    const cbc = rawCbc !== null ? rawCbc : 0
+    const fpo = rawFpo !== null ? rawFpo : 0
+    const jf  = rawJf  !== null ? rawJf  : 0
 
     SpreadsheetService.updateRow(recSheet, ipatId, {
       overallScore: overall,
@@ -522,7 +536,7 @@ const IPATService = (() => {
     })
 
     AuditService.log('COMPUTE_OVERALL', 'IPAT',
-      `Overall=${overall} (${descriptor}) CBC=${cbc} FPO=${fpo} JF=${jf} for ${ipatId}`, user)
+      `Overall=${overall} (${descriptor}) CBC=${rawCbc} FPO=${rawFpo} JF=${rawJf} weights=${round2(totalWeight)} for ${ipatId}`, user)
 
     return { ipatId, cbcScore: cbc, fpoScore: fpo, jfScore: jf, overallScore: overall, descriptor }
   }

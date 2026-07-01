@@ -388,6 +388,9 @@ const IPATRaterAssignmentService = (() => {
       if (allDone) {
         try {
           IPATService.computeCBC(ipatRecordId, user)
+          try { IPATService.computeJF(ipatRecordId, user) } catch (je) {
+            Logger.log('[PMES] computeJF skipped (no JF ratings yet): ' + je.message)
+          }
           IPATService.computeOverall(ipatRecordId, user)
         } catch (e) {
           Logger.log('[PMES] Auto-compute failed for ' + ipatRecordId + ': ' + e.message)
@@ -419,10 +422,14 @@ const IPATRaterAssignmentService = (() => {
       const pendingRaters   = assignments.filter(a => a.status !== 'Completed').map(a => a.raterType)
       const allComplete     = totalRaters > 0 && completedRaters === totalRaters
 
-      // Auto-compute on first view if all raters are done but scores haven't been saved yet
-      if (allComplete && !r.cbcScore) {
+      // Auto-compute on first view if all raters are done but scores are missing or incomplete
+      const needsCompute = allComplete && (!r.cbcScore || !r.overallScore || (r.cbcScore && !r.jfScore))
+      if (needsCompute) {
         try {
           IPATService.computeCBC(r.id, user)
+          try { IPATService.computeJF(r.id, user) } catch (je) {
+            Logger.log('[PMES] getMyResults computeJF skipped: ' + je.message)
+          }
           IPATService.computeOverall(r.id, user)
           const freshRec = SpreadsheetService.getRow(recSheet, r.id)
           if (freshRec) r = freshRec

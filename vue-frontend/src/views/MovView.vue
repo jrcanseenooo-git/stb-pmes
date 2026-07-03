@@ -73,7 +73,7 @@ function handleFileSelect(e) { console.log('Selected files:', e.target.files) }
 .gap-6{gap:6px;}.gap-8{gap:8px;}
 .mb-8{margin-bottom:8px;}.mb-12{margin-bottom:12px;}.mt-10{margin-top:10px;}
 .text-sm{font-size:12px;}.text-xs{font-size:10px;}.muted{color:#718096;}.fw-500{font-weight:500;}
-.btn{display:inline-flex;align-items:center;gap:5px;padding:6px 11px;border-radius:6px;font-size:11px;cursor:pointer;border:1px solid #E2E8F0;background:#fff;color:#4A5568;transition:all .15s;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:6px 11px;border-radius:6px;font-size:11px;cursor:pointer;border:1px solid #E2E8F0;background:#fff;color:#4A5568;transition:all .15s;}
 .btn:hover{background:#F7FAFC;border-color:#2F80ED;color:#2F80ED;}
 .btn-primary{background:#2F80ED;color:#fff;border-color:#2F80ED;}
 .btn-primary:hover{background:#1a6cd4;color:#fff;}

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="eval-page">
 
     <!-- Content card -->
@@ -8,7 +8,7 @@
     <div class="page-hd">
       <div>
         <h2 class="page-title">Evaluation</h2>
-        <p class="page-sub">Innovations Performance Assessment Tool — CBC 30% · FPO 55% · JF 15%</p>
+        <p class="page-sub">Innovations Performance Assessment Tool</p>
       </div>
       <div style="display:flex;gap:8px;align-items:center">
         <button v-if="canAdmin" class="btn btn-outline" @click="openGenerateModal">
@@ -26,13 +26,13 @@
       <div class="domain-item d-cbc">
         <div class="domain-pct">30%</div>
         <div class="domain-label">Core Behavioral Competencies</div>
-        <div class="domain-sub">5 HEARTWORK Values · 5 Indicators each · 1–4 Likert</div>
+        <div class="domain-sub">5 HEARTWORK Values</div>
       </div>
       <div class="domain-sep">+</div>
       <div class="domain-item d-fpo">
         <div class="domain-pct">55%</div>
         <div class="domain-label">Functional Performance Output</div>
-        <div class="domain-sub">IPCRF/DPCR Final Numerical Rating</div>
+        <div class="domain-sub">IPCRF/CCEF Final Numerical Rating</div>
       </div>
       <div class="domain-sep">+</div>
       <div class="domain-item d-jf">
@@ -44,7 +44,7 @@
       <div class="domain-item d-overall">
         <div class="domain-pct">100%</div>
         <div class="domain-label">Overall Performance Audit Score</div>
-        <div class="domain-sub">1.00 – 4.00 Scale</div>
+        <div class="domain-sub">1.00 - 4.00 Scale</div>
       </div>
     </div>
 
@@ -71,16 +71,16 @@
         <!-- Period bar (Tasks & Results) -->
         <div v-if="activeView !== 'all'" class="tasks-period-bar">
           <label class="tasks-period-label">Period:</label>
-          <select v-model="tasksSemester" class="filter-select" style="width:160px">
+          <select v-model="tasksSemester" class="filter-select" style="width:175px">
             <option value="1">1st Semester (Jan&#8211;Jun)</option>
             <option value="2">2nd Semester (Jul&#8211;Dec)</option>
           </select>
-          <select v-model="tasksYear" class="filter-select" style="width:82px">
+          <select v-model="tasksYear" class="filter-select" style="width:80px">
             <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}</option>
           </select>
-          <button class="btn btn-sm" @click="activeView === 'my-tasks' ? loadMyTasks() : loadMyResults()" :disabled="loadingTasks || loadingResults">
+          <button class="btn" @click="activeView === 'my-tasks' ? loadMyTasks() : loadMyResults()" :disabled="loadingTasks || loadingResults">
             <span v-if="loadingTasks || loadingResults" class="spinner-sm"></span>
-            {{ (loadingTasks || loadingResults) ? '' : 'Load' }}
+            {{ (loadingTasks || loadingResults) ? '' : 'Refresh Data' }}
           </button>
         </div>
 
@@ -126,15 +126,21 @@
             <div v-for="task in myTasks" :key="task.id"
               :class="['eli', selectedTask && selectedTask.id === task.id ? 'eli-active' : '']"
               @click="selectedTask = task; selectedResult = null; selectedRecord = null">
-              <div class="eli-top">
+              <div class="eli-row">
+                <div :class="['eli-av', rterTypeCls(task.raterType)]">{{ task.rateeName?.charAt(0)?.toUpperCase() || '?' }}</div>
+                <div class="eli-info">
+                  <div class="eli-name">{{ task.rateeName }}</div>
+                  <div class="eli-meta">S{{ task.semester }} {{ task.year }}{{ task.rateeDivisionId ? ' · ' + task.rateeDivisionId : '' }}</div>
+                </div>
+                <div :class="['eli-dot', task.status === 'Completed' ? 'eli-dot-done' : 'eli-dot-pend']" :title="task.status"></div>
+              </div>
+              <div class="eli-chips">
                 <span :class="['rtype-badge', rterTypeCls(task.raterType)]">{{ raterTypeLabel(task.raterType) }}</span>
                 <span :class="['status-badge', task.status === 'Completed' ? 'st-green' : 'st-draft']">{{ task.status }}</span>
-              </div>
-              <div class="eli-name">{{ task.rateeName }}</div>
-              <div class="eli-meta">S{{ task.semester }} {{ task.year }}{{ task.rateeDivisionId ? ' · ' + task.rateeDivisionId : '' }}</div>
-              <div v-if="task.ipatStatus === 'Final'" class="eli-final">
-                <svg width="10" height="10" viewBox="0 0 11 11" fill="none"><path d="M5.5 1L1 3.25V6c0 2.3 1.67 4.35 4.5 4.75 2.83-.4 4.5-2.45 4.5-4.75V3.25L5.5 1z" fill="#15803D" stroke="#15803D" stroke-width=".4"/><path d="M3.5 5.5l1.5 1.5 2.5-2.5" stroke="#fff" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                Finalized
+                <span v-if="task.ipatStatus === 'Final'" class="eli-final">
+                  <svg width="10" height="10" viewBox="0 0 11 11" fill="none"><path d="M5.5 1L1 3.25V6c0 2.3 1.67 4.35 4.5 4.75 2.83-.4 4.5-2.45 4.5-4.75V3.25L5.5 1z" fill="#15803D" stroke="#15803D" stroke-width=".4"/><path d="M3.5 5.5l1.5 1.5 2.5-2.5" stroke="#fff" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  Finalized
+                </span>
               </div>
             </div>
           </div>
@@ -158,16 +164,21 @@
             <div v-for="res in myResults" :key="res.id"
               :class="['eli', selectedResult && selectedResult.id === res.id ? 'eli-active' : '']"
               @click="selectedResult = res; selectedTask = null; selectedRecord = null">
-              <div class="eli-top">
-                <span class="eli-period-pill">S{{ res.semester }} {{ res.year }}</span>
+              <div class="eli-row">
+                <div class="eli-av eli-av-res">{{ res.rateeName?.charAt(0)?.toUpperCase() || '?' }}</div>
+                <div class="eli-info">
+                  <div class="eli-name">{{ res.rateeName }}</div>
+                  <div class="eli-meta">{{ res.divisionName }}</div>
+                </div>
                 <span v-if="res.allComplete && res.overallScore" class="rc-status-badge rc-done" style="font-size:10px">Computed</span>
                 <span v-else class="rc-status-badge rc-pending" style="font-size:10px">In Progress</span>
               </div>
-              <div class="eli-name">{{ res.rateeName }}</div>
-              <div class="eli-meta">{{ res.divisionName }}</div>
-              <div v-if="res.overallScore" class="eli-score-row">
-                <span class="eli-score-big">{{ res.overallScore }}</span>
-                <span v-if="res.descriptor" :class="['eli-desc-chip', descriptorClass(res.descriptor)]">{{ res.descriptor }}</span>
+              <div class="eli-chips">
+                <span class="eli-period-pill">S{{ res.semester }} {{ res.year }}</span>
+                <template v-if="res.overallScore">
+                  <span class="eli-score-big">{{ res.overallScore }}</span>
+                  <span v-if="res.descriptor" :class="['eli-desc-chip', descriptorClass(res.descriptor)]">{{ res.descriptor }}</span>
+                </template>
               </div>
             </div>
           </div>
@@ -191,15 +202,20 @@
             <div v-for="rec in filteredRecords" :key="rec.id"
               :class="['eli', selectedRecord && selectedRecord.id === rec.id ? 'eli-active' : '']"
               @click="selectedRecord = rec; selectedTask = null; selectedResult = null">
-              <div class="eli-top">
+              <div class="eli-row">
+                <div class="eli-av eli-av-rec">{{ rec.rateeName?.charAt(0)?.toUpperCase() || '?' }}</div>
+                <div class="eli-info">
+                  <div class="eli-name">{{ rec.rateeName }}</div>
+                  <div class="eli-meta">{{ rec.divisionName || '—' }}</div>
+                </div>
                 <span :class="['status-badge', statusClass(rec.status)]">{{ rec.status }}</span>
-                <span class="eli-period-pill">S{{ rec.semester }} {{ rec.year }}</span>
               </div>
-              <div class="eli-name">{{ rec.rateeName }}</div>
-              <div class="eli-meta">{{ rec.divisionName || '—' }}</div>
-              <div v-if="rec.overallScore" class="eli-score-row">
-                <span class="eli-score-big">{{ rec.overallScore }}</span>
-                <span v-if="rec.descriptor" :class="['eli-desc-chip', descriptorClass(rec.descriptor)]">{{ rec.descriptor }}</span>
+              <div class="eli-chips">
+                <span class="eli-period-pill">S{{ rec.semester }} {{ rec.year }}</span>
+                <template v-if="rec.overallScore">
+                  <span class="eli-score-big">{{ rec.overallScore }}</span>
+                  <span v-if="rec.descriptor" :class="['eli-desc-chip', descriptorClass(rec.descriptor)]">{{ rec.descriptor }}</span>
+                </template>
               </div>
             </div>
           </div>
@@ -322,46 +338,6 @@
     </div>
     <!-- /eval-tp-shell -->
 
-    <!-- Rating scale reference -->
-    <div class="scale-card">
-      <div class="scale-title">Likert Scale (CBC &amp; JF) and Qualitative Descriptors</div>
-      <div class="scale-grid">
-        <div class="scale-row">
-          <div class="scale-label">Rating Scale (1–4)</div>
-          <div class="scale-items">
-            <span class="scale-item"><strong>1</strong> = Never</span>
-            <span class="scale-item"><strong>2</strong> = Rarely</span>
-            <span class="scale-item"><strong>3</strong> = Frequently</span>
-            <span class="scale-item"><strong>4</strong> = Always</span>
-          </div>
-        </div>
-        <div class="scale-row">
-          <div class="scale-label">Overall Descriptors</div>
-          <div class="scale-items">
-            <span class="scale-item desc-excellent">3.50–4.00 Excellent Alignment</span>
-            <span class="scale-item desc-satisfactory">2.50–3.49 Satisfactory Alignment</span>
-            <span class="scale-item desc-needs">1.50–2.49 Needs Development</span>
-            <span class="scale-item desc-immediate">1.00–1.49 Requires Immediate Intervention</span>
-          </div>
-        </div>
-        <div class="scale-row">
-          <div class="scale-label">CBC Raters &amp; Weights</div>
-          <div class="scale-items">
-            <span class="scale-item">Self 15%</span>
-            <span class="scale-item">Peer1 15% + Peer2 15% (Technical Staff, no subordinate)</span>
-            <span class="scale-item">Peer 15% + Subordinate 15% (with subordinates)</span>
-            <span class="scale-item">Supervisor 30%</span>
-            <span class="scale-item">Skip Supervisor 25%</span>
-          </div>
-        </div>
-        <div class="scale-row">
-          <div class="scale-label">JF Raters</div>
-          <div class="scale-items">
-            <span class="scale-item">Self + Immediate Supervisor ÷ 2</span>
-          </div>
-        </div>
-      </div>
-    </div>
 
     </div>
     <!-- /Content card -->
@@ -1612,29 +1588,36 @@ function _resetEdap() {
 }
 </script>
 
-<style>
+<style scoped>
 .eval-page{padding:0;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;font-size:13px;color:#1A2332;min-height:100%;}
 
 /* ── Two-panel shell ── */
 .eval-tp-shell{display:flex;min-height:520px;border:1px solid #E2E8F0;border-radius:12px;overflow:hidden;background:#fff;margin-top:12px;}
-.eval-tp-left{width:410px;flex-shrink:0;border-right:1px solid #E2E8F0;display:flex;flex-direction:column;overflow-y:auto;max-height:82vh;scrollbar-width:thin;scrollbar-color:#E2E8F0 transparent;}
+.eval-tp-left{width:520px;flex-shrink:0;border-right:1px solid #E2E8F0;display:flex;flex-direction:column;overflow-y:auto;max-height:82vh;scrollbar-width:thin;scrollbar-color:#E2E8F0 transparent;}
 .eval-tp-left .tasks-period-bar,.eval-tp-left .filter-bar{border-bottom:1px solid #F1F5F9;padding:14px 18px;flex-shrink:0;}
 .eval-tp-right{flex:1;min-width:0;display:flex;flex-direction:column;overflow-y:auto;max-height:82vh;scrollbar-width:thin;scrollbar-color:#E2E8F0 transparent;}
 
 /* ── List items ── */
 .eli-list{flex:1;overflow-y:auto;}
-.eli{padding:14px 18px;border-bottom:1px solid #F1F5F9;cursor:pointer;transition:background .12s;}
+.eli{padding:13px 16px;border-bottom:1px solid #F1F5F9;cursor:pointer;transition:background .12s;display:flex;flex-direction:column;gap:8px;}
 .eli:hover{background:#F8FAFC;}
-.eli-active{background:#EFF6FF !important;border-left:3px solid #3B82F6;padding-left:15px;}
+.eli-active{background:#EFF6FF !important;border-left:3px solid #3B82F6;padding-left:13px;}
 .eli-sk{pointer-events:none;}
-.eli-top{display:flex;gap:6px;align-items:center;margin-bottom:6px;}
-.eli-name{font-size:14px;font-weight:700;color:#1E293B;line-height:1.3;margin-bottom:4px;}
-.eli-meta{font-size:11.5px;color:#64748B;margin-bottom:3px;}
-.eli-period-pill{font-size:10px;font-weight:700;background:#F1F5F9;color:#475569;border-radius:20px;padding:2px 9px;}
-.eli-score-row{display:flex;align-items:center;gap:8px;margin-top:6px;}
-.eli-score-big{font-size:20px;font-weight:800;color:#1E293B;}
+.eli-row{display:flex;align-items:center;gap:10px;}
+.eli-av{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;}
+.eli-av-res{background:#F0FDF4;color:#15803D;}
+.eli-av-rec{background:#F1F5F9;color:#475569;}
+.eli-info{flex:1;min-width:0;}
+.eli-name{font-size:13.5px;font-weight:700;color:#1E293B;line-height:1.25;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.eli-meta{font-size:11px;color:#64748B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.eli-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.eli-dot-done{background:#22C55E;box-shadow:0 0 0 2px #DCFCE7;}
+.eli-dot-pend{background:#F59E0B;box-shadow:0 0 0 2px #FEF3C7;}
+.eli-chips{display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
+.eli-period-pill{font-size:10px;font-weight:700;background:#F1F5F9;color:#475569;border-radius:20px;padding:2px 8px;}
+.eli-score-big{font-size:18px;font-weight:800;color:#1E293B;}
 .eli-desc-chip{font-size:10px;font-weight:700;border-radius:20px;padding:2px 9px;}
-.eli-final{display:flex;align-items:center;gap:4px;font-size:10.5px;color:#15803D;font-weight:600;margin-top:4px;}
+.eli-final{display:flex;align-items:center;gap:4px;font-size:10px;color:#15803D;font-weight:600;}
 
 /* ── Left empty state ── */
 .eval-lp-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;gap:8px;color:#94A3B8;text-align:center;}
@@ -1711,13 +1694,13 @@ function _resetEdap() {
 /* Filters */
 .filter-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap;}
 .status-tabs{display:flex;gap:4px;}
-.status-tab{padding:5px 14px;border-radius:20px;font-size:12px;font-weight:500;border:1px solid #E2E8F0;background:#fff;color:#64748B;cursor:pointer;transition:all .15s;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;}
+.status-tab{padding:5px 14px;border-radius:20px;font-size:12px;font-weight:500;border:1px solid #E2E8F0;background:#fff;color:#64748B;cursor:pointer;transition:all .15s;}
 .status-tab.active{background:#0D2137;color:#fff;border-color:#0D2137;}
 .filter-right{display:flex;gap:8px;align-items:center;}
 .srch-wrap{position:relative;}
 .srch-icon{position:absolute;left:9px;top:50%;transform:translateY(-50%);pointer-events:none;}
-.srch-inp{padding:7px 11px 7px 28px;border:1px solid #E2E8F0;border-radius:8px;font-size:12px;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;outline:none;width:200px;background:#fff;}
-.filter-select{padding:7px 10px;border:1px solid #E2E8F0;border-radius:7px;font-size:12px;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;color:#374151;background:#fff;outline:none;cursor:pointer;}
+.srch-inp{padding:7px 11px 7px 28px;border:1px solid #E2E8F0;border-radius:8px;font-size:12px;outline:none;width:200px;background:#fff;}
+.filter-select{padding:7px 10px;border:1px solid #E2E8F0;border-radius:7px;font-size:12px;color:#374151;background:#fff;outline:none;cursor:pointer;}
 
 /* Records grid */
 .records-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-bottom:16px;}
@@ -1747,14 +1730,6 @@ function _resetEdap() {
 .desc-needs{background:#FEF9C3;color:#92400E;}
 .desc-immediate{background:#FEF2F2;color:#B91C1C;}
 
-/* Scale card */
-.scale-card{background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:14px 18px;}
-.scale-title{font-size:11px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;}
-.scale-grid{display:flex;flex-direction:column;gap:8px;}
-.scale-row{display:flex;align-items:flex-start;gap:12px;}
-.scale-label{font-size:11px;font-weight:600;color:#374151;width:200px;flex-shrink:0;}
-.scale-items{display:flex;gap:8px;flex-wrap:wrap;}
-.scale-item{font-size:11px;color:#64748B;padding:2px 8px;background:#F8FAFC;border-radius:6px;}
 
 /* Empty */
 .empty-state{display:flex;flex-direction:column;align-items:center;padding:60px 0;gap:8px;}
@@ -1770,7 +1745,7 @@ function _resetEdap() {
 .sk-scores{display:flex;gap:8px;}
 
 /* Buttons */
-.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 13px;border-radius:8px;font-size:12px;cursor:pointer;border:1px solid #E2E8F0;background:#fff;color:#374151;transition:all .15s;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;font-weight:500;}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 13px;border-radius:8px;font-size:12px;cursor:pointer;border:1px solid #E2E8F0;background:#fff;color:#374151;transition:all .15s;font-weight:500;}
 .btn:hover{border-color:#CBD5E1;background:#F8FAFC;}
 .btn:disabled{opacity:.55;cursor:not-allowed;}
 .btn-primary{background:#0D2137;color:#fff;border-color:#0D2137;}
@@ -1804,7 +1779,7 @@ function _resetEdap() {
 /* Tabs */
 .dtabs{display:flex;padding:0 24px;border-bottom:1px solid #E8EDF3;flex-shrink:0;overflow-x:auto;scrollbar-width:none;}
 .dtabs::-webkit-scrollbar{display:none;}
-.dtab{padding:10px 14px;font-size:12px;font-weight:500;cursor:pointer;border:none;background:transparent;color:#64748B;border-bottom:2px solid transparent;margin-bottom:-1px;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;transition:all .15s;white-space:nowrap;}
+.dtab{padding:10px 14px;font-size:12px;font-weight:500;cursor:pointer;border:none;background:transparent;color:#64748B;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;white-space:nowrap;}
 .dtab.active{color:#1A56B0;border-bottom-color:#1A56B0;font-weight:600;}
 
 /* Tab content */
@@ -1828,7 +1803,7 @@ function _resetEdap() {
 .ind-num{width:22px;height:22px;border-radius:50%;background:#F1F5F9;color:#64748B;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .ind-text{flex:1;font-size:12px;color:#374151;line-height:1.5;}
 .ind-rating{display:flex;gap:4px;flex-shrink:0;}
-.rating-btn{min-width:38px;height:38px;padding:0 10px;border-radius:8px;border:1.5px solid #E2E8F0;background:#fff;font-size:13px;font-weight:700;color:#64748B;cursor:pointer;transition:all .12s;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;display:flex;align-items:center;justify-content:center;}
+.rating-btn{min-width:38px;height:38px;padding:0 10px;border-radius:8px;border:1.5px solid #E2E8F0;background:#fff;font-size:13px;font-weight:700;color:#64748B;cursor:pointer;transition:all .12s;display:flex;align-items:center;justify-content:center;}
 .rating-btn:hover:not(.selected){background:#EFF6FF;border-color:#93C5FD;color:#1A56B0;}
 .rating-btn.selected{background:#1A56B0;border-color:#1A56B0;color:#fff;box-shadow:0 2px 8px rgba(26,86,176,.25);}
 
@@ -1881,7 +1856,7 @@ function _resetEdap() {
 .jf-num{width:22px;height:22px;border-radius:50%;background:#F3EEFF;color:#6B3FA0;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;}
 .jf-info{flex:1;min-width:0;}
 .jf-label{font-size:12px;font-weight:600;color:#374151;margin-bottom:5px;line-height:1.4;}
-.jf-evidence{width:100%;padding:5px 9px;border:1px solid #E2E8F0;border-radius:6px;font-size:11px;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;color:#64748B;outline:none;}
+.jf-evidence{width:100%;padding:5px 9px;border:1px solid #E2E8F0;border-radius:6px;font-size:11px;color:#64748B;outline:none;}
 .jf-evidence:focus{border-color:#6B3FA0;}
 
 /* Form fields */
@@ -1889,10 +1864,10 @@ function _resetEdap() {
 .field{display:flex;flex-direction:column;gap:5px;}
 .full{grid-column:span 2;}
 .field-label{font-size:11px;font-weight:600;color:#374151;}
-.field-input{padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:9px;font-size:13px;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;color:#0F172A;background:#fff;outline:none;transition:border-color .15s;}
+.field-input{padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:9px;font-size:13px;color:#0F172A;background:#fff;outline:none;transition:border-color .15s;}
 .field-input:focus{border-color:#3B82F6;box-shadow:0 0 0 3px rgba(59,130,246,.1);}
 .toggle-row{display:flex;gap:8px;}
-.toggle-btn{flex:1;padding:10px;border:1.5px solid #E2E8F0;border-radius:9px;cursor:pointer;font-size:12px;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;background:#fff;color:#374151;transition:all .15s;}
+.toggle-btn{flex:1;padding:10px;border:1.5px solid #E2E8F0;border-radius:9px;cursor:pointer;font-size:12px;background:#fff;color:#374151;transition:all .15s;}
 .toggle-btn.active{border-color:#3B82F6;background:#EBF4FF;color:#1A56B0;font-weight:600;}
 
 /* Detail loading */
@@ -1953,7 +1928,7 @@ function _resetEdap() {
 
 /* View tabs */
 .view-tabs{display:flex;gap:4px;margin-bottom:16px;}
-.view-tab{display:inline-flex;align-items:center;gap:6px;padding:7px 16px;border-radius:20px;font-size:12px;font-weight:500;border:1px solid #E2E8F0;background:#fff;color:#64748B;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;transition:all .15s;}
+.view-tab{display:inline-flex;align-items:center;gap:6px;padding:7px 16px;border-radius:20px;font-size:12px;font-weight:500;border:1px solid #E2E8F0;background:#fff;color:#64748B;cursor:pointer;transition:all .15s;}
 .view-tab.active{background:#0D2137;color:#fff;border-color:#0D2137;}
 .view-tab-badge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#EF4444;color:#fff;font-size:10px;font-weight:700;}
 

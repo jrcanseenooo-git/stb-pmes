@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="ipcrf-page">
 
     <div class="tp-shell">
@@ -24,41 +24,49 @@
           <!-- Self-service Generate Targets/Ratings -->
           <div v-if="canSelfServe" class="generate-bar">
             <div class="generate-period">
-              <label class="field-label">Semester</label>
-              <select v-model="periodSemester" class="filter-select">
-                <option value="1">1st Semester</option>
-                <option value="2">2nd Semester</option>
-              </select>
               <label class="field-label">Year</label>
               <input v-model.number="periodYear" type="number" class="filter-select" style="width:80px"/>
             </div>
             <div class="generate-actions">
               <a
-                v-if="periodStatusInfo?.docFileUrl && (periodStatusInfo?.hasTargetsDoc || periodStatusInfo?.hasRatingsDoc)"
+                v-if="periodStatusInfo?.docFileUrl"
                 :href="periodStatusInfo.docFileUrl"
                 target="_blank"
                 class="btn btn-sm btn-active-ok">
                 Open Spreadsheet
               </a>
+              <span v-if="periodStatusInfo?.docMissing" class="generate-hint generate-hint--warn">
+                File was deleted from Drive. Regenerate to create a new one.
+              </span>
               <div class="generate-item">
                 <template v-if="periodStatusInfo?.hasTargetsDoc">
                   <span class="generate-label">Targets:</span>
-                  <button class="btn btn-xs btn-regenerate" :disabled="!!periodBusy" @click="doPeriodGenerate('targets')">{{ periodBusy === 'targets' ? 'Regenerating...' : 'Regenerate' }}</button>
+                  <button class="btn btn-xs btn-regenerate" :disabled="!!periodBusy || periodStatusLoading" @click="doPeriodGenerate('targets')">
+                    {{ periodBusy === 'targets' ? 'Regenerating...' : 'Regenerate' }}
+                  </button>
                 </template>
-                <button v-else class="btn btn-sm" :disabled="!!periodBusy" @click="doPeriodGenerate('targets')">
-                  {{ periodBusy === 'targets' ? 'Checking...' : `Generate ${myFormType} Targets` }}
+                <button v-else class="btn btn-sm" :disabled="!!periodBusy || periodStatusLoading" @click="doPeriodGenerate('targets')">
+                  {{ periodStatusLoading ? 'Checking...' : periodBusy === 'targets' ? 'Generating...' : `Generate ${myFormType} Targets` }}
                 </button>
-                <span v-if="periodStatusLoading" class="generate-hint">Checking...</span>
               </div>
               <div class="generate-item">
-                <template v-if="periodStatusInfo?.hasRatingsDoc">
-                  <span class="generate-label">Ratings:</span>
-                  <button class="btn btn-xs btn-regenerate" :disabled="!!periodBusy" @click="doPeriodGenerate('ratings')">{{ periodBusy === 'ratings' ? 'Regenerating...' : 'Regenerate' }}</button>
+                <span class="generate-label">Ratings:</span>
+                <template v-if="periodStatusInfo?.hasS1RatingsDoc">
+                  <button class="btn btn-xs btn-regenerate" :disabled="!!periodBusy || periodStatusLoading" @click="doPeriodGenerate('ratings', 1)">
+                    {{ periodBusy === 'ratings-1' ? 'Regenerating...' : 'Regen S1' }}
+                  </button>
                 </template>
-                <button v-else class="btn btn-primary btn-sm" :disabled="!!periodBusy" @click="doPeriodGenerate('ratings')">
-                  {{ periodBusy === 'ratings' ? 'Checking...' : `Generate ${myFormType} Ratings` }}
+                <button v-else class="btn btn-sm" :disabled="!!periodBusy || periodStatusLoading" @click="doPeriodGenerate('ratings', 1)">
+                  {{ periodStatusLoading ? 'Checking...' : periodBusy === 'ratings-1' ? 'Generating...' : 'S1 Ratings' }}
                 </button>
-                <span v-if="periodStatusLoading" class="generate-hint">Checking...</span>
+                <template v-if="periodStatusInfo?.hasS2RatingsDoc">
+                  <button class="btn btn-xs btn-regenerate" :disabled="!!periodBusy || periodStatusLoading" @click="doPeriodGenerate('ratings', 2)">
+                    {{ periodBusy === 'ratings-2' ? 'Regenerating...' : 'Regen S2' }}
+                  </button>
+                </template>
+                <button v-else class="btn btn-primary btn-sm" :disabled="!!periodBusy || periodStatusLoading" @click="doPeriodGenerate('ratings', 2)">
+                  {{ periodStatusLoading ? 'Checking...' : periodBusy === 'ratings-2' ? 'Generating...' : 'S2 Ratings' }}
+                </button>
               </div>
             </div>
           </div>
@@ -78,11 +86,6 @@
                 <option value="">All Types</option>
                 <option value="IPCRF">IPCRF</option>
                 <option value="CCEF">CCEF</option>
-              </select>
-              <select v-model="filterSemester" class="filter-select">
-                <option value="">All Semesters</option>
-                <option value="1">Semester 1</option>
-                <option value="2">Semester 2</option>
               </select>
             </div>
           </div>
@@ -116,7 +119,7 @@
             >
               <div class="fli-top">
                 <span :class="['type-badge', form.type === 'IPCRF' ? 'type-ipcrf' : 'type-ccef']">{{ form.type }}</span>
-                <span class="fli-period">S{{ form.semester }} {{ form.year }}</span>
+                <span class="fli-period">{{ form.year }}</span>
                 <span :class="['status-badge', statusClass(form.status)]">{{ form.status }}</span>
               </div>
               <div class="fli-name">{{ form.employeeName }}</div>
@@ -128,8 +131,6 @@
               <div class="fli-foot" @click.stop>
                 <span class="fli-date">{{ fmtDate(form.updatedAt || form.createdAt) }}</span>
                 <div class="fli-actions">
-                  <button v-if="(form.status === 'Draft' || form.status === 'Returned') && form.userId === authStore.profileId"
-                    class="btn btn-xs btn-outline" @click.stop="quickSubmit(form)">Submit</button>
                   <button v-if="canReviewForm(form)"
                     class="btn btn-xs btn-success" @click.stop="quickApprove(form)">Approve</button>
                   <button v-if="canReviewForm(form)"
@@ -166,7 +167,7 @@
                 <span :class="['status-badge', statusClass(activeForm?.status)]">{{ activeForm?.status }}</span>
               </div>
               <div class="dh-name">{{ activeForm?.employeeName }}</div>
-              <div class="dh-sub">S{{ activeForm?.semester }} {{ activeForm?.year }} | {{ activeForm?.divisionName }}</div>
+              <div class="dh-sub">{{ activeForm?.year }} | {{ activeForm?.divisionName }}</div>
             </div>
             <button class="modal-close" @click="closeFormModal">
               <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
@@ -303,6 +304,15 @@
                   <button class="btn btn-warn btn-sm" @click="doReturn">Return</button>
                 </div>
               </div>
+              <div v-else-if="activeForm?.status === 'Approved' && activeForm?.userId === authStore.profileId" class="wf-bar">
+                <span class="wf-info">Targets approved — complete your accomplishments, then submit ratings for Division Chief review.</span>
+                <button class="btn btn-primary btn-sm" :disabled="ratingBusy" @click="doSubmitRatings">
+                  {{ ratingBusy ? 'Submitting...' : 'Submit Ratings for Review' }}
+                </button>
+              </div>
+              <div v-else-if="activeForm?.status === 'Approved'" class="wf-bar">
+                <span class="wf-info muted-text">Waiting for {{ activeForm?.employeeName }} to submit their ratings.</span>
+              </div>
             </div>
 
             <!-- DETAILS TAB -->
@@ -311,7 +321,7 @@
                 <div>
                   <div class="det-st">Period & Role</div>
                   <div class="det-row"><span class="dk">Form Type</span><span class="dv">{{ activeForm?.type }}</span></div>
-                  <div class="det-row"><span class="dk">Semester / Year</span><span class="dv">S{{ activeForm?.semester }}, {{ activeForm?.year }}</span></div>
+                  <div class="det-row"><span class="dk">Year</span><span class="dv">{{ activeForm?.year }}</span></div>
                   <div class="det-row"><span class="dk">Division</span><span class="dv">{{ activeForm?.divisionName || '-' }}</span></div>
                   <div class="det-row"><span class="dk">Section</span><span class="dv">{{ activeForm?.sectionName || '-' }}</span></div>
                   <div class="det-st" style="margin-top:16px">Weights</div>
@@ -612,7 +622,7 @@
             </div>
             <div>
               <h3 class="modal-title">New Performance Form</h3>
-              <p class="modal-sub">IPCRF or CCEF for this semester</p>
+              <p class="modal-sub">IPCRF or CCEF for the year</p>
             </div>
             <button class="modal-close" @click="showNewFormModal = false">
               <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
@@ -636,14 +646,7 @@
                 </div>
                 <p class="type-auto-hint">Set automatically based on your Employment Type ({{ authStore.employmentType || 'Regular' }})</p>
               </div>
-              <div class="field">
-                <label class="field-label">Semester <span class="req">*</span></label>
-                <select v-model="newForm.semester" class="field-input">
-                  <option value="1">1st Semester (Jan-Jun)</option>
-                  <option value="2">2nd Semester (Jul-Dec)</option>
-                </select>
-              </div>
-              <div class="field">
+              <div class="field full">
                 <label class="field-label">Year</label>
                 <input v-model.number="newForm.year" type="number" class="field-input"/>
               </div>
@@ -820,7 +823,7 @@ const entriesLoading = ref(false)
 const creating       = ref(false)
 const activeStatus   = ref('All')
 const filterType     = ref('')
-const filterSemester = ref('')
+
 const activeForm     = ref(null)
 const activeTab      = ref('indicators')
 const allEntries     = ref([])
@@ -859,7 +862,7 @@ const ratingBusy   = ref(false)
 
 const newForm = ref({
   type: 'IPCRF',
-  semester: String(new Date().getMonth() < 6 ? 1 : 2),
+
   year: new Date().getFullYear(),
   immediateSupervisor: '', supervisorPosition: '',
   approvingAuthority: '', authorityPosition: ''
@@ -890,7 +893,7 @@ const filteredForms = computed(() => {
   let f = forms.value
   if (activeStatus.value !== 'All') f = f.filter(x => x.status === activeStatus.value)
   if (filterType.value)     f = f.filter(x => x.type     === filterType.value)
-  if (filterSemester.value) f = f.filter(x => String(x.semester) === filterSemester.value)
+
   return f.sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt))
 })
 
@@ -943,7 +946,7 @@ function isCosEmploymentType(value) {
 const myFormType   = computed(() => isCosEmploymentType(authStore.employmentType) ? 'CCEF' : 'IPCRF')
 
 // Period-level Generate Targets/Ratings (self-service, list-page entry point)
-const periodSemester = ref(String(new Date().getMonth() < 6 ? 1 : 2))
+
 const periodYear     = ref(new Date().getFullYear())
 const periodBusy     = ref('')
 const periodStatusInfo    = ref(null)
@@ -957,9 +960,6 @@ function posWeight(item)    {
 }
 function fmtDate(iso)       { return iso ? new Date(iso).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' }) : '' }
 function showToast(msg, type = 'success') { toast.value = { show: true, msg, type }; setTimeout(() => { toast.value.show = false }, 3500) }
-function semesterLabel(semester = periodSemester.value) {
-  return String(semester) === '1' ? '1st Semester' : '2nd Semester'
-}
 function isSelected(item)   { return libSelected.value.some(s => s.id === item.id) }
 function toggleSelect(item) {
   const i = libSelected.value.findIndex(s => s.id === item.id)
@@ -995,7 +995,7 @@ onMounted(loadForms)
 onMounted(loadPeriodStatus)
 
 let periodWatchTimer = null
-watch([periodSemester, periodYear], () => {
+watch(periodYear, () => {
   clearTimeout(periodWatchTimer)
   periodWatchTimer = setTimeout(loadPeriodStatus, 400)
 })
@@ -1004,7 +1004,7 @@ async function loadPeriodStatus() {
   if (!canSelfServe.value) return
   periodStatusLoading.value = true
   try {
-    periodStatusInfo.value = await ipcrfApi.periodStatus(periodSemester.value, periodYear.value)
+    periodStatusInfo.value = await ipcrfApi.periodStatus(periodYear.value)
   } catch (e) {
     periodStatusInfo.value = null
   } finally {
@@ -1071,7 +1071,7 @@ async function openFormModal(form) {
 
 async function createForm() {
   if (creating.value) return
-  const ok = await confirm(CONFIRMS.createForm(newForm.value.type, newForm.value.semester, newForm.value.year))
+  const ok = await confirm(CONFIRMS.createForm(newForm.value.type, newForm.value.year))
   if (!ok) return
   creating.value = true
   try {
@@ -1089,7 +1089,7 @@ async function createForm() {
 
 // Quick actions from list item
 async function quickSubmit(form)  {
-  const ok = await confirm(CONFIRMS.submitForm(form.type, form.semester, form.year))
+  const ok = await confirm(CONFIRMS.submitForm(form.type, form.year))
   if (!ok) return
   try { const u = await ipcrfApi.submitForm(form.id);  _syncList(form.id, u); showToast('Submitted') } catch (e) { showToast(e.message, 'error') }
 }
@@ -1211,7 +1211,7 @@ async function doDelete() {
 }
 
 async function doSubmit()  {
-  const ok = await confirm(CONFIRMS.submitForm(activeForm.value.type, activeForm.value.semester, activeForm.value.year))
+  const ok = await confirm(CONFIRMS.submitForm(activeForm.value.type, activeForm.value.year))
   if (!ok) return
   try { const u = await ipcrfApi.submitForm(activeForm.value.id);  _sync(u); showToast('Submitted') }       catch (e) { showToast(e.message, 'error') }
 }
@@ -1256,6 +1256,26 @@ async function doMarkRated() {
   finally { ratingBusy.value = false }
 }
 
+async function doSubmitRatings() {
+  if (ratingBusy.value) return
+  const ok = await confirm({
+    type: 'submit',
+    title: 'Submit Ratings for Review',
+    message: `This will submit your ${activeForm.value?.type || 'form'} ratings to the Division Chief for review.`,
+    note: 'Make sure your accomplishments and ratings are complete before submitting.',
+    confirmLabel: 'Submit Ratings',
+    cancelLabel: 'Cancel'
+  })
+  if (!ok) return
+  ratingBusy.value = true
+  try {
+    const u = await ipcrfApi.submitRatings(activeForm.value.id)
+    _sync(u)
+    showToast('Ratings submitted for Division Chief review.')
+  } catch (e) { showToast(e.message, 'error') }
+  finally { ratingBusy.value = false }
+}
+
 async function doFinalize() {
   if (ratingBusy.value) return
   const ok = await confirm({
@@ -1277,55 +1297,75 @@ async function doFinalize() {
 }
 
 // ── Self-service period Generate (list-page entry point) ──
-async function doPeriodGenerate(kind) {
+async function doPeriodGenerate(kind, sem) {
   if (periodBusy.value) return
-  const docName = kind === 'targets' ? 'Targets Sheet' : 'Ratings Sheet'
+  const isRatings = kind === 'ratings'
+  const semLabel  = sem === 1 ? '1st Semester' : '2nd Semester'
+  const docName   = isRatings ? `${semLabel} Ratings Sheet` : 'Targets Sheet'
+  const busyKey   = isRatings ? `ratings-${sem}` : 'targets'
+
   const ok = await confirm({
     type: 'submit',
     title: `Generate ${myFormType.value} ${docName}`,
-    message: `This will generate or regenerate the ${docName.toLowerCase()} for ${semesterLabel()} ${periodYear.value}.`,
+    message: `This will generate or regenerate the ${docName.toLowerCase()} for ${periodYear.value}.`,
     details: [
       { label: 'Form Type', value: myFormType.value },
-      { label: 'Period', value: `${semesterLabel()} ${periodYear.value}` }
+      { label: 'Period',    value: isRatings ? `${semLabel} ${periodYear.value}` : `${periodYear.value}` }
     ],
-    note: 'If a generated sheet already exists, it may be updated or regenerated.',
+    note: 'If a generated sheet already exists, it will be replaced in the same file.',
     confirmLabel: `Generate ${docName}`,
     cancelLabel: 'Cancel'
   })
   if (!ok) return
-  periodBusy.value = kind
+  periodBusy.value = busyKey
   try {
-    const status = await ipcrfApi.periodStatus(periodSemester.value, periodYear.value)
+    const status = await ipcrfApi.periodStatus(periodYear.value)
 
     if (!status.hasForm) {
-      if (kind === 'targets') {
-        showToast(`No ${status.type} Targets form yet for S${periodSemester.value} ${periodYear.value} - create one below.`, 'error')
-        newForm.value = { ...newForm.value, type: status.type, semester: String(periodSemester.value), year: Number(periodYear.value) }
+      if (!isRatings) {
+        showToast(`No ${status.type} Targets form yet for ${periodYear.value} - create one below.`, 'error')
+        newForm.value = { ...newForm.value, type: status.type, year: Number(periodYear.value) }
         showNewFormModal.value = true
       } else {
-        showToast(`Create your ${status.type} Targets form for S${periodSemester.value} ${periodYear.value} first.`, 'error')
+        showToast(`Create your ${status.type} form for ${periodYear.value} first.`, 'error')
       }
       return
     }
 
-    if (kind === 'targets') {
+    if (!isRatings) {
       const r = await docGenApi.generateTargets(status.formId)
       _syncList(status.formId, { docFileId: r.fileId, targetsGeneratedAt: new Date().toISOString() })
+      periodStatusInfo.value = {
+        ...periodStatusInfo.value,
+        docFileId:     r.fileId,
+        docFileUrl:    `https://docs.google.com/spreadsheets/d/${r.fileId}/edit`,
+        hasTargetsDoc: true,
+        docMissing:    false
+      }
       showToast('Targets document generated')
       return
     }
 
     if (status.totalEntries === 0) {
-      showToast('Add indicators to this form before generating Ratings - open the form to add them.', 'error')
+      showToast('Add indicators to this form before generating Ratings.', 'error')
       return
     }
     if (!status.hasTargetsDoc) {
-      showToast('Generate the Targets sheet first so Ratings can be added to the same spreadsheet file.', 'error')
+      showToast('Generate the Targets sheet first so Ratings can be added to the same file.', 'error')
       return
     }
-    const r = await docGenApi.generateRatings(status.formId)
-    _syncList(status.formId, { docFileId: r.fileId, ratingsGeneratedAt: new Date().toISOString() })
-    showToast('Ratings document generated')
+    const r = await docGenApi.generateRatings(status.formId, sem)
+    const ratingsField = sem === 2 ? 's2RatingsGeneratedAt' : 's1RatingsGeneratedAt'
+    _syncList(status.formId, { docFileId: r.fileId, [ratingsField]: new Date().toISOString() })
+    periodStatusInfo.value = {
+      ...periodStatusInfo.value,
+      docFileId:        r.fileId,
+      docFileUrl:       `https://docs.google.com/spreadsheets/d/${r.fileId}/edit`,
+      hasRatingsDoc:    true,
+      ...(sem === 2 ? { hasS2RatingsDoc: true } : { hasS1RatingsDoc: true }),
+      docMissing:       false
+    }
+    showToast(`${semLabel} Ratings document generated`)
   } catch (e) { showToast(e.message, 'error') }
   finally { periodBusy.value = ''; loadPeriodStatus() }
 }
@@ -1350,7 +1390,7 @@ async function doPrint(fileId, tab) {
 }
 </script>
 
-<style>
+<style scoped>
 *{box-sizing:border-box;}
 .ipcrf-page { padding: 0; font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;font-size:13px;color:#1A2332;background: transparent; min-height: 100%; }
 .muted-text{color:#94A3B8;}
@@ -1359,7 +1399,7 @@ async function doPrint(fileId, tab) {
 
 /* Two-panel shell */
 .tp-shell { display: flex; background: #fff; border: 1px solid #E2E8F0; border-radius: 14px; overflow: hidden; min-height: 560px; }
-.tp-left { width: 410px; flex-shrink: 0; border-right: 1px solid #E2E8F0; display: flex; flex-direction: column; overflow-y: auto; max-height: 84vh; scrollbar-width: thin; scrollbar-color: #E2E8F0 transparent; }
+.tp-left { width: 650px; flex-shrink: 0; border-right: 1px solid #E2E8F0; display: flex; flex-direction: column; overflow-y: auto; max-height: 84vh; scrollbar-width: thin; scrollbar-color: #E2E8F0 transparent; }
 .tp-left::-webkit-scrollbar { width: 4px; }
 .tp-left::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 4px; }
 .tp-right { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; max-height: 84vh; }
@@ -1383,28 +1423,32 @@ async function doPrint(fileId, tab) {
 .page-sub{font-size:11px;color:#94A3B8;margin:0;}
 
 /* Filters */
-.filter-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:10px;flex-wrap:wrap;}
+.filter-bar{display:flex;flex-direction:column;gap:8px;margin-bottom:14px;}
 
 /* Self-service period generate bar */
-.generate-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;margin-bottom:14px;background:#F5F9FF;border:1px solid #DCE9FB;border-radius:10px;flex-wrap:wrap;}
-.generate-period{display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
+.generate-bar{display:flex;flex-direction:column;gap:9px;padding:10px 14px;margin-bottom:14px;background:#F5F9FF;border:1px solid #DCE9FB;border-radius:10px;}
+.generate-period{display:flex;align-items:center;gap:7px;}
 .generate-period .field-label{margin:0;font-size:11px;}
-.generate-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;}
-.generate-item{display:grid;grid-template-columns:auto auto auto;align-items:center;gap:5px 7px;justify-content:flex-start;}
+.generate-period .filter-select:first-of-type{flex:1;min-width:0;}
+.generate-actions{display:flex;gap:7px;}
+.generate-actions>*{flex:1;min-width:0;text-align:center;justify-content:center;}
+.generate-item{display:flex;align-items:center;justify-content:center;gap:6px;}
 .generate-label{font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;}
-.generate-hint{grid-column:1 / -1;font-size:10px;color:#94A3B8;font-weight:500;line-height:1.2;}
+.generate-hint{font-size:10px;color:#94A3B8;font-weight:500;line-height:1.2;}
+.generate-hint--warn{color:#B45309;background:#FFFBEB;border:1px solid #FDE68A;border-radius:6px;padding:3px 8px;}
 .btn-regenerate{padding:4px 9px;border-color:#CBD5E1;background:#fff;color:#334155;font-size:11px;font-weight:600;}
 .btn-regenerate:hover:not(:disabled){border-color:#3B82F6;background:#EFF6FF;color:#1D4ED8;}
 .btn-active-ok{background:#F0FDF4;color:#15803D;border-color:#BBF7D0;}
 .btn-active-ok:hover{background:#DCFCE7;}
 
-.status-tabs{display:flex;gap:4px;flex-wrap:wrap;}
-.status-tab{padding:4px 11px;border-radius:20px;font-size:11px;font-weight:500;border:1px solid #E2E8F0;background:#fff;color:#64748B;cursor:pointer;transition:all .15s;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;}
+.status-tabs{display:flex;gap:4px;flex-wrap:wrap;width:100%;}
+.status-tab{padding:4px 8px;border-radius:20px;font-size:11px;font-weight:500;border:1px solid #E2E8F0;background:#fff;color:#64748B;cursor:pointer;transition:all .15s;flex:1;text-align:center;white-space:nowrap;}
 .status-tab:hover{border-color:#CBD5E1;}
 .status-tab.active{background:#0D2137;color:#fff;border-color:#0D2137;}
 .tab-badge{background:#3B82F6;color:#fff;border-radius:10px;font-size:10px;padding:1px 5px;margin-left:3px;}
-.filter-selects{display:flex;gap:6px;}
-.filter-select{padding:6px 10px;border:1px solid #E2E8F0;border-radius:7px;font-size:12px;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;color:#374151;background:#fff;outline:none;cursor:pointer;}
+.filter-selects{display:flex;gap:6px;width:100%;}
+.filter-selects .filter-select{flex:1 1 0;min-width:0;width:0;}
+.filter-select{padding:6px 10px;border:1px solid #E2E8F0;border-radius:7px;font-size:12px;color:#374151;background:#fff;outline:none;cursor:pointer;}
 .filter-select:focus{border-color:#3B82F6;}
 
 /* Forms list */
@@ -1441,7 +1485,7 @@ async function doPrint(fileId, tab) {
 .st-finalized{background:#F0FDF4;color:#15803D;}
 
 /* Buttons */
-.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 13px;border-radius:8px;font-size:12px;cursor:pointer;border:1px solid #E2E8F0;background:#fff;color:#374151;transition:all .15s;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;font-weight:500;}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 13px;border-radius:8px;font-size:12px;cursor:pointer;border:1px solid #E2E8F0;background:#fff;color:#374151;transition:all .15s;font-weight:500;}
 .btn:hover{border-color:#CBD5E1;background:#F8FAFC;}
 .btn:disabled{opacity:.55;cursor:not-allowed;}
 .btn-primary{background:#0D2137;color:#fff;border-color:#0D2137;}
@@ -1470,7 +1514,7 @@ async function doPrint(fileId, tab) {
 .sk-badge{background:linear-gradient(90deg,#E2E8F0 25%,#F1F5F9 50%,#E2E8F0 75%);background-size:200%;animation:shimmer 1.4s infinite;border-radius:6px;width:50px;height:20px;display:inline-block;}
 
 /* Modal overlay */
-.modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.5);display:flex;align-items:center;justify-content:center;z-index:300;padding:16px;backdrop-filter:blur(4px);font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;}
+.modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.5);display:flex;align-items:center;justify-content:center;z-index:300;padding:16px;backdrop-filter:blur(4px);}
 
 /* Modal base */
 .modal{background:#fff;border-radius:16px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.2);overflow:hidden;}
@@ -1496,7 +1540,7 @@ async function doPrint(fileId, tab) {
 
 /* Tabs */
 .dtabs{display:flex;padding:0 24px;border-bottom:1px solid #E8EDF3;flex-shrink:0;background:#fff;}
-.dtab{flex:1 1 0;padding:13px 14px;font-size:13px;font-weight:500;cursor:pointer;border:none;background:transparent;color:#64748B;border-bottom:3px solid transparent;margin-bottom:-1px;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;transition:all .15s;display:inline-flex;align-items:center;justify-content:center;gap:6px;}
+.dtab{flex:1 1 0;padding:13px 14px;font-size:13px;font-weight:500;cursor:pointer;border:none;background:transparent;color:#64748B;border-bottom:3px solid transparent;margin-bottom:-1px;transition:all .15s;display:inline-flex;align-items:center;justify-content:center;gap:6px;}
 .dtab:hover{color:#374151;background:#FAFBFF;}
 .dtab.active{color:#1A56B0;border-bottom-color:#1A56B0;font-weight:700;background:#F5F9FF;}
 .dtab-cnt{background:#EBF4FF;color:#1A56B0;border-radius:9px;font-size:10px;padding:1px 6px;font-weight:600;}
@@ -1523,7 +1567,7 @@ async function doPrint(fileId, tab) {
 .fn-empty{text-align:center;padding:14px;font-size:11px;color:#94A3B8;border:1.5px dashed #E2E8F0;border-radius:8px;}
 
 /* Add pills */
-.add-pill{display:inline-flex;align-items:center;gap:4px;padding:4px 11px;border-radius:12px;font-size:10px;font-weight:600;border:1px solid #BFDBFE;background:#EFF6FF;color:#1A56B0;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;transition:all .12s;}
+.add-pill{display:inline-flex;align-items:center;gap:4px;padding:4px 11px;border-radius:12px;font-size:10px;font-weight:600;border:1px solid #BFDBFE;background:#EFF6FF;color:#1A56B0;cursor:pointer;transition:all .12s;}
 .add-pill:hover{background:#1A56B0;color:#fff;border-color:#1A56B0;}
 .add-pill-ghost{border-color:#E2E8F0;background:#fff;color:#475569;}
 .add-pill-ghost:hover{background:#F8FAFC;border-color:#CBD5E1;color:#1A56B0;}
@@ -1593,11 +1637,11 @@ async function doPrint(fileId, tab) {
 .lib-filters{display:flex;gap:8px;padding:12px 24px;border-bottom:1px solid #F1F5F9;flex-shrink:0;flex-wrap:wrap;}
 .srch-wrap{flex:1;position:relative;min-width:160px;}
 .srch-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);pointer-events:none;}
-.srch-inp{width:100%;padding:8px 11px 8px 30px;border:1.5px solid #E2E8F0;border-radius:7px;font-size:12px;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;color:#0F172A;outline:none;}
+.srch-inp{width:100%;padding:8px 11px 8px 30px;border:1.5px solid #E2E8F0;border-radius:7px;font-size:12px;color:#0F172A;outline:none;}
 .srch-inp:focus{border-color:#3B82F6;box-shadow:0 0 0 3px rgba(59,130,246,.1);}
 .sel-strip{display:flex;align-items:center;justify-content:space-between;padding:7px 24px;background:#EBF4FF;border-bottom:1px solid #BFDBFE;flex-shrink:0;}
 .sel-cnt{font-size:12px;font-weight:600;color:#1A56B0;}
-.sel-clr{font-size:11px;color:#64748B;background:none;border:none;cursor:pointer;text-decoration:underline;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;}
+.sel-clr{font-size:11px;color:#64748B;background:none;border:none;cursor:pointer;text-decoration:underline;}
 .lib-scroll{flex:1;overflow-y:auto;padding:12px 24px;max-height:50vh;}
 .lib-list{display:flex;flex-direction:column;gap:6px;}
 .lib-item{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border:1.5px solid #E8EDF3;border-radius:9px;cursor:pointer;transition:all .12s;user-select:none;}
@@ -1636,7 +1680,7 @@ async function doPrint(fileId, tab) {
 .ci-rm:hover{background:#FEF2F2;color:#EF4444;}
 
 /* Fullscreen lock */
-.fullscreen-lock{position:fixed;inset:0;background:rgba(15,23,42,.9);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;}
+.fullscreen-lock{position:fixed;inset:0;background:rgba(15,23,42,.9);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);}
 .lock-box{background:#fff;border-radius:20px;padding:36px 44px;text-align:center;width:380px;max-width:calc(100vw - 32px);box-shadow:0 32px 80px rgba(0,0,0,.35);}
 .lock-spin{width:48px;height:48px;border:4px solid #E2E8F0;border-top-color:#1A56B0;border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 20px;}
 .lock-title{font-size:17px;font-weight:700;color:#0F172A;margin-bottom:16px;letter-spacing:-.3px;}
@@ -1660,7 +1704,7 @@ async function doPrint(fileId, tab) {
 .field{display:flex;flex-direction:column;gap:5px;}
 .full{grid-column:span 2;}
 .field-label{font-size:11px;font-weight:600;color:#374151;}
-.field-input{padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:9px;font-size:13px;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;color:#0F172A;background:#fff;outline:none;transition:border-color .15s;resize:vertical;}
+.field-input{padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:9px;font-size:13px;color:#0F172A;background:#fff;outline:none;transition:border-color .15s;resize:vertical;}
 .field-input:focus{border-color:#3B82F6;box-shadow:0 0 0 3px rgba(59,130,246,.1);}
 .field-input::placeholder{color:#CBD5E1;}
 .avg-box{background:#F0FDF4;color:#15803D;font-weight:600;cursor:default;pointer-events:none;}
@@ -1671,7 +1715,7 @@ async function doPrint(fileId, tab) {
 .type-opt-locked{cursor:default;}
 .type-opt-locked:hover{border-color:#3B82F6;}
 .type-auto-hint{font-size:10.5px;color:#94A3B8;margin:6px 0 0;}
-.type-opt{padding:12px;border:1.5px solid #E2E8F0;border-radius:10px;cursor:pointer;text-align:left;background:#fff;transition:all .15s;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;}
+.type-opt{padding:12px;border:1.5px solid #E2E8F0;border-radius:10px;cursor:pointer;text-align:left;background:#fff;transition:all .15s;}
 .type-opt strong{display:block;font-size:13px;font-weight:700;color:#0F172A;margin-bottom:3px;}
 .type-opt span{font-size:10px;color:#94A3B8;line-height:1.4;}
 .type-opt:hover{border-color:#CBD5E1;}

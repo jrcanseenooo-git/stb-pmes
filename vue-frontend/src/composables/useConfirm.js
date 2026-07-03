@@ -61,13 +61,13 @@ export function useConfirm() {
 export const CONFIRMS = {
 
   // Submitting a form for approval
-  submitForm: (formType, semester, year) => ({
+  submitForm: (formType, year) => ({
     type:         'submit',
     title:        `Submit ${formType} for Approval`,
-    message:      `You are about to submit your ${formType} for ${String(semester) === '1' ? '1st' : '2nd'} Semester ${year} to your immediate supervisor for review and approval.`,
+    message:      `You are about to submit your ${formType} for ${year} to your immediate supervisor for review and approval.`,
     details: [
       { label: 'Form Type', value: formType },
-      { label: 'Period',    value: `${String(semester) === '1' ? '1st' : '2nd'} Semester ${year}` },
+      { label: 'Year',      value: year },
       { label: 'Status',   value: 'DRAFT -> SUBMITTED' }
     ],
     note:         'Once submitted, you will not be able to edit your targets unless your supervisor returns it for revision.',
@@ -125,13 +125,13 @@ export const CONFIRMS = {
   }),
 
   // Creating a new form
-  createForm: (type, semester, year) => ({
+  createForm: (type, year) => ({
     type:         'info',
     title:        `Create New ${type} Form`,
-    message:      `A new ${type} form will be created for ${String(semester) === '1' ? '1st' : '2nd'} Semester ${year}.`,
+    message:      `A new ${type} form will be created for ${year}.`,
     details: [
       { label: 'Form Type', value: type },
-      { label: 'Period',    value: `${String(semester) === '1' ? '1st' : '2nd'} Semester ${year}` }
+      { label: 'Year',      value: year }
     ],
     note:         'You can start adding your KRA targets immediately after creation.',
     confirmLabel: 'Create Form',

@@ -50,6 +50,18 @@ const AccomplishmentsService = (() => {
       )
     }
 
+    // Enrich rows that lack functionType by joining FormEntries via entryId
+    const rowsNeedingType = rows.filter(r => !r.functionType && r.entryId)
+    if (rowsNeedingType.length) {
+      const entrySheet = SpreadsheetService.getSheet(SHEET.FORM_ENTRIES)
+      const entryMap   = {}
+      SpreadsheetService.getAllRows(entrySheet).forEach(function(e) { entryMap[e.id] = e })
+      rows = rows.map(function(r) {
+        if (r.functionType || !r.entryId) return r
+        return Object.assign({}, r, { functionType: entryMap[r.entryId]?.functionType || '' })
+      })
+    }
+
     return SpreadsheetService.paginate(rows, params.page, params.pageSize)
   }
 
@@ -84,6 +96,7 @@ const AccomplishmentsService = (() => {
       division:      body.division      || profile.divisionName,
       formId:        body.formId        || '',
       entryId:       body.entryId       || '',
+      functionType:  body.functionType  || '',
       kraId:         body.kraId         || '',
       kraTitle:      body.kraTitle      || '',
       siId:          body.siId          || '',

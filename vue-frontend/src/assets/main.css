@@ -205,3 +205,8 @@
   overflow-y: auto !important;
   overflow-x: hidden !important;
 }
+
+html, body, #app {
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
+}
+* { font-family: inherit; }

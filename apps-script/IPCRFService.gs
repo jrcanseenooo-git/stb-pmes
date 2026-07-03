@@ -39,7 +39,6 @@ const IpcrfService = (() => {
     }
 
     if (params.userId)     rows = rows.filter(r => r.userId     === params.userId)
-    if (params.semester)   rows = rows.filter(r => r.semester   === params.semester)
     if (params.year)       rows = rows.filter(r => String(r.year) === String(params.year))
     if (params.status)     rows = rows.filter(r => r.status     === params.status)
     if (params.divisionId) rows = rows.filter(r => r.divisionId === params.divisionId)
@@ -192,16 +191,15 @@ const IpcrfService = (() => {
     const profile = AuthService.getProfile(user)
     const now     = new Date().toISOString()
 
-    // Prevent duplicate form per user per semester/year/type
+    // Prevent duplicate form per user per year/type
     const sheet    = SpreadsheetService.getSheet(SHEET.IPCRF_FORMS)
     const _type = _formTypeForProfile(profile)
     const existing = SpreadsheetService.getAllRows(sheet).find(r =>
       r.userId   === (body.userId || profile.id) &&
-      r.semester === body.semester &&
       String(r.year) === String(body.year) &&
       r.type === _type
     )
-    if (existing) throw HttpError(`An ${_type} form already exists for this period`, 409)
+    if (existing) throw HttpError(`An ${_type} form already exists for ${body.year}`, 409)
 
     // ── Derive position level and weights from user's position title ──
     // Never trust frontend input for these — always compute server-side.
@@ -218,7 +216,6 @@ const IpcrfService = (() => {
       divisionId:            profile.divisionId    || '',
       divisionName:          profile.divisionName  || '',
       sectionName:           profile.section       || '',
-      semester:              body.semester         || '',
       year:                  body.year             || new Date().getFullYear(),
       status:                'Draft',
       coreFunctionWeight:    _weights.core,
@@ -426,6 +423,29 @@ const IpcrfService = (() => {
     return updated
   }
 
+  function submitRatings(id, body, user) {
+    const profile = AuthService.getProfile(user)
+    const sheet   = SpreadsheetService.getSheet(SHEET.IPCRF_FORMS)
+    const row     = SpreadsheetService.getRow(sheet, id)
+    if (!row) throw HttpError('Form not found', 404)
+    if (row.userId !== profile.id) throw HttpError('Only the form owner can submit ratings for review.', 403)
+    if (row.status === 'Rated') return row  // idempotent — already submitted
+    _assertTransition(row.status, 'Rated')
+
+    const updated = SpreadsheetService.updateRow(sheet, id, {
+      status:    'Rated',
+      ratedAt:   new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    })
+    AuditService.log('SUBMIT_RATINGS', 'IPCRF', 'Owner submitted ratings for form ' + id, user)
+    _notifyRouteRecipient(
+      row.ratingRoutedToUserId,
+      row.employeeName + ' has submitted ' + row.type + ' ratings — ready for Division Chief review.',
+      id
+    )
+    return updated
+  }
+
   function rate(id, body, user) {
     const profile = AuthService.requireRole(user,
       'System Administrator', 'Bureau Director',
@@ -435,7 +455,9 @@ const IpcrfService = (() => {
     const row   = SpreadsheetService.getRow(sheet, id)
     if (!row) throw HttpError('Form not found', 404)
     _assertApproverScope(row, profile)
-    _assertTransition(row.status, 'Rated')
+    if (!['Approved', 'Rated'].includes(row.status)) {
+      throw HttpError('Cannot rate a form with status "' + row.status + '". Must be Approved or Rated.', 400)
+    }
 
     const updated = SpreadsheetService.updateRow(sheet, id, {
       status:               'Rated',
@@ -464,6 +486,7 @@ const IpcrfService = (() => {
     const row   = SpreadsheetService.getRow(sheet, id)
     if (!row) throw HttpError('Form not found', 404)
     _assertTransition(row.status, 'Finalized')
+    if (!row.finalNumericalRating) throw HttpError('Form has not been rated yet. A numerical rating must be recorded before finalizing.', 400)
 
     const updated = SpreadsheetService.updateRow(sheet, id, {
       status:               'Finalized',
@@ -596,6 +619,7 @@ const IpcrfService = (() => {
         type: form.type, semester: form.semester, year: form.year,
         userId: form.userId, employeeName: form.employeeName,
         divisionId: form.divisionId, division: form.divisionName,
+        functionType: entry.functionType || '',
         kraTitle: entry.kraName, target: entry.successIndicator
       }, user)
     } catch (e) {
@@ -811,7 +835,7 @@ const IpcrfService = (() => {
     _notifyUser(
       recipientId,
       'submission',
-      `${form.employeeName} submitted their ${form.type} for ${form.semester} ${form.year}.`,
+      `${form.employeeName} submitted their ${form.type} for ${form.year}.`,
       form.id,
       'IPCRF'
     )
@@ -963,8 +987,7 @@ const IpcrfService = (() => {
     const sheet = SpreadsheetService.getSheet(SHEET.IPCRF_FORMS)
     const form  = SpreadsheetService.getAllRows(sheet).find(r =>
       r.userId === profile.id &&
-      String(r.semester) === String(params.semester) &&
-      String(r.year)     === String(params.year) &&
+      String(r.year) === String(params.year) &&
       r.type === type
     )
 
@@ -977,16 +1000,21 @@ const IpcrfService = (() => {
     }
 
     const completeness = AccomplishmentsService.completenessForForm(form.id)
+    const hasTargetsDoc  = !!form.targetsGeneratedAt
+    const hasS1RatingsDoc = !!form.s1RatingsGeneratedAt
+    const hasS2RatingsDoc = !!form.s2RatingsGeneratedAt
     const doc = _docAvailability(form.docFileId)
     return {
       type, hasForm: true, formId: form.id, formStatus: form.status,
       ratingsReady: completeness.isReady,
       totalEntries: completeness.total, readyEntries: completeness.ready,
-      docFileId: doc.exists ? form.docFileId : null,
-      docFileUrl: doc.exists ? `https://docs.google.com/spreadsheets/d/${form.docFileId}/edit` : null,
-      hasTargetsDoc: doc.exists && !!form.targetsGeneratedAt,
-      hasRatingsDoc: doc.exists && !!form.ratingsGeneratedAt,
-      docMissing: !!form.docFileId && !doc.exists
+      docFileId:       form.docFileId || null,
+      docFileUrl:      doc.exists ? `https://docs.google.com/spreadsheets/d/${form.docFileId}/edit` : null,
+      hasTargetsDoc,
+      hasS1RatingsDoc,
+      hasS2RatingsDoc,
+      hasRatingsDoc:   hasS1RatingsDoc || hasS2RatingsDoc,
+      docMissing:      (hasTargetsDoc || hasS1RatingsDoc || hasS2RatingsDoc) && !!form.docFileId && !doc.exists
     }
   }
 
@@ -1039,7 +1067,7 @@ const IpcrfService = (() => {
 
   return {
     list, reviewQueue, get, create, update,
-    submit, route, approve, return_, rate, finalize, computeScore,
+    submit, route, approve, return_, rate, submitRatings, finalize, computeScore,
     listEntries, addEntry, updateEntry, deleteEntry,
     getFinalRatingForUser, getPeriodStatus,
     listReviewComments, saveReviewComments, listAssignableReviewers

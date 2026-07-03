@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <transition name="modal-fade">
     <div v-if="show" class="overlay" @click.self="$emit('cancel')">
       <div class="modal" :class="`modal-${type}`">
@@ -107,7 +107,7 @@ defineEmits(['confirm', 'cancel'])
   width: 100%; max-width: 420px;
   box-shadow: 0 24px 80px rgba(0,0,0,0.2);
   overflow: hidden;
-  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
+ 
 }
 
 /* Top accent bar */
@@ -194,7 +194,7 @@ defineEmits(['confirm', 'cancel'])
   flex: 1; padding: 11px;
   background: #F8FAFC; border: 1.5px solid #E2E8F0;
   border-radius: 10px; font-size: 13px; font-weight: 500;
-  color: #64748B; cursor: pointer; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
+  color: #64748B; cursor: pointer;
   transition: all 0.15s;
 }
 .btn-cancel:hover:not(:disabled) { background: #F1F5F9; border-color: #CBD5E1; color: #374151; }
@@ -204,7 +204,7 @@ defineEmits(['confirm', 'cancel'])
   flex: 1.4; padding: 11px;
   border: none; border-radius: 10px;
   font-size: 13px; font-weight: 600;
-  color: #fff; cursor: pointer; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
+  color: #fff; cursor: pointer;
   transition: all 0.15s;
   display: flex; align-items: center; justify-content: center; gap: 7px;
 }

@@ -94,7 +94,7 @@ function initializeSheets() {
       'targetRoutedAt', 'targetCompletedAt',
       'ratingReviewStage', 'ratingRoutedToUserId', 'ratingRoutedToName',
       'ratingRoutedAt', 'ratingCompletedAt',
-      'docFileId', 'targetsGeneratedAt', 'ratingsGeneratedAt',
+      'docFileId', 'targetsGeneratedAt', 'ratingsGeneratedAt', 's1RatingsGeneratedAt', 's2RatingsGeneratedAt',
       'createdAt', 'updatedAt'
     ],
     FormEntries: [
@@ -203,6 +203,49 @@ function seedDivisions(ss) {
   ]
   sheet.getRange(2, 1, divs.length, divs[0].length).setValues(divs)
   Logger.log('Seeded Divisions.')
+}
+
+// ── Utility: delete ALL sheets and rebuild from all init functions ──
+function nukeAndRebuildSheets_DANGER() {
+  let confirmed = false
+  try {
+    const ui = SpreadsheetApp.getUi()
+    const result = ui.alert(
+      '⚠️ IRREVERSIBLE — DELETE EVERYTHING',
+      'This will permanently DELETE ALL SHEETS AND ALL DATA, then rebuild empty sheets from scratch.\n\nAre you absolutely sure?',
+      ui.ButtonSet.YES_NO
+    )
+    confirmed = (result === ui.Button.YES)
+  } catch (e) {
+    Logger.log('⚠️ nukeAndRebuildSheets_DANGER must be run from the Apps Script editor menu. Aborting.')
+    return
+  }
+  if (!confirmed) return
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet()
+
+  // Google Sheets requires at least one sheet at all times — insert a placeholder
+  const temp = ss.insertSheet('__rebuilding__')
+
+  // Delete every other sheet
+  ss.getSheets().forEach(sheet => {
+    if (sheet.getName() !== '__rebuilding__') ss.deleteSheet(sheet)
+  })
+  Logger.log('All sheets deleted.')
+
+  // Rebuild from all three init functions
+  initializeSheets()      // Core sheets (Users, IPCRForms, Accomplishments, etc.)
+  initIPATSheets()        // IPAT sheets
+  initMasterKRALibrary()  // MasterKRALibrary + KRA seed data
+
+  // Remove the placeholder
+  const placeholder = ss.getSheetByName('__rebuilding__')
+  if (placeholder) ss.deleteSheet(placeholder)
+
+  Logger.log('✅ All sheets nuked and rebuilt successfully.')
+  try {
+    SpreadsheetApp.getUi().alert('✅ Done! All sheets deleted and rebuilt from scratch.')
+  } catch (e) {}
 }
 
 // ── Utility: clear all data rows (keep headers) – use with caution ──

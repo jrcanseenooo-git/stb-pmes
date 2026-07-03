@@ -38,6 +38,24 @@ function doPost(e) {
   return handleRequest(e, 'POST')
 }
 
+// ── Rate limiter (per authenticated user, using CacheService) ──
+// GAS does not expose client IP, so limiting is per user ID rather than per IP.
+// Limit: 60 requests per minute per user for general routes.
+function checkRateLimit(userId) {
+  let count = 0
+  try {
+    const cache = CacheService.getScriptCache()
+    const key   = 'rl_' + userId + '_' + Math.floor(Date.now() / 60000)
+    count = parseInt(cache.get(key) || '0', 10) + 1
+    cache.put(key, String(count), 90) // TTL 90s so it survives the minute boundary
+  } catch (e) {
+    // CacheService failure is non-fatal — allow the request through
+    Logger.log('Rate limiter cache error: ' + e.message)
+    return
+  }
+  if (count > 60) throw HttpError('Too many requests. Please wait a moment.', 429)
+}
+
 // ── Main dispatcher ──
 function handleRequest(e, method) {
   try {
@@ -45,13 +63,16 @@ function handleRequest(e, method) {
     const user = AuthService.verifyToken(e)
     if (!user) return respond(401, false, null, 'Unauthorized – invalid or missing token')
 
-    // 2. Read _method from query params FIRST (before parseBody strips it)
+    // 2. Rate limit per authenticated user
+    const route = (e.parameter?.route || '').replace(/^\/|\/$/g, '')
+    checkRateLimit(user.uid || user.email)
+
+    // 3. Read _method from query params FIRST (before parseBody strips it)
     //    then parse the rest of the body
     const httpMethod = (e.parameter?._method || method).toUpperCase()
     const body       = parseBody(e)
 
-    // 3. Route
-    const route  = (e.parameter?.route || '').replace(/^\/|\/$/g, '')
+    // 4. Route
     const result = Router.dispatch(route, httpMethod, e.parameter, body, user)
 
     return respond(200, true, result)
@@ -59,7 +80,10 @@ function handleRequest(e, method) {
   } catch (err) {
     Logger.log('PMES Error: ' + err.message + '\n' + err.stack)
     const code = err.statusCode || 500
-    return respond(code, false, null, err.message)
+    const clientMsg = code >= 500
+      ? 'An unexpected error occurred. Please try again later.'
+      : err.message
+    return respond(code, false, null, clientMsg)
   }
 }
 

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="shell" :class="{ 'sidebar-collapsed': collapsed }">
     <aside class="sidebar">
       <div class="sb-brand">
@@ -105,7 +105,7 @@
             </transition>
           </RouterLink>
 
-          <RouterLink to="/mov" class="nav-item" active-class="active" :title="collapsed ? 'MOV Files' : ''">
+          <!-- <RouterLink to="/mov" class="nav-item" active-class="active" :title="collapsed ? 'MOV Files' : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <path d="M9 1.5H4a1.5 1.5 0 00-1.5 1.5v10A1.5 1.5 0 004 14.5h8A1.5 1.5 0 0013.5 13V6L9 1.5z"
@@ -116,7 +116,7 @@
             <transition name="fade">
               <span v-if="!collapsed" class="nav-label-text">MOV Files</span>
             </transition>
-          </RouterLink>
+          </RouterLink> -->
         </div>
 
         <div class="nav-group">
@@ -307,6 +307,11 @@ const notifStore = useNotificationsStore()
 const route = useRoute()
 const router = useRouter()
 
+watch(() => route.path, () => {
+  const el = document.querySelector('.page-body')
+  if (el) el.scrollTop = 0
+}, { flush: 'post' })
+
 const collapsed = ref(false)
 const search = ref('')
 const showNotifs = ref(false)
@@ -421,8 +426,6 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
 * {
   box-sizing: border-box;
   margin: 0;
@@ -913,7 +916,7 @@ onUnmounted(() => {
   font-weight: 600;
   color: var(--blue);
   padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
+ 
 }
 .notif-mark-all:hover { text-decoration: underline; }
 

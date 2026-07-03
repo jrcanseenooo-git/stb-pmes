@@ -167,7 +167,7 @@ const loginMethod = ref('')
 const error       = ref('')
 
 const domain      = import.meta.env.VITE_ALLOWED_EMAIL_DOMAIN || 'dswd.gov.ph'
-const redirect    = route.query.redirect || '/dashboard'
+const redirect = String(route.query.redirect || '') || '/dashboard'
 const currentYear = computed(() => new Date().getFullYear())
 
 async function handleEmailLogin() {

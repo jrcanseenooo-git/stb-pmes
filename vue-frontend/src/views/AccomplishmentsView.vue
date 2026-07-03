@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="acc-page">
     <div class="tp-shell">
 
@@ -10,12 +10,12 @@
               <h2 class="page-title">Accomplishments</h2>
               <p class="page-sub">IPCRF / CCEF ratings entry source</p>
             </div>
-            <button class="btn btn-primary" @click="openAddModal">
+            <!-- <button class="btn btn-primary" @click="openAddModal">
               <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
                 <path d="M6.5 1v11M1 6.5h11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
               </svg>
               New Entry
-            </button>
+            </button> -->
           </div>
 
           <div v-if="linkedFormId" class="link-banner">
@@ -24,7 +24,7 @@
           </div>
 
           <div class="filter-bar">
-            <select v-model="periodFilter" class="filter-select">
+            <select v-model="periodFilter" class="filter-select filter-period">
               <option value="">All Periods</option>
               <option v-for="period in periodOptions" :key="period.value" :value="period.value">
                 {{ period.label }}
@@ -68,7 +68,10 @@
             >
               <div class="ali-top">
                 <div class="ali-kra">{{ row.kraTitle || '---' }}</div>
-                <span class="period-pill">{{ periodLabel(row) }}</span>
+                <div class="ali-badges">
+                  <span v-if="row.functionType" :class="['fn-badge', fnBadgeClass(row.functionType)]">{{ row.functionType }}</span>
+                  <span class="period-pill">{{ periodLabel(row) }}</span>
+                </div>
               </div>
               <div class="ali-emp">
                 <div class="av" :style="{ background: avatarColor(row.employeeName) }">{{ initials(row.employeeName) }}</div>
@@ -158,7 +161,7 @@
 
     <!-- ═══ EDIT / ADD MODAL ═══ -->
     <teleport to="body">
-      <div v-if="showFormModal" class="modal-overlay" @click.self="closeFormModal">
+      <div v-if="showFormModal" class="modal-overlay">
         <div class="modal modal-form">
           <div class="modal-hd">
             <div class="modal-icon">
@@ -185,10 +188,10 @@
               <p v-if="editingItem?.formId" class="linked-note">Linked to your IPCRF/CCEF form. KRA and indicator text come from there and cannot be edited here.</p>
               <div class="field full"><label class="field-label">Accomplishment</label><textarea v-model="form.accomplishment" class="field-input" rows="3" placeholder="What was actually accomplished..."></textarea></div>
               <div class="field full"><label class="field-label">Means of Verification</label><textarea v-model="form.movReferences" class="field-input" rows="2" placeholder="Documents, report names, links, or MOV references..."></textarea></div>
-              <div class="field"><label class="field-label">Efficiency (E)</label><input v-model="form.ratingEfficiency" type="text" inputmode="decimal" class="field-input" placeholder="e.g. 4.5 or N/A"/></div>
-              <div class="field"><label class="field-label">Quality (Q)</label><input v-model="form.ratingQuality" type="text" inputmode="decimal" class="field-input" placeholder="e.g. 5 or N/A"/></div>
-              <div class="field"><label class="field-label">Timeliness (T)</label><input v-model="form.ratingTimeliness" type="text" inputmode="decimal" class="field-input" placeholder="e.g. 3.75 or N/A"/></div>
-              <div class="field"><label class="field-label">Average</label><input :value="computedAverage || ''" type="text" class="field-input readonly-input" readonly placeholder="Auto"/></div>
+              <div class="field"><label class="field-label">Efficiency (E) <span class="eqt-hint">1 – 5</span></label><input v-model.number="form.ratingEfficiency" type="number" min="1" max="5" step="0.01" class="field-input" placeholder="1 – 5" @blur="clampRating('ratingEfficiency')"/></div>
+              <div class="field"><label class="field-label">Quality (Q) <span class="eqt-hint">1 – 5</span></label><input v-model.number="form.ratingQuality" type="number" min="1" max="5" step="0.01" class="field-input" placeholder="1 – 5" @blur="clampRating('ratingQuality')"/></div>
+              <div class="field"><label class="field-label">Timeliness (T) <span class="eqt-hint">1 – 5</span></label><input v-model.number="form.ratingTimeliness" type="number" min="1" max="5" step="0.01" class="field-input" placeholder="1 – 5" @blur="clampRating('ratingTimeliness')"/></div>
+              <div class="field"><label class="field-label">Average <span class="eqt-hint">auto-computed</span></label><input :value="computedAverage || ''" type="text" class="field-input readonly-input" readonly placeholder="—"/></div>
               <div class="field full"><label class="field-label">Remarks</label><input v-model="form.remarks" type="text" class="field-input" placeholder="Optional notes..."/></div>
             </div>
           </div>
@@ -290,6 +293,21 @@ function initials(name) {
 function avatarColor(name) {
   const colors = ['#2F80ED', '#27AE60', '#E9A840', '#9B59B6', '#EB5757', '#1A56B0']
   return colors[(name || '').length % colors.length] || '#2F80ED'
+}
+
+function fnBadgeClass(type) {
+  if (type === 'Core')    return 'fn-core'
+  if (type === 'Support') return 'fn-support'
+  return ''
+}
+
+function clampRating(field) {
+  const v = form.value[field]
+  if (v === '' || v === null || v === undefined) return
+  const n = Number(v)
+  if (isNaN(n)) { form.value[field] = ''; return }
+  if (n < 1) form.value[field] = 1
+  else if (n > 5) form.value[field] = 5
 }
 
 function showToast(msg, type = 'success') {
@@ -438,12 +456,12 @@ async function saveEntry() {
 }
 </script>
 
-<style>
+<style scoped>
 .acc-page { padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif; font-size: 13px; color: #1A2332; min-height: 100%; }
 
 /* Two-panel shell */
 .tp-shell { display: flex; background: #fff; border: 1px solid #E2E8F0; border-radius: 14px; overflow: hidden; min-height: 520px; }
-.tp-left { width: 410px; flex-shrink: 0; border-right: 1px solid #E2E8F0; display: flex; flex-direction: column; overflow-y: auto; max-height: 82vh; scrollbar-width: thin; scrollbar-color: #E2E8F0 transparent; }
+.tp-left { width: 680px; flex-shrink: 0; border-right: 1px solid #E2E8F0; display: flex; flex-direction: column; overflow-x: hidden; overflow-y: auto; max-height: 82vh; scrollbar-width: thin; scrollbar-color: #E2E8F0 transparent; }
 .tp-left::-webkit-scrollbar { width: 4px; }
 .tp-left::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 4px; }
 .tp-right { flex: 1; min-width: 0; overflow-y: auto; max-height: 82vh; scrollbar-width: thin; scrollbar-color: #E2E8F0 transparent; }
@@ -457,13 +475,14 @@ async function saveEntry() {
 .page-sub { font-size: 11px; color: #94A3B8; margin: 0; }
 
 /* Filters */
-.filter-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
-.filter-select { padding: 6px 10px; border: 1px solid #E2E8F0; border-radius: 8px; font-size: 12px; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif; color: #0F172A; outline: none; background: #fff; }
+.filter-bar { display: flex; flex-direction: row; flex-wrap: nowrap; align-items: center; gap: 8px; margin-bottom: 12px; }
+.filter-period { flex-shrink: 0; }
+.filter-select { padding: 6px 10px; border: 1px solid #E2E8F0; border-radius: 8px; font-size: 12px; color: #0F172A; outline: none; background: #fff; }
 .filter-select:focus { border-color: #3B82F6; }
 .link-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px; margin-bottom: 12px; background: #F5F9FF; border: 1px solid #DCE9FB; border-radius: 9px; font-size: 12px; color: #1A56B0; flex-wrap: wrap; }
-.srch-wrap { position: relative; flex: 1; min-width: 120px; }
+.srch-wrap { position: relative; flex: 1; min-width: 120px; max-width: 200px; }
 .srch-icon { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); pointer-events: none; }
-.srch-inp { width: 100%; padding: 6px 11px 6px 28px; border: 1px solid #E2E8F0; border-radius: 8px; font-size: 12px; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif; color: #0F172A; outline: none; background: #fff; }
+.srch-inp { width: 100%; padding: 6px 11px 6px 28px; border: 1px solid #E2E8F0; border-radius: 8px; font-size: 12px; color: #0F172A; outline: none; background: #fff; }
 .srch-inp:focus { border-color: #3B82F6; }
 
 /* List items */
@@ -475,6 +494,11 @@ async function saveEntry() {
 .ali-sk { pointer-events: none; }
 .ali-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .ali-kra { font-size: 13.5px; font-weight: 700; color: #0F172A; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.3; }
+.ali-badges { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.fn-badge { font-size: 9.5px; font-weight: 700; border-radius: 20px; padding: 2px 7px; letter-spacing: .02em; text-transform: uppercase; }
+.eqt-hint { font-size: 10px; font-weight: 500; color: #94A3B8; margin-left: 4px; text-transform: none; letter-spacing: 0; }
+.fn-core { background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; }
+.fn-support { background: #FFF7ED; color: #C2410C; border: 1px solid #FED7AA; }
 .ali-emp { display: flex; align-items: center; gap: 6px; }
 .ali-name { font-size: 12px; color: #374151; font-weight: 500; }
 .ali-div { font-size: 11px; color: #94A3B8; }
@@ -524,7 +548,7 @@ async function saveEntry() {
 .sk-line { background: linear-gradient(90deg,#E2E8F0 25%,#F1F5F9 50%,#E2E8F0 75%); background-size: 200%; animation: shimmer 1.4s infinite; border-radius: 4px; height: 12px; display: block; }
 
 /* Buttons */
-.btn { display: inline-flex; align-items: center; gap: 5px; padding: 7px 13px; border-radius: 8px; font-size: 12px; cursor: pointer; border: 1px solid #E2E8F0; background: #fff; color: #374151; transition: all .15s; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif; font-weight: 500; }
+.btn { display: inline-flex; align-items: center; gap: 5px; padding: 7px 13px; border-radius: 8px; font-size: 12px; cursor: pointer; border: 1px solid #E2E8F0; background: #fff; color: #374151; transition: all .15s; font-weight: 500; }
 .btn:hover { border-color: #CBD5E1; background: #F8FAFC; }
 .btn:disabled { opacity: .55; cursor: not-allowed; }
 .btn-primary { background: #0D2137; color: #fff; border-color: #0D2137; }
@@ -537,7 +561,7 @@ async function saveEntry() {
 .readonly-input { background: #F8FAFC; color: #64748B; cursor: not-allowed; }
 .linked-note { font-size: 11px; color: #94A3B8; grid-column: span 2; margin: -4px 0 4px; }
 .modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.5); display: flex; align-items: center; justify-content: center; z-index: 300; padding: 16px; backdrop-filter: blur(4px); }
-.modal { background: #fff; border-radius: 16px; width: 100%; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 24px 64px rgba(0,0,0,.2); overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif; }
+.modal { background: #fff; border-radius: 16px; width: 100%; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 24px 64px rgba(0,0,0,.2); overflow: hidden; }
 .modal-form { max-width: 700px; }
 .modal-hd { display: flex; align-items: flex-start; gap: 12px; padding: 20px 24px 16px; border-bottom: 1px solid #F1F5F9; background: #FAFBFF; flex-shrink: 0; }
 .modal-icon { width: 36px; height: 36px; border-radius: 10px; background: #EBF4FF; color: #2F80ED; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -551,7 +575,7 @@ async function saveEntry() {
 .field { display: flex; flex-direction: column; gap: 5px; }
 .full { grid-column: span 2; }
 .field-label { font-size: 11px; font-weight: 600; color: #374151; }
-.field-input { padding: 9px 12px; border: 1.5px solid #E2E8F0; border-radius: 9px; font-size: 13px; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif; color: #0F172A; background: #fff; outline: none; transition: border-color .15s; resize: vertical; }
+.field-input { padding: 9px 12px; border: 1.5px solid #E2E8F0; border-radius: 9px; font-size: 13px; color: #0F172A; background: #fff; outline: none; transition: border-color .15s; resize: vertical; }
 .field-input:focus { border-color: #3B82F6; box-shadow: 0 0 0 3px rgba(59,130,246,.1); }
 .spinner-sm { display: inline-block; width: 11px; height: 11px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .6s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg) } }

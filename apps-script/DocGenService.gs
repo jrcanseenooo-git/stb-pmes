@@ -67,13 +67,14 @@ const PmesDocGenService = (() => {
   // ─────────────────────────────────────────────
   // PUBLIC: generate Annex F.2 — Ratings
   // ─────────────────────────────────────────────
-  function generateRatingsDoc(formId, user) {
+  function generateRatingsDoc(formId, user, semester) {
     const form = _withAccomplishmentFields(_withOwnerProfileFields(IpcrfService.get(formId, user)))
-    const sem  = String(form.semester) === '2' ? '2' : '1'
+    const sem  = String(semester) === '2' ? '2' : '1'
 
     const ss    = _getOrCreateFormFile(form)
     const templateId = form.type === 'CCEF' ? CCEF_RATINGS_TEMPLATE_ID : TEMPLATE_ID[form.type]
-    const sheet = _addOrReplaceTab(ss, templateId, SOURCE_TAB[form.type].ratings[sem], 'Ratings')
+    const fixedTabName = sem === '2' ? 'S2 Ratings' : 'S1 Ratings'
+    const sheet = _addOrReplaceTab(ss, templateId, SOURCE_TAB[form.type].ratings[sem], fixedTabName)
 
     _fillRatingsHeader(sheet, form, sem)
     _fillIndicatorSections(sheet, form, 'ratings')
@@ -83,12 +84,13 @@ const PmesDocGenService = (() => {
     _trimUnusedColumns(sheet, 'J')
     _forceWrapAndAutosize(sheet)
 
+    const ratingsField = sem === '2' ? 's2RatingsGeneratedAt' : 's1RatingsGeneratedAt'
     SpreadsheetService.updateRow(SpreadsheetService.getSheet(SHEET.IPCRF_FORMS), formId, {
-      docFileId: ss.getId(), ratingsGeneratedAt: new Date().toISOString()
+      docFileId: ss.getId(), [ratingsField]: new Date().toISOString()
     })
 
     AuditService.log('GENERATE_DOC', 'IPCRF', `Generated Ratings doc for ${form.employeeName} (${form.type}, S${sem} ${form.year})`, user)
-    return { fileId: ss.getId(), fileUrl: ss.getUrl(), fileName: ss.getName(), sheetId: sheet.getSheetId() }
+    return { fileId: ss.getId(), fileUrl: ss.getUrl(), fileName: ss.getName(), sheetId: sheet.getSheetId(), tab: fixedTabName }
   }
 
   // ─────────────────────────────────────────────

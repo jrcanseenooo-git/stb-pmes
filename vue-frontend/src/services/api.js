@@ -281,15 +281,16 @@ export const ipcrfApi = {
   approveForm:  (id, data = {})        => gasWrite('PATCH', `ipcrf/${id}/approve`,     data),
   returnForm:   (id, data = {})        => gasWrite('PATCH', `ipcrf/${id}/return`,      data),
   rateForm:     (id, data)             => gasWrite('PATCH', `ipcrf/${id}/rate`,        data),
+  submitRatings:(id, data = {})        => gasWrite('PATCH', `ipcrf/${id}/submit-ratings`, data),
   finalizeForm: (id, data = {})        => gasWrite('PATCH', `ipcrf/${id}/finalize`,    data),
-  periodStatus: (semester, year)       => gasGet(`ipcrf/period-status`, { semester, year }),
+  periodStatus: (year)                  => gasGet(`ipcrf/period-status`, { year }),
 }
 
 // ── Document Generation (official IPCRF/CCEF Targets & Ratings forms) ──
 
 export const docGenApi = {
   generateTargets: (formId)  => gasWrite('POST', `ipcrf/${formId}/generate-targets`),
-  generateRatings: (formId)  => gasWrite('POST', `ipcrf/${formId}/generate-ratings`),
+  generateRatings: (formId, semester) => gasWrite('POST', `ipcrf/${formId}/generate-ratings`, { semester }),
   printPdf:        (fileId, tab)  => gasGet(`docgen/${fileId}/print`, { tab })
 }
 

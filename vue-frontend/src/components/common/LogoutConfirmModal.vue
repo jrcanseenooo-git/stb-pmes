@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <transition name="modal-fade">
     <div v-if="show" class="overlay" @click.self="$emit('cancel')">
       <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="logout-title">
@@ -56,7 +56,7 @@ async function handleConfirm() {
   background: rgba(9, 19, 38, .6);
   display: flex; align-items: center; justify-content: center;
   z-index: 600; padding: 16px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
+ 
 }
 
 .modal {
@@ -109,7 +109,7 @@ async function handleConfirm() {
   border-radius: 8px;
   font-size: 13px;
   font-weight: 600;
-  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
+ 
   cursor: pointer;
   transition: background-color .15s, border-color .15s;
 }

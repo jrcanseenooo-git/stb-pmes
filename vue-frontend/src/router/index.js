@@ -57,6 +57,14 @@ const router = createRouter({
 
 // ── Auth guard ──
 router.beforeEach(async (to) => {
+  // Strip open-redirect payloads from the ?redirect query param
+  const r = to.query.redirect
+  if (r && !/^\/(?!\/)/.test(r)) {
+    const q = { ...to.query }
+    delete q.redirect
+    return { path: to.path, query: q }
+  }
+
   if (!to.meta.requiresAuth) return true;
   const auth = useAuthStore();
   if (!auth.initialised) await auth.init();

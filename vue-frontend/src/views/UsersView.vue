@@ -966,7 +966,7 @@ function showToast(msg, type='success') {
 
 <style scoped>
 *{box-sizing:border-box;}
-.content{padding:20px;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;font-size:13px;color:#1A2332;background:#EEF2F7;min-height:100%;}
+.content{padding:20px;font-size:13px;color:#1A2332;background:#EEF2F7;min-height:100%;}
 
 /* Page header */
 .page-panel{background:#fff;border:1px solid #DDE7F3;border-radius:12px;box-shadow:0 1px 3px rgba(15,23,42,.05);padding:18px;margin-bottom:14px;}
@@ -982,12 +982,12 @@ function showToast(msg, type='success') {
 .control-strip{display:grid;grid-template-columns:minmax(260px,1fr) 190px 150px;gap:10px;align-items:center;}
 .search-box{display:flex;align-items:center;gap:8px;background:#fff;border:1.5px solid #DDE7F3;border-radius:9px;padding:9px 12px;min-width:0;}
 .search-box:focus-within{border-color:#2F80ED;box-shadow:0 0 0 3px rgba(47,128,237,.09);}
-.search-box input{border:none;outline:none;font-size:13px;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;color:#1A2332;width:100%;min-width:0;}
-.filter-select{height:39px;border:1.5px solid #DDE7F3;background:#fff;border-radius:9px;padding:0 12px;color:#1A2332;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;font-size:13px;outline:none;}
+.search-box input{border:none;outline:none;font-size:13px;color:#1A2332;width:100%;min-width:0;}
+.filter-select{height:39px;border:1.5px solid #DDE7F3;background:#fff;border-radius:9px;padding:0 12px;color:#1A2332;font-size:13px;outline:none;}
 .filter-select:focus{border-color:#2F80ED;box-shadow:0 0 0 3px rgba(47,128,237,.09);}
 
 /* Buttons */
-.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 13px;border-radius:8px;font-size:12px;cursor:pointer;border:1px solid #E2E8F0;background:#fff;color:#374151;transition:all .15s;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;font-weight:500;}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 13px;border-radius:8px;font-size:12px;cursor:pointer;border:1px solid #E2E8F0;background:#fff;color:#374151;transition:all .15s;font-weight:500;}
 .btn:hover{border-color:#CBD5E1;background:#F8FAFC;}
 .btn-primary{background:#0D2137;color:#fff;border-color:#0D2137;}
 .btn-primary:hover{background:#1e3f61;border-color:#1e3f61;}
@@ -1038,7 +1038,7 @@ function showToast(msg, type='success') {
 :deep(.search-select){position:relative;width:100%;min-width:0;}
 :deep(.search-select-icon){position:absolute;left:10px;top:50%;transform:translateY(-50%);display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:1;}
 :deep(.search-select-avatar){width:19px;height:19px;border-radius:6px;background:#EBF4FF;color:#1A56B0;font-size:8.5px;font-weight:900;display:flex;align-items:center;justify-content:center;}
-:deep(.search-select-input){display:block;box-sizing:border-box;width:100%;max-width:100%;height:40px;padding:0 34px 0 36px;border:1.5px solid #DDE7F3;border-radius:10px;font-size:12.5px;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;color:#0F172A;background:#fff;text-overflow:ellipsis;transition:border-color .15s,box-shadow .15s;}
+:deep(.search-select-input){display:block;box-sizing:border-box;width:100%;max-width:100%;height:40px;padding:0 34px 0 36px;border:1.5px solid #DDE7F3;border-radius:10px;font-size:12.5px;color:#0F172A;background:#fff;text-overflow:ellipsis;transition:border-color .15s,box-shadow .15s;}
 :deep(.search-select-input:focus){outline:none;border-color:#2F80ED;box-shadow:0 0 0 3px rgba(47,128,237,.1);}
 :deep(.search-select-input::placeholder){color:#AAB8CD;}
 :deep(.search-select-clear){position:absolute;right:8px;top:50%;transform:translateY(-50%);width:20px;height:20px;border:0;background:#F1F5F9;color:#7183A3;border-radius:7px;font-size:13px;line-height:18px;cursor:pointer;transition:all .15s;}
@@ -1156,7 +1156,7 @@ function showToast(msg, type='success') {
 
 .field-input,.field-select{
   padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:9px;
-  font-size:13px;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;color:#0F172A;
+  font-size:13px;color:#0F172A;
   background:#fff;outline:none;transition:border-color .15s,box-shadow .15s;width:100%;
 }
 .field-input:focus,.field-select:focus{border-color:#3B82F6;box-shadow:0 0 0 3px rgba(59,130,246,.1);}

@@ -1,27 +1,33 @@
-<template>
+﻿<template>
   <div class="review-page">
 
     <!-- Top toolbar -->
     <div class="rq-toolbar">
       <div class="rq-toolbar-title">
-        <h1>Review Queue</h1>
-        <p>Forms routed to you for checking and sign-off</p>
+        <h1>{{ isOwnerView ? 'My Form Status' : 'Review Queue' }}</h1>
+        <p>{{ isOwnerView ? 'Track the review progress of your submitted form' : 'Forms routed to you for checking and sign-off' }}</p>
       </div>
       <div class="rq-toolbar-controls">
-        <div class="rq-segmented" role="tablist" aria-label="Review type">
-          <button type="button" :class="['rq-seg-btn', reviewTypeFilter === 'targets' && 'active']" @click="setReviewType('targets')">Targets</button>
-          <button type="button" :class="['rq-seg-btn', reviewTypeFilter === 'ratings' && 'active']" @click="setReviewType('ratings')">Ratings</button>
+        <div class="rq-mode-switch">
+          <button type="button" :class="['rq-mode-btn', viewMode === 'queue' && 'active']" @click="setMode('queue')">Review Queue</button>
+          <button type="button" :class="['rq-mode-btn', viewMode === 'myforms' && 'active']" @click="setMode('myforms')">My Form</button>
         </div>
-        <select v-model="semesterFilter" class="rq-select">
-          <option value="">All Semesters</option>
-          <option value="1">1st Semester</option>
-          <option value="2">2nd Semester</option>
-        </select>
-        <button class="rq-btn rq-btn-ghost" @click="loadQueue" :disabled="loading">
-          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" :class="loading && 'rq-spin'">
+        <template v-if="!isOwnerView">
+          <div class="rq-segmented" role="tablist" aria-label="Review type">
+            <button type="button" :class="['rq-seg-btn', reviewTypeFilter === 'targets' && 'active']" @click="setReviewType('targets')">Targets</button>
+            <button type="button" :class="['rq-seg-btn', reviewTypeFilter === 'ratings' && 'active']" @click="setReviewType('ratings')">Ratings</button>
+          </div>
+          <select v-model="semesterFilter" class="rq-select">
+            <option value="">All Semesters</option>
+            <option value="1">1st Semester</option>
+            <option value="2">2nd Semester</option>
+          </select>
+        </template>
+        <button class="rq-btn rq-btn-ghost" @click="isOwnerView ? loadMyForms() : loadQueue()" :disabled="displayLoading">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" :class="displayLoading && 'rq-spin'">
             <path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2.5v3.2h-3.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
-          {{ loading ? 'Loading' : 'Refresh' }}
+          {{ displayLoading ? 'Loading' : 'Refresh' }}
         </button>
       </div>
     </div>
@@ -30,12 +36,12 @@
 
       <!-- ============ LEFT: queue list ============ -->
       <aside class="rq-list">
-        <div v-if="loading" class="rq-empty-state">
+        <div v-if="displayLoading" class="rq-empty-state">
           <div class="rq-spinner"></div>
-          <p>Loading assigned forms...</p>
+          <p>{{ isOwnerView ? 'Loading your forms...' : 'Loading assigned forms...' }}</p>
         </div>
 
-        <div v-else-if="!forms.length" class="rq-empty-state">
+        <div v-else-if="!displayForms.length" class="rq-empty-state">
           <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
             <path d="M20 5l13 6v9c0 7.5-5.5 12.5-13 14-7.5-1.5-13-6.5-13-14v-9l13-6z" stroke="#D7E0EE" stroke-width="2"/>
             <path d="M14.5 20l4 4 7-8" stroke="#B9C5DD" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -45,7 +51,7 @@
 
         <button
           v-else
-          v-for="form in forms" :key="form.id"
+          v-for="form in displayForms" :key="form.id"
           type="button"
           :class="['rq-item', selectedForm?.id === form.id && 'active']"
           @click="selectForm(form)"
@@ -59,7 +65,7 @@
             <span :class="['rq-chip', form.type === 'IPCRF' ? 'tone-blue' : 'tone-note']">{{ form.type }}</span>
           </div>
           <div class="rq-item-bottom">
-            <span class="rq-period">S{{ form.semester }} {{ form.year }}</span>
+            <span class="rq-period">{{ form.semester ? 'S' + form.semester + ' ' : '' }}{{ form.year }}</span>
             <span class="rq-item-status">{{ reviewLabel(form) }}</span>
             <span :class="['rq-stage-pill', 'tone-' + stageTone(routeStageFor(form))]">{{ routeStageFor(form) }}</span>
           </div>
@@ -85,10 +91,10 @@
               <span class="rq-avatar lg">{{ initials(selectedForm.employeeName) }}</span>
               <div>
                 <div class="rq-doc-name">{{ selectedForm.employeeName }}</div>
-                <div class="rq-doc-meta">{{ formTitle }} · {{ semesterText(selectedForm.semester) }}, CY {{ selectedForm.year }} · {{ selectedForm.divisionName }}</div>
+                <div class="rq-doc-meta">{{ formTitle }} · {{ periodText(selectedForm) }} · {{ selectedForm.divisionName }}</div>
               </div>
             </div>
-            <div class="rq-doc-actions">
+            <div class="rq-doc-actions" v-if="!isOwnerView">
               <button class="rq-btn rq-btn-ghost" @click="saveSheetEdits" :disabled="editsSaving || entriesLoading">
                 {{ editsSaving ? 'Saving...' : 'Save Edits' }}
               </button>
@@ -137,11 +143,20 @@
                 {{ routing ? 'Saving...' : completeButtonLabel }}
               </button>
             </div>
+            <div v-else class="rq-owner-badge">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2a4 4 0 014 4v2.5l1 2H3l1-2V6a4 4 0 014-4z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M6.5 14.5a1.5 1.5 0 003 0" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+              Read-only — your form is under review
+            </div>
           </header>
 
           <div class="rq-assignee-line">
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 1.5a4.5 4.5 0 014.5 4.5v3l1.5 2.5H2L3.5 9V6A4.5 4.5 0 018 1.5z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
             Currently with <strong>{{ currentAssigneeName || '—' }}</strong>
+          </div>
+
+          <div v-if="isOwnerView" class="rq-owner-banner">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M8 7.2v3.6M8 5.2v.1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+            Your {{ selectedForm.type }} is currently under review. You can track its progress and read reviewer notes below, but cannot make changes.
           </div>
 
           <!-- Stage stepper -->
@@ -179,6 +194,7 @@
           <div v-if="activeWorkbookTab === 'targets'" class="rq-entries">
             <div v-if="entriesLoading" class="rq-empty-state"><div class="rq-spinner"></div><p>Loading form entries...</p></div>
             <div v-else-if="!entries.length" class="rq-empty-state"><p>No indicators submitted yet.</p></div>
+            <fieldset :disabled="isOwnerView" class="rq-owner-fs">
 
             <section v-if="coreEntries.length" class="rq-fn-section rq-fn-core">
               <div class="rq-fn-hd">
@@ -237,9 +253,9 @@
                 <label class="rq-note-field">
                   <span>
                     <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M2 13.5l1-3.3L11.5 1.7a1.2 1.2 0 0 1 1.7 0l1.1 1.1a1.2 1.2 0 0 1 0 1.7L5.8 12.9l-3.3 1z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
-                    Your Review Notes
+                    {{ isOwnerView ? "Reviewer's Notes" : "Your Review Notes" }}
                   </span>
-                  <textarea v-model="reviewComments[entry.id]" rows="2" placeholder="Add a note for this indicator..."></textarea>
+                  <textarea v-model="reviewComments[entry.id]" rows="2" :placeholder="isOwnerView ? 'No notes yet.' : 'Add a note for this indicator...'"></textarea>
                 </label>
               </article>
             </section>
@@ -303,16 +319,18 @@
                     <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M2 13.5l1-3.3L11.5 1.7a1.2 1.2 0 0 1 1.7 0l1.1 1.1a1.2 1.2 0 0 1 0 1.7L5.8 12.9l-3.3 1z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
                     Your Review Notes
                   </span>
-                  <textarea v-model="reviewComments[entry.id]" rows="2" placeholder="Add a note for this indicator..."></textarea>
+                  <textarea v-model="reviewComments[entry.id]" rows="2" :placeholder="isOwnerView ? 'No notes yet.' : 'Add a note for this indicator...'"></textarea>
                 </label>
               </article>
             </section>
+            </fieldset>
           </div>
 
           <!-- ===== RATINGS ===== -->
           <div v-else-if="activeWorkbookTab === 'ratings'" class="rq-entries">
             <div v-if="entriesLoading" class="rq-empty-state"><div class="rq-spinner"></div><p>Loading form entries...</p></div>
             <div v-else-if="!entries.length" class="rq-empty-state"><p>No accomplishments submitted yet.</p></div>
+            <fieldset :disabled="isOwnerView" class="rq-owner-fs">
 
             <section v-if="coreEntries.length" class="rq-fn-section rq-fn-core">
               <div class="rq-fn-hd">
@@ -376,9 +394,9 @@
                 <label class="rq-note-field">
                   <span>
                     <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M2 13.5l1-3.3L11.5 1.7a1.2 1.2 0 0 1 1.7 0l1.1 1.1a1.2 1.2 0 0 1 0 1.7L5.8 12.9l-3.3 1z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
-                    Your Review Notes
+                    {{ isOwnerView ? "Reviewer's Notes" : "Your Review Notes" }}
                   </span>
-                  <textarea v-model="reviewComments[entry.id]" rows="2" placeholder="Add a note for this indicator..."></textarea>
+                  <textarea v-model="reviewComments[entry.id]" rows="2" :placeholder="isOwnerView ? 'No notes yet.' : 'Add a note for this indicator...'"></textarea>
                 </label>
               </article>
             </section>
@@ -445,32 +463,56 @@
                 <label class="rq-note-field">
                   <span>
                     <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M2 13.5l1-3.3L11.5 1.7a1.2 1.2 0 0 1 1.7 0l1.1 1.1a1.2 1.2 0 0 1 0 1.7L5.8 12.9l-3.3 1z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
-                    Your Review Notes
+                    {{ isOwnerView ? "Reviewer's Notes" : "Your Review Notes" }}
                   </span>
-                  <textarea v-model="reviewComments[entry.id]" rows="2" placeholder="Add a note for this indicator..."></textarea>
+                  <textarea v-model="reviewComments[entry.id]" rows="2" :placeholder="isOwnerView ? 'No notes yet.' : 'Add a note for this indicator...'"></textarea>
                 </label>
               </article>
             </section>
+            </fieldset>
 
-            <div class="rq-feedback-card">
+            <div v-if="showPartII" class="rq-feedback-card">
               <div class="rq-feedback-hd">Part II · Feedback and Proposed Intervention</div>
-              <div class="rq-feedback-grid">
-                <div><span>Strengths</span><p>{{ selectedForm.feedbackStrengths || 'For Division Chief input' }}</p></div>
-                <div><span>Areas for Improvement</span><p>{{ selectedForm.feedbackAreasForImprovement || 'For Division Chief input' }}</p></div>
-                <div><span>Comments / Recommendations</span><p>{{ selectedForm.feedbackComments || selectedForm.feedbackRecommendations || 'For Division Chief input' }}</p></div>
-              </div>
+              <template v-if="isDCReviewer">
+                <div class="rq-feedback-grid rq-feedback-edit">
+                  <div>
+                    <label class="rq-fb-label">Strengths</label>
+                    <textarea v-model="dcFeedbackForm.feedbackStrengths" class="rq-fb-input" rows="2" placeholder="What the ratee does well..."></textarea>
+                  </div>
+                  <div>
+                    <label class="rq-fb-label">Areas for Improvement</label>
+                    <textarea v-model="dcFeedbackForm.feedbackAreasForImprovement" class="rq-fb-input" rows="2" placeholder="Development needs..."></textarea>
+                  </div>
+                  <div>
+                    <label class="rq-fb-label">Rater's Comments &amp; Recommendations</label>
+                    <textarea v-model="dcFeedbackForm.feedbackComments" class="rq-fb-input" rows="2" placeholder="Comments, commendations, recommendations..."></textarea>
+                  </div>
+                </div>
+                <p class="rq-fb-note">Part II will be saved when you click "{{ completeButtonLabel }}".</p>
+              </template>
+              <template v-else>
+                <div class="rq-feedback-grid">
+                  <div><span>Strengths</span><p>{{ selectedForm.feedbackStrengths || 'Pending Division Chief input' }}</p></div>
+                  <div><span>Areas for Improvement</span><p>{{ selectedForm.feedbackAreasForImprovement || 'Pending Division Chief input' }}</p></div>
+                  <div><span>Comments / Recommendations</span><p>{{ selectedForm.feedbackComments || selectedForm.feedbackRecommendations || 'Pending Division Chief input' }}</p></div>
+                </div>
+              </template>
             </div>
           </div>
 
           <!-- ===== COMMENTS ===== -->
           <div v-else-if="activeWorkbookTab === 'comments'" class="rq-comments">
+            <div v-if="isOwnerView" class="rq-owner-banner" style="margin-bottom:10px;">
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M8 7.2v3.6M8 5.2v.1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+              These are comments left by reviewers. You can read but not edit them.
+            </div>
             <div v-if="!entries.length" class="rq-empty-state"><p>No indicators to comment on.</p></div>
             <div v-for="entry in entries" :key="entry.id" class="rq-comment-row">
               <div class="rq-comment-ref">
                 <strong>{{ entry.kraName }}</strong>
                 <p>{{ entry.successIndicator }}</p>
               </div>
-              <textarea v-model="reviewComments[entry.id]" rows="3" placeholder="Add clarification, correction, or note for this row..."></textarea>
+              <textarea v-model="reviewComments[entry.id]" rows="3" :disabled="isOwnerView" :placeholder="isOwnerView ? 'No comments yet.' : 'Add clarification, correction, or note for this row...'"></textarea>
             </div>
           </div>
 
@@ -479,7 +521,7 @@
             <div class="rq-routing-grid">
               <div><span>Employee</span><strong>{{ selectedForm.employeeName }}</strong></div>
               <div><span>Form Type</span><strong>{{ selectedForm.type }}</strong></div>
-              <div><span>Period</span><strong>{{ semesterText(selectedForm.semester) }}, CY {{ selectedForm.year }}</strong></div>
+              <div><span>Period</span><strong>{{ periodText(selectedForm) }}</strong></div>
               <div><span>Current Review Type</span><strong>{{ selectedReviewType }}</strong></div>
               <div><span>Current Stage</span><strong>{{ currentRouteStage }}</strong></div>
               <div><span>Currently With</span><strong>{{ currentAssigneeName || '—' }}</strong></div>
@@ -527,6 +569,15 @@ const showAssignPanel = ref(false)
 const assigneeSearch = ref('')
 const assigneeResults = ref([])
 const assigneeLoading = ref(false)
+const viewMode = ref('queue')
+const myForms = ref([])
+const myFormsLoading = ref(false)
+const isOwnerView = computed(() => viewMode.value === 'myforms')
+const displayForms = computed(() => isOwnerView.value ? myForms.value : forms.value)
+const displayLoading = computed(() => isOwnerView.value ? myFormsLoading.value : loading.value)
+const isDCReviewer = computed(() => !isOwnerView.value && currentRouteStage.value === 'Division Chief')
+const showPartII   = computed(() => isOwnerView.value || isDCReviewer.value)
+const dcFeedbackForm = ref({ feedbackStrengths: '', feedbackAreasForImprovement: '', feedbackComments: '' })
 
 const workbookTabs = [
   { value: 'targets', label: 'Targets' },
@@ -562,10 +613,12 @@ const currentAssigneeName = computed(() => {
     ? (selectedForm.value.targetRoutedToName || '')
     : (selectedForm.value.ratingRoutedToName || '')
 })
-const emptyMessage = computed(() => reviewTypeFilter.value === 'ratings'
-  ? 'No ratings forms assigned yet. Ratings review appears after targets are approved and accomplishments/ratings are ready.'
-  : 'No target forms assigned for review.'
-)
+const emptyMessage = computed(() => {
+  if (isOwnerView.value) return 'None of your forms are currently under review.'
+  return reviewTypeFilter.value === 'ratings'
+    ? 'No ratings forms assigned yet. Ratings review appears after targets are approved and accomplishments/ratings are ready.'
+    : 'No target forms assigned for review.'
+})
 const activeInstruction = computed(() => {
   if (activeWorkbookTab.value === 'targets') return 'Review the submitted KRA/SI, applicable rating period, rating guide, means of verification, and remarks.'
   if (activeWorkbookTab.value === 'ratings') return 'Review accomplishments against the target basis, EQT rating guide, MOV, remarks, average, and Part II feedback.'
@@ -581,6 +634,30 @@ watch([reviewTypeFilter, semesterFilter], loadQueue)
 function setReviewType(type) {
   reviewTypeFilter.value = type
   activeWorkbookTab.value = type === 'ratings' ? 'ratings' : 'targets'
+}
+
+function setMode(mode) {
+  viewMode.value = mode
+  selectedForm.value = null
+  entries.value = []
+  editableEntries.value = {}
+  reviewComments.value = {}
+  if (mode === 'myforms') loadMyForms()
+  else loadQueue()
+}
+
+async function loadMyForms() {
+  myFormsLoading.value = true
+  try {
+    const r = await ipcrfApi.listForms(authStore.profileId ? { userId: authStore.profileId } : {})
+    const all = r?.items || (Array.isArray(r) ? r : [])
+    myForms.value = all.filter(f => ['Submitted', 'Approved', 'Rated', 'Returned'].includes(f.status))
+    if (!selectedForm.value && myForms.value.length) await selectForm(myForms.value[0])
+  } catch (e) {
+    showToast(`Could not load your forms: ${e.message}`, 'error')
+  } finally {
+    myFormsLoading.value = false
+  }
 }
 
 async function loadQueue() {
@@ -607,6 +684,11 @@ async function selectForm(form) {
   entries.value = []
   editableEntries.value = {}
   reviewComments.value = {}
+  dcFeedbackForm.value = {
+    feedbackStrengths:           form.feedbackStrengths           || '',
+    feedbackAreasForImprovement: form.feedbackAreasForImprovement || '',
+    feedbackComments:            form.feedbackComments || form.feedbackRecommendations || ''
+  }
   entriesLoading.value = true
   activeWorkbookTab.value = reviewTypeForForm(form) === 'ratings' ? 'ratings' : 'targets'
   try {
@@ -698,6 +780,13 @@ async function completeSelected() {
   try {
     await saveEntryEditsSilently()
     await saveCommentsSilently()
+    if (isDCReviewer.value && !isTargetsReview.value) {
+      await ipcrfApi.rateForm(selectedForm.value.id, {
+        finalNumericalRating: selectedForm.value.finalNumericalRating || '',
+        adjectivalRating:     selectedForm.value.adjectivalRating     || '',
+        ...dcFeedbackForm.value
+      })
+    }
     const updated = await ipcrfApi.routeForm(selectedForm.value.id, {
       reviewType: reviewTypeForForm(selectedForm.value),
       action: 'complete'
@@ -835,7 +924,13 @@ function entryPayload(entry) {
 }
 
 function semesterText(value) {
+  if (!value || String(value).trim() === '') return ''
   return String(value) === '1' ? '1st Semester' : '2nd Semester'
+}
+
+function periodText(form) {
+  const sem = semesterText(form?.semester)
+  return sem ? `${sem}, CY ${form?.year}` : `CY ${form?.year}`
 }
 
 function reviewLabel(form) {
@@ -1143,6 +1238,12 @@ const routeSteps = computed(() => {
 .rq-feedback-grid > div { display: contents; }
 .rq-feedback-grid span { padding: 11px 14px; font-size: 11.5px; font-weight: 700; color: var(--muted); background: var(--surface-2); border-top: 1px solid var(--border); }
 .rq-feedback-grid p { margin: 0; padding: 11px 14px; font-size: 12.5px; color: var(--ink-soft); border-top: 1px solid var(--border); }
+.rq-feedback-edit { display: flex; flex-direction: column; gap: 0; }
+.rq-feedback-edit > div { padding: 10px 14px; border-top: 1px solid var(--border); }
+.rq-fb-label { display: block; font-size: 11px; font-weight: 700; color: var(--muted); margin-bottom: 5px; }
+.rq-fb-input { width: 100%; resize: vertical; border: 1px solid var(--border); border-radius: 7px; padding: 7px 9px; font-size: 12.5px; color: var(--ink-soft); background: var(--surface); font-family: inherit; box-sizing: border-box; }
+.rq-fb-input:focus { outline: none; border-color: var(--accent); }
+.rq-fb-note { margin: 0; padding: 8px 14px 10px; font-size: 11px; color: var(--muted); font-style: italic; }
 
 /* ── Comments tab ── */
 .rq-comments { display: flex; flex-direction: column; gap: 10px; }
@@ -1164,6 +1265,24 @@ const routeSteps = computed(() => {
 .toast-warning { background: var(--warn); }
 .toast-slide-enter-active, .toast-slide-leave-active { transition: all .2s; }
 .toast-slide-enter-from, .toast-slide-leave-to { opacity: 0; transform: translateY(8px); }
+
+/* ── Mode switch (Review Queue / My Form toggle) ── */
+.rq-mode-switch { display: flex; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); padding: 3px; }
+.rq-mode-btn { height: 30px; border: 0; border-radius: 7px; background: transparent; padding: 0 14px; font: inherit; font-size: 12.5px; font-weight: 700; color: var(--muted); cursor: pointer; transition: all .15s; white-space: nowrap; }
+.rq-mode-btn.active { background: var(--accent); color: #fff; }
+.rq-mode-btn:not(.active):hover { background: var(--slate-soft); color: var(--ink); }
+
+/* ── Owner view elements ── */
+.rq-owner-badge { display: inline-flex; align-items: center; gap: 7px; height: 36px; border: 1px solid #BFD3FA; border-radius: 9px; background: var(--accent-soft); padding: 0 14px; font-size: 12.5px; font-weight: 700; color: var(--accent-strong); white-space: nowrap; }
+.rq-owner-banner { display: flex; align-items: flex-start; gap: 9px; background: #FFFBEB; border: 1px solid #FDE68A; color: #92400E; border-radius: 10px; padding: 10px 14px; font-size: 12.5px; margin-bottom: 14px; }
+.rq-owner-banner svg { flex-shrink: 0; margin-top: 1px; }
+.rq-owner-fs { border: 0; padding: 0; margin: 0; min-width: 0; width: 100%; display: contents; }
+.rq-owner-fs:disabled textarea,
+.rq-owner-fs[disabled] textarea,
+.rq-owner-fs:disabled input,
+.rq-owner-fs[disabled] input,
+.rq-owner-fs:disabled select,
+.rq-owner-fs[disabled] select { background: var(--surface-2) !important; color: var(--ink-soft) !important; cursor: not-allowed !important; }
 
 /* ── Responsive ── */
 @media (max-width: 980px) {

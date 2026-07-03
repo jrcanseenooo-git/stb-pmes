@@ -24,5 +24,13 @@ export const useDashboardStore = defineStore('dashboard', () => {
     loading.value = false
   }
 
-  return { summary, divisions, statusBreakdown, monthlyActivity, loading, fetchAll }
+  async function fetchActivity(params = {}) {
+    try {
+      monthlyActivity.value = await dashboardApi.monthlyActivity(params)
+    } catch (e) {
+      console.warn('[Dashboard]', e.message)
+    }
+  }
+
+  return { summary, divisions, statusBreakdown, monthlyActivity, loading, fetchAll, fetchActivity }
 })

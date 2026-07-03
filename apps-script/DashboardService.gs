@@ -68,6 +68,7 @@ const DashboardService = (() => {
     accs           = applyScope(accs, profile)
 
     if (params.semester) accs = accs.filter(r => r.semester === params.semester)
+    if (params.year)     accs = accs.filter(r => r.year == params.year)
 
     const STATUS_LIST = ['Not Started','Ongoing','Submitted','For Revision','Approved','Delayed','Completed']
     return STATUS_LIST.map(s => ({

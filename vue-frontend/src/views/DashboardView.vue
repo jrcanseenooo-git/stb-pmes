@@ -5,8 +5,8 @@
     <div class="stats-grid">
       <div class="stat-card stat-blue">
         <div class="stat-label">Total Personnel</div>
-        <div class="stat-value">84</div>
-        <div class="stat-sub up">↑ 3 new this semester</div>
+        <div class="stat-value">{{ stats.totalPersonnel }}</div>
+        <div class="stat-sub">Active accounts</div>
         <div class="stat-icon blue">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <circle cx="8" cy="5" r="2.5" stroke="currentColor" stroke-width="1.4" />
@@ -16,8 +16,8 @@
       </div>
       <div class="stat-card stat-green">
         <div class="stat-label">Completion Rate</div>
-        <div class="stat-value">73<span style="font-size:14px">%</span></div>
-        <div class="stat-sub up">↑ 8% vs last sem.</div>
+        <div class="stat-value">{{ stats.completionRate }}<span style="font-size:14px">%</span></div>
+        <div class="stat-sub up">{{ stats.completed }} of {{ stats.totalTargets }} targets</div>
         <div class="stat-icon green">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path d="M2 14V8l4-4 4 4 4-4v10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"
@@ -27,8 +27,8 @@
       </div>
       <div class="stat-card stat-gold">
         <div class="stat-label">Pending Submissions</div>
-        <div class="stat-value">17</div>
-        <div class="stat-sub">Across 4 divisions</div>
+        <div class="stat-value">{{ stats.pending }}</div>
+        <div class="stat-sub">Awaiting review</div>
         <div class="stat-icon gold">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.4" />
@@ -38,8 +38,8 @@
       </div>
       <div class="stat-card stat-red">
         <div class="stat-label">Delayed Targets</div>
-        <div class="stat-value">6</div>
-        <div class="stat-sub down">↑ 2 since last week</div>
+        <div class="stat-value">{{ stats.delayed }}</div>
+        <div class="stat-sub" :class="stats.delayed > 0 && 'down'">{{ stats.delayed > 0 ? 'Needs attention' : 'On track' }}</div>
         <div class="stat-icon red">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path d="M8 2L1 14h14L8 2z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"
@@ -56,10 +56,11 @@
       <div class="card">
         <div class="card-hd">
           <span class="card-title">Division Performance</span>
-          <span class="sem-tag">S1 2025</span>
+          <span class="sem-tag">{{ currentSemester }}</span>
         </div>
         <div class="card-body">
           <div class="div-list">
+            <div v-if="!divisions.length" class="div-pct">No division data for this period yet.</div>
             <div v-for="div in divisions" :key="div.name" class="div-item">
               <div class="div-row-top">
                 <span class="div-name">{{ div.name }}</span>
@@ -81,26 +82,22 @@
       <div class="card">
         <div class="card-hd">
           <span class="card-title">Accomplishment Status</span>
-          <button class="btn">View all</button>
+          <button class="btn" @click="router.push('/accomplishments')">View all</button>
         </div>
         <div class="card-body">
           <div class="donut-wrap">
             <svg width="110" height="110" viewBox="0 0 110 110">
               <circle cx="55" cy="55" r="42" fill="none" stroke="#E2E8F0" stroke-width="16" />
-              <circle cx="55" cy="55" r="42" fill="none" stroke="#27AE60" stroke-width="16" stroke-dasharray="96 168"
-                stroke-dashoffset="0" transform="rotate(-90 55 55)" stroke-linecap="round" />
-              <circle cx="55" cy="55" r="42" fill="none" stroke="#2F80ED" stroke-width="16" stroke-dasharray="46 168"
-                stroke-dashoffset="-96" transform="rotate(-90 55 55)" stroke-linecap="round" />
-              <circle cx="55" cy="55" r="42" fill="none" stroke="#F2994A" stroke-width="16" stroke-dasharray="17 168"
-                stroke-dashoffset="-142" transform="rotate(-90 55 55)" stroke-linecap="round" />
-              <circle cx="55" cy="55" r="42" fill="none" stroke="#EB5757" stroke-width="16" stroke-dasharray="9 168"
-                stroke-dashoffset="-159" transform="rotate(-90 55 55)" stroke-linecap="round" />
+              <circle v-for="seg in donutSegments" :key="seg.label" cx="55" cy="55" r="42" fill="none"
+                :stroke="seg.color" stroke-width="16" :stroke-dasharray="seg.dash"
+                :stroke-dashoffset="seg.offset" transform="rotate(-90 55 55)" stroke-linecap="round" />
               <text x="55" y="51" text-anchor="middle" font-size="18" font-weight="600" fill="#1A2332"
-                font-family="DM Mono,monospace">152</text>
+                font-family="DM Mono,monospace">{{ totalTargets }}</text>
               <text x="55" y="64" text-anchor="middle" font-size="8" fill="#718096"
                 font-family="DM Sans,sans-serif">targets</text>
             </svg>
             <div class="donut-legend">
+              <div v-if="!statuses.length" class="legend-item">No targets recorded yet.</div>
               <div v-for="s in statuses" :key="s.label" class="legend-item">
                 <div class="legend-dot" :style="{ background: s.color }"></div>
                 {{ s.label }} ({{ s.count }})
@@ -120,16 +117,17 @@
           <span class="card-title">Monthly Submission Activity</span>
           <div class="pill-tabs">
             <div v-for="t in ['IPCR', 'CCEF']" :key="t" :class="['pill', activeTab === t && 'active']"
-              @click="activeTab = t">{{ t }}</div>
+              @click="setTab(t)">{{ t }}</div>
           </div>
         </div>
         <div class="card-body">
           <div class="bar-chart">
-            <div v-for="(bar, i) in bars" :key="bar.label" class="bar-col">
+            <div v-if="!bars.length" class="bar-lbl">No submissions recorded yet.</div>
+            <div v-for="bar in bars" :key="bar.label" class="bar-col">
               <div class="bar" :style="{
                 height: (bar.val / maxBar * 100) + '%',
-                background: i === 4 ? '#2F80ED' : i === 5 ? '#E2E8F0' : '#2F80ED',
-                opacity: i === 5 ? 0.5 : i < 4 ? 0.65 + i * 0.07 : 1
+                background: bar.future ? '#E2E8F0' : '#2F80ED',
+                opacity: bar.future ? 0.5 : bar.current ? 1 : 0.8
               }"></div>
               <div class="bar-lbl">{{ bar.label }}</div>
             </div>
@@ -139,7 +137,7 @@
               <div class="cl-dot accent"></div>{{ activeTab }} submissions
             </div>
             <div class="cl-item">
-              <div class="cl-dot gray"></div>Projected
+              <div class="cl-dot gray"></div>Upcoming months
             </div>
           </div>
         </div>
@@ -149,10 +147,11 @@
       <div class="card">
         <div class="card-hd">
           <span class="card-title">Notifications</span>
-          <span class="badge badge-red-solid">5 new</span>
+          <span v-if="notifUnread > 0" class="badge badge-red-solid">{{ notifUnread }} new</span>
         </div>
         <div class="card-body notif-body">
-          <div v-for="n in notifications" :key="n.msg" class="notif-item">
+          <div v-if="!notifications.length" class="notif-text" style="padding:8px 0;">You're all caught up.</div>
+          <div v-for="n in notifications" :key="n.id" class="notif-item">
             <div class="notif-icon" :style="{ background: n.bg }">
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                 <path :d="n.path" :stroke="n.color" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
@@ -173,61 +172,130 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useDashboardStore } from '@/stores/dashboard'
 import { useAuthStore } from '@/stores/auth'
+import { useNotificationsStore } from '@/stores/notifications'
 
-const dashStore = useDashboardStore()
-const authStore = useAuthStore()
+const router     = useRouter()
+const dashStore  = useDashboardStore()
+const authStore  = useAuthStore()
+const notifStore = useNotificationsStore()
+
+const activeTab = ref('IPCR')
 
 onMounted(async () => {
   if (!authStore.initialised) await authStore.init()
   if (authStore.isAuthenticated) {
-    dashStore.fetchAll().catch(() => { })
+    dashStore.fetchAll({ type: activeTab.value }).catch(() => { })
+    if (!notifStore.notifications.length) notifStore.fetchAll().catch(() => { })
   }
 })
 
-const activeTab = ref('IPCR')
+// ── Period tag ──
+const currentSemester = computed(() => {
+  const now = new Date()
+  return `${now.getMonth() < 6 ? 'S1' : 'S2'} ${now.getFullYear()}`
+})
 
-const divisions = computed(() =>
-  dashStore.divisions.length ? dashStore.divisions : [
-    { name: 'Admin Pool', pct: 82, color: '#27AE60', top: true },
-    { name: 'Design Formulation Div.', pct: 76, color: '#2F80ED' },
-    { name: 'Pilot Implementation Div.', pct: 68, color: '#E9A840' },
-    { name: 'Social Tech Analysis & Eval.', pct: 61, color: '#F2994A', down: true }
-  ]
-)
+// ── Stat cards (dashboard/summary) ──
+const stats = computed(() => dashStore.summary || {
+  totalPersonnel: '—', totalTargets: 0, completionRate: 0, delayed: 0, pending: 0, completed: 0
+})
+
+// ── Division performance (dashboard/divisions) ──
+const DIV_COLORS = { blue: '#2F80ED', green: '#27AE60', gold: '#E9A840', orange: '#F2994A', red: '#EB5757', purple: '#7C3AED' }
+
+const divisions = computed(() => {
+  const rows = dashStore.divisions || []
+  const maxPct = Math.max(...rows.map(d => d.completionRate || 0), 0)
+  return rows.map(d => ({
+    name:  d.name,
+    pct:   d.completionRate || 0,
+    color: DIV_COLORS[d.color] || (String(d.color || '').startsWith('#') ? d.color : '#2F80ED'),
+    top:   rows.length > 1 && maxPct > 0 && d.completionRate === maxPct
+  }))
+})
+
+// ── Status donut (dashboard/status) ──
+const STATUS_COLORS = {
+  'Not Started': '#CBD5E1', 'Ongoing': '#2F80ED', 'Submitted': '#E9A840',
+  'For Revision': '#F2994A', 'Approved': '#6FCF97', 'Delayed': '#EB5757', 'Completed': '#27AE60'
+}
 
 const statuses = computed(() =>
-  dashStore.statusBreakdown.length ? dashStore.statusBreakdown : [
-    { label: 'Completed', count: 87, color: '#27AE60' },
-    { label: 'Ongoing', count: 42, color: '#2F80ED' },
-    { label: 'For Revision', count: 15, color: '#F2994A' },
-    { label: 'Delayed', count: 8, color: '#EB5757' }
-  ]
+  (dashStore.statusBreakdown || []).map(s => ({
+    label: s.status, count: s.count, color: STATUS_COLORS[s.status] || '#94A3B8'
+  }))
 )
 
-const ipcr = [
-  { label: 'Jan', val: 12 }, { label: 'Feb', val: 18 },
-  { label: 'Mar', val: 28 }, { label: 'Apr', val: 22 },
-  { label: 'May', val: 35 }, { label: 'Jun', val: 14 }
-]
-const ccef = [
-  { label: 'Jan', val: 8 }, { label: 'Feb', val: 14 },
-  { label: 'Mar', val: 20 }, { label: 'Apr', val: 16 },
-  { label: 'May', val: 25 }, { label: 'Jun', val: 10 }
-]
+const totalTargets = computed(() => statuses.value.reduce((sum, s) => sum + s.count, 0))
 
-const bars = computed(() => activeTab.value === 'IPCR' ? ipcr : ccef)
-const maxBar = computed(() => Math.max(...bars.value.map(b => b.val)))
+const DONUT_CIRC = 2 * Math.PI * 42
+const donutSegments = computed(() => {
+  const total = totalTargets.value
+  if (!total) return []
+  let acc = 0
+  return statuses.value.map(s => {
+    const len = (s.count / total) * DONUT_CIRC
+    const seg = { label: s.label, color: s.color, dash: `${len} ${DONUT_CIRC - len}`, offset: -acc }
+    acc += len
+    return seg
+  })
+})
+
+// ── Monthly activity (dashboard/activity) ──
+const bars = computed(() => {
+  const rows = dashStore.monthlyActivity || []
+  const nowMonth = new Date().getMonth()
+  return rows.map((m, idx) => ({
+    label:   m.label,
+    val:     m.count || 0,
+    current: idx === nowMonth,
+    future:  idx > nowMonth
+  }))
+})
+const maxBar = computed(() => Math.max(...bars.value.map(b => b.val), 1))
+
+function setTab(t) {
+  if (activeTab.value === t) return
+  activeTab.value = t
+  dashStore.fetchActivity({ type: t }).catch(() => { })
+}
+
+// ── Notifications (real store, same one AppLayout uses) ──
+const NOTIF_META = {
+  approval: { bg: '#E6F4EA', color: '#27AE60', path: 'M1 5l3 3 5-5' },
+  revision: { bg: '#FEF3E2', color: '#C8882A', path: 'M1 5a4 4 0 017-2M11 7a4 4 0 01-7 2M11 3v3H8' },
+  deadline: { bg: '#FDECEC', color: '#EB5757', path: 'M6 1L1 11h10L6 1zM6 5v3M6 9.5v.5' },
+  alert:    { bg: '#EBF4FF', color: '#2F80ED', path: 'M6 1v6M3 5l3 2.5L9 5M2 9v1a1 1 0 001 1h6a1 1 0 001-1V9' }
+}
+const NOTIF_LABELS = { approval: 'Approved', revision: 'Revision', deadline: 'Deadline Alert', alert: 'Alert' }
 
 const notifications = computed(() =>
-  dashStore.notifications?.length ? dashStore.notifications : [
-    { type: 'Deadline Alert', msg: 'Q1 IPCR submission ends in 2 days', time: 'May 11, 2025 • 8:00 AM', bg: '#FDECEC', color: '#EB5757', path: 'M6 1L1 11h10L6 1zM6 5v3M6 9.5v.5' },
-    { type: 'Approved', msg: 'M. Santos – Admin Pool Q1 IPCR', time: 'May 10, 2025 • 2:14 PM', bg: '#E6F4EA', color: '#27AE60', path: 'M1 5l3 3 5-5' },
-    { type: 'Revision', msg: 'J. Cruz – CCEF Target 3 MOV missing', time: 'May 9, 2025 • 10:30 AM', bg: '#FEF3E2', color: '#C8882A', path: 'M1 5a4 4 0 017-2M11 7a4 4 0 01-7 2M11 3v3H8' },
-    { type: 'New MOV', msg: 'R. Dela Cruz submitted 3 files', time: 'May 8, 2025 • 4:00 PM', bg: '#EBF4FF', color: '#2F80ED', path: 'M6 1v6M3 5l3 2.5L9 5M2 9v1a1 1 0 001 1h6a1 1 0 001-1V9' }
-  ]
+  (notifStore.notifications || []).slice(0, 4).map(n => {
+    const meta = NOTIF_META[n.type] || NOTIF_META.alert
+    return {
+      id:    n.id,
+      type:  NOTIF_LABELS[n.type] || 'Notice',
+      msg:   n.message,
+      time:  formatNotifTime(n.createdAt),
+      bg:    meta.bg,
+      color: meta.color,
+      path:  meta.path
+    }
+  })
 )
+const notifUnread = computed(() => notifStore.unreadCount)
+
+function formatNotifTime(iso) {
+  if (!iso) return ''
+  try {
+    const d = new Date(iso)
+    return d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) +
+           ' • ' + d.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })
+  } catch { return '' }
+}
 </script>
 
 <style scoped>

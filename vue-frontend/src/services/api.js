@@ -287,13 +287,13 @@ export const ipcrfApi = {
   computeScore: (id)                   => gasWrite('POST',  `ipcrf/${id}/compute-score`),
   assignableUsers: (formId, search = '') => gasGet(`ipcrf/${formId}/assignable-users`, { search }),
   reviewComments: (formId, reviewType) => gasGet(`ipcrf/${formId}/review-comments`, { reviewType }),
-  saveReviewComments: (formId, data)   => gasWrite('POST', `ipcrf/${formId}/review-comments`, {
+  saveReviewComments: (formId, data)   => gasWriteBody('POST', `ipcrf/${formId}/review-comments`, {
     ...data,
     comments: JSON.stringify(data.comments || [])
   }),
   listEntries:  (formId)               => gasGet(`ipcrf/${formId}/entries`),
   addEntry:     (formId, data)         => gasWrite('POST',   `ipcrf/${formId}/entries`,            data),
-  updateEntry:  (formId, entryId, data)=> gasWrite('PUT',    `ipcrf/${formId}/entries/${entryId}`, data),
+  updateEntry:  (formId, entryId, data)=> gasWriteBody('PUT', `ipcrf/${formId}/entries/${entryId}`, data),
   deleteEntry:  (formId, entryId)      => gasWrite('DELETE', `ipcrf/${formId}/entries/${entryId}`),
   listJrbRatings: (formId)             => gasGet(`ipcrf/${formId}/jrb`),
   saveJrbRatings: (formId, data)       => gasWrite('POST',  `ipcrf/${formId}/jrb`,    data),

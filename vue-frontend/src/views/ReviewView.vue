@@ -95,12 +95,10 @@
               </div>
             </div>
             <div class="rq-doc-actions" v-if="!isOwnerView">
-              <button class="rq-btn rq-btn-ghost" @click="saveSheetEdits" :disabled="editsSaving || entriesLoading">
-                {{ editsSaving ? 'Saving...' : 'Save Edits' }}
-              </button>
-              <button class="rq-btn rq-btn-ghost" @click="saveComments" :disabled="commentsSaving || entriesLoading">
-                {{ commentsSaving ? 'Saving...' : 'Save Comments' }}
-              </button>
+              <span v-if="saveChipText" :class="['rq-save-chip', `save-${saveState}`]" @click="saveState === 'error' && flushReviewSaves()">
+                <span v-if="saveState === 'saving'" class="rq-spinner-xs"></span>
+                {{ saveChipText }}
+              </span>
               <button class="rq-btn rq-btn-outline-warn" @click="returnSelected">Return</button>
 
               <div class="rq-assign-wrap" v-click-outside="closeAssignPanel">
@@ -377,7 +375,7 @@
                     <div class="rq-rate-col"><span>Efficiency</span><input v-model="editableEntries[entry.id].ratingEfficiency" inputmode="decimal"/></div>
                     <div class="rq-rate-col"><span>Quality</span><input v-model="editableEntries[entry.id].ratingQuality" inputmode="decimal"/></div>
                     <div class="rq-rate-col"><span>Timeliness</span><input v-model="editableEntries[entry.id].ratingTimeliness" inputmode="decimal"/></div>
-                    <div class="rq-rate-col rq-avg"><span>Average</span><input v-model="editableEntries[entry.id].ratingAverage" inputmode="decimal"/></div>
+                    <div class="rq-rate-col rq-avg"><span>Average</span><input v-model="editableEntries[entry.id].ratingAverage" inputmode="decimal" readonly title="Auto-computed from E/Q/T"/></div>
                   </div>
 
                   <div class="rq-mov-remarks rq-field-wide">
@@ -446,7 +444,7 @@
                     <div class="rq-rate-col"><span>Efficiency</span><input v-model="editableEntries[entry.id].ratingEfficiency" inputmode="decimal"/></div>
                     <div class="rq-rate-col"><span>Quality</span><input v-model="editableEntries[entry.id].ratingQuality" inputmode="decimal"/></div>
                     <div class="rq-rate-col"><span>Timeliness</span><input v-model="editableEntries[entry.id].ratingTimeliness" inputmode="decimal"/></div>
-                    <div class="rq-rate-col rq-avg"><span>Average</span><input v-model="editableEntries[entry.id].ratingAverage" inputmode="decimal"/></div>
+                    <div class="rq-rate-col rq-avg"><span>Average</span><input v-model="editableEntries[entry.id].ratingAverage" inputmode="decimal" readonly title="Auto-computed from E/Q/T"/></div>
                   </div>
 
                   <div class="rq-mov-remarks rq-field-wide">
@@ -544,7 +542,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { ipcrf as ipcrfApi } from '@/services/api'
 import { useConfirm, CONFIRMS } from '@/composables/useConfirm'
 import { useAuthStore } from '@/stores/auth'
@@ -553,8 +551,6 @@ const { confirm } = useConfirm()
 const authStore = useAuthStore()
 const loading = ref(false)
 const entriesLoading = ref(false)
-const commentsSaving = ref(false)
-const editsSaving = ref(false)
 const routing = ref(false)
 const forms = ref([])
 const entries = ref([])
@@ -628,8 +624,134 @@ const activeInstruction = computed(() => {
 const coreEntries = computed(() => entries.value.filter(e => e.functionType === 'Core'))
 const supportEntries = computed(() => entries.value.filter(e => e.functionType === 'Support'))
 
-onMounted(loadQueue)
+onMounted(() => {
+  loadQueue()
+  window.addEventListener('beforeunload', onBeforeUnload)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('beforeunload', onBeforeUnload)
+  flushReviewSaves()
+})
 watch([reviewTypeFilter, semesterFilter], loadQueue)
+
+// ── Inline autosave (replaces the Save Edits / Save Comments buttons) ──
+const lastSavedComments = ref({})
+const saveState = ref('idle')   // idle | dirty | saving | saved | error
+const savedAt = ref(null)
+let saveTimer = null
+let saveInFlight = false
+let saveQueued = false
+
+const saveChipText = computed(() => {
+  if (saveState.value === 'saving') return 'Saving…'
+  if (saveState.value === 'dirty') return 'Unsaved changes'
+  if (saveState.value === 'error') return 'Save failed — click to retry'
+  if (saveState.value === 'saved' && savedAt.value) {
+    return `Saved ${savedAt.value.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })}`
+  }
+  return ''
+})
+
+watch(editableEntries, scheduleAutosave, { deep: true })
+watch(reviewComments, scheduleAutosave, { deep: true })
+
+function scheduleAutosave() {
+  if (isOwnerView.value || entriesLoading.value || routing.value || !selectedForm.value) return
+  recomputeAverages()
+  if (!dirtyEntryIds().length && !commentsDirty()) {
+    if (saveState.value === 'dirty') saveState.value = 'idle'
+    return
+  }
+  saveState.value = 'dirty'
+  if (saveTimer) clearTimeout(saveTimer)
+  saveTimer = setTimeout(() => flushReviewSaves(), 1200)
+}
+
+function recomputeAverages() {
+  Object.values(editableEntries.value).forEach(entry => {
+    if (!entry) return
+    const values = [entry.ratingEfficiency, entry.ratingQuality, entry.ratingTimeliness]
+      .map(v => String(v ?? '').trim())
+      .filter(v => v !== '' && v.toUpperCase() !== 'N/A')
+      .map(Number)
+      .filter(n => !Number.isNaN(n))
+    const avg = values.length
+      ? Math.round((values.reduce((sum, n) => sum + n, 0) / values.length) * 100000) / 100000
+      : ''
+    if (String(entry.ratingAverage ?? '') !== String(avg)) entry.ratingAverage = avg
+  })
+}
+
+function dirtyEntryIds() {
+  return entries.value
+    .filter(entry => {
+      const edited = editableEntries.value[entry.id]
+      if (!edited) return false
+      return JSON.stringify(entryPayload(edited)) !== JSON.stringify(entryPayload(entry))
+    })
+    .map(entry => entry.id)
+}
+
+function commentsDirty() {
+  return entries.value.some(entry =>
+    (reviewComments.value[entry.id] || '') !== (lastSavedComments.value[entry.id] || '')
+  )
+}
+
+async function flushReviewSaves(isRetry = false) {
+  if (saveTimer) { clearTimeout(saveTimer); saveTimer = null }
+  if (!selectedForm.value || isOwnerView.value) return
+  const form = selectedForm.value
+  const dirtyIds = dirtyEntryIds()
+  const doComments = commentsDirty()
+  if (!dirtyIds.length && !doComments) {
+    if (saveState.value === 'dirty') saveState.value = 'idle'
+    return
+  }
+  if (saveInFlight) { saveQueued = true; return }
+  saveInFlight = true
+  saveState.value = 'saving'
+  const entryJobs = dirtyIds.map(id => ({ id, payload: entryPayload(editableEntries.value[id] || {}) }))
+  const commentsPayload = doComments
+    ? entries.value.map(entry => ({ entryId: entry.id, comment: reviewComments.value[entry.id] || '' }))
+    : null
+  try {
+    for (const job of entryJobs) {
+      const updated = await ipcrfApi.updateEntry(form.id, job.id, job.payload)
+      const idx = entries.value.findIndex(e => e.id === job.id)
+      if (idx !== -1) entries.value[idx] = updated
+    }
+    if (commentsPayload) {
+      await ipcrfApi.saveReviewComments(form.id, {
+        reviewType: reviewTypeForForm(form),
+        comments: commentsPayload
+      })
+      const snap = { ...lastSavedComments.value }
+      commentsPayload.forEach(c => { snap[c.entryId] = c.comment })
+      lastSavedComments.value = snap
+    }
+    savedAt.value = new Date()
+    if (saveState.value === 'saving') saveState.value = 'saved'
+  } catch (e) {
+    if (!isRetry) {
+      // One silent retry for transient failures before bothering the user
+      setTimeout(() => flushReviewSaves(true), 1500)
+    } else {
+      saveState.value = 'error'
+      showToast(`Auto-save failed: ${e.message}`, 'error')
+    }
+  } finally {
+    saveInFlight = false
+    if (saveQueued) { saveQueued = false; flushReviewSaves() }
+  }
+}
+
+function onBeforeUnload(e) {
+  if (saveState.value === 'dirty' || saveState.value === 'saving' || saveTimer) {
+    e.preventDefault()
+    e.returnValue = ''
+  }
+}
 
 function setReviewType(type) {
   reviewTypeFilter.value = type
@@ -680,10 +802,13 @@ async function loadQueue() {
 }
 
 async function selectForm(form) {
+  flushReviewSaves() // flush pending edits of the previous form (fire-and-forget)
   selectedForm.value = form
   entries.value = []
   editableEntries.value = {}
   reviewComments.value = {}
+  lastSavedComments.value = {}
+  saveState.value = 'idle'
   dcFeedbackForm.value = {
     feedbackStrengths:           form.feedbackStrengths           || '',
     feedbackAreasForImprovement: form.feedbackAreasForImprovement || '',
@@ -700,6 +825,8 @@ async function selectForm(form) {
     editableEntries.value = Object.fromEntries(entries.value.map(entry => [entry.id, cloneEntry(entry)]))
     reviewComments.value = Object.fromEntries((Array.isArray(commentResult) ? commentResult : [])
       .map(comment => [comment.entryId, comment.comment || '']))
+    lastSavedComments.value = { ...reviewComments.value }
+    saveState.value = 'idle'
   } catch (e) {
     showToast(e.message, 'error')
   } finally {
@@ -707,57 +834,15 @@ async function selectForm(form) {
   }
 }
 
-async function saveSheetEdits() {
-  if (!selectedForm.value) return
-  const ok = await confirm({
-    type: 'submit',
-    title: 'Save Sheet Edits',
-    message: 'This will save the direct edits you made in the review workbook cells.',
-    confirmLabel: 'Save Sheet Edits',
-    cancelLabel: 'Cancel'
-  })
-  if (!ok) return
-
-  editsSaving.value = true
-  try {
-    await saveEntryEditsSilently()
-    showToast('Sheet edits saved.')
-  } catch (e) {
-    showToast(e.message, 'error')
-  } finally {
-    editsSaving.value = false
-  }
-}
-
+// Saves only entries that actually changed, and leaves editableEntries alone
+// so in-progress typing is never clobbered by a save.
 async function saveEntryEditsSilently() {
   if (!selectedForm.value) return
-  const updatedRows = await Promise.all(entries.value.map(entry => {
-    const edited = editableEntries.value[entry.id] || {}
-    return ipcrfApi.updateEntry(selectedForm.value.id, entry.id, entryPayload(edited))
-  }))
-  entries.value = updatedRows
-  editableEntries.value = Object.fromEntries(updatedRows.map(entry => [entry.id, cloneEntry(entry)]))
-}
-
-async function saveComments() {
-  if (!selectedForm.value) return
-  const ok = await confirm({
-    type: 'submit',
-    title: 'Save Review Comments',
-    message: `Your review notes for ${selectedForm.value.employeeName}'s ${selectedReviewType.value.toLowerCase()} will be saved to the database.`,
-    confirmLabel: 'Save Comments',
-    cancelLabel: 'Cancel'
-  })
-  if (!ok) return
-
-  commentsSaving.value = true
-  try {
-    await saveCommentsSilently()
-    showToast('Review comments saved.')
-  } catch (e) {
-    showToast(e.message, 'error')
-  } finally {
-    commentsSaving.value = false
+  const dirtyIds = dirtyEntryIds()
+  for (const id of dirtyIds) {
+    const updated = await ipcrfApi.updateEntry(selectedForm.value.id, id, entryPayload(editableEntries.value[id] || {}))
+    const idx = entries.value.findIndex(e => e.id === id)
+    if (idx !== -1) entries.value[idx] = updated
   }
 }
 
@@ -876,6 +961,7 @@ async function saveCommentsSilently() {
   })
   reviewComments.value = Object.fromEntries((Array.isArray(result) ? result : [])
     .map(comment => [comment.entryId, comment.comment || '']))
+  lastSavedComments.value = { ...reviewComments.value }
 }
 
 async function returnSelected() {
@@ -1118,7 +1204,13 @@ const routeSteps = computed(() => {
 .rq-doc-id { display: flex; align-items: center; gap: 12px; }
 .rq-doc-name { font-size: 17px; font-weight: 800; letter-spacing: -.2px; }
 .rq-doc-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
-.rq-doc-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.rq-doc-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.rq-save-chip { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 20px; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.save-dirty { background: #FEF3E2; color: #B45309; }
+.save-saving { background: #EFF6FF; color: #1D4ED8; }
+.save-saved { background: #ECFDF5; color: #047857; }
+.save-error { background: #FEF2F2; color: #B91C1C; cursor: pointer; }
+.rq-spinner-xs { width: 9px; height: 9px; border: 2px solid rgba(29,78,216,.25); border-top-color: #1D4ED8; border-radius: 50%; animation: rq-spin .6s linear infinite; display: inline-block; }
 
 .rq-avatar.sm { width: 26px; height: 26px; border-radius: 8px; font-size: 10px; }
 

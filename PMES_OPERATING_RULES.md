@@ -2,7 +2,7 @@
 
 ## Typography — Font Family
 
-The system font is set **once** in `vue-frontend/src/assets/main.css` using two rules:
+The system font is set **once** in `vue-frontend/src/assets/fonts.css` (imported in `main.js`) using two rules:
 
 ```css
 /* Sets the Inter stack for the whole app */
@@ -10,13 +10,18 @@ html, body, #app {
   font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
 }
 
-/* Forces ALL elements — including button/input/select — to inherit it */
-* {
+/* Forces ALL elements — including button/input/select and content
+   teleported to <body> (modals, toasts) — to inherit it.
+   html/body are excluded so this rule cannot out-rank the stack above;
+   svg is excluded so inline font-family attributes keep working. */
+*:not(html):not(body):not(svg):not(svg *) {
   font-family: inherit;
 }
 ```
 
-These two rules together mean every element in the entire system automatically uses the correct font, including form elements that browsers normally do not inherit font on.
+These two rules together mean every element in the entire system automatically uses the correct font, including form elements that browsers normally do not inherit font on, and modals rendered via `<teleport to="body">`.
+
+> Note: `src/assets/main.css` is **not** imported by the app (it never was). Do not import it wholesale without a full visual audit — it carries Tailwind preflight and component styles the current UI was never built against. `fonts.css` is the only global stylesheet.
 
 **Rules — apply to every new module, view, component, or feature:**
 
@@ -25,7 +30,7 @@ These two rules together mean every element in the entire system automatically u
 - **Login module** (`LoginView.vue`) is exempt — it uses its own font design intentionally.
 - **SVG `<text>` attributes** may keep a short inline stack (e.g. `font-family="Inter,system-ui,sans-serif"`) since SVG attributes bypass CSS cascade.
 
-If you find yourself typing `-apple-system` or `BlinkMacSystemFont` anywhere outside `main.css`, **stop and delete it**.
+If you find yourself typing `-apple-system` or `BlinkMacSystemFont` anywhere outside `fonts.css`, **stop and delete it**.
 
 ## Apps Script Updates
 

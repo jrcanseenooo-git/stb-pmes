@@ -14,6 +14,19 @@ async function getToken() {
   }
 }
 
+async function parseApiResponse(res) {
+  const text = await res.text()
+  let data
+  try {
+    data = JSON.parse(text)
+  } catch {
+    // Google returned an HTML error page (URL too long, transient outage, etc.)
+    throw new Error('The server returned an unexpected response. Please try again.')
+  }
+  if (!data.success) throw new Error(data.message || 'API error')
+  return data.data
+}
+
 async function gasGet(route, params = {}) {
   const token = await getToken()
   const qs = new URLSearchParams({
@@ -21,10 +34,8 @@ async function gasGet(route, params = {}) {
     token: token || '',
     ...flattenParams(params)
   }).toString()
-  const res  = await fetch(`${BASE_URL}?${qs}`)
-  const data = await res.json()
-  if (!data.success) throw new Error(data.message || 'API error')
-  return data.data
+  const res = await fetch(`${BASE_URL}?${qs}`)
+  return parseApiResponse(res)
 }
 
 async function gasWrite(method, route, body = {}) {
@@ -35,10 +46,26 @@ async function gasWrite(method, route, body = {}) {
     token:   token || '',
     ...flattenParams(body)
   }).toString()
-  const res  = await fetch(`${BASE_URL}?${qs}`)
-  const data = await res.json()
-  if (!data.success) throw new Error(data.message || 'API error')
-  return data.data
+  const res = await fetch(`${BASE_URL}?${qs}`)
+  return parseApiResponse(res)
+}
+
+// POST with a JSON body, for text-heavy writes: long accomplishment/MOV text
+// overflows the URL that gasWrite builds (Google then answers with an HTML
+// error page, not JSON). The backend already reads e.postData.contents.
+// No custom headers — keeps it a CORS "simple request" that GAS can answer.
+async function gasWriteBody(method, route, body = {}) {
+  const token = await getToken()
+  const qs = new URLSearchParams({
+    route,
+    _method: method,
+    token:   token || ''
+  }).toString()
+  const res = await fetch(`${BASE_URL}?${qs}`, {
+    method: 'POST',
+    body: JSON.stringify(body || {})
+  })
+  return parseApiResponse(res)
 }
 
 function flattenParams(obj, prefix = '') {
@@ -130,8 +157,8 @@ export const kraLibraryApi = {
 export const accomplishmentsApi = {
   list:            (p = {})              => gasGet('accomplishments',                          p),
   get:             (id)                  => gasGet(`accomplishments/${id}`),
-  create:          (data)                => gasWrite('POST',  'accomplishments',                data),
-  update:          (id, data)            => gasWrite('PUT',   `accomplishments/${id}`,          data),
+  create:          (data)                => gasWriteBody('POST', 'accomplishments',             data),
+  update:          (id, data)            => gasWriteBody('PUT',  `accomplishments/${id}`,       data),
   approve:         (id, remarks)         => gasWrite('PATCH', `accomplishments/${id}/approve`,  { remarks }),
   requestRevision: (id, remarks)         => gasWrite('PATCH', `accomplishments/${id}/revision`, { remarks }),
   updateStatus:    (id, status, remarks) => gasWrite('PATCH', `accomplishments/${id}/status`,   { status, remarks }),

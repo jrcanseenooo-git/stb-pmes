@@ -399,7 +399,7 @@ function revertField(field, e) {
   saveState.value = Object.keys(buildPatch(selectedRow.value)).length ? 'dirty' : 'idle'
 }
 
-async function flushSave(row = selectedRow.value) {
+async function flushSave(row = selectedRow.value, isRetry = false) {
   if (saveTimer) { clearTimeout(saveTimer); saveTimer = null }
   if (!row?.id) return
   const patch = buildPatch(row)
@@ -419,8 +419,13 @@ async function flushSave(row = selectedRow.value) {
     savedAt.value = new Date()
     if (saveState.value === 'saving') saveState.value = 'saved'
   } catch (e) {
-    saveState.value = 'error'
-    showToast(`Auto-save failed: ${e.message}`, 'error')
+    if (!isRetry) {
+      // One silent retry for transient failures before bothering the user
+      setTimeout(() => flushSave(row, true), 1500)
+    } else {
+      saveState.value = 'error'
+      showToast(`Auto-save failed: ${e.message}`, 'error')
+    }
   } finally {
     saveInFlight = false
     if (saveQueued) { saveQueued = false; flushSave() }

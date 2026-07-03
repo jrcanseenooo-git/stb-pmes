@@ -111,7 +111,13 @@
                 {{ selectedRow.divisionName || selectedRow.division || '' }}
               </div>
             </div>
-            <button class="btn btn-primary btn-sm" @click="openEditModal(selectedRow)">Edit</button>
+            <div class="rp-hd-actions">
+              <span v-if="saveChipText" :class="['save-chip', `save-${saveState}`]" @click="saveState === 'error' && flushSave()">
+                <span v-if="saveState === 'saving'" class="spinner-xs"></span>
+                {{ saveChipText }}
+              </span>
+              <button class="btn btn-primary btn-sm" @click="openEditModal(selectedRow)">Edit</button>
+            </div>
           </div>
 
           <div class="rp-body">
@@ -121,37 +127,67 @@
             </div>
 
             <div class="det-section">
-              <div class="det-label">Accomplishment</div>
-              <div class="det-text">{{ selectedRow.accomplishment || '---' }}</div>
+              <div class="det-label">Accomplishment <span class="inline-hint">auto-saves</span></div>
+              <textarea
+                v-model="draft.accomplishment"
+                :class="['inline-ta', isDirty('accomplishment') && 'inline-dirty']"
+                placeholder="What was actually accomplished..."
+                @input="onFieldInput($event)"
+                @blur="flushSave()"
+                @keydown.esc="revertField('accomplishment', $event)"
+              ></textarea>
             </div>
 
             <div class="det-section">
-              <div class="det-label">Means of Verification</div>
-              <div class="det-text">{{ selectedRow.movReferences || '---' }}</div>
+              <div class="det-label">Means of Verification <span class="inline-hint">auto-saves</span></div>
+              <textarea
+                v-model="draft.movReferences"
+                :class="['inline-ta', 'inline-ta-sm', isDirty('movReferences') && 'inline-dirty']"
+                placeholder="Documents, report names, links, or MOV references..."
+                @input="onFieldInput($event)"
+                @blur="flushSave()"
+                @keydown.esc="revertField('movReferences', $event)"
+              ></textarea>
             </div>
 
             <div class="det-ratings">
               <div class="det-rating-item">
                 <div class="det-label">Efficiency</div>
-                <div class="det-score">{{ ratingText(selectedRow.ratingEfficiency) }}</div>
+                <input v-model.number="draft.ratingEfficiency" type="number" min="1" max="5" step="0.01"
+                  :class="['det-score-input', isDirty('ratingEfficiency') && 'inline-dirty']" placeholder="—"
+                  @input="onFieldInput($event)" @blur="onRatingBlur('ratingEfficiency')"
+                  @keydown.esc="revertField('ratingEfficiency', $event)"/>
               </div>
               <div class="det-rating-item">
                 <div class="det-label">Quality</div>
-                <div class="det-score">{{ ratingText(selectedRow.ratingQuality) }}</div>
+                <input v-model.number="draft.ratingQuality" type="number" min="1" max="5" step="0.01"
+                  :class="['det-score-input', isDirty('ratingQuality') && 'inline-dirty']" placeholder="—"
+                  @input="onFieldInput($event)" @blur="onRatingBlur('ratingQuality')"
+                  @keydown.esc="revertField('ratingQuality', $event)"/>
               </div>
               <div class="det-rating-item">
                 <div class="det-label">Timeliness</div>
-                <div class="det-score">{{ ratingText(selectedRow.ratingTimeliness) }}</div>
+                <input v-model.number="draft.ratingTimeliness" type="number" min="1" max="5" step="0.01"
+                  :class="['det-score-input', isDirty('ratingTimeliness') && 'inline-dirty']" placeholder="—"
+                  @input="onFieldInput($event)" @blur="onRatingBlur('ratingTimeliness')"
+                  @keydown.esc="revertField('ratingTimeliness', $event)"/>
               </div>
               <div class="det-rating-item det-avg">
-                <div class="det-label">Average</div>
-                <div class="det-score det-score-avg">{{ ratingText(selectedRow.ratingAverage) }}</div>
+                <div class="det-label">Average <span class="eqt-hint">auto</span></div>
+                <div class="det-score det-score-avg">{{ draftAverage || '---' }}</div>
               </div>
             </div>
 
-            <div v-if="selectedRow.remarks" class="det-section">
-              <div class="det-label">Remarks</div>
-              <div class="det-text">{{ selectedRow.remarks }}</div>
+            <div class="det-section">
+              <div class="det-label">Remarks <span class="inline-hint">auto-saves</span></div>
+              <textarea
+                v-model="draft.remarks"
+                :class="['inline-ta', 'inline-ta-sm', isDirty('remarks') && 'inline-dirty']"
+                placeholder="Optional notes..."
+                @input="onFieldInput($event)"
+                @blur="flushSave()"
+                @keydown.esc="revertField('remarks', $event)"
+              ></textarea>
             </div>
           </div>
         </template>
@@ -215,7 +251,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { accomplishmentsApi } from '@/services/api'
 import { useConfirm } from '@/composables/useConfirm'
@@ -270,7 +306,142 @@ const filteredRows = computed(() => {
   return result
 })
 
-onMounted(loadRows)
+onMounted(() => {
+  loadRows()
+  window.addEventListener('beforeunload', onBeforeUnload)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('beforeunload', onBeforeUnload)
+  flushSave()
+})
+
+// ── Inline editing / autosave (right panel) ──
+const AUTOSAVE_FIELDS = ['accomplishment', 'movReferences', 'ratingEfficiency', 'ratingQuality', 'ratingTimeliness', 'remarks']
+const RATING_KEYS = ['ratingEfficiency', 'ratingQuality', 'ratingTimeliness']
+
+const draft = ref(blankDraft())
+const saveState = ref('idle')   // idle | dirty | saving | saved | error
+const savedAt = ref(null)
+let saveTimer = null
+let saveInFlight = false
+let saveQueued = false
+
+const draftAverage = computed(() => calculateAverage(draft.value))
+
+const saveChipText = computed(() => {
+  if (saveState.value === 'saving') return 'Saving…'
+  if (saveState.value === 'dirty') return 'Unsaved changes'
+  if (saveState.value === 'error') return 'Save failed — click to retry'
+  if (saveState.value === 'saved' && savedAt.value) {
+    return `Saved ${savedAt.value.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })}`
+  }
+  return ''
+})
+
+watch(selectedRow, (newRow, oldRow) => {
+  if (newRow?.id === oldRow?.id) return
+  if (oldRow) flushSave(oldRow)
+  loadDraft(newRow)
+})
+
+function blankDraft() {
+  return { accomplishment: '', movReferences: '', ratingEfficiency: '', ratingQuality: '', ratingTimeliness: '', remarks: '' }
+}
+
+function loadDraft(row) {
+  const d = blankDraft()
+  AUTOSAVE_FIELDS.forEach(k => { d[k] = row?.[k] ?? '' })
+  draft.value = d
+  saveState.value = 'idle'
+  nextTick(resizeAllTextareas)
+}
+
+function isDirty(field) {
+  return String(draft.value[field] ?? '') !== String(selectedRow.value?.[field] ?? '')
+}
+
+function buildPatch(row) {
+  const patch = {}
+  AUTOSAVE_FIELDS.forEach(k => {
+    if (String(draft.value[k] ?? '') !== String(row?.[k] ?? '')) patch[k] = draft.value[k]
+  })
+  if (RATING_KEYS.some(k => k in patch)) {
+    patch.ratingAverage = calculateAverage(draft.value)
+  }
+  return patch
+}
+
+function onFieldInput(e) {
+  if (e?.target?.tagName === 'TEXTAREA') autoGrow(e.target)
+  saveState.value = 'dirty'
+  if (saveTimer) clearTimeout(saveTimer)
+  saveTimer = setTimeout(() => flushSave(), 1200)
+}
+
+function onRatingBlur(field) {
+  clampDraftRating(field)
+  flushSave()
+}
+
+function clampDraftRating(field) {
+  const v = draft.value[field]
+  if (v === '' || v === null || v === undefined) return
+  const n = Number(v)
+  if (isNaN(n)) { draft.value[field] = ''; return }
+  if (n < 1) draft.value[field] = 1
+  else if (n > 5) draft.value[field] = 5
+}
+
+function revertField(field, e) {
+  draft.value[field] = selectedRow.value?.[field] ?? ''
+  if (e?.target?.tagName === 'TEXTAREA') nextTick(() => autoGrow(e.target))
+  saveState.value = Object.keys(buildPatch(selectedRow.value)).length ? 'dirty' : 'idle'
+}
+
+async function flushSave(row = selectedRow.value) {
+  if (saveTimer) { clearTimeout(saveTimer); saveTimer = null }
+  if (!row?.id) return
+  const patch = buildPatch(row)
+  if (!Object.keys(patch).length) {
+    if (saveState.value === 'dirty') saveState.value = 'idle'
+    return
+  }
+  if (saveInFlight) { saveQueued = true; return }
+  saveInFlight = true
+  saveState.value = 'saving'
+  try {
+    const updated = await accomplishmentsApi.update(row.id, patch)
+    const merged = { ...row, ...patch, ...(updated || {}) }
+    const idx = rows.value.findIndex(r => r.id === row.id)
+    if (idx !== -1) rows.value[idx] = { ...rows.value[idx], ...merged }
+    if (selectedRow.value?.id === row.id) selectedRow.value = { ...selectedRow.value, ...merged }
+    savedAt.value = new Date()
+    if (saveState.value === 'saving') saveState.value = 'saved'
+  } catch (e) {
+    saveState.value = 'error'
+    showToast(`Auto-save failed: ${e.message}`, 'error')
+  } finally {
+    saveInFlight = false
+    if (saveQueued) { saveQueued = false; flushSave() }
+  }
+}
+
+function autoGrow(el) {
+  el.style.height = 'auto'
+  el.style.height = el.scrollHeight + 'px'
+}
+
+function resizeAllTextareas() {
+  document.querySelectorAll('.inline-ta').forEach(autoGrow)
+}
+
+function onBeforeUnload(e) {
+  if (saveState.value === 'dirty' || saveState.value === 'saving' || saveTimer) {
+    e.preventDefault()
+    e.returnValue = ''
+  }
+}
 
 function blankForm() {
   return {
@@ -439,6 +610,7 @@ async function saveEntry() {
       if (idx !== -1) rows.value[idx] = { ...rows.value[idx], ...updated }
       if (selectedRow.value?.id === editingItem.value.id) {
         selectedRow.value = { ...selectedRow.value, ...updated }
+        loadDraft(selectedRow.value)
       }
       showToast('Entry updated')
     } else {
@@ -537,6 +709,27 @@ async function saveEntry() {
 .det-avg { background: #EBF4FF; border-color: #BFDBFE; }
 .det-score { font-size: 24px; font-weight: 800; color: #0F172A; margin-top: 4px; }
 .det-score-avg { color: #1A56B0; font-size: 28px; }
+
+/* Inline editing (right panel) */
+.rp-hd-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.save-chip { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 20px; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.save-dirty { background: #FEF3E2; color: #B45309; }
+.save-saving { background: #EFF6FF; color: #1D4ED8; }
+.save-saved { background: #ECFDF5; color: #047857; }
+.save-error { background: #FEF2F2; color: #B91C1C; cursor: pointer; }
+.spinner-xs { width: 9px; height: 9px; border: 2px solid rgba(29,78,216,.25); border-top-color: #1D4ED8; border-radius: 50%; animation: spin .6s linear infinite; display: inline-block; }
+.inline-hint { font-size: 9px; font-weight: 600; color: #B7C3D4; text-transform: none; letter-spacing: .02em; }
+.inline-ta { width: 100%; min-height: 96px; padding: 10px 12px; border: 1.5px solid #E2E8F0; border-radius: 9px; font-size: 13.5px; line-height: 1.7; color: #1A2332; background: #fff; outline: none; resize: none; overflow: hidden; transition: border-color .15s, background .15s; }
+.inline-ta-sm { min-height: 72px; }
+.inline-ta:focus { border-color: #3B82F6; box-shadow: 0 0 0 3px rgba(59,130,246,.1); }
+.inline-ta::placeholder { color: #CBD5E1; }
+.inline-dirty { border-left: 3px solid #E9A840 !important; }
+.det-score-input { width: 100%; border: 1.5px solid transparent; background: transparent; text-align: center; font-size: 24px; font-weight: 800; color: #0F172A; margin-top: 4px; outline: none; border-radius: 8px; padding: 0; transition: border-color .15s, background .15s; }
+.det-score-input:hover { border-color: #E2E8F0; background: #fff; }
+.det-score-input:focus { border-color: #3B82F6; background: #fff; box-shadow: 0 0 0 3px rgba(59,130,246,.1); }
+.det-score-input::placeholder { color: #CBD5E1; }
+.det-score-input::-webkit-outer-spin-button, .det-score-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.det-score-input[type=number] { -moz-appearance: textfield; appearance: textfield; }
 
 /* Empty state (list) */
 .empty-state { display: flex; flex-direction: column; align-items: center; padding: 40px 16px; gap: 8px; text-align: center; }

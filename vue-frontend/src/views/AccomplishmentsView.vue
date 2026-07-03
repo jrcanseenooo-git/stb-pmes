@@ -710,7 +710,7 @@ async function saveEntry() {
 .det-label::after { content: ''; flex: 1; height: 1px; background: #F1F5F9; }
 .det-text { font-size: 13.5px; color: #1A2332; line-height: 1.7; white-space: pre-wrap; }
 .det-ratings { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 16px 0; border-bottom: 1px solid #F1F5F9; }
-.det-rating-item { background: #fff; border: 1px solid #D8E0EA; border-radius: 10px; padding: 14px 10px; text-align: center; box-shadow: 0 1px 2px rgba(15,23,42,.05); }
+.det-rating-item { background: #F8FAFC; border: 1px solid #E8EDF3; border-radius: 10px; padding: 14px 10px; text-align: center; }
 .det-avg { background: #EBF4FF; border-color: #BFDBFE; }
 .det-score { font-size: 24px; font-weight: 800; color: #0F172A; margin-top: 4px; }
 .det-score-avg { color: #1A56B0; font-size: 28px; }
@@ -729,8 +729,8 @@ async function saveEntry() {
 .inline-ta:focus { border-color: #3B82F6; box-shadow: 0 0 0 3px rgba(59,130,246,.1); }
 .inline-ta::placeholder { color: #CBD5E1; }
 .inline-dirty { border-left: 3px solid #E9A840 !important; }
-.det-score-input { width: 100%; border: 1.5px solid transparent; background: transparent; text-align: center; font-size: 24px; font-weight: 800; color: #0F172A; margin-top: 4px; outline: none; border-radius: 8px; padding: 0; transition: border-color .15s, background .15s; }
-.det-score-input:hover { border-color: #E2E8F0; background: #fff; }
+.det-score-input { width: 100%; border: 1.5px solid #D8E0EA; background: #fff; text-align: center; font-size: 24px; font-weight: 800; color: #0F172A; margin-top: 4px; outline: none; border-radius: 8px; padding: 4px 0; box-shadow: 0 1px 2px rgba(15,23,42,.05); transition: border-color .15s, background .15s; }
+.det-score-input:hover { border-color: #B9C6D8; }
 .det-score-input:focus { border-color: #3B82F6; background: #fff; box-shadow: 0 0 0 3px rgba(59,130,246,.1); }
 .det-score-input::placeholder { color: #CBD5E1; }
 .det-score-input::-webkit-outer-spin-button, .det-score-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }

@@ -99,10 +99,13 @@
                 <span v-if="saveState === 'saving'" class="rq-spinner-xs"></span>
                 {{ saveChipText }}
               </span>
-              <button class="rq-btn rq-btn-outline-warn" @click="returnSelected">Return</button>
+              <button class="rq-btn rq-btn-outline-warn" @click="returnSelected"
+                :disabled="routing || saveBusy"
+                :title="saveBusy ? 'Please wait — your edits are still saving.' : ''">Return</button>
 
               <div class="rq-assign-wrap" v-click-outside="closeAssignPanel">
-                <button class="rq-btn rq-btn-ghost" @click="openAssignPanel" :disabled="routing">
+                <button class="rq-btn rq-btn-ghost" @click="openAssignPanel" :disabled="routing || saveBusy"
+                  :title="saveBusy ? 'Please wait — your edits are still saving.' : ''">
                   <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
                     <circle cx="8" cy="5.5" r="2.5" stroke="currentColor" stroke-width="1.3"/>
                     <path d="M3 13c0-2.5 2.2-4 5-4s5 1.5 5 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
@@ -137,8 +140,9 @@
                 </div>
               </div>
 
-              <button class="rq-btn rq-btn-primary" @click="completeSelected" :disabled="routing || entriesLoading">
-                {{ routing ? 'Saving...' : completeButtonLabel }}
+              <button class="rq-btn rq-btn-primary" @click="completeSelected" :disabled="routing || entriesLoading || saveBusy"
+                :title="saveBusy ? 'Please wait — your edits are still saving.' : ''">
+                {{ routing ? 'Saving...' : saveBusy ? 'Saving edits…' : completeButtonLabel }}
               </button>
             </div>
             <div v-else class="rq-owner-badge">
@@ -642,6 +646,8 @@ let saveTimer = null
 let saveInFlight = false
 let saveQueued = false
 
+const saveBusy = computed(() => saveState.value === 'saving')
+
 const saveChipText = computed(() => {
   if (saveState.value === 'saving') return 'Saving…'
   if (saveState.value === 'dirty') return 'Unsaved changes'
@@ -834,10 +840,19 @@ async function selectForm(form) {
   }
 }
 
+// Routing actions must not write in parallel with an in-flight autosave:
+// cancel the pending debounce (the caller saves everything itself) and wait
+// out any request that is already on the wire.
+async function waitForSaveIdle() {
+  if (saveTimer) { clearTimeout(saveTimer); saveTimer = null }
+  while (saveInFlight) await new Promise(resolve => setTimeout(resolve, 150))
+}
+
 // Saves only entries that actually changed, and leaves editableEntries alone
 // so in-progress typing is never clobbered by a save.
 async function saveEntryEditsSilently() {
   if (!selectedForm.value) return
+  await waitForSaveIdle()
   const dirtyIds = dirtyEntryIds()
   for (const id of dirtyIds) {
     const updated = await ipcrfApi.updateEntry(selectedForm.value.id, id, entryPayload(editableEntries.value[id] || {}))
@@ -952,6 +967,7 @@ async function confirmAssign(person) {
 
 async function saveCommentsSilently() {
   if (!selectedForm.value) return
+  await waitForSaveIdle()
   const result = await ipcrfApi.saveReviewComments(selectedForm.value.id, {
     reviewType: reviewTypeForForm(selectedForm.value),
     comments: entries.value.map(entry => ({

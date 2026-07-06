@@ -292,6 +292,10 @@ const IpcrfService = (() => {
       updatedAt:   new Date().toISOString()
     })
     AuditService.log('SUBMIT', 'IPCRF', `Submitted form ${id}`, user)
+    // Clear any stale "assigned/routed to you" notifications from a prior review
+    // cycle before notifying the division focal fresh — the form is back at the
+    // start of the chain, so earlier reviewers are no longer the current holder.
+    _obsoleteRouteNotifications(id)
     _notifyReviewers(updated, profile)
     return updated
   }
@@ -420,6 +424,9 @@ const IpcrfService = (() => {
       updatedAt:     new Date().toISOString()
     })
     AuditService.log('RETURN', 'IPCRF', `Returned form ${id}: ${body.remarks || ''}`, user)
+    // The form has left the review chain — clear reviewers' now-stale routing
+    // notifications so they don't see it "assigned" with an empty queue.
+    _obsoleteRouteNotifications(id)
     _notifyUser(row.userId, 'revision',
       `Your ${row.type} form was returned for revision. ${body.remarks || ''}`,
       id, 'IPCRF'
@@ -529,15 +536,15 @@ const IpcrfService = (() => {
     const supportWeight = Number(form.supportFunctionWeight) || 30
 
     const avgRating = (list) => {
-      const rated = list.filter(e => e.ratingAverage !== '' && e.ratingAverage !== null)
+      const rated = list.filter(e => _entryAverage(e) !== null)
       if (!rated.length) return 0
-      return rated.reduce((s, e) => s + Number(e.ratingAverage), 0) / rated.length
+      return rated.reduce((s, e) => s + Number(_entryAverage(e)), 0) / rated.length
     }
 
     const coreAvg    = avgRating(coreEntries)
     const supportAvg = avgRating(supportEntries)
     const total      = coreEntries.length + supportEntries.length
-    const rated      = entries.filter(e => e.ratingAverage !== '' && e.ratingAverage !== null).length
+    const rated      = entries.filter(e => _entryAverage(e) !== null).length
 
     let score = 0
     if (coreEntries.length > 0 && supportEntries.length > 0) {
@@ -643,6 +650,8 @@ const IpcrfService = (() => {
     if (!row || row.formId !== formId) throw HttpError('Entry not found', 404)
 
     const { id: _id, formId: _fid, createdAt: _c, ...safe } = body
+    const autoAverage = _entryAverage({ ...row, ...safe })
+    if (autoAverage !== null) safe.ratingAverage = autoAverage
     const updated = SpreadsheetService.updateRow(sheet, entryId, {
       ...safe,
       updatedAt: new Date().toISOString()
@@ -727,6 +736,19 @@ const IpcrfService = (() => {
     return SpreadsheetService.getAllRows(sheet)
       .filter(r => r.formId === formId)
       .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0))
+  }
+
+  function _entryAverage(entry) {
+    const e = Number(entry.ratingEfficiency)
+    const q = Number(entry.ratingQuality)
+    const t = Number(entry.ratingTimeliness)
+    if ([e, q, t].every(v => isFinite(v) && v > 0)) {
+      return Math.round(((e + q + t) / 3) * 100) / 100
+    }
+
+    const saved = Number(entry.ratingAverage)
+    if (isFinite(saved) && saved > 0) return Math.round(saved * 100) / 100
+    return null
   }
 
   function _guardAccess(form, profile) {
@@ -826,6 +848,25 @@ const IpcrfService = (() => {
       })
     } catch (e) {
       Logger.log('Notification error: ' + e.message)
+    }
+  }
+
+  // When a form re-enters (or leaves) the review chain, any earlier "routed/
+  // assigned to you" notifications for it are stale — a reviewer would see the
+  // notification but find nothing in their queue because the form has moved on.
+  // Mark those unread routing notifications (type 'submission') as read.
+  function _obsoleteRouteNotifications(formId) {
+    try {
+      const sheet = SpreadsheetService.getSheet(SHEET.NOTIFICATIONS)
+      SpreadsheetService.getAllRows(sheet)
+        .filter(n =>
+          String(n.relatedId) === String(formId) &&
+          n.type === 'submission' &&
+          !(n.read === true || String(n.read).toLowerCase() === 'true')
+        )
+        .forEach(n => SpreadsheetService.updateRow(sheet, n.id, { read: true, readAt: new Date().toISOString() }))
+    } catch (e) {
+      Logger.log('[IPCRF] Could not obsolete route notifications for ' + formId + ': ' + e.message)
     }
   }
 

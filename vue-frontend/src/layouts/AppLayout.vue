@@ -85,11 +85,11 @@
             <transition name="fade">
               <span v-if="!collapsed" class="nav-label-text">
                 Accomplishments
-                <span class="nav-badge">3</span>
+                <span v-if="accomplishmentsUnread > 0" class="nav-badge">{{ accomplishmentsUnread }}</span>
               </span>
             </transition>
 
-            <span v-if="collapsed" class="nav-badge-dot"></span>
+            <span v-if="collapsed && accomplishmentsUnread > 0" class="nav-badge-dot"></span>
           </RouterLink>
 
           <RouterLink to="/review" class="nav-item" active-class="active" :title="collapsed ? 'Review' : ''">
@@ -304,6 +304,11 @@ import LogoutConfirmModal from '@/components/common/LogoutConfirmModal.vue'
 const authStore = useAuthStore()
 const { canManageUsers } = usePermissions()
 const notifStore = useNotificationsStore()
+
+// Unread notifications tied to the Accomplishments module — drives the sidebar nav badge
+const accomplishmentsUnread = computed(() =>
+  notifStore.notifications.filter(n => !n.read && n.module === 'Accomplishments').length
+)
 const route = useRoute()
 const router = useRouter()
 

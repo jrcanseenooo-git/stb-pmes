@@ -61,8 +61,8 @@ const files = [
   { type:'xls', name:'Pilot_Results_Q1.xlsx',    division:'Pilot Implementation',link:'Pilot Monitoring → SI-2',status:'Verified', statusClass:'badge-green', color:'#27AE60', iconBg:'#E6F4EA' }
 ]
 
-function handleDrop(e) { console.log('Dropped files:', e.dataTransfer.files) }
-function handleFileSelect(e) { console.log('Selected files:', e.target.files) }
+function handleDrop() { /* drag-and-drop upload not wired yet */ }
+function handleFileSelect() { /* file-picker upload not wired yet */ }
 </script>
 
 <style scoped>

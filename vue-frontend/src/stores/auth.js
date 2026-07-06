@@ -63,7 +63,8 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const data = await authApi.me()
       profile.value = data
-      console.log('[PMES] Profile loaded:', data)
+      // Do not log the profile object — it contains personal data (email,
+      // employee number, uid) and would leak into the browser console.
     } catch (e) {
       console.warn('[PMES] Could not load profile from Sheets:', e.message)
       // Minimal fallback from Firebase so the app still renders
@@ -102,7 +103,9 @@ export const useAuthStore = defineStore('auth', () => {
         unsub()
         if (firebaseUser) {
           user.value = firebaseUser
-          await fetchProfile()
+          // Skip if a login flow already loaded the profile — avoids a
+          // duplicate profile fetch (and duplicate console output) on sign-in.
+          if (!profile.value) await fetchProfile()
         }
         initialised.value = true
         resolve()

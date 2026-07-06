@@ -21,14 +21,31 @@ export const useNotificationsStore = defineStore('notifications', () => {
   }
 
   async function markRead(id) {
-    await notificationsApi.markRead(id)
     const n = notifications.value.find(n => n.id === id)
+    const previous = n?.read
     if (n) n.read = true
+
+    try {
+      await notificationsApi.markRead(id)
+    } catch (error) {
+      if (n) n.read = previous
+      throw error
+    }
   }
 
   async function markAllRead() {
-    await notificationsApi.markAllRead()
+    const previous = notifications.value.map(n => ({ id: n.id, read: n.read }))
     notifications.value.forEach(n => { n.read = true })
+
+    try {
+      await notificationsApi.markAllRead()
+    } catch (error) {
+      previous.forEach(saved => {
+        const n = notifications.value.find(item => item.id === saved.id)
+        if (n) n.read = saved.read
+      })
+      throw error
+    }
   }
 
   return { notifications, unreadCount, loading, fetchAll, markRead, markAllRead }

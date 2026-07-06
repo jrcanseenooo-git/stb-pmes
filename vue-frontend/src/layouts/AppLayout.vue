@@ -239,7 +239,7 @@
               <span class="notif-title">Notifications</span>
               <div class="notif-hd-right">
                 <span v-if="notifStore.unreadCount > 0" class="notif-count">{{ notifStore.unreadCount }} new</span>
-                <button v-if="notifStore.unreadCount > 0" class="notif-mark-all" @click.stop="notifStore.markAllRead()">Mark all read</button>
+                <button v-if="notifStore.unreadCount > 0" class="notif-mark-all" @click.stop="confirmMarkAllRead">Mark all read</button>
               </div>
             </div>
 
@@ -250,8 +250,8 @@
                 v-for="n in notifStore.notifications"
                 :key="n.id"
                 class="notif-row"
-                :class="{ 'notif-unread': !n.read }"
-                @click="n.read || notifStore.markRead(n.id)"
+                :class="{ 'notif-unread': !n.read, 'notif-actionable': notificationTarget(n) }"
+                @click="handleNotificationClick(n)"
               >
                 <div class="notif-icon-wrap" :style="{ background: notifStyle(n.type).bg }">
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -298,12 +298,14 @@ import { RouterView, RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { usePermissions } from '@/composables/usePermissions'
 import { useNotificationsStore } from '@/stores/notifications'
+import { useConfirm } from '@/composables/useConfirm'
 import PasswordChangePrompt from '@/components/common/PasswordChangePrompt.vue'
 import LogoutConfirmModal from '@/components/common/LogoutConfirmModal.vue'
 
 const authStore = useAuthStore()
 const { canManageUsers } = usePermissions()
 const notifStore = useNotificationsStore()
+const { confirm } = useConfirm()
 
 // Unread notifications tied to the Accomplishments module — drives the sidebar nav badge
 const accomplishmentsUnread = computed(() =>
@@ -372,6 +374,75 @@ function relativeTime(iso) {
   const hours = Math.floor(minutes / 60)
   if (hours < 24) return `${hours}h ago`
   return `${Math.floor(hours / 24)}d ago`
+}
+
+function notificationTarget(notification) {
+  const moduleName = String(notification?.module || '').toLowerCase()
+  const text = `${notification?.type || ''} ${notification?.message || ''}`.toLowerCase()
+  const relatedId = notification?.relatedId || notification?.formId || notification?.recordId || notification?.assignmentId || ''
+  const withRelated = relatedId ? { highlight: relatedId } : {}
+
+  if (moduleName.includes('accomplishment')) return { path: '/accomplishments', query: withRelated }
+  if (moduleName.includes('review')) return { path: '/review', query: withRelated }
+  if (moduleName.includes('ipcr') || moduleName.includes('ccef') || moduleName.includes('form')) {
+    return { path: '/ipcrf', query: withRelated }
+  }
+  if (moduleName.includes('evaluation') || moduleName.includes('ipat')) {
+    return { path: '/evaluation', query: withRelated }
+  }
+  if (moduleName.includes('kra')) return { path: '/kra', query: withRelated }
+  if (moduleName.includes('report')) return { path: '/reports', query: withRelated }
+  if (moduleName.includes('audit')) return { path: '/audit', query: withRelated }
+  if (moduleName.includes('user')) return { path: '/users', query: withRelated }
+  if (moduleName.includes('mov')) return { path: '/mov', query: withRelated }
+
+  if (text.includes('returned') || text.includes('revision') || text.includes('target') || text.includes('ipcrf') || text.includes('ccef')) {
+    return { path: '/ipcrf', query: withRelated }
+  }
+  if (text.includes('accomplishment') || text.includes('rating period') || text.includes('deadline')) {
+    return { path: '/accomplishments', query: withRelated }
+  }
+  if (text.includes('review') || text.includes('route') || text.includes('checking')) {
+    return { path: '/review', query: withRelated }
+  }
+
+  return null
+}
+
+async function handleNotificationClick(notification) {
+  const target = notificationTarget(notification)
+
+  if (!notification.read) {
+    try {
+      await notifStore.markRead(notification.id)
+    } catch {
+      return
+    }
+  }
+
+  if (!target) return
+  showNotifs.value = false
+  router.push(target)
+}
+
+async function confirmMarkAllRead() {
+  const count = notifStore.unreadCount
+  if (!count) return
+
+  const ok = await confirm({
+    type: 'info',
+    title: 'Mark all as read?',
+    message: `This will clear ${count} unread notification${count === 1 ? '' : 's'} from your badge.`,
+    confirmLabel: 'Yes, Mark All Read',
+    cancelLabel: 'Cancel'
+  })
+
+  if (!ok) return
+  try {
+    await notifStore.markAllRead()
+  } catch {
+    // Keep browser messages generic; detailed errors stay server-side.
+  }
 }
 
 watch(
@@ -945,7 +1016,11 @@ onUnmounted(() => {
   background: #f8faff;
   cursor: pointer;
 }
-.notif-row.notif-unread:hover { background: #eef4ff; }
+.notif-row.notif-actionable {
+  cursor: pointer;
+}
+.notif-row.notif-unread:hover,
+.notif-row.notif-actionable:hover { background: #eef4ff; }
 
 .notif-icon-wrap {
   width: 28px;

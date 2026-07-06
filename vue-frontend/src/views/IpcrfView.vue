@@ -368,20 +368,28 @@
 
             <!-- SCORE TAB -->
             <div v-else-if="activeTab === 'score'" class="rp-tab-content">
-              <div v-if="!activeForm?.finalNumericalRating" class="score-empty">
+              <div v-if="scoreBusy && !displayScore" class="score-empty">
                 <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
                   <circle cx="20" cy="20" r="16" stroke="#E2E8F0" stroke-width="2"/>
                   <path d="M20 12v8l5 3" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round"/>
                 </svg>
-                <p class="muted-text">Score not yet computed</p>
-                <button class="btn btn-primary btn-sm" @click="doCompute">Compute Score</button>
+                <p class="muted-text">Updating score...</p>
+              </div>
+              <div v-else-if="!displayScore" class="score-empty">
+                <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+                  <circle cx="20" cy="20" r="16" stroke="#E2E8F0" stroke-width="2"/>
+                  <path d="M20 12v8l5 3" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                <p class="muted-text">No ratings entered yet</p>
+                <p class="muted-text score-help">Enter ratings in the accomplishments/ratings entries and the final score will appear automatically.</p>
               </div>
               <div v-else class="score-view">
                 <div :class="['score-hero', scoreColorClass]">
-                  <span class="score-big">{{ activeForm?.finalNumericalRating }}</span>
+                  <span class="score-big">{{ displayScore }}</span>
                   <span class="score-denom">/ 5.0</span>
                 </div>
-                <div class="score-adj">{{ activeForm?.adjectivalRating }}</div>
+                <div class="score-adj">{{ displayAdjectivalRating }}</div>
+                <div class="score-auto">{{ scoreBusy ? 'Syncing latest ratings...' : 'Score updates automatically from the latest ratings.' }}</div>
                 <div class="score-table">
                   <div class="st-hd"><span>Indicator</span><span>Avg</span></div>
                   <div v-for="e in allEntries" :key="e.id" class="st-row">
@@ -392,7 +400,6 @@
                     <span :class="['st-val', e.ratingAverage ? '' : 'muted-text']">{{ e.ratingAverage || '-' }}</span>
                   </div>
                 </div>
-                <button class="btn btn-sm" style="margin-top:14px" @click="doCompute">Recompute</button>
 
                 <!-- Rate / Finalize workflow -->
                 <div v-if="activeForm?.status === 'Approved'" class="rate-panel">
@@ -895,6 +902,9 @@ const docGen = ref({ printing: false })
 const feedbackForm = ref({ feedbackStrengths: '', feedbackComments: '', feedbackRecommendations: '', feedbackAreasForImprovement: '' })
 const finalizeForm = ref({ dateSignedRatee: '', dateSignedSupervisor: '', dateSignedAuthority: '' })
 const ratingBusy   = ref(false)
+const scoreBusy    = ref(false)
+const lastAutoScoreKey = ref('')
+let autoScoreTimer = null
 
 const newForm = ref({
   type: 'IPCRF',
@@ -907,6 +917,19 @@ const newForm = ref({
 watch(showNewFormModal, (open) => {
   if (open) newForm.value.type = myFormType.value
 })
+
+watch(
+  () => [
+    activeTab.value,
+    activeForm.value?.id || '',
+    entriesLoading.value,
+    allEntries.value.map(e => `${e.id}:${e.ratingAverage ?? ''}`).join('|')
+  ],
+  () => {
+    if (activeTab.value === 'score') queueAutoComputeScore()
+  },
+  { flush: 'post' }
+)
 
 const entryForm = ref({
   kraName: '', successIndicator: '', functionType: 'Core', weight: 5,
@@ -958,8 +981,19 @@ const computedAvg = computed(() => {
   return (e && q && t) ? Math.round((e + q + t) / 3 * 100) / 100 : null
 })
 
+const liveScore = computed(() => calculateScoreFromEntries(allEntries.value, activeForm.value))
+const displayScore = computed(() => {
+  if (liveScore.value?.score) return liveScore.value.score
+  const saved = Number(activeForm.value?.finalNumericalRating)
+  if (saved > 0) return saved
+  return null
+})
+const displayAdjectivalRating = computed(() =>
+  liveScore.value?.label || activeForm.value?.adjectivalRating || (displayScore.value ? ratingLabel(displayScore.value) : '')
+)
+
 const scoreColorClass = computed(() => {
-  const s = Number(activeForm.value?.finalNumericalRating)
+  const s = Number(displayScore.value)
   if (s >= 4.5) return 'score-out'
   if (s >= 3.5) return 'score-vs'
   if (s >= 2.5) return 'score-sat'
@@ -997,6 +1031,75 @@ function posWeight(item)    {
 function fmtDate(iso)       { return iso ? new Date(iso).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' }) : '' }
 function showToast(msg, type = 'success') { toast.value = { show: true, msg, type }; setTimeout(() => { toast.value.show = false }, 3500) }
 function isSelected(item)   { return libSelected.value.some(s => s.id === item.id) }
+function ratingLabel(score) {
+  const s = Number(score)
+  if (s >= 4.5) return 'Outstanding'
+  if (s >= 3.5) return 'Very Satisfactory'
+  if (s >= 2.5) return 'Satisfactory'
+  if (s >= 1.5) return 'Unsatisfactory'
+  return 'Poor'
+}
+function calculateScoreFromEntries(entries, form) {
+  const rows = Array.isArray(entries) ? entries : []
+  const rated = rows.filter(e => e.ratingAverage !== '' && e.ratingAverage !== null && e.ratingAverage !== undefined && Number.isFinite(Number(e.ratingAverage)))
+  if (!rated.length) return null
+
+  const coreRows = rows.filter(e => e.functionType === 'Core')
+  const supportRows = rows.filter(e => e.functionType === 'Support')
+  const average = (list) => {
+    const listRated = list.filter(e => e.ratingAverage !== '' && e.ratingAverage !== null && e.ratingAverage !== undefined && Number.isFinite(Number(e.ratingAverage)))
+    if (!listRated.length) return 0
+    return listRated.reduce((sum, e) => sum + Number(e.ratingAverage), 0) / listRated.length
+  }
+
+  const coreAvg = average(coreRows)
+  const supportAvg = average(supportRows)
+  const coreWeight = Number(form?.coreFunctionWeight) || 70
+  const supportWeight = Number(form?.supportFunctionWeight) || 30
+
+  let score = 0
+  if (coreRows.length && supportRows.length) score = (coreAvg * coreWeight + supportAvg * supportWeight) / 100
+  else if (coreRows.length) score = coreAvg
+  else score = supportAvg
+
+  score = Math.round(score * 100) / 100
+  return { score, label: ratingLabel(score), ratedCount: rated.length, entryCount: rows.length }
+}
+function autoScoreKey() {
+  const score = liveScore.value
+  if (!activeForm.value?.id || !score) return ''
+  const ratings = allEntries.value
+    .map(e => `${e.id}:${e.ratingAverage ?? ''}`)
+    .join('|')
+  return `${activeForm.value.id}:${score.score}:${ratings}`
+}
+function queueAutoComputeScore() {
+  if (autoScoreTimer) clearTimeout(autoScoreTimer)
+  autoScoreTimer = setTimeout(() => {
+    autoScoreTimer = null
+    autoComputeScore()
+  }, 450)
+}
+async function autoComputeScore() {
+  const score = liveScore.value
+  if (!activeForm.value?.id || !score || entriesLoading.value || scoreBusy.value) return
+
+  const savedScore = Number(activeForm.value.finalNumericalRating)
+  const savedLabel = activeForm.value.adjectivalRating || ''
+  const currentKey = autoScoreKey()
+  if (lastAutoScoreKey.value === currentKey && savedScore === score.score && savedLabel === score.label) return
+
+  lastAutoScoreKey.value = currentKey
+  scoreBusy.value = true
+  try {
+    const updated = await ipcrfApi.computeScore(activeForm.value.id)
+    _sync(updated)
+  } catch {
+    lastAutoScoreKey.value = ''
+  } finally {
+    scoreBusy.value = false
+  }
+}
 function toggleSelect(item) {
   const i = libSelected.value.findIndex(s => s.id === item.id)
   if (i !== -1) libSelected.value.splice(i, 1)
@@ -1076,6 +1179,7 @@ async function openFormModal(form) {
   allEntries.value   = []
   docGen.value.printing = false
   reviewNotes.value  = {}
+  lastAutoScoreKey.value = ''
   if (form.status === 'Returned') loadReviewNotes(form.id)
   feedbackForm.value = {
     feedbackStrengths:           form.feedbackStrengths           || '',
@@ -1098,6 +1202,7 @@ async function openFormModal(form) {
   } finally {
     entriesLoading.value = false
   }
+  if (activeTab.value === 'score') queueAutoComputeScore()
   if (!libraryItems.value.length) {
     libLoading.value = true
     kraLibraryApi.list()
@@ -1225,10 +1330,12 @@ async function saveEntry() {
       const i = allEntries.value.findIndex(e => e.id === editingEntry.value.id)
       if (i !== -1) allEntries.value[i] = { ...allEntries.value[i], ...u }
       showToast('Indicator updated')
+      queueAutoComputeScore()
     } else {
       const e = await ipcrfApi.addEntry(activeForm.value.id, { ...entryForm.value, functionType: currentFnType.value, isCustom: true })
       allEntries.value.push(e)
       showToast('Indicator added')
+      queueAutoComputeScore()
     }
     closeEntry()
   } catch (e) { showToast(e.message, 'error') }
@@ -1244,6 +1351,7 @@ async function doDelete() {
     allEntries.value = allEntries.value.filter(e => e.id !== confirmDel.value.entryId)
     showToast('Indicator removed')
     confirmDel.value.show = false
+    queueAutoComputeScore()
   } catch (e) { showToast(e.message, 'error') }
   finally { deletingEntry.value = false }
 }
@@ -1660,6 +1768,7 @@ async function doPrint(fileId, tab) {
 
 /* Score tab */
 .score-empty{display:flex;flex-direction:column;align-items:center;gap:12px;padding:40px 0;}
+.score-help{max-width:380px;text-align:center;line-height:1.5;}
 .score-view{text-align:center;}
 .score-hero{display:inline-flex;align-items:baseline;gap:5px;padding:14px 24px;border-radius:14px;margin-bottom:8px;}
 .score-out{background:#DCFCE7;}
@@ -1669,6 +1778,7 @@ async function doPrint(fileId, tab) {
 .score-big{font-size:52px;font-weight:800;color:#0F172A;line-height:1;letter-spacing:-2px;}
 .score-denom{font-size:16px;color:#94A3B8;}
 .score-adj{font-size:15px;font-weight:600;color:#374151;}
+.score-auto{margin-top:6px;font-size:11px;color:#64748B;}
 .score-table{margin-top:20px;border:1px solid #F1F5F9;border-radius:9px;overflow:hidden;}
 .st-hd{display:flex;justify-content:space-between;padding:8px 14px;background:#F8FAFC;font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.06em;}
 .st-row{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;border-top:1px solid #F8FAFC;}

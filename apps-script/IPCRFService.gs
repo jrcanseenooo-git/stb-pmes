@@ -411,9 +411,13 @@ const IpcrfService = (() => {
     _assertApproverScope(row, profile)
     _assertTransition(row.status, 'Returned')
 
+    _ensureColumns(sheet, ['returnRemarks', 'returnedBy', 'returnedAt'])
     const updated = SpreadsheetService.updateRow(sheet, id, {
-      status:    'Returned',
-      updatedAt: new Date().toISOString()
+      status:        'Returned',
+      returnRemarks: body.remarks || '',
+      returnedBy:    profile.fullName,
+      returnedAt:    new Date().toISOString(),
+      updatedAt:     new Date().toISOString()
     })
     AuditService.log('RETURN', 'IPCRF', `Returned form ${id}: ${body.remarks || ''}`, user)
     _notifyUser(row.userId, 'revision',

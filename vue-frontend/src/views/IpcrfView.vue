@@ -176,6 +176,22 @@
             </button>
           </div>
 
+          <!-- Returned-for-revision banner -->
+          <div v-if="activeForm?.status === 'Returned'" class="ret-banner">
+            <div class="ret-banner-hd">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <circle cx="7" cy="7" r="5.7" stroke="currentColor" stroke-width="1.4"/>
+                <path d="M7 4.4v3.2M7 9.8v.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+              </svg>
+              <span>Returned for revision</span>
+              <span v-if="activeForm?.returnedBy" class="ret-by">
+                by {{ activeForm.returnedBy }}<template v-if="activeForm?.returnedAt"> · {{ fmtDate(activeForm.returnedAt) }}</template>
+              </span>
+            </div>
+            <div v-if="activeForm?.returnRemarks" class="ret-reason">{{ activeForm.returnRemarks }}</div>
+            <div v-else class="ret-reason ret-reason-muted">No reason was provided. Check the reviewer notes on each indicator below, or coordinate with your reviewer.</div>
+          </div>
+
           <!-- Tabs -->
           <div class="dtabs">
             <button :class="['dtab', activeTab === 'indicators' && 'active']" @click="activeTab = 'indicators'">
@@ -239,6 +255,9 @@
                     <div v-if="e.meansOfVerification" class="ind-mov">
                       <span class="ind-mov-lbl">MOV:</span> {{ e.meansOfVerification }}
                     </div>
+                    <div v-if="reviewNotes[e.id]" class="ind-note">
+                      <span class="ind-note-lbl">Reviewer note:</span> {{ reviewNotes[e.id] }}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -284,6 +303,9 @@
                     </div>
                     <div v-if="e.meansOfVerification" class="ind-mov">
                       <span class="ind-mov-lbl">MOV:</span> {{ e.meansOfVerification }}
+                    </div>
+                    <div v-if="reviewNotes[e.id]" class="ind-note">
+                      <span class="ind-note-lbl">Reviewer note:</span> {{ reviewNotes[e.id] }}
                     </div>
                   </div>
                 </div>
@@ -812,7 +834,7 @@ import { useConfirm, CONFIRMS } from '@/composables/useConfirm'
 
 const router    = useRouter()
 const authStore = useAuthStore()
-const { confirm } = useConfirm()
+const { confirm, confirmState } = useConfirm()
 
 const PHASES = ['ANALYSIS', 'DESIGN', 'TESTING', 'EVALUATION', 'PROMOTION', 'PORTFOLIO', 'SOCIAL_MARKETING', 'STRATEGIC']
 
@@ -825,6 +847,20 @@ const activeStatus   = ref('All')
 const filterType     = ref('')
 
 const activeForm     = ref(null)
+const reviewNotes    = ref({})   // entryId → reviewer comment, shown when a form is Returned
+
+// Review comments live under two reviewType buckets; fetch both and merge so the
+// owner sees the notes regardless of which review phase the return happened in.
+async function loadReviewNotes(formId) {
+  const [targets, ratings] = await Promise.all([
+    ipcrfApi.reviewComments(formId, 'targets').catch(() => []),
+    ipcrfApi.reviewComments(formId, 'ratings').catch(() => [])
+  ])
+  const map = {}
+  ;[...(Array.isArray(targets) ? targets : []), ...(Array.isArray(ratings) ? ratings : [])]
+    .forEach(c => { if (c.comment) map[c.entryId] = c.comment })
+  reviewNotes.value = map
+}
 const activeTab      = ref('indicators')
 const allEntries     = ref([])
 const showFormModal    = ref(false)
@@ -1039,6 +1075,8 @@ async function openFormModal(form) {
   activeTab.value    = 'indicators'
   allEntries.value   = []
   docGen.value.printing = false
+  reviewNotes.value  = {}
+  if (form.status === 'Returned') loadReviewNotes(form.id)
   feedbackForm.value = {
     feedbackStrengths:           form.feedbackStrengths           || '',
     feedbackComments:            form.feedbackComments            || '',
@@ -1103,7 +1141,7 @@ async function quickReturn(form)  {
   if (!canReviewForm(form)) return
   const ok = await confirm(CONFIRMS.returnForm(form.employeeName))
   if (!ok) return
-  try { const u = await ipcrfApi.returnForm(form.id);  _syncList(form.id, u); showToast('Returned') } catch (e) { showToast(e.message, 'error') }
+  try { const u = await ipcrfApi.returnForm(form.id, { remarks: confirmState.inputValue });  _syncList(form.id, u); showToast('Returned') } catch (e) { showToast(e.message, 'error') }
 }
 function _syncList(id, u) { const i = forms.value.findIndex(f => f.id === id); if (i !== -1) forms.value[i] = { ...forms.value[i], ...u } }
 
@@ -1225,7 +1263,7 @@ async function doReturn()  {
   if (!canReviewActiveForm.value) return
   const ok = await confirm(CONFIRMS.returnForm(activeForm.value.employeeName))
   if (!ok) return
-  try { const u = await ipcrfApi.returnForm(activeForm.value.id);  _sync(u); showToast('Returned for revision') } catch (e) { showToast(e.message, 'error') }
+  try { const u = await ipcrfApi.returnForm(activeForm.value.id, { remarks: confirmState.inputValue });  _sync(u); showToast('Returned for revision') } catch (e) { showToast(e.message, 'error') }
 }
 async function doCompute() {
   const ok = await confirm(CONFIRMS.computeScore(activeForm.value.employeeName))
@@ -1585,6 +1623,15 @@ async function doPrint(fileId, tab) {
 .ind-tags{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;}
 .ind-mov{font-size:11px;color:#64748B;background:#F8FAFC;border:1px solid #F1F5F9;border-radius:6px;padding:5px 8px;line-height:1.5;}
 .ind-mov-lbl{font-weight:600;color:#374151;}
+.ind-note{font-size:11px;color:#92400E;background:#FFFBEB;border:1px solid #FDE68A;border-radius:6px;padding:5px 8px;line-height:1.5;margin-top:5px;}
+.ind-note-lbl{font-weight:700;}
+
+/* Returned-for-revision banner */
+.ret-banner{margin:12px 20px 0;padding:11px 14px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;}
+.ret-banner-hd{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;color:#B45309;}
+.ret-by{font-size:11px;font-weight:500;color:#92400E;}
+.ret-reason{margin-top:6px;font-size:12px;color:#78350F;line-height:1.6;white-space:pre-wrap;}
+.ret-reason-muted{color:#A16207;font-style:italic;}
 
 /* Tags */
 .etag{padding:2px 7px;border-radius:9px;font-size:10px;font-weight:500;background:#F1F5F9;color:#64748B;}

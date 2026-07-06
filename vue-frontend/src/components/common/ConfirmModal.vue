@@ -53,6 +53,17 @@
             </svg>
             {{ note }}
           </div>
+
+          <!-- Text input (optional) -->
+          <div v-if="input" class="input-wrap">
+            <label class="input-label">{{ input.label }}<span v-if="input.required" class="input-req"> *</span></label>
+            <textarea
+              v-model="text"
+              class="input-field"
+              :rows="input.rows || 3"
+              :placeholder="input.placeholder || ''"
+            ></textarea>
+          </div>
         </div>
 
         <!-- Actions -->
@@ -61,7 +72,8 @@
             {{ cancelLabel || 'Cancel' }}
           </button>
           <button :class="['btn-confirm', `btn-confirm-${type}`]"
-            @click="$emit('confirm')" :disabled="loading">
+            @click="$emit('confirm', input ? text : undefined)"
+            :disabled="loading || (input && input.required && !text.trim())">
             <span v-if="loading" class="spinner"></span>
             <component :is="confirmIcon" v-else-if="confirmIcon"/>
             {{ loading ? 'Processing...' : confirmLabel || 'Confirm' }}
@@ -74,19 +86,25 @@
 </template>
 
 <script setup>
-defineProps({
+import { ref, watch } from 'vue'
+
+const props = defineProps({
   show:         { type: Boolean, default: false },
   type:         { type: String,  default: 'info' }, // info | warning | danger | submit | approve
   title:        { type: String,  required: true },
   message:      { type: String,  required: true },
   details:      { type: Array,   default: null },  // [{ label, value }]
   note:         { type: String,  default: null },
+  input:        { type: Object,  default: null },  // { label, placeholder, rows, required }
   confirmLabel: { type: String,  default: 'Confirm' },
   cancelLabel:  { type: String,  default: 'Cancel' },
   loading:      { type: Boolean, default: false },
   confirmIcon:  { type: Object,  default: null }
 })
 defineEmits(['confirm', 'cancel'])
+
+const text = ref('')
+watch(() => props.show, (visible) => { if (visible) text.value = '' })
 </script>
 
 <style scoped>
@@ -183,6 +201,20 @@ defineEmits(['confirm', 'cancel'])
 .note-submit  { background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; }
 .note-approve { background: #F0FDF4; color: #15803D; border: 1px solid #BBF7D0; }
 .note-info    { background: #EEF2FF; color: #4338CA; border: 1px solid #C7D2FE; }
+
+/* Text input */
+.input-wrap { margin-top: 14px; text-align: left; }
+.input-label { display: block; font-size: 11.5px; font-weight: 600; color: #374151; margin-bottom: 5px; }
+.input-req { color: #EF4444; }
+.input-field {
+  width: 100%; padding: 9px 12px;
+  border: 1.5px solid #E2E8F0; border-radius: 9px;
+  font-size: 13px; color: #0F172A; background: #fff;
+  outline: none; resize: vertical; line-height: 1.5;
+  transition: border-color 0.15s;
+}
+.input-field:focus { border-color: #3B82F6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+.input-field::placeholder { color: #CBD5E1; }
 
 /* Actions */
 .modal-actions {

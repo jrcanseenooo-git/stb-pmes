@@ -547,7 +547,7 @@ import { ipcrf as ipcrfApi } from '@/services/api'
 import { useConfirm, CONFIRMS } from '@/composables/useConfirm'
 import { useAuthStore } from '@/stores/auth'
 
-const { confirm } = useConfirm()
+const { confirm, confirmState } = useConfirm()
 const authStore = useAuthStore()
 const loading = ref(false)
 const entriesLoading = ref(false)
@@ -971,7 +971,7 @@ async function returnSelected() {
   try {
     await saveEntryEditsSilently()
     await saveCommentsSilently()
-    const updated = await ipcrfApi.returnForm(selectedForm.value.id)
+    const updated = await ipcrfApi.returnForm(selectedForm.value.id, { remarks: confirmState.inputValue })
     syncSelected(updated)
     showToast('Form returned for revision.', 'warning')
     await loadQueue()

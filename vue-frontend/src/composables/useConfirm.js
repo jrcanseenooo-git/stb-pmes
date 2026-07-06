@@ -13,6 +13,8 @@ const state = reactive({
   message:      '',
   details:      null,
   note:         null,
+  input:        null,
+  inputValue:   '',
   confirmLabel: 'Confirm',
   cancelLabel:  'Cancel',
   loading:      false,
@@ -28,6 +30,8 @@ export function useConfirm() {
     state.message      = options.message      || 'This action cannot be undone.'
     state.details      = options.details      || null
     state.note         = options.note         || null
+    state.input        = options.input        || null
+    state.inputValue   = ''
     state.confirmLabel = options.confirmLabel || 'Confirm'
     state.cancelLabel  = options.cancelLabel  || 'Cancel'
     state.loading      = false
@@ -37,7 +41,8 @@ export function useConfirm() {
     })
   }
 
-  function onConfirm() {
+  function onConfirm(value) {
+    state.inputValue = typeof value === 'string' ? value.trim() : ''
     state.show = false
     state.resolve?.(true)
     state.resolve = null
@@ -96,6 +101,12 @@ export const CONFIRMS = {
     title:        'Return for Revision',
     message:      `The IPCRF/CCEF form of ${employeeName} will be returned to DRAFT status. The employee will be notified to make the necessary corrections.`,
     note:         'The employee must re-submit after making changes.',
+    input: {
+      label:       'Reason / instructions for the employee',
+      placeholder: 'e.g. Please revise the rating guide for Research and re-submit.',
+      rows:        3,
+      required:    true
+    },
     confirmLabel: 'Return for Revision',
     cancelLabel:  'Cancel'
   }),

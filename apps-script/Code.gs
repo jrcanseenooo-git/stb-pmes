@@ -56,25 +56,37 @@ function checkRateLimit(userId) {
   if (count > 60) throw HttpError('Too many requests. Please wait a moment.', 429)
 }
 
+const RESERVED_KEYS = ['route', '_method', 'token']
+
 // ── Main dispatcher ──
 function handleRequest(e, method) {
   try {
-    // 1. Authenticate every request
-    const user = AuthService.verifyToken(e)
+    // Parse the JSON body first — route, method, token and payload now travel
+    // in the POST body so they never land in the URL (logs, history, Referer).
+    // Query params are still honored as a fallback for backward compatibility.
+    const body   = parseBody(e)
+    const q      = e.parameter || {}
+
+    const token      = q.token   || body.token   || ''
+    const route      = String(q.route || body.route || '').replace(/^\/|\/$/g, '')
+    const httpMethod = String(q._method || body._method || method).toUpperCase()
+
+    // 1. Authenticate every request (signature-verified inside verifyToken)
+    const user = AuthService.verifyToken(token)
     if (!user) return respond(401, false, null, 'Unauthorized – invalid or missing token')
 
     // 2. Rate limit per authenticated user
-    const route = (e.parameter?.route || '').replace(/^\/|\/$/g, '')
     checkRateLimit(user.uid || user.email)
 
-    // 3. Read _method from query params FIRST (before parseBody strips it)
-    //    then parse the rest of the body
-    const httpMethod = (e.parameter?._method || method).toUpperCase()
-    const body       = parseBody(e)
+    // 3. Build the params/body handed to the router: query + body, minus the
+    //    reserved routing keys. Router reads this for both GET filters and writes.
+    const params = {}
+    Object.keys(q).forEach(k => { params[k] = q[k] })
+    Object.keys(body).forEach(k => { params[k] = body[k] })
+    RESERVED_KEYS.forEach(k => { delete params[k] })
 
     // 4. Route
-    const result = Router.dispatch(route, httpMethod, e.parameter, body, user)
-
+    const result = Router.dispatch(route, httpMethod, params, params, user)
     return respond(200, true, result)
 
   } catch (err) {
@@ -90,13 +102,12 @@ function handleRequest(e, method) {
 // ── Helpers ──
 function parseBody(e) {
   try {
-    // Try JSON POST body first
-    if (e.postData && e.postData.contents) return JSON.parse(e.postData.contents)
-    // Fall back to query parameters (GET-based writes)
-    const reserved = new Set(['route', '_method', 'token'])
+    // JSON POST body (current transport)
+    if (e && e.postData && e.postData.contents) return JSON.parse(e.postData.contents)
+    // Fall back to query parameters (legacy GET-based calls)
     const body = {}
-    for (const key in (e.parameter || {})) {
-      if (!reserved.has(key)) body[key] = e.parameter[key]
+    for (const key in (e && e.parameter || {})) {
+      if (RESERVED_KEYS.indexOf(key) === -1) body[key] = e.parameter[key]
     }
     return body
   } catch (err) {

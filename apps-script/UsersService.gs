@@ -37,9 +37,18 @@ const UsersService = (() => {
 
   // ── GET single user ──
   function get(id, user) {
+    const profile = AuthService.getProfile(user)
     const sheet = _usersSheet()
     const row   = SpreadsheetService.getRow(sheet, id)
     if (!row) throw HttpError('User not found', 404)
+
+    // Same scoping as list(): you can always read yourself; admins/bureau read
+    // anyone; everyone else is limited to their own division. This closes the
+    // IDOR where any authenticated user could enumerate every user record by id.
+    const isAdmin = ['System Administrator', 'Bureau Director', 'Assistant Bureau Director'].includes(profile.role)
+    if (!isAdmin && row.id !== profile.id && row.divisionId !== profile.divisionId) {
+      throw HttpError('Access denied to this user record', 403)
+    }
     return _safeUser(row)
   }
 
@@ -300,7 +309,7 @@ const UsersService = (() => {
         const ipcrfSheet = SpreadsheetService.getSheet('IPCRForms')
         const forms      = SpreadsheetService.getAllRows(ipcrfSheet)
         forms.forEach(form => {
-          if (form.userId === id && form.status === 'DRAFT') {
+          if (form.userId === id && form.status === 'Draft') {
             SpreadsheetService.updateRow(ipcrfSheet, form.id, {
               position:      body.position,
               positionLevel: resolvePositionLevel(body.position),
@@ -320,7 +329,17 @@ const UsersService = (() => {
   function _usersSheet() {
     const sheet = SpreadsheetService.getSheet(SHEET.USERS)
     _ensureColumns(sheet, USER_EXTRA_COLUMNS)
-    _migratePlainTempPasswords(sheet)
+    // One-time migration of any legacy plaintext temp passwords. Gated by a
+    // Script Property so this doesn't scan the whole Users sheet on every request.
+    try {
+      const props = PropertiesService.getScriptProperties()
+      if (props.getProperty('TEMP_PW_MIGRATED') !== 'true') {
+        _migratePlainTempPasswords(sheet)
+        props.setProperty('TEMP_PW_MIGRATED', 'true')
+      }
+    } catch (e) {
+      Logger.log('[Users] temp-password migration skipped: ' + e.message)
+    }
     return sheet
   }
 

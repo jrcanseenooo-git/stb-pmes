@@ -7,19 +7,14 @@ const AuthService = (() => {
   // TOKEN VERIFICATION
   // ─────────────────────────────────────────────────────────────
   function verifyToken(e) {
-    const raw = (e.parameter?.token || '').trim()
-    if (!raw) {
-      Logger.log('[Auth] No token in request')
-      return null
-    }
+    // Accept either the request event (token in query/body param) or a raw string.
+    const raw = (typeof e === 'string' ? e : (e?.parameter?.token || '')).trim()
+    if (!raw) return null
 
     try {
       const parts = raw.split('.')
-      if (parts.length !== 3) {
-        Logger.log('[Auth] Token does not have 3 parts, got: ' + parts.length)
-        return null
-      }
-      
+      if (parts.length !== 3) return null
+
       const b64url  = parts[1]
       const b64std  = b64url.replace(/-/g, '+').replace(/_/g, '/')
       const padLen  = (4 - (b64std.length % 4)) % 4   // 0, 1, 2, or 3
@@ -28,50 +23,53 @@ const AuthService = (() => {
       const jsonStr = Utilities.newBlob(Utilities.base64Decode(padded)).getDataAsString()
       const payload = JSON.parse(jsonStr)
 
-      Logger.log('[Auth] Token payload decoded. sub=' + payload.sub + ' email=' + payload.email)
-
-      // ── Time checks ──
+      // ── Cheap structural pre-checks (reject obvious junk before any network) ──
       const nowSec = Math.floor(Date.now() / 1000)
-      if (payload.exp && payload.exp < nowSec) {
-        Logger.log('[Auth] Token expired at ' + new Date(payload.exp * 1000).toISOString())
-        return null
-      }
-      if (payload.iat && payload.iat > nowSec + 300) {
-        // Allow 5-min clock skew
-        Logger.log('[Auth] Token issued too far in the future: iat=' + payload.iat + ' now=' + nowSec)
-        return null
-      }
-
-      // ── Audience / issuer ──
+      if (payload.exp && payload.exp < nowSec) return null
+      if (payload.iat && payload.iat > nowSec + 300) return null   // 5-min skew
       if (FIREBASE_PROJECT_ID) {
-        if (payload.aud !== FIREBASE_PROJECT_ID) {
-          Logger.log('[Auth] Wrong aud: ' + payload.aud + ' expected: ' + FIREBASE_PROJECT_ID)
-          return null
-        }
-        const expectedIss = 'https://securetoken.google.com/' + FIREBASE_PROJECT_ID
-        if (payload.iss !== expectedIss) {
-          Logger.log('[Auth] Wrong iss: ' + payload.iss)
-          return null
-        }
+        if (payload.aud !== FIREBASE_PROJECT_ID) return null
+        if (payload.iss !== 'https://securetoken.google.com/' + FIREBASE_PROJECT_ID) return null
+      }
+      const claimEmail = (payload.email || '').toLowerCase()
+      if (ALLOWED_EMAIL_DOMAIN && !claimEmail.endsWith('@' + ALLOWED_EMAIL_DOMAIN.toLowerCase())) return null
+
+      // ── Authoritative signature verification (the security-critical step) ──
+      // The payload above is attacker-controllable; nothing is trusted until
+      // Google confirms the RS256 signature. Cache the verified result briefly
+      // so the network round-trip is paid at most once per token per 5 minutes.
+      const cache    = _safeCache()
+      const cacheKey = 'idtok_' + _tokenHash(raw)
+      if (cache) {
+        const hit = cache.get(cacheKey)
+        if (hit) return JSON.parse(hit)
       }
 
-      // ── Domain restriction ──
-      const email = (payload.email || '').toLowerCase()
-      if (ALLOWED_EMAIL_DOMAIN && !email.endsWith('@' + ALLOWED_EMAIL_DOMAIN.toLowerCase())) {
-        Logger.log('[Auth] Domain not allowed: ' + email)
-        return null
-      }
+      const verified = FirebaseAuthService.verifyIdToken(raw)
+      if (!verified || verified.disabled) return null
 
-      return {
-        uid:   payload.sub   || '',
-        email: payload.email || '',
-        name:  payload.name  || ''
-      }
+      // Re-check the domain against Google's authoritative email, not the claim.
+      const email = (verified.email || '').toLowerCase()
+      if (ALLOWED_EMAIL_DOMAIN && !email.endsWith('@' + ALLOWED_EMAIL_DOMAIN.toLowerCase())) return null
+
+      const result = { uid: verified.uid, email: verified.email, name: verified.name }
+      if (cache) cache.put(cacheKey, JSON.stringify(result), 300)   // 5 minutes
+      return result
 
     } catch (err) {
-      Logger.log('[Auth] verifyToken error: ' + err.message + ' | stack: ' + err.stack)
+      Logger.log('[Auth] verifyToken error: ' + err.message)
       return null
     }
+  }
+
+  function _safeCache() {
+    try { return CacheService.getScriptCache() } catch (e) { return null }
+  }
+
+  function _tokenHash(token) {
+    // Short digest so the cache key is bounded and the raw token never becomes a key.
+    const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, token, Utilities.Charset.UTF_8)
+    return bytes.map(b => ('0' + (b < 0 ? b + 256 : b).toString(16)).slice(-2)).join('').slice(0, 32)
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -81,9 +79,6 @@ const AuthService = (() => {
     const sheet = _usersSheet()
     const rows  = SpreadsheetService.getAllRows(sheet)
 
-    Logger.log('[Auth] Looking up profile for uid=' + user.uid + ' email=' + user.email)
-    Logger.log('[Auth] Total users in sheet: ' + rows.length)
-
     const row = rows.find(r => {
       const uidMatch   = user.uid   && String(r.uid   || '').trim() === String(user.uid).trim()
       const emailMatch = user.email && String(r.email || '').trim().toLowerCase() ===
@@ -92,11 +87,9 @@ const AuthService = (() => {
     })
 
     if (!row) {
-      Logger.log('[Auth] Profile NOT found. Available emails: ' + rows.map(r => r.email).join(', '))
+      Logger.log('[Auth] Profile not found for uid=' + user.uid)
       throw HttpError('User profile not found. Contact your administrator.', 404)
     }
-
-    Logger.log('[Auth] Profile found: id=' + row.id + ' role=' + row.role)
 
     // Stamp lastLoginAt (best-effort, non-blocking)
     try {

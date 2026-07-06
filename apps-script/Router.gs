@@ -51,18 +51,9 @@ const Router = (() => {
         break
 
       case 'kras':
-        if (!id && method === 'GET') return KraService.list(params, user)
-        if (!id && method === 'POST') return KraService.create(body, user)
-        if (id && !sub && method === 'GET') return KraService.get(id, user)
-        if (id && !sub && method === 'PUT') return KraService.update(id, body, user)
-        if (id && !sub && method === 'DELETE') return KraService.remove(id, user)
-        if (id && sub === 'indicators') {
-          if (!subId && method === 'GET') return KraService.listSI(id, user)
-          if (!subId && method === 'POST') return KraService.createSI(id, body, user)
-          if (subId && method === 'PUT') return KraService.updateSI(id, subId, body, user)
-          if (subId && method === 'DELETE') return KraService.removeSI(id, subId, user)
-        }
-        break
+        // Not implemented — the live KRA feature uses the 'kra-library' routes.
+        // Guarded so a stray call returns a clean 501 instead of a 500 crash.
+        throw HttpError('KRA endpoint is not available. Use kra-library.', 501)
 
       // ─────────────────────────────────────────
       // KRA Library (MasterKRALibrary sheet)
@@ -104,10 +95,8 @@ const Router = (() => {
       // Reports
       // ─────────────────────────────────────────
       case 'reports':
-        if (!id && method === 'GET') return ReportsService.list(user)
-        if (id === 'generate') return ReportsService.generate(body, user)
-        if (id && sub === 'download') return ReportsService.download(id, user)
-        break
+        // Not implemented yet — guarded so calls return a clean 501, not a 500.
+        throw HttpError('Reports endpoint is not available yet.', 501)
 
       // ─────────────────────────────────────────
       // Notifications
@@ -132,12 +121,8 @@ const Router = (() => {
       // Deadlines
       // ─────────────────────────────────────────
       case 'deadlines':
-        if (!id && method === 'GET') return DeadlinesService.list(params, user)
-        if (!id && method === 'POST') return DeadlinesService.create(body, user)
-        if (id && method === 'GET') return DeadlinesService.get(id, user)
-        if (id && method === 'PUT') return DeadlinesService.update(id, body, user)
-        if (id && method === 'DELETE') return DeadlinesService.remove(id, user)
-        break
+        // Not implemented yet — guarded so calls return a clean 501, not a 500.
+        throw HttpError('Deadlines endpoint is not available yet.', 501)
 
       // ─────────────────────────────────────────
       // IPCRF / CCEF Forms

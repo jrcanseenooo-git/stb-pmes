@@ -46,10 +46,22 @@ const MovService = (() => {
 
   // ── GET ──
   function get(id, user) {
+    const profile = AuthService.getProfile(user)
     const sheet = SpreadsheetService.getSheet(SHEET.MOV)
     const row   = SpreadsheetService.getRow(sheet, id)
     if (!row) throw HttpError('MOV file not found', 404)
+    _guardMovAccess(row, profile)
     return row
+  }
+
+  // Same scope as list(): admins/bureau see all, Division Chief sees their
+  // division, everyone else only their own uploads. Prevents enumerating other
+  // users' evidence (and their Drive URLs) by iterating MOV ids.
+  function _guardMovAccess(row, profile) {
+    if (['System Administrator', 'Bureau Director', 'Assistant Bureau Director'].includes(profile.role)) return
+    if (profile.role === 'Division Chief' && row.divisionId === profile.divisionId) return
+    if (row.uploadedBy === profile.id) return
+    throw HttpError('Access denied to this MOV file', 403)
   }
 
   // ── UPLOAD ──
@@ -68,8 +80,11 @@ const MovService = (() => {
     const folder   = getOrCreateFolder(profile)
     const driveFile = folder.createFile(blob)
 
-    // Make it accessible by link (read-only)
-    driveFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW)
+    // Restrict to the organization's Workspace domain rather than the whole
+    // internet. Falls back to link-access only if the Drive isn't part of a
+    // Workspace domain (so uploads never fail), but the common case keeps
+    // evidence readable only to signed-in dswd.gov.ph users.
+    _shareRestricted(driveFile)
 
     const now     = new Date().toISOString()
     const fileId  = driveFile.getId()
@@ -156,6 +171,16 @@ const MovService = (() => {
   function getCurrentSemester() {
     const month = new Date().getMonth() + 1
     return month <= 6 ? 'Semester-1' : 'Semester-2'
+  }
+
+  function _shareRestricted(driveFile) {
+    try {
+      driveFile.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.VIEW)
+    } catch (e) {
+      // Not a Workspace-domain Drive — keep link access so the feature still works.
+      Logger.log('[MOV] Domain sharing unavailable, using link access: ' + e.message)
+      driveFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW)
+    }
   }
 
   return { list, get, upload, remove, preview }

@@ -19,8 +19,48 @@ const FirebaseAuthService = (() => {
   const PROJECT_ID   = PROPS.getProperty('FIREBASE_PROJECT_ID')   || 'pmes-1cb6d'
   const CLIENT_EMAIL = PROPS.getProperty('FIREBASE_CLIENT_EMAIL') || ''
   const PRIVATE_KEY  = (PROPS.getProperty('FIREBASE_PRIVATE_KEY') || '').replace(/\\n/g, '\n')
+  // Public Firebase Web API key (NOT a secret — it is already shipped in the
+  // frontend bundle). Prefer a Script Property; fall back to the known value so
+  // token verification cannot silently fail-open if the property is unset.
+  const WEB_API_KEY  = PROPS.getProperty('FIREBASE_WEB_API_KEY') || 'AIzaSyDf-fc_WBHb45Env4XJ5Gsw6lRfHORptnQ'
 
   const ADMIN_BASE   = `https://identitytoolkit.googleapis.com/v1/projects/${PROJECT_ID}`
+
+  // ── VERIFY a Firebase ID token authoritatively (checks Google's signature) ──
+  // accounts:lookup with an idToken makes Google validate the token's RS256
+  // signature, expiry, and issuer. A forged or expired token returns non-200.
+  // Returns { uid, email, name, emailVerified, disabled } or null when invalid.
+  function verifyIdToken(idToken) {
+    if (!idToken) return null
+    try {
+      const response = UrlFetchApp.fetch(
+        `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${WEB_API_KEY}`,
+        {
+          method:             'post',
+          contentType:        'application/json',
+          payload:            JSON.stringify({ idToken }),
+          muteHttpExceptions: true
+        }
+      )
+      if (response.getResponseCode() !== 200) {
+        Logger.log('[Auth] ID token rejected by Identity Toolkit: ' + response.getResponseCode())
+        return null
+      }
+      const data = JSON.parse(response.getContentText())
+      const u = data.users && data.users[0]
+      if (!u || !u.localId) return null
+      return {
+        uid:           u.localId,
+        email:         u.email || '',
+        name:          u.displayName || '',
+        emailVerified: u.emailVerified === true,
+        disabled:      u.disabled === true
+      }
+    } catch (e) {
+      Logger.log('[Auth] verifyIdToken error: ' + e.message)
+      return null
+    }
+  }
 
   // ── Build a signed JWT and exchange it for an access token ──
   function getAdminToken() {
@@ -248,6 +288,7 @@ const FirebaseAuthService = (() => {
   }
 
   return {
+    verifyIdToken,
     createUser,
     updatePassword,
     disableUser,

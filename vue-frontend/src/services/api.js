@@ -20,66 +20,29 @@ async function parseApiResponse(res) {
   try {
     data = JSON.parse(text)
   } catch {
-    // Google returned an HTML error page (URL too long, transient outage, etc.)
+    // Google returned an HTML error page (transient outage, etc.)
     throw new Error('The server returned an unexpected response. Please try again.')
   }
   if (!data.success) throw new Error(data.message || 'API error')
   return data.data
 }
 
-async function gasGet(route, params = {}) {
+// Single transport for every call: POST with a JSON body carrying route,
+// method, token and payload. Nothing sensitive (token, form data) ever appears
+// in the URL, and there is no URL-length limit to overflow. No custom headers,
+// so it stays a CORS "simple request" that the Apps Script /exec endpoint answers.
+async function gasSend(method, route, data = {}) {
   const token = await getToken()
-  const qs = new URLSearchParams({
-    route,
-    token: token || '',
-    ...flattenParams(params)
-  }).toString()
-  const res = await fetch(`${BASE_URL}?${qs}`)
-  return parseApiResponse(res)
-}
-
-async function gasWrite(method, route, body = {}) {
-  const token = await getToken()
-  const qs = new URLSearchParams({
-    route,
-    _method: method,
-    token:   token || '',
-    ...flattenParams(body)
-  }).toString()
-  const res = await fetch(`${BASE_URL}?${qs}`)
-  return parseApiResponse(res)
-}
-
-// POST with a JSON body, for text-heavy writes: long accomplishment/MOV text
-// overflows the URL that gasWrite builds (Google then answers with an HTML
-// error page, not JSON). The backend already reads e.postData.contents.
-// No custom headers — keeps it a CORS "simple request" that GAS can answer.
-async function gasWriteBody(method, route, body = {}) {
-  const token = await getToken()
-  const qs = new URLSearchParams({
-    route,
-    _method: method,
-    token:   token || ''
-  }).toString()
-  const res = await fetch(`${BASE_URL}?${qs}`, {
+  const res = await fetch(BASE_URL, {
     method: 'POST',
-    body: JSON.stringify(body || {})
+    body: JSON.stringify({ route, _method: method, token: token || '', ...(data || {}) })
   })
   return parseApiResponse(res)
 }
 
-function flattenParams(obj, prefix = '') {
-  const result = {}
-  for (const [k, v] of Object.entries(obj || {})) {
-    const key = prefix ? `${prefix}.${k}` : k
-    if (v !== null && v !== undefined && typeof v === 'object' && !Array.isArray(v)) {
-      Object.assign(result, flattenParams(v, key))
-    } else {
-      result[key] = v ?? ''
-    }
-  }
-  return result
-}
+const gasGet       = (route, params = {}) => gasSend('GET', route, params)
+const gasWrite     = (method, route, body = {}) => gasSend(method, route, body)
+const gasWriteBody = (method, route, body = {}) => gasSend(method, route, body)
 
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {

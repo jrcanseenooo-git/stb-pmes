@@ -226,7 +226,7 @@
             <input v-model="search" type="text" placeholder="Search..." />
           </div>
 
-          <div class="icon-btn" @click="showNotifs = !showNotifs">
+          <div class="icon-btn" @click.stop="showNotifs = !showNotifs">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path d="M8 1.5a4.5 4.5 0 014.5 4.5v3l1.5 2.5H2L3.5 9V6A4.5 4.5 0 018 1.5zM6.5 12.5a1.5 1.5 0 003 0"
                 stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />

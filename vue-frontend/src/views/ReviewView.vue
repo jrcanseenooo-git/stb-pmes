@@ -101,7 +101,10 @@
               </span>
               <button class="rq-btn rq-btn-outline-warn" @click="returnSelected"
                 :disabled="routing || saveBusy"
-                :title="saveBusy ? 'Please wait — your edits are still saving.' : ''">Return</button>
+                :title="saveBusy ? 'Please wait — your edits are still saving.' : ''">
+                <span v-if="routingAction === 'return'" class="rq-spinner-xs rq-spinner-warn"></span>
+                {{ routingAction === 'return' ? 'Returning…' : 'Return' }}
+              </button>
 
               <div class="rq-assign-wrap" v-click-outside="closeAssignPanel">
                 <button class="rq-btn rq-btn-ghost" @click="openAssignPanel" :disabled="routing || saveBusy"
@@ -142,7 +145,8 @@
 
               <button class="rq-btn rq-btn-primary" @click="completeSelected" :disabled="routing || entriesLoading || saveBusy"
                 :title="saveBusy ? 'Please wait — your edits are still saving.' : ''">
-                {{ routing ? 'Saving...' : saveBusy ? 'Saving edits…' : completeButtonLabel }}
+                <span v-if="routingAction === 'complete'" class="rq-spinner-xs rq-spinner-light"></span>
+                {{ routingAction === 'complete' ? 'Saving & completing…' : routing ? 'Please wait…' : saveBusy ? 'Saving edits…' : completeButtonLabel }}
               </button>
             </div>
             <div v-else class="rq-owner-badge">
@@ -556,6 +560,7 @@ const authStore = useAuthStore()
 const loading = ref(false)
 const entriesLoading = ref(false)
 const routing = ref(false)
+const routingAction = ref('')   // 'return' | 'complete' | 'assign' — which routing action is running
 const forms = ref([])
 const entries = ref([])
 const editableEntries = ref({})
@@ -877,6 +882,7 @@ async function completeSelected() {
   if (!ok) return
 
   routing.value = true
+  routingAction.value = 'complete'
   try {
     await saveEntryEditsSilently()
     await saveCommentsSilently()
@@ -898,6 +904,7 @@ async function completeSelected() {
     showToast(e.message, 'error')
   } finally {
     routing.value = false
+    routingAction.value = ''
   }
 }
 
@@ -947,6 +954,7 @@ async function confirmAssign(person) {
 
   closeAssignPanel()
   routing.value = true
+  routingAction.value = 'assign'
   try {
     await saveEntryEditsSilently()
     await saveCommentsSilently()
@@ -962,6 +970,7 @@ async function confirmAssign(person) {
     showToast(e.message, 'error')
   } finally {
     routing.value = false
+    routingAction.value = ''
   }
 }
 
@@ -984,6 +993,8 @@ async function returnSelected() {
   if (!selectedForm.value) return
   const ok = await confirm(CONFIRMS.returnForm(selectedForm.value.employeeName))
   if (!ok) return
+  routing.value = true
+  routingAction.value = 'return'
   try {
     await saveEntryEditsSilently()
     await saveCommentsSilently()
@@ -993,6 +1004,9 @@ async function returnSelected() {
     await loadQueue()
   } catch (e) {
     showToast(e.message, 'error')
+  } finally {
+    routing.value = false
+    routingAction.value = ''
   }
 }
 
@@ -1227,6 +1241,8 @@ const routeSteps = computed(() => {
 .save-saved { background: #ECFDF5; color: #047857; }
 .save-error { background: #FEF2F2; color: #B91C1C; cursor: pointer; }
 .rq-spinner-xs { width: 9px; height: 9px; border: 2px solid rgba(29,78,216,.25); border-top-color: #1D4ED8; border-radius: 50%; animation: rq-spin .6s linear infinite; display: inline-block; }
+.rq-spinner-warn { border-color: rgba(180,83,9,.25); border-top-color: #B45309; }
+.rq-spinner-light { border-color: rgba(255,255,255,.35); border-top-color: #fff; }
 
 .rq-avatar.sm { width: 26px; height: 26px; border-radius: 8px; font-size: 10px; }
 

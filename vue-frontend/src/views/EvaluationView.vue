@@ -137,6 +137,7 @@
             <div v-for="task in myTasks" :key="task.id"
               :class="['eli', selectedTask && selectedTask.id === task.id ? 'eli-active' : '']"
               @click="selectTask(task)">
+              <span class="eli-accent" :style="{ background: raterAccent(task.raterType) }"></span>
               <div class="eli-row">
                 <div :class="['eli-av', rterTypeCls(task.raterType)]">{{ task.rateeName?.charAt(0)?.toUpperCase() || '?' }}</div>
                 <div class="eli-info">
@@ -1034,6 +1035,11 @@ async function loadMyTasks() {
   try {
     const data = await ipatAssignmentsApi.getMyRatees({ semester: tasksSemester.value, year: tasksYear.value })
     myTasks.value = Array.isArray(data) ? data : (data?.items || [])
+    // Auto-open the first pending task so the rating form is front-and-center
+    // on arrival instead of an empty panel — rating is the module's main job.
+    if (activeView.value === 'my-tasks' && !selectedTask.value && myTasks.value.length) {
+      selectTask(myTasks.value.find(t => t.status !== 'Completed') || myTasks.value[0])
+    }
   } catch (e) {
     if (String(e.message || '').includes('Route not found: ipat-assignments/my-ratees')) {
       myTasks.value = []
@@ -1218,6 +1224,20 @@ function rterTypeCls(type) {
     SkipSupervisor:'rt-skip'
   }
   return cls[type] || ''
+}
+
+// Strong accent color per rater type — drives the colored spine on each task card
+function raterAccent(type) {
+  const map = {
+    Self:          '#3B82F6',
+    Peer:          '#8B5CF6',
+    Peer1:         '#8B5CF6',
+    Peer2:         '#8B5CF6',
+    Subordinate:   '#F59E0B',
+    Supervisor:    '#22C55E',
+    SkipSupervisor:'#F97316'
+  }
+  return map[type] || '#94A3B8'
 }
 
 async function loadRecords() {
@@ -1874,16 +1894,21 @@ function _resetEdap() {
 .eval-footer-count.done{color:#047857;background:#ECFDF5;}
 
 /* ════════════ LEFT PANEL — card polish ════════════ */
-.eval-tp-left{width:430px;background:#FBFCFE;}
-.eli-list{padding:8px;display:flex;flex-direction:column;gap:8px;}
-.eli{border:1px solid #EAF0F7;border-bottom:1px solid #EAF0F7;border-radius:12px;background:#fff;padding:12px 13px;
-  box-shadow:0 1px 2px rgba(15,23,42,.04);transition:box-shadow .15s,border-color .15s,transform .08s;}
-.eli:hover{border-color:#C7DBF5;box-shadow:0 3px 10px rgba(15,23,42,.07);}
-.eli:active{transform:translateY(1px);}
-.eli-active{background:#F5F9FF !important;border-color:#3B82F6 !important;border-left:3px solid #3B82F6;padding-left:11px;box-shadow:0 3px 12px rgba(59,130,246,.14);}
-.eli-av{border-radius:11px;box-shadow:inset 0 0 0 1px rgba(15,23,42,.04);}
-.eli-chips{padding-top:2px;border-top:1px dashed #EEF2F7;margin-top:2px;}
+.eval-tp-left{width:500px;background:#FBFDFF;}
+.eli-list{padding:10px;display:flex;flex-direction:column;gap:10px;}
+.eli{position:relative;overflow:hidden;border:1px solid #E6EDF6;border-radius:14px;background:#fff;padding:14px 15px 14px 18px;
+  box-shadow:0 1px 3px rgba(15,23,42,.05);transition:box-shadow .16s,border-color .16s,transform .09s;}
+.eli:hover{border-color:#BFD6F5;box-shadow:0 6px 16px rgba(15,23,42,.09);transform:translateY(-1px);}
+.eli:active{transform:translateY(0);}
+.eli-active{background:#F4F9FF !important;border-color:#93C5FD !important;box-shadow:0 6px 18px rgba(59,130,246,.16);}
+/* Colored rater-type spine down the left edge of each card */
+.eli-accent{position:absolute;left:0;top:0;bottom:0;width:5px;}
+.eli-av{width:42px;height:42px;border-radius:12px;font-size:16px;box-shadow:inset 0 0 0 1px rgba(15,23,42,.05);}
+.eli-name{font-size:14.5px;}
+.eli-meta{font-size:11.5px;}
+.eli-chips{padding-top:9px;border-top:1px dashed #EDF2F8;margin-top:9px;}
 .eli-active .eli-chips{border-top-color:#DBEAFE;}
+.eli-dot{width:9px;height:9px;}
 
 @media (max-width: 1280px) {
   .page-hd{grid-template-columns:1fr;}

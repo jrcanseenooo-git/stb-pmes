@@ -1858,7 +1858,7 @@ function _resetEdap() {
 .eval-footer-count.done{color:#047857;background:#ECFDF5;}
 
 /* ════════════ LEFT PANEL — card polish ════════════ */
-.eval-tp-left{width:360px;background:#FBFCFE;}
+.eval-tp-left{width:430px;background:#FBFCFE;}
 .eli-list{padding:8px;display:flex;flex-direction:column;gap:8px;}
 .eli{border:1px solid #EAF0F7;border-bottom:1px solid #EAF0F7;border-radius:12px;background:#fff;padding:12px 13px;
   box-shadow:0 1px 2px rgba(15,23,42,.04);transition:box-shadow .15s,border-color .15s,transform .08s;}

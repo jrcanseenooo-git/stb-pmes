@@ -127,6 +127,51 @@ const AuthService = (() => {
   }
 
   // ─────────────────────────────────────────────────────────────
+  // ONBOARDING STATE — never throws for the unregistered case, so the
+  // frontend can route a signed-in-but-unprovisioned user to registration
+  // instead of silently granting a fallback Staff profile.
+  //   registered=false        → no PMES account yet (show registration)
+  //   registered=true, pending→ self-registered, awaiting admin approval
+  //   registered=true, active → normal access
+  // ─────────────────────────────────────────────────────────────
+  function whoami(user) {
+    try {
+      const profile = getProfile(user)
+      const active  = profile.active !== false && String(profile.active).toLowerCase() !== 'false'
+      const pending = profile.pendingActivation === true || String(profile.pendingActivation).toLowerCase() === 'true'
+      return { registered: true, active: active && !pending, pending: pending, profile: profile }
+    } catch (e) {
+      if (e && e.statusCode === 404) {
+        return {
+          registered: false, active: false, pending: false, profile: null,
+          identity: { email: user.email || '', uid: user.uid || '', name: user.name || '' }
+        }
+      }
+      throw e
+    }
+  }
+
+  // Reference data for the self-registration form. Read-only and profile-free
+  // (the caller only needs a valid domain token), so an unprovisioned user can
+  // still populate the division dropdown before they have a PMES account.
+  function registrationOptions() {
+    let divisions = []
+    try {
+      divisions = SpreadsheetService.getAllRows(SpreadsheetService.getSheet(SHEET.DIVISIONS))
+        .filter(d => d.active !== false && String(d.active).toLowerCase() !== 'false')
+        .map(d => ({ id: d.id, name: d.name }))
+        .sort((a, b) => String(a.name).localeCompare(String(b.name)))
+    } catch (e) {
+      Logger.log('[Auth] registrationOptions divisions error: ' + e.message)
+    }
+    return {
+      divisions: divisions,
+      employmentTypes: ['Regular', 'Contract of Service (COS)', 'Casual', 'Job Order'],
+      requestedRoles: ['Staff', 'Section Head', 'Division Chief', 'Assistant Bureau Director', 'Bureau Director']
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
   // ROLE GUARD
   // ─────────────────────────────────────────────────────────────
   function requireRole(user, ...allowedRoles) {
@@ -178,5 +223,5 @@ const AuthService = (() => {
     return sheet
   }
 
-  return { verifyToken, getProfile, requireRole, debugDecodeToken }
+  return { verifyToken, getProfile, whoami, registrationOptions, requireRole, debugDecodeToken }
 })()

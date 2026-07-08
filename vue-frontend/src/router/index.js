@@ -14,6 +14,18 @@ const routes = [
         name: "Login",
         component: () => import("@/views/LoginView.vue"),
       },
+      {
+        path: "register",
+        name: "Register",
+        component: () => import("@/views/RegisterView.vue"),
+        meta: { requiresFirebaseUser: true },
+      },
+      {
+        path: "pending",
+        name: "Pending",
+        component: () => import("@/views/PendingView.vue"),
+        meta: { requiresFirebaseUser: true },
+      },
     ],
   },
   { path: "/", redirect: "/dashboard" },
@@ -65,10 +77,28 @@ router.beforeEach(async (to) => {
     return { path: to.path, query: q }
   }
 
-  if (!to.meta.requiresAuth) return true;
   const auth = useAuthStore();
+
+  // Onboarding pages: require a signed-in Firebase user, and keep users on the
+  // page that matches their state (unregistered → register, pending → pending).
+  if (to.meta.requiresFirebaseUser) {
+    if (!auth.initialised) await auth.init();
+    if (!auth.isAuthenticated) return { path: "/auth/login" };
+    if (to.name === "Register" && !auth.needsRegistration) {
+      return auth.needsActivation ? { path: "/auth/pending" } : { path: "/dashboard" };
+    }
+    if (to.name === "Pending" && !auth.needsActivation) {
+      return auth.needsRegistration ? { path: "/auth/register" } : { path: "/dashboard" };
+    }
+    return true;
+  }
+
+  if (!to.meta.requiresAuth) return true;
   if (!auth.initialised) await auth.init();
   if (!auth.isAuthenticated) return { path: "/auth/login" };
+  // Signed in but not yet provisioned / approved in PMES
+  if (auth.needsRegistration) return { path: "/auth/register" };
+  if (auth.needsActivation)   return { path: "/auth/pending" };
   return true;
 });
 

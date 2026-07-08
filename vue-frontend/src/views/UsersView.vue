@@ -59,6 +59,7 @@
         </select>
         <select v-model="statusFilter" class="filter-select">
           <option value="">All status</option>
+          <option value="Pending">Pending activation{{ pendingUsersCount ? ` (${pendingUsersCount})` : '' }}</option>
           <option value="Active">Active</option>
           <option value="Inactive">Inactive</option>
         </select>
@@ -228,9 +229,10 @@
                   <span v-else class="text-xs muted">—</span>
                 </td>
                 <td>
-                  <span :class="['status-badge', u.status === 'Active' ? 's-green' : 's-red']">
-                    {{ u.status }}
+                  <span :class="['status-badge', u.status === 'Active' ? 's-green' : u.status === 'Pending' ? 's-amber' : 's-red']">
+                    {{ u.status === 'Pending' ? 'Pending' : u.status }}
                   </span>
+                  <div v-if="u.status === 'Pending' && u.requestedRole" class="req-role-hint">wants: {{ u.requestedRole }}</div>
                 </td>
                 <!-- <td class="text-xs muted">{{ u.lastLogin }}</td> -->
                 <td>
@@ -241,7 +243,11 @@
                         <path d="M6.5 4l1.5-1.5 1.5 1.5L8 5.5" stroke="#64748B" stroke-width="1.2" stroke-linecap="round"/>
                       </svg>
                     </button>
-                    <button v-if="u.status === 'Inactive'" class="btn btn-xs activate" @click="activateUser(u)">Activate</button>
+                    <template v-if="u.status === 'Pending'">
+                      <button class="btn btn-xs approve" @click="activateUser(u)">Approve</button>
+                      <button class="btn btn-xs deactivate" @click="declineUser(u)">Decline</button>
+                    </template>
+                    <button v-else-if="u.status === 'Inactive'" class="btn btn-xs activate" @click="activateUser(u)">Activate</button>
                     <button v-else-if="u.status === 'Active'" class="btn btn-xs deactivate" @click="deactivateUser(u)">Deactivate</button>
                     <button class="icon-btn-sm danger" @click="resetPassword(u)" title="Reset password">
                       <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -523,6 +529,7 @@ const { confirm } = useConfirm()
 const isSystemAdmin = computed(() => authStore.role === 'System Administrator')
 const activeUsersCount = computed(() => users.value.filter(u => u.status === 'Active').length)
 const inactiveUsersCount = computed(() => users.value.filter(u => u.status === 'Inactive').length)
+const pendingUsersCount = computed(() => users.value.filter(u => u.status === 'Pending').length)
 const reviewerUsersCount = computed(() => users.value.filter(u =>
   ['System Administrator', 'Bureau Director', 'Assistant Bureau Director', 'Division Chief', 'Section Head'].includes(u.role)
 ).length)
@@ -792,7 +799,12 @@ function mapUser(row) {
     position:     row.position     || '',
     employeeNo:   row.employeeNo   || '',
     type:         row.type         || 'Regular',
-    status:       row.active === false || row.active === 'false' ? 'Inactive' : 'Active',
+    status:       (row.pendingActivation === true || String(row.pendingActivation).toLowerCase() === 'true')
+                    ? 'Pending'
+                    : (row.active === false || row.active === 'false' ? 'Inactive' : 'Active'),
+    pendingActivation: row.pendingActivation === true || String(row.pendingActivation).toLowerCase() === 'true',
+    requestedRole: row.requestedRole || '',
+    selfRegistered: row.selfRegistered === true || String(row.selfRegistered).toLowerCase() === 'true',
     lastLogin:    row.lastLoginAt ? formatDate(row.lastLoginAt) : 'Never',
     tempPassword: row.tempPassword || '',
     avatarColor:  colors[Math.abs(hashStr(row.email)) % colors.length]
@@ -913,12 +925,42 @@ async function saveUser() {
   }
 }
 
-// ── Activate / Deactivate ──
+// ── Activate / Approve / Deactivate ──
 async function activateUser(user) {
-  const ok = await confirm(CONFIRMS.activateUser(user.name))
+  const isApproval = user.status === 'Pending'
+  const ok = await confirm(isApproval ? {
+    type: 'approve',
+    title: 'Approve Account',
+    message: `${user.name} will be granted access to PMES with the role "${user.role}". Edit their role or division first if it needs to change.`,
+    details: [
+      { label: 'Email', value: user.email },
+      { label: 'Requested role', value: user.requestedRole || '—' },
+      { label: 'Assigned role', value: user.role }
+    ],
+    note: 'The user will be able to sign in immediately after approval.',
+    confirmLabel: 'Approve & Activate',
+    cancelLabel: 'Not yet'
+  } : CONFIRMS.activateUser(user.name))
   if (!ok) return
-  try   { await usersApi.activate(user.id); user.status = 'Active';   showToast(`${user.name} activated.`) }
+  try   { await usersApi.activate(user.id); user.status = 'Active'; user.pendingActivation = false; showToast(`${user.name} ${isApproval ? 'approved' : 'activated'}.`) }
   catch (e) { showToast(`Failed: ${e.message}`, 'error') }
+}
+
+async function declineUser(user) {
+  const ok = await confirm({
+    type: 'danger',
+    title: 'Decline Registration',
+    message: `${user.name}'s registration request will be removed. They will not gain access. They can register again if this was a mistake.`,
+    details: [{ label: 'Email', value: user.email }],
+    confirmLabel: 'Decline',
+    cancelLabel: 'Cancel'
+  })
+  if (!ok) return
+  try {
+    await usersApi.decline(user.id)
+    users.value = users.value.filter(u => u.id !== user.id)
+    showToast(`${user.name}'s registration declined.`, 'warning')
+  } catch (e) { showToast(`Failed: ${e.message}`, 'error') }
 }
 async function deactivateUser(user) {
   const ok = await confirm(CONFIRMS.deactivateUser(user.name))
@@ -1104,6 +1146,10 @@ function showToast(msg, type='success') {
 .status-badge{display:inline-flex;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:500;}
 .s-green{background:#F0FDF4;color:#15803D;}
 .s-red{background:#FEF2F2;color:#B91C1C;}
+.s-amber{background:#FEF3E2;color:#B45309;}
+.req-role-hint{font-size:9.5px;color:#94A3B8;margin-top:3px;}
+.approve{background:#0D2137;color:#fff;border-color:#0D2137;}
+.approve:hover{background:#1e3f61;}
 
 /* Temp pw */
 .temp-pw{font-family:'DM Mono',monospace;font-size:11px;color:#0F172A;background:#F1F5F9;padding:3px 7px;border-radius:5px;letter-spacing:.5px;}

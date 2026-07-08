@@ -6,7 +6,72 @@
  */
 
 const UsersService = (() => {
-  const USER_EXTRA_COLUMNS = ['tempPassword', 'tempPasswordHash', 'mustChangePassword']
+  const USER_EXTRA_COLUMNS = ['tempPassword', 'tempPasswordHash', 'mustChangePassword', 'pendingActivation', 'requestedRole', 'selfRegistered']
+
+  // ── SELF-REGISTER (Google-authenticated user with no PMES account yet) ──
+  // Identity (uid/email) is taken from the verified token, never the form.
+  // Role is forced to Staff and the account is created inactive + pending, so
+  // a self-registering user can never grant themselves elevated access — an
+  // admin reviews and sets the real role on approval.
+  function selfRegister(body, user) {
+    const sheet = _usersSheet()
+    const email = String(user.email || '').trim().toLowerCase()
+    if (!email) throw HttpError('No authenticated email found for registration.', 400)
+
+    const existing = SpreadsheetService.getAllRows(sheet).find(r => {
+      if (r.deleted === true || String(r.deleted).toLowerCase() === 'true') return false
+      const uidMatch   = user.uid && String(r.uid || '').trim() === String(user.uid).trim()
+      const emailMatch = String(r.email || '').trim().toLowerCase() === email
+      return uidMatch || emailMatch
+    })
+    if (existing) throw HttpError('An account for this email already exists. Contact your administrator.', 409)
+
+    const now = new Date().toISOString()
+    const id  = SpreadsheetService.generateId('USR-')
+    const newUser = {
+      id,
+      uid:                user.uid   || '',
+      email:              user.email || '',
+      fullName:           body.fullName || user.name || '',
+      role:               'Staff',                                   // forced — admin sets real role on approval
+      requestedRole:      body.role || '',                          // what the user asked for (hint only)
+      positionLevel:      resolvePositionLevel(body.position || ''),
+      divisionId:         body.divisionId   || '',
+      divisionName:       body.division || body.divisionName || '',
+      section:            body.section      || '',
+      position:           body.position     || '',
+      employeeNo:         body.employeeNo   || '',
+      type:               body.type         || 'Regular',
+      tempPassword:       '',
+      tempPasswordHash:   '',
+      mustChangePassword: false,                                    // Google-authenticated — no temp password
+      active:             false,
+      pendingActivation:  true,
+      selfRegistered:     true,
+      createdAt:          now,
+      updatedAt:          now,
+      lastLoginAt:        now
+    }
+    SpreadsheetService.appendRow(sheet, newUser)
+    AuditService.log('SELF_REGISTER', 'Users', `Self-registration pending review: ${newUser.email}`, user)
+    return { pending: true }
+  }
+
+  // ── DECLINE a pending registration (admin) ──
+  function decline(id, user) {
+    AuthService.requireRole(user, 'System Administrator')
+    const sheet = _usersSheet()
+    const row   = SpreadsheetService.getRow(sheet, id)
+    if (!row) throw HttpError('User not found', 404)
+    SpreadsheetService.updateRow(sheet, id, {
+      deleted:           true,
+      active:            false,
+      pendingActivation: false,
+      updatedAt:         new Date().toISOString()
+    })
+    AuditService.log('DECLINE_USER', 'Users', `Declined registration: ${row.email}`, user)
+    return { declined: true }
+  }
 
   // ── LIST users ──
   function list(params, user) {
@@ -189,8 +254,9 @@ const UsersService = (() => {
     if (!row) throw HttpError('User not found', 404)
 
     SpreadsheetService.updateRow(sheet, id, {
-      active:    true,
-      updatedAt: new Date().toISOString()
+      active:            true,
+      pendingActivation: false,   // approving a self-registered account clears the pending flag
+      updatedAt:         new Date().toISOString()
     })
 
     // Enable in Firebase
@@ -396,5 +462,5 @@ const UsersService = (() => {
     return safe
   }
 
-  return { list, get, create, update, updateOwnProfile, activate, deactivate, resetPassword }
+  return { list, get, create, update, updateOwnProfile, activate, deactivate, resetPassword, selfRegister, decline }
 })()

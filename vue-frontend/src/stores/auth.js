@@ -17,9 +17,13 @@ export const useAuthStore = defineStore('auth', () => {
   const initialised = ref(false)
   const loading     = ref(false)
   const error       = ref(null)
+  // Onboarding state: a signed-in Google user who isn't provisioned in PMES
+  const needsRegistration = ref(false)   // authenticated but no PMES account → show registration
+  const needsActivation   = ref(false)   // registered but awaiting admin approval → show pending
 
   // ── Computed ──
   const isAuthenticated = computed(() => !!user.value)
+  const hasAccess       = computed(() => !!profile.value && !needsRegistration.value && !needsActivation.value)
   const role            = computed(() => profile.value?.role ?? null)
 
   const fullName = computed(() =>
@@ -58,34 +62,28 @@ export const useAuthStore = defineStore('auth', () => {
     return email.endsWith(`@${ALLOWED_DOMAIN}`)
   }
 
-  // ── Fetch PMES profile from Google Sheets via Apps Script ──
+  // ── Resolve onboarding state + PMES profile via Apps Script ──
+  // Unregistered users are routed to self-registration; pending users to the
+  // in-review screen. We no longer silently grant a fallback Staff profile.
   async function fetchProfile() {
+    needsRegistration.value = false
+    needsActivation.value   = false
     try {
-      const data = await authApi.me()
-      profile.value = data
-      // Do not log the profile object — it contains personal data (email,
-      // employee number, uid) and would leak into the browser console.
-    } catch (e) {
-      console.warn('[PMES] Could not load profile from Sheets:', e.message)
-      // Minimal fallback from Firebase so the app still renders
-      if (user.value) {
-        profile.value = {
-          id:           user.value.uid,
-          uid:          user.value.uid,
-          email:        user.value.email,
-          fullName:     user.value.displayName || user.value.email?.split('@')[0] || 'User',
-          role:         'Staff',
-          divisionId:   '',
-          divisionName: '',
-          position:     '',
-          employeeNo:   '',
-          positionLevel: '',
-          sgLevel:      '',
-          type:         'Regular',
-          active:       true,
-          createdAt:    ''
-        }
+      const res = await authApi.whoami()
+      if (!res || !res.registered) {
+        profile.value = null
+        needsRegistration.value = true
+      } else if (res.pending || res.active === false) {
+        profile.value = res.profile || null
+        needsActivation.value = true
+      } else {
+        profile.value = res.profile
       }
+    } catch (e) {
+      // Transient error (network/server). Don't misroute to registration —
+      // leave the user unresolved so the guard keeps them on login.
+      console.warn('[PMES] Could not resolve account status:', e.message)
+      profile.value = null
     }
   }
 
@@ -94,6 +92,19 @@ export const useAuthStore = defineStore('auth', () => {
     if (profile.value) {
       profile.value = { ...profile.value, ...updates }
     }
+  }
+
+  // Identity from the verified Firebase user, used to prefill the registration form
+  const identity = computed(() => ({
+    email: user.value?.email || '',
+    name:  user.value?.displayName || user.value?.email?.split('@')[0] || ''
+  }))
+
+  // ── Submit self-registration (Google-authenticated, no PMES account yet) ──
+  async function register(details) {
+    await authApi.register(details)
+    needsRegistration.value = false
+    needsActivation.value   = true   // now awaiting admin approval
   }
 
   // ── Init: called once by router guard ──
@@ -162,6 +173,8 @@ export const useAuthStore = defineStore('auth', () => {
     await signOut(auth)
     user.value    = null
     profile.value = null
+    needsRegistration.value = false
+    needsActivation.value   = false
   }
 
   // ── Human-readable Firebase errors ──
@@ -180,8 +193,9 @@ export const useAuthStore = defineStore('auth', () => {
   return {
     // State
     user, profile, initialised, loading, error,
+    needsRegistration, needsActivation,
     // Computed – auth
-    isAuthenticated, role, fullName, initials,
+    isAuthenticated, hasAccess, role, fullName, initials, identity,
     // Computed – profile fields (FIX: previously missing)
     profileId, employeeNo,
     position, divisionName, divisionId,
@@ -189,6 +203,6 @@ export const useAuthStore = defineStore('auth', () => {
     isActive, createdAt,
     // Methods
     init, loginWithEmail, loginWithGoogle, logout,
-    fetchProfile, patchProfile
+    fetchProfile, patchProfile, register
   }
 })

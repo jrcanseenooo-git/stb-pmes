@@ -57,6 +57,9 @@ function fileToBase64(file) {
 
 export const authApi = {
   me:        ()                        => gasGet('auth/me'),
+  whoami:    ()                        => gasGet('auth/whoami'),
+  registerOptions: ()                  => gasGet('auth/register-options'),
+  register:  (data)                    => gasWriteBody('POST', 'auth/register', data),
   logAction: (action, module, details) => gasGet('auth/log', { action, module, details })
 }
 
@@ -78,6 +81,7 @@ export const usersApi = {
   update:        (id, data) => gasWrite('PUT',   `users/${id}`,              data),
   activate:      (id)       => gasWrite('PATCH', `users/${id}/activate`),
   deactivate:    (id)       => gasWrite('PATCH', `users/${id}/deactivate`),
+  decline:       (id)       => gasWrite('PATCH', `users/${id}/decline`),
   resetPassword: (id, data) => gasWrite('PATCH', `users/${id}/reset-password`, data)
 }
 

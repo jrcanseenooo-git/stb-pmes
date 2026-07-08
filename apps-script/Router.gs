@@ -15,6 +15,9 @@ const Router = (() => {
       // ─────────────────────────────────────────
       case 'auth':
         if (id === 'me') return AuthService.getProfile(user)
+        if (id === 'whoami') return AuthService.whoami(user)
+        if (id === 'register-options') return AuthService.registrationOptions()
+        if (id === 'register' && method === 'POST') return UsersService.selfRegister(body, user)
         if (id === 'log') return AuditService.log(body.action, body.module, body.details, user)
         break
 
@@ -39,6 +42,7 @@ const Router = (() => {
         if (id && !sub && method === 'PUT') return UsersService.update(id, body, user)
         if (id && sub === 'deactivate') return UsersService.deactivate(id, user)
         if (id && sub === 'activate') return UsersService.activate(id, user)
+        if (id && sub === 'decline') return UsersService.decline(id, user)
         if (id && sub === 'reset-password') return UsersService.resetPassword(id, body, user)
         break
 

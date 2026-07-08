@@ -137,13 +137,15 @@ const composedName = computed(() => {
 })
 const canSubmit = computed(() => form.value.firstName.trim() && form.value.lastName.trim() && form.value.divisionId)
 
-// Best-effort split of the Google display name into First / Middle / Last.
+// Prefill from the Google display name conservatively: last token is the
+// surname, everything before it is the first name, and middle name is left
+// blank (it can't be reliably guessed — e.g. "John Reiman" is a compound
+// first name, not first + middle). The user corrects any of it.
 function splitName(display) {
   const parts = String(display || '').trim().split(/\s+/).filter(Boolean)
-  if (!parts.length)       return { firstName: '', middleName: '', lastName: '' }
-  if (parts.length === 1)  return { firstName: parts[0], middleName: '', lastName: '' }
-  if (parts.length === 2)  return { firstName: parts[0], middleName: '', lastName: parts[1] }
-  return { firstName: parts[0], lastName: parts[parts.length - 1], middleName: parts.slice(1, -1).join(' ') }
+  if (!parts.length)      return { firstName: '', middleName: '', lastName: '' }
+  if (parts.length === 1) return { firstName: parts[0], middleName: '', lastName: '' }
+  return { firstName: parts.slice(0, -1).join(' '), middleName: '', lastName: parts[parts.length - 1] }
 }
 
 onMounted(async () => {
@@ -199,6 +201,7 @@ async function signOut() {
 </script>
 
 <style scoped>
+*{box-sizing:border-box;}
 .ob-root{position:fixed;inset:0;overflow-y:auto;display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;}
 .ob-bg{position:fixed;inset:0;z-index:0;background:#0A1526;
   background-image:radial-gradient(1200px 600px at 20% -10%,#12315F 0%,transparent 55%),radial-gradient(900px 500px at 110% 10%,#2A1A46 0%,transparent 50%),linear-gradient(160deg,#0C1E3C,#0A1220 60%,#140C26);}

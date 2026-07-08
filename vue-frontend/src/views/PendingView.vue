@@ -84,6 +84,7 @@ async function signOut() {
 </script>
 
 <style scoped>
+*{box-sizing:border-box;}
 .pd-root{position:fixed;inset:0;overflow-y:auto;display:flex;align-items:center;justify-content:center;padding:40px 16px;}
 .pd-bg{position:fixed;inset:0;z-index:0;background:#0A1526;
   background-image:radial-gradient(1200px 600px at 20% -10%,#12315F 0%,transparent 55%),radial-gradient(900px 500px at 110% 10%,#2A1A46 0%,transparent 50%),linear-gradient(160deg,#0C1E3C,#0A1220 60%,#140C26);}

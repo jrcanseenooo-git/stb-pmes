@@ -54,7 +54,7 @@
             </div>
             <div class="ob-field">
               <label>Employee No.</label>
-              <input v-model.trim="form.employeeNo" type="text" placeholder="e.g. 24-0247" :disabled="submitting"/>
+              <input v-model.trim="form.employeeNo" type="text" placeholder="e.g. 24-0001" :disabled="submitting"/>
             </div>
             <div class="ob-field ob-full">
               <label>Employment Type</label>
@@ -77,11 +77,17 @@
 
           <div class="ob-grid">
             <div class="ob-field ob-full">
-              <label>Division <span class="req">*</span></label>
+              <label>
+                Division <span v-if="options.divisions.length" class="req">*</span>
+                <button v-if="optionsError" type="button" class="ob-name-reset" @click="loadOptions" :disabled="loadingOptions">
+                  {{ loadingOptions ? 'Retrying…' : 'Retry' }}
+                </button>
+              </label>
               <select v-model="form.divisionId" :disabled="submitting || loadingOptions">
-                <option value="">{{ loadingOptions ? 'Loading divisions…' : 'Select division…' }}</option>
+                <option value="">{{ loadingOptions ? 'Loading divisions…' : (options.divisions.length ? 'Select division…' : 'Division unavailable — admin will assign') }}</option>
                 <option v-for="d in options.divisions" :key="d.id" :value="d.id">{{ d.name }}</option>
               </select>
+              <span v-if="optionsError" class="ob-name-tip" style="color:#B45309">{{ optionsError }}</span>
             </div>
             <div class="ob-field">
               <label>Section</label>
@@ -123,8 +129,14 @@ const initials = computed(() =>
   (identity.value.name || identity.value.email || '?').split(/[\s@.]+/).filter(Boolean).slice(0, 2).map(s => s[0]).join('').toUpperCase()
 )
 
-const options = ref({ divisions: [], employmentTypes: ['Regular'], requestedRoles: [] })
+// Static option lists live in the frontend so they always render even if the
+// reference endpoint is unreachable. Only divisions must come from the server.
+const EMPLOYMENT_TYPES = ['Regular', 'Contract of Service (COS)', 'Casual', 'Job Order', 'Co-Terminus']
+const REQUESTED_ROLES  = ['Staff', 'Section Head', 'Division Chief', 'Assistant Bureau Director', 'Bureau Director']
+
+const options = ref({ divisions: [], employmentTypes: EMPLOYMENT_TYPES, requestedRoles: REQUESTED_ROLES })
 const loadingOptions = ref(true)
+const optionsError = ref('')
 const submitting = ref(false)
 const error = ref('')
 
@@ -154,7 +166,12 @@ watch(() => [form.value.firstName, form.value.middleName, form.value.lastName, f
 function onFullNameInput() { fullNameTouched.value = true }
 function resetFullName() { fullNameTouched.value = false; fullName.value = composeName() }
 
-const canSubmit = computed(() => form.value.firstName.trim() && form.value.lastName.trim() && fullName.value.trim() && form.value.divisionId)
+// Division is required only when the list actually loaded; if it couldn't load,
+// the user can still submit and an admin assigns the division on approval.
+const canSubmit = computed(() =>
+  form.value.firstName.trim() && form.value.lastName.trim() && fullName.value.trim() &&
+  (options.value.divisions.length === 0 || !!form.value.divisionId)
+)
 
 // Prefill from the Google display name conservatively: last token is the
 // surname, everything before it is the first name, and middle name is left
@@ -167,23 +184,34 @@ function splitName(display) {
   return { firstName: parts.slice(0, -1).join(' '), middleName: '', lastName: parts[parts.length - 1] }
 }
 
+async function loadOptions() {
+  loadingOptions.value = true
+  optionsError.value = ''
+  try {
+    const opts = await authApi.registerOptions()
+    options.value = {
+      divisions:       opts?.divisions || [],
+      employmentTypes: opts?.employmentTypes?.length ? opts.employmentTypes : EMPLOYMENT_TYPES,
+      requestedRoles:  opts?.requestedRoles?.length  ? opts.requestedRoles  : REQUESTED_ROLES
+    }
+    if (!options.value.divisions.length) {
+      optionsError.value = 'No divisions were returned. You can still submit — an admin will assign your division on approval.'
+    }
+  } catch (e) {
+    // Keep the static role/employment fallbacks; only divisions need the server.
+    optionsError.value = `Could not load divisions (${e.message || 'network error'}). Retry, or submit and an admin will assign it.`
+  } finally {
+    loadingOptions.value = false
+  }
+}
+
 onMounted(async () => {
   const g = splitName(identity.value.name)
   form.value.firstName  = g.firstName
   form.value.middleName = g.middleName
   form.value.lastName   = g.lastName
   fullName.value        = composeName()
-  try {
-    const opts = await authApi.registerOptions()
-    if (opts) {
-      options.value = {
-        divisions: opts.divisions || [],
-        employmentTypes: opts.employmentTypes?.length ? opts.employmentTypes : ['Regular'],
-        requestedRoles: opts.requestedRoles || []
-      }
-    }
-  } catch { /* dropdowns fall back to defaults */ }
-  finally { loadingOptions.value = false }
+  loadOptions()
 })
 
 async function submit() {

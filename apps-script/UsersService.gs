@@ -6,7 +6,7 @@
  */
 
 const UsersService = (() => {
-  const USER_EXTRA_COLUMNS = ['tempPassword', 'tempPasswordHash', 'mustChangePassword', 'pendingActivation', 'requestedRole', 'selfRegistered']
+  const USER_EXTRA_COLUMNS = ['tempPassword', 'tempPasswordHash', 'mustChangePassword', 'pendingActivation', 'requestedRole', 'selfRegistered', 'firstName', 'middleName', 'lastName', 'suffix']
 
   // ── SELF-REGISTER (Google-authenticated user with no PMES account yet) ──
   // Identity (uid/email) is taken from the verified token, never the form.
@@ -33,6 +33,10 @@ const UsersService = (() => {
       uid:                user.uid   || '',
       email:              user.email || '',
       fullName:           body.fullName || user.name || '',
+      firstName:          body.firstName  || '',
+      middleName:         body.middleName || '',
+      lastName:           body.lastName   || '',
+      suffix:             body.suffix     || '',
       role:               'Staff',                                   // forced — admin sets real role on approval
       requestedRole:      body.role || '',                          // what the user asked for (hint only)
       positionLevel:      resolvePositionLevel(body.position || ''),

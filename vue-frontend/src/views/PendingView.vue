@@ -1,42 +1,45 @@
 <template>
   <div class="pd-root">
-    <div class="ob-hero">
-      <div class="ob-kicker">SOCIAL TECHNOLOGY BUREAU</div>
-      <h1 class="ob-title">Performance Monitoring &amp; Evaluation System</h1>
-    </div>
-
-    <div class="pd-card">
-      <div class="pd-icon">
-        <svg width="30" height="30" viewBox="0 0 30 30" fill="none">
-          <circle cx="15" cy="15" r="13" stroke="#D97706" stroke-width="2"/>
-          <path d="M15 8v7l4.5 2.5" stroke="#D97706" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
+    <div class="pd-bg" aria-hidden="true"></div>
+    <div class="pd-shell">
+      <div class="pd-hero">
+        <div class="pd-kicker">SOCIAL TECHNOLOGY BUREAU</div>
+        <h1 class="pd-hero-title">Performance Monitoring &amp; Evaluation System</h1>
       </div>
 
-      <h2 class="pd-h2">Your account is under review</h2>
-      <p class="pd-msg">
-        Thanks, <strong>{{ name }}</strong> — your registration has been submitted and is
-        <strong>awaiting activation</strong> by a system administrator. You'll be able to sign in
-        once your account is approved.
-      </p>
+      <div class="pd-card">
+        <div class="pd-icon">
+          <svg width="30" height="30" viewBox="0 0 30 30" fill="none">
+            <circle cx="15" cy="15" r="13" stroke="#D97706" stroke-width="2"/>
+            <path d="M15 8v7l4.5 2.5" stroke="#D97706" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
 
-      <div class="pd-detail">
-        <div class="pd-row"><span>Account</span><span>{{ email }}</span></div>
-        <div class="pd-row"><span>Status</span><span class="pd-badge">Pending activation</span></div>
-      </div>
+        <h2 class="pd-h2">Your account is under review</h2>
+        <p class="pd-msg">
+          Thanks, <strong>{{ name }}</strong> — your registration has been submitted and is
+          <strong>awaiting activation</strong> by a system administrator. You'll be able to sign in
+          once your account is approved.
+        </p>
 
-      <p class="pd-hint">Please contact your STB system administrator to activate your access.</p>
+        <div class="pd-detail">
+          <div class="pd-row"><span>Account</span><span>{{ email }}</span></div>
+          <div class="pd-row"><span>Status</span><span class="pd-badge">Pending activation</span></div>
+        </div>
 
-      <transition name="ob-fade">
-        <div v-if="notice" class="pd-notice">{{ notice }}</div>
-      </transition>
+        <p class="pd-hint">Please contact your STB system administrator to activate your access.</p>
 
-      <div class="pd-actions">
-        <button class="pd-btn pd-btn-ghost" @click="recheck" :disabled="checking">
-          <span v-if="checking" class="ob-spin ob-spin-dark"></span>
-          {{ checking ? 'Checking…' : 'I\'ve been approved — check again' }}
-        </button>
-        <button class="pd-btn pd-btn-solid" @click="signOut" :disabled="checking">Sign out</button>
+        <transition name="ob-fade">
+          <div v-if="notice" class="pd-notice">{{ notice }}</div>
+        </transition>
+
+        <div class="pd-actions">
+          <button class="pd-btn pd-btn-ghost" @click="recheck" :disabled="checking">
+            <span v-if="checking" class="ob-spin ob-spin-dark"></span>
+            {{ checking ? 'Checking…' : 'I\'ve been approved — check again' }}
+          </button>
+          <button class="pd-btn pd-btn-solid" @click="signOut" :disabled="checking">Sign out</button>
+        </div>
       </div>
     </div>
   </div>
@@ -81,12 +84,16 @@ async function signOut() {
 </script>
 
 <style scoped>
-.pd-root{width:100%;max-width:460px;margin:0 auto;padding:24px 16px;}
-.ob-hero{text-align:center;margin-bottom:18px;}
-.ob-kicker{font-size:10px;font-weight:800;letter-spacing:.22em;color:#93B4E6;margin-bottom:6px;}
-.ob-title{font-size:15px;font-weight:800;color:#E8EEF8;letter-spacing:-.2px;margin:0;opacity:.9;}
+.pd-root{position:fixed;inset:0;overflow-y:auto;display:flex;align-items:center;justify-content:center;padding:40px 16px;}
+.pd-bg{position:fixed;inset:0;z-index:0;background:#0A1526;
+  background-image:radial-gradient(1200px 600px at 20% -10%,#12315F 0%,transparent 55%),radial-gradient(900px 500px at 110% 10%,#2A1A46 0%,transparent 50%),linear-gradient(160deg,#0C1E3C,#0A1220 60%,#140C26);}
+.pd-shell{position:relative;z-index:1;width:100%;max-width:460px;}
 
-.pd-card{background:#fff;border-radius:18px;padding:30px 26px;text-align:center;box-shadow:0 30px 70px rgba(2,10,30,.45);}
+.pd-hero{text-align:center;margin-bottom:18px;}
+.pd-kicker{font-size:10px;font-weight:800;letter-spacing:.24em;color:#8FB2E8;margin-bottom:7px;}
+.pd-hero-title{font-size:16px;font-weight:800;color:#EAF1FB;letter-spacing:-.2px;margin:0;}
+
+.pd-card{background:#fff;border-radius:18px;padding:30px 26px;text-align:center;box-shadow:0 30px 80px rgba(2,8,24,.55);}
 .pd-icon{width:60px;height:60px;border-radius:50%;background:#FFFBEB;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;}
 .pd-h2{font-size:20px;font-weight:800;color:#0F172A;margin:0 0 10px;letter-spacing:-.3px;}
 .pd-msg{font-size:13px;color:#64748B;line-height:1.65;margin:0 0 18px;}

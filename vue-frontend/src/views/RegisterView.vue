@@ -1,86 +1,105 @@
 <template>
   <div class="ob-root">
-    <div class="ob-hero">
-      <div class="ob-kicker">SOCIAL TECHNOLOGY BUREAU</div>
-      <h1 class="ob-title">Performance Monitoring &amp; Evaluation System</h1>
-    </div>
-
-    <div class="ob-card">
-      <div class="ob-card-hd">
-        <div class="ob-avatar">{{ initials }}</div>
-        <div class="ob-hd-info">
-          <h2 class="ob-h2">Complete your registration</h2>
-          <p class="ob-sub">Signed in as <strong>{{ identity.email }}</strong></p>
-        </div>
+    <div class="ob-bg" aria-hidden="true"></div>
+    <div class="ob-shell">
+      <div class="ob-hero">
+        <div class="ob-kicker">SOCIAL TECHNOLOGY BUREAU</div>
+        <h1 class="ob-title">Performance Monitoring &amp; Evaluation System</h1>
       </div>
 
-      <div class="ob-note">
-        <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-          <circle cx="7.5" cy="7.5" r="6.3" stroke="#1D4ED8" stroke-width="1.3"/>
-          <path d="M7.5 4.4v3.6M7.5 10v.1" stroke="#1D4ED8" stroke-width="1.4" stroke-linecap="round"/>
-        </svg>
-        Your Google account isn't set up in PMES yet. Fill in your details below — an administrator will review and activate your access.
+      <div class="ob-card">
+        <div class="ob-card-hd">
+          <div class="ob-avatar">{{ initials }}</div>
+          <div class="ob-hd-info">
+            <h2 class="ob-h2">Complete your registration</h2>
+            <p class="ob-sub">Signed in as <strong>{{ identity.email }}</strong></p>
+          </div>
+        </div>
+
+        <div class="ob-note">
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+            <circle cx="7.5" cy="7.5" r="6.3" stroke="#1D4ED8" stroke-width="1.3"/>
+            <path d="M7.5 4.4v3.6M7.5 10v.1" stroke="#1D4ED8" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+          Your Google account isn't set up in PMES yet. Fill in your details below — an administrator will review and activate your access.
+        </div>
+
+        <transition name="ob-fade">
+          <div v-if="error" class="ob-error" role="alert">{{ error }}</div>
+        </transition>
+
+        <form class="ob-form" @submit.prevent="submit" novalidate>
+          <div class="ob-section-label">Profile details</div>
+
+          <div class="ob-grid">
+            <div class="ob-field">
+              <label>First Name <span class="req">*</span></label>
+              <input v-model.trim="form.firstName" type="text" placeholder="e.g. Juan" :disabled="submitting"/>
+            </div>
+            <div class="ob-field">
+              <label>Middle Name <span class="ob-hint">optional</span></label>
+              <input v-model.trim="form.middleName" type="text" placeholder="e.g. Santos" :disabled="submitting"/>
+            </div>
+            <div class="ob-field">
+              <label>Last Name <span class="req">*</span></label>
+              <input v-model.trim="form.lastName" type="text" placeholder="e.g. Dela Cruz" :disabled="submitting"/>
+            </div>
+            <div class="ob-field">
+              <label>Suffix <span class="ob-hint">optional</span></label>
+              <input v-model.trim="form.suffix" type="text" placeholder="e.g. Jr., III" :disabled="submitting"/>
+            </div>
+            <div class="ob-field">
+              <label>Position / Title</label>
+              <input v-model.trim="form.position" type="text" placeholder="e.g. Social Welfare Officer II" :disabled="submitting"/>
+            </div>
+            <div class="ob-field">
+              <label>Employee No.</label>
+              <input v-model.trim="form.employeeNo" type="text" placeholder="e.g. 24-0247" :disabled="submitting"/>
+            </div>
+            <div class="ob-field ob-full">
+              <label>Employment Type</label>
+              <select v-model="form.type" :disabled="submitting">
+                <option v-for="t in options.employmentTypes" :key="t" :value="t">{{ t }}</option>
+              </select>
+            </div>
+          </div>
+
+          <div v-if="composedName" class="ob-name-preview">
+            Full name on record: <strong>{{ composedName }}</strong>
+          </div>
+
+          <div class="ob-section-label" style="margin-top:16px">Access &amp; assignment</div>
+
+          <div class="ob-grid">
+            <div class="ob-field ob-full">
+              <label>Division <span class="req">*</span></label>
+              <select v-model="form.divisionId" :disabled="submitting || loadingOptions">
+                <option value="">{{ loadingOptions ? 'Loading divisions…' : 'Select division…' }}</option>
+                <option v-for="d in options.divisions" :key="d.id" :value="d.id">{{ d.name }}</option>
+              </select>
+            </div>
+            <div class="ob-field">
+              <label>Section</label>
+              <input v-model.trim="form.section" type="text" placeholder="e.g. Children and Youth Section" :disabled="submitting"/>
+            </div>
+            <div class="ob-field">
+              <label>Requested Role <span class="ob-hint">admin confirms</span></label>
+              <select v-model="form.role" :disabled="submitting">
+                <option value="">Select role…</option>
+                <option v-for="r in options.requestedRoles" :key="r" :value="r">{{ r }}</option>
+              </select>
+            </div>
+          </div>
+
+          <button type="submit" class="ob-submit" :disabled="submitting || !canSubmit">
+            <span v-if="submitting" class="ob-spin"></span>
+            {{ submitting ? 'Submitting…' : 'Submit for approval' }}
+            <svg v-if="!submitting" width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M2.5 7.5h10M9 4l3.5 3.5L9 11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </form>
+
+        <button class="ob-signout" @click="signOut" :disabled="submitting">Not you? Sign out</button>
       </div>
-
-      <transition name="ob-fade">
-        <div v-if="error" class="ob-error" role="alert">{{ error }}</div>
-      </transition>
-
-      <form class="ob-form" @submit.prevent="submit" novalidate>
-        <div class="ob-section-label">Profile details</div>
-
-        <div class="ob-grid">
-          <div class="ob-field ob-full">
-            <label>Full Name <span class="req">*</span></label>
-            <input v-model.trim="form.fullName" type="text" placeholder="e.g. Juan Dela Cruz" :disabled="submitting"/>
-          </div>
-          <div class="ob-field">
-            <label>Position / Title</label>
-            <input v-model.trim="form.position" type="text" placeholder="e.g. Social Welfare Officer II" :disabled="submitting"/>
-          </div>
-          <div class="ob-field">
-            <label>Employee No.</label>
-            <input v-model.trim="form.employeeNo" type="text" placeholder="e.g. 24-0247" :disabled="submitting"/>
-          </div>
-          <div class="ob-field">
-            <label>Employment Type</label>
-            <select v-model="form.type" :disabled="submitting">
-              <option v-for="t in options.employmentTypes" :key="t" :value="t">{{ t }}</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="ob-section-label" style="margin-top:16px">Access &amp; assignment</div>
-
-        <div class="ob-grid">
-          <div class="ob-field ob-full">
-            <label>Division <span class="req">*</span></label>
-            <select v-model="form.divisionId" :disabled="submitting || loadingOptions">
-              <option value="">{{ loadingOptions ? 'Loading divisions…' : 'Select division…' }}</option>
-              <option v-for="d in options.divisions" :key="d.id" :value="d.id">{{ d.name }}</option>
-            </select>
-          </div>
-          <div class="ob-field">
-            <label>Section</label>
-            <input v-model.trim="form.section" type="text" placeholder="e.g. Children and Youth Section" :disabled="submitting"/>
-          </div>
-          <div class="ob-field">
-            <label>Requested Role <span class="ob-hint">admin confirms</span></label>
-            <select v-model="form.role" :disabled="submitting">
-              <option value="">Select role…</option>
-              <option v-for="r in options.requestedRoles" :key="r" :value="r">{{ r }}</option>
-            </select>
-          </div>
-        </div>
-
-        <button type="submit" class="ob-submit" :disabled="submitting || !canSubmit">
-          <span v-if="submitting" class="ob-spin"></span>
-          {{ submitting ? 'Submitting…' : 'Submit for approval' }}
-          <svg v-if="!submitting" width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M2.5 7.5h10M9 4l3.5 3.5L9 11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </button>
-      </form>
-
-      <button class="ob-signout" @click="signOut" :disabled="submitting">Not you? Sign out</button>
     </div>
   </div>
 </template>
@@ -104,11 +123,34 @@ const loadingOptions = ref(true)
 const submitting = ref(false)
 const error = ref('')
 
-const form = ref({ fullName: '', position: '', employeeNo: '', type: 'Regular', divisionId: '', section: '', role: '' })
-const canSubmit = computed(() => form.value.fullName.trim() && form.value.divisionId)
+const form = ref({
+  firstName: '', middleName: '', lastName: '', suffix: '',
+  position: '', employeeNo: '', type: 'Regular', divisionId: '', section: '', role: ''
+})
+
+// Compose the single fullName the rest of the system uses: "First Middle Last, Suffix"
+const composedName = computed(() => {
+  const core = [form.value.firstName, form.value.middleName, form.value.lastName]
+    .map(s => s.trim()).filter(Boolean).join(' ')
+  const sfx = form.value.suffix.trim()
+  return sfx ? `${core}${core ? ' ' : ''}${sfx}` : core
+})
+const canSubmit = computed(() => form.value.firstName.trim() && form.value.lastName.trim() && form.value.divisionId)
+
+// Best-effort split of the Google display name into First / Middle / Last.
+function splitName(display) {
+  const parts = String(display || '').trim().split(/\s+/).filter(Boolean)
+  if (!parts.length)       return { firstName: '', middleName: '', lastName: '' }
+  if (parts.length === 1)  return { firstName: parts[0], middleName: '', lastName: '' }
+  if (parts.length === 2)  return { firstName: parts[0], middleName: '', lastName: parts[1] }
+  return { firstName: parts[0], lastName: parts[parts.length - 1], middleName: parts.slice(1, -1).join(' ') }
+}
 
 onMounted(async () => {
-  form.value.fullName = identity.value.name || ''
+  const g = splitName(identity.value.name)
+  form.value.firstName  = g.firstName
+  form.value.middleName = g.middleName
+  form.value.lastName   = g.lastName
   try {
     const opts = await authApi.registerOptions()
     if (opts) {
@@ -123,13 +165,17 @@ onMounted(async () => {
 })
 
 async function submit() {
-  if (!canSubmit.value) { error.value = 'Please provide your full name and division.'; return }
+  if (!canSubmit.value) { error.value = 'Please provide your first name, last name, and division.'; return }
   error.value = ''
   submitting.value = true
   try {
     const division = options.value.divisions.find(d => d.id === form.value.divisionId)
     await authStore.register({
-      fullName:   form.value.fullName,
+      fullName:   composedName.value,
+      firstName:  form.value.firstName,
+      middleName: form.value.middleName,
+      lastName:   form.value.lastName,
+      suffix:     form.value.suffix,
       position:   form.value.position,
       employeeNo: form.value.employeeNo,
       type:       form.value.type,
@@ -153,12 +199,16 @@ async function signOut() {
 </script>
 
 <style scoped>
-.ob-root{width:100%;max-width:560px;margin:0 auto;padding:24px 16px;}
-.ob-hero{text-align:center;margin-bottom:18px;}
-.ob-kicker{font-size:10px;font-weight:800;letter-spacing:.22em;color:#93B4E6;margin-bottom:6px;}
-.ob-title{font-size:15px;font-weight:800;color:#E8EEF8;letter-spacing:-.2px;margin:0;opacity:.9;}
+.ob-root{position:fixed;inset:0;overflow-y:auto;display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;}
+.ob-bg{position:fixed;inset:0;z-index:0;background:#0A1526;
+  background-image:radial-gradient(1200px 600px at 20% -10%,#12315F 0%,transparent 55%),radial-gradient(900px 500px at 110% 10%,#2A1A46 0%,transparent 50%),linear-gradient(160deg,#0C1E3C,#0A1220 60%,#140C26);}
+.ob-shell{position:relative;z-index:1;width:100%;max-width:600px;}
 
-.ob-card{background:#fff;border-radius:18px;padding:24px;box-shadow:0 30px 70px rgba(2,10,30,.45);}
+.ob-hero{text-align:center;margin-bottom:18px;}
+.ob-kicker{font-size:10px;font-weight:800;letter-spacing:.24em;color:#8FB2E8;margin-bottom:7px;}
+.ob-title{font-size:16px;font-weight:800;color:#EAF1FB;letter-spacing:-.2px;margin:0;}
+
+.ob-card{background:#fff;border-radius:18px;padding:24px;box-shadow:0 30px 80px rgba(2,8,24,.55);}
 .ob-card-hd{display:flex;align-items:center;gap:13px;margin-bottom:16px;}
 .ob-avatar{width:46px;height:46px;border-radius:13px;background:linear-gradient(135deg,#2F6BE4,#1A56B0);color:#fff;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;flex-shrink:0;}
 .ob-h2{font-size:19px;font-weight:800;color:#0F172A;margin:0;letter-spacing:-.3px;}
@@ -180,6 +230,9 @@ async function signOut() {
 .ob-field input:focus,.ob-field select:focus{border-color:#3B82F6;box-shadow:0 0 0 3px rgba(59,130,246,.12);}
 .ob-field input::placeholder{color:#CBD5E1;}
 
+.ob-name-preview{margin-top:11px;font-size:12px;color:#64748B;background:#F8FAFC;border:1px solid #EEF2F7;border-radius:9px;padding:8px 12px;}
+.ob-name-preview strong{color:#0F172A;}
+
 .ob-submit{width:100%;margin-top:20px;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px;border:none;border-radius:11px;background:linear-gradient(135deg,#2F6BE4,#1A56B0);color:#fff;font-size:14px;font-weight:700;cursor:pointer;transition:filter .15s,box-shadow .15s;box-shadow:0 8px 20px rgba(26,86,176,.32);}
 .ob-submit:hover:not(:disabled){filter:brightness(1.06);box-shadow:0 10px 26px rgba(26,86,176,.42);}
 .ob-submit:disabled{opacity:.55;cursor:not-allowed;box-shadow:none;}
@@ -191,5 +244,5 @@ async function signOut() {
 .ob-fade-enter-active,.ob-fade-leave-active{transition:opacity .2s;}
 .ob-fade-enter-from,.ob-fade-leave-to{opacity:0;}
 
-@media(max-width:520px){.ob-grid{grid-template-columns:1fr;}.ob-card{padding:18px;}}
+@media(max-width:560px){.ob-grid{grid-template-columns:1fr;}.ob-card{padding:18px;}}
 </style>

@@ -64,8 +64,13 @@
             </div>
           </div>
 
-          <div v-if="composedName" class="ob-name-preview">
-            Full name on record: <strong>{{ composedName }}</strong>
+          <div class="ob-field ob-full" style="margin-top:12px">
+            <label>
+              Full Name on record <span class="ob-hint">auto-formatted · editable</span>
+              <button v-if="fullNameTouched" type="button" class="ob-name-reset" @click="resetFullName">reset</button>
+            </label>
+            <input v-model="fullName" @input="onFullNameInput" type="text" placeholder="Full name as it should appear on records" :disabled="submitting"/>
+            <span class="ob-name-tip">Middle name is shortened to an initial (e.g. Bautista → B.). Edit if the spelling or format needs to change.</span>
           </div>
 
           <div class="ob-section-label" style="margin-top:16px">Access &amp; assignment</div>
@@ -94,7 +99,7 @@
           <button type="submit" class="ob-submit" :disabled="submitting || !canSubmit">
             <span v-if="submitting" class="ob-spin"></span>
             {{ submitting ? 'Submitting…' : 'Submit for approval' }}
-            <svg v-if="!submitting" width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M2.5 7.5h10M9 4l3.5 3.5L9 11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <!-- <svg v-if="!submitting" width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M2.5 7.5h10M9 4l3.5 3.5L9 11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg> -->
           </button>
         </form>
 
@@ -105,7 +110,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { authApi } from '@/services/api'
@@ -128,14 +133,28 @@ const form = ref({
   position: '', employeeNo: '', type: 'Regular', divisionId: '', section: '', role: ''
 })
 
-// Compose the single fullName the rest of the system uses: "First Middle Last, Suffix"
-const composedName = computed(() => {
-  const core = [form.value.firstName, form.value.middleName, form.value.lastName]
-    .map(s => s.trim()).filter(Boolean).join(' ')
+// Full name on record: "First M.I. Last Suffix" — the middle name is shortened
+// to an initial with a dot (PH government standard). Editable, so the user can
+// validate the exact spelling; auto-composes from the parts until they edit it.
+const fullName = ref('')
+const fullNameTouched = ref(false)
+
+function middleInitials(mid) {
+  return String(mid || '').trim().split(/\s+/).filter(Boolean).map(w => w[0].toUpperCase() + '.').join(' ')
+}
+function composeName() {
+  const core = [form.value.firstName, middleInitials(form.value.middleName), form.value.lastName]
+    .map(s => String(s).trim()).filter(Boolean).join(' ')
   const sfx = form.value.suffix.trim()
   return sfx ? `${core}${core ? ' ' : ''}${sfx}` : core
+}
+watch(() => [form.value.firstName, form.value.middleName, form.value.lastName, form.value.suffix], () => {
+  if (!fullNameTouched.value) fullName.value = composeName()
 })
-const canSubmit = computed(() => form.value.firstName.trim() && form.value.lastName.trim() && form.value.divisionId)
+function onFullNameInput() { fullNameTouched.value = true }
+function resetFullName() { fullNameTouched.value = false; fullName.value = composeName() }
+
+const canSubmit = computed(() => form.value.firstName.trim() && form.value.lastName.trim() && fullName.value.trim() && form.value.divisionId)
 
 // Prefill from the Google display name conservatively: last token is the
 // surname, everything before it is the first name, and middle name is left
@@ -153,6 +172,7 @@ onMounted(async () => {
   form.value.firstName  = g.firstName
   form.value.middleName = g.middleName
   form.value.lastName   = g.lastName
+  fullName.value        = composeName()
   try {
     const opts = await authApi.registerOptions()
     if (opts) {
@@ -173,7 +193,7 @@ async function submit() {
   try {
     const division = options.value.divisions.find(d => d.id === form.value.divisionId)
     await authStore.register({
-      fullName:   composedName.value,
+      fullName:   fullName.value.trim(),
       firstName:  form.value.firstName,
       middleName: form.value.middleName,
       lastName:   form.value.lastName,
@@ -233,8 +253,9 @@ async function signOut() {
 .ob-field input:focus,.ob-field select:focus{border-color:#3B82F6;box-shadow:0 0 0 3px rgba(59,130,246,.12);}
 .ob-field input::placeholder{color:#CBD5E1;}
 
-.ob-name-preview{margin-top:11px;font-size:12px;color:#64748B;background:#F8FAFC;border:1px solid #EEF2F7;border-radius:9px;padding:8px 12px;}
-.ob-name-preview strong{color:#0F172A;}
+.ob-name-reset{margin-left:auto;background:none;border:none;color:#3B82F6;font-size:11px;font-weight:600;cursor:pointer;padding:0;}
+.ob-name-reset:hover{text-decoration:underline;}
+.ob-name-tip{font-size:10.5px;color:#94A3B8;line-height:1.4;}
 
 .ob-submit{width:100%;margin-top:20px;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px;border:none;border-radius:11px;background:linear-gradient(135deg,#2F6BE4,#1A56B0);color:#fff;font-size:14px;font-weight:700;cursor:pointer;transition:filter .15s,box-shadow .15s;box-shadow:0 8px 20px rgba(26,86,176,.32);}
 .ob-submit:hover:not(:disabled){filter:brightness(1.06);box-shadow:0 10px 26px rgba(26,86,176,.42);}

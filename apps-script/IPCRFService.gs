@@ -653,6 +653,13 @@ const IpcrfService = (() => {
     if (!row || row.formId !== formId) throw HttpError('Entry not found', 404)
 
     const { id: _id, formId: _fid, createdAt: _c, ...safe } = body
+    ;['ratingEfficiency', 'ratingQuality', 'ratingTimeliness'].forEach(f => {
+      if (safe[f] !== undefined && safe[f] !== '' && safe[f] !== null) {
+        const n = Number(safe[f])
+        if (isNaN(n) || n < 1 || n > 5) throw HttpError(f + ' must be between 1 and 5', 400)
+        safe[f] = Math.round(n)
+      }
+    })
     const autoAverage = _entryAverage({ ...row, ...safe })
     if (autoAverage !== null) safe.ratingAverage = autoAverage
     const updated = SpreadsheetService.updateRow(sheet, entryId, {

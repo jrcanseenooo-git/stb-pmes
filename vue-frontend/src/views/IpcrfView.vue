@@ -169,6 +169,11 @@
               <div class="dh-name">{{ activeForm?.employeeName }}</div>
               <div class="dh-sub">{{ activeForm?.year }} | {{ activeForm?.divisionName }}</div>
             </div>
+            <button class="readiness-trigger" @click="showReadinessModal = true">
+              <span :class="['readiness-dot', readinessSummary.ready ? 'ok' : 'warn']"></span>
+              Readiness
+              <strong>{{ readinessSummary.title }}</strong>
+            </button>
             <button class="modal-close" @click="closeFormModal">
               <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
                 <path d="M2 2l11 11M13 2L2 13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
@@ -250,7 +255,7 @@
                       <span class="etag">{{ e.applicableRatingPeriod }}</span>
                       <span class="etag">{{ e.classification }}</span>
                       <span v-if="e.isCustom === true || e.isCustom === 'true'" class="etag etag-amber">Custom</span>
-                      <span v-if="e.ratingAverage" class="etag etag-green">Avg {{ e.ratingAverage }}</span>
+                      <span v-if="entryAverage(e)" class="etag etag-green">Avg {{ entryAverage(e) }}</span>
                     </div>
                     <div v-if="e.meansOfVerification" class="ind-mov">
                       <span class="ind-mov-lbl">MOV:</span> {{ e.meansOfVerification }}
@@ -299,7 +304,7 @@
                       <span class="etag">{{ e.applicableRatingPeriod }}</span>
                       <span class="etag">{{ e.classification }}</span>
                       <span v-if="e.isCustom === true || e.isCustom === 'true'" class="etag etag-amber">Custom</span>
-                      <span v-if="e.ratingAverage" class="etag etag-green">Avg {{ e.ratingAverage }}</span>
+                      <span v-if="entryAverage(e)" class="etag etag-green">Avg {{ entryAverage(e) }}</span>
                     </div>
                     <div v-if="e.meansOfVerification" class="ind-mov">
                       <span class="ind-mov-lbl">MOV:</span> {{ e.meansOfVerification }}
@@ -397,7 +402,7 @@
                       <span :class="['st-fn', e.functionType === 'Core' ? 'fn-c' : 'fn-s']">{{ e.functionType[0] }}</span>
                       <span class="st-name">{{ e.kraName }}</span>
                     </div>
-                    <span :class="['st-val', e.ratingAverage ? '' : 'muted-text']">{{ e.ratingAverage || '-' }}</span>
+                    <span :class="['st-val', entryAverage(e) ? '' : 'muted-text']">{{ entryAverage(e) || '-' }}</span>
                   </div>
                 </div>
 
@@ -715,6 +720,46 @@
          CUSTOM / EDIT ENTRY MODAL
     ================================== -->
     <teleport to="body">
+      <div v-if="showReadinessModal" class="modal-overlay" @click.self="showReadinessModal = false">
+        <div class="modal modal-readiness">
+          <div class="modal-hd">
+            <div>
+              <h3 class="modal-title">Smart Readiness</h3>
+              <p class="modal-sub">{{ activeForm?.employeeName }} · {{ activeForm?.type }} {{ activeForm?.year }}</p>
+            </div>
+            <span :class="['smart-pill', readinessSummary.ready ? 'smart-pill-ok' : 'smart-pill-warn']">
+              {{ readinessSummary.ready ? 'Ready' : 'Needs attention' }}
+            </span>
+            <button class="modal-close" @click="showReadinessModal = false">
+              <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+                <path d="M2 2l11 11M13 2L2 13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+              </svg>
+            </button>
+          </div>
+          <div class="modal-body">
+            <div class="readiness-summary-card">
+              <div class="smart-eyebrow">Current status</div>
+              <div class="smart-title">{{ readinessSummary.title }}</div>
+              <p class="readiness-summary-copy">These checks update from the latest form details, ratings, and generated Google Sheet status.</p>
+            </div>
+            <div class="smart-grid smart-grid-modal">
+              <div v-for="item in readinessItems" :key="item.key" :class="['smart-item', item.ok ? 'smart-ok' : 'smart-warn']">
+                <span class="smart-dot"></span>
+                <div>
+                  <div class="smart-item-title">{{ item.title }}</div>
+                  <div class="smart-item-copy">{{ item.copy }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-primary" @click="showReadinessModal = false">Done</button>
+          </div>
+        </div>
+      </div>
+    </teleport>
+
+    <teleport to="body">
       <div v-if="showEntryModal" class="modal-overlay" @click.self="closeEntry">
         <div class="modal" style="max-width:480px">
           <div class="modal-hd">
@@ -775,15 +820,15 @@
                 </div>
                 <div class="field">
                   <label class="field-label">Efficiency <span class="muted-text">(1-5)</span></label>
-                  <input v-model.number="entryForm.ratingEfficiency" type="number" class="field-input" min="1" max="5" step="0.01"/>
+                  <input v-model.number="entryForm.ratingEfficiency" type="number" class="field-input" min="1" max="5" step="1" @input="clampRating('ratingEfficiency', $event)"/>
                 </div>
                 <div class="field">
                   <label class="field-label">Quality <span class="muted-text">(1-5)</span></label>
-                  <input v-model.number="entryForm.ratingQuality" type="number" class="field-input" min="1" max="5" step="0.01"/>
+                  <input v-model.number="entryForm.ratingQuality" type="number" class="field-input" min="1" max="5" step="1" @input="clampRating('ratingQuality', $event)"/>
                 </div>
                 <div class="field">
                   <label class="field-label">Timeliness <span class="muted-text">(1-5)</span></label>
-                  <input v-model.number="entryForm.ratingTimeliness" type="number" class="field-input" min="1" max="5" step="0.01"/>
+                  <input v-model.number="entryForm.ratingTimeliness" type="number" class="field-input" min="1" max="5" step="1" @input="clampRating('ratingTimeliness', $event)"/>
                 </div>
                 <div v-if="computedAvg" class="field">
                   <label class="field-label">Average</label>
@@ -832,7 +877,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ipcrf as ipcrfApi, kraLibrary as kraLibraryApi, docGenApi } from '@/services/api'
 import { usePermissions } from '@/composables/usePermissions'
@@ -872,6 +917,7 @@ const activeTab      = ref('indicators')
 const allEntries     = ref([])
 const showFormModal    = ref(false)
 const showNewFormModal = ref(false)
+const showReadinessModal = ref(false)
 
 // Library
 const showLibrary    = ref(false)
@@ -923,7 +969,7 @@ watch(
     activeTab.value,
     activeForm.value?.id || '',
     entriesLoading.value,
-    allEntries.value.map(e => `${e.id}:${e.ratingAverage ?? ''}`).join('|')
+    allEntries.value.map(e => `${e.id}:${entryAverage(e) ?? ''}`).join('|')
   ],
   () => {
     if (activeTab.value === 'score') queueAutoComputeScore()
@@ -974,6 +1020,13 @@ const filteredLibrary = computed(() => {
   return items
 })
 
+function clampRating(field, event) {
+  const v = parseInt(event.target.value, 10)
+  if (!v || v < 1) { entryForm.value[field] = ''; event.target.value = '' }
+  else if (v > 5) { entryForm.value[field] = 5; event.target.value = 5 }
+  else { entryForm.value[field] = v; event.target.value = v }
+}
+
 const computedAvg = computed(() => {
   const e = Number(entryForm.value.ratingEfficiency)
   const q = Number(entryForm.value.ratingQuality)
@@ -1000,6 +1053,93 @@ const scoreColorClass = computed(() => {
   return 'score-low'
 })
 
+const readinessItems = computed(() => {
+  if (!activeForm.value) return []
+  const rows = allEntries.value
+  const selectedStatus = activePeriodStatus.value
+  const missingPeriod = rows.filter(e => !e.applicableRatingPeriod).length
+  const missingMov = rows.filter(e => !e.meansOfVerification).length
+  const missingAccomplishment = rows.filter(e => !e.accomplishment).length
+  const missingRating = rows.filter(e => !entryAverage(e)).length
+  const hasTargetsDoc = !!(selectedStatus?.hasTargetsDoc || activeForm.value.targetsGeneratedAt)
+  const hasRatingsDoc = !!(
+    selectedStatus?.hasRatingsDoc ||
+    selectedStatus?.hasS1RatingsDoc ||
+    selectedStatus?.hasS2RatingsDoc ||
+    activeForm.value.s1RatingsGeneratedAt ||
+    activeForm.value.s2RatingsGeneratedAt
+  )
+  const feedbackDone = !!(
+    activeForm.value.feedbackStrengths ||
+    activeForm.value.feedbackComments ||
+    activeForm.value.feedbackRecommendations ||
+    activeForm.value.feedbackAreasForImprovement
+  )
+
+  return [
+    {
+      key: 'indicators',
+      ok: rows.length > 0,
+      title: 'Indicators',
+      copy: rows.length ? `${rows.length} indicator${rows.length !== 1 ? 's' : ''} selected.` : 'Add at least one KRA / success indicator.'
+    },
+    {
+      key: 'periods',
+      ok: rows.length > 0 && missingPeriod === 0,
+      title: 'Applicable periods',
+      copy: missingPeriod ? `${missingPeriod} indicator${missingPeriod !== 1 ? 's' : ''} missing applicable rating period.` : 'All indicators have rating periods.'
+    },
+    {
+      key: 'mov',
+      ok: rows.length > 0 && missingMov === 0,
+      title: 'Means of verification',
+      copy: missingMov ? `${missingMov} indicator${missingMov !== 1 ? 's' : ''} missing MOV.` : 'All indicators have MOV basis.'
+    },
+    {
+      key: 'targets-sheet',
+      ok: hasTargetsDoc && !selectedStatus?.docMissing,
+      title: 'Targets sheet',
+      copy: selectedStatus?.docMissing ? 'Generated spreadsheet was deleted from Drive.' : hasTargetsDoc ? 'Targets sheet is available.' : 'Targets sheet not generated yet.'
+    },
+    {
+      key: 'ratings',
+      ok: rows.length > 0 && missingAccomplishment === 0 && missingRating === 0,
+      title: 'Ratings entries',
+      copy: missingAccomplishment || missingRating
+        ? `${missingAccomplishment} accomplishment${missingAccomplishment !== 1 ? 's' : ''} and ${missingRating} rating${missingRating !== 1 ? 's' : ''} still incomplete.`
+        : 'Accomplishments and ratings are complete.'
+    },
+    {
+      key: 'ratings-sheet',
+      ok: hasRatingsDoc && !selectedStatus?.docMissing,
+      title: 'Ratings sheet',
+      copy: selectedStatus?.docMissing ? 'Generated spreadsheet was deleted from Drive.' : hasRatingsDoc ? 'Ratings sheet is available.' : 'Ratings sheet not generated yet.'
+    },
+    {
+      key: 'part-ii',
+      ok: activeForm.value.status !== 'Rated' || feedbackDone,
+      title: 'Part II feedback',
+      copy: feedbackDone ? 'Feedback/proposed intervention has entries.' : 'Division Chief feedback is still pending.'
+    }
+  ]
+})
+
+const readinessSummary = computed(() => {
+  const items = readinessItems.value
+  const readyCount = items.filter(item => item.ok).length
+  const ready = items.length > 0 && readyCount === items.length
+  return {
+    ready,
+    title: ready ? 'Everything looks ready.' : `${readyCount}/${items.length} checks complete`
+  }
+})
+
+const activePeriodStatus = computed(() => {
+  if (!activeForm.value || !periodStatusInfo.value) return null
+  if (String(periodStatusInfo.value.formId || '') !== String(activeForm.value.id || '')) return null
+  return periodStatusInfo.value
+})
+
 const { canApprove, isAdmin, isDirector, isAsstDir } = usePermissions()
 const canFinalize  = computed(() => isAdmin.value || isDirector.value || isAsstDir.value)
 const canSelfServe = computed(() => !isDirector.value && !isAsstDir.value)
@@ -1021,6 +1161,7 @@ const periodYear     = ref(new Date().getFullYear())
 const periodBusy     = ref('')
 const periodStatusInfo    = ref(null)
 const periodStatusLoading = ref(false)
+let periodStatusRefreshTimer = null
 
 // ── Helpers ──
 function countByStatus(s)   { return forms.value.filter(f => f.status === s).length }
@@ -1031,6 +1172,18 @@ function posWeight(item)    {
 function fmtDate(iso)       { return iso ? new Date(iso).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' }) : '' }
 function showToast(msg, type = 'success') { toast.value = { show: true, msg, type }; setTimeout(() => { toast.value.show = false }, 3500) }
 function isSelected(item)   { return libSelected.value.some(s => s.id === item.id) }
+function entryAverage(entry) {
+  const e = Number(entry?.ratingEfficiency)
+  const q = Number(entry?.ratingQuality)
+  const t = Number(entry?.ratingTimeliness)
+  if ([e, q, t].every(v => Number.isFinite(v) && v > 0)) {
+    return Math.round(((e + q + t) / 3) * 100) / 100
+  }
+
+  const saved = Number(entry?.ratingAverage)
+  if (Number.isFinite(saved) && saved > 0) return Math.round(saved * 100) / 100
+  return null
+}
 function ratingLabel(score) {
   const s = Number(score)
   if (s >= 4.5) return 'Outstanding'
@@ -1041,15 +1194,15 @@ function ratingLabel(score) {
 }
 function calculateScoreFromEntries(entries, form) {
   const rows = Array.isArray(entries) ? entries : []
-  const rated = rows.filter(e => e.ratingAverage !== '' && e.ratingAverage !== null && e.ratingAverage !== undefined && Number.isFinite(Number(e.ratingAverage)))
+  const rated = rows.filter(e => entryAverage(e))
   if (!rated.length) return null
 
   const coreRows = rows.filter(e => e.functionType === 'Core')
   const supportRows = rows.filter(e => e.functionType === 'Support')
   const average = (list) => {
-    const listRated = list.filter(e => e.ratingAverage !== '' && e.ratingAverage !== null && e.ratingAverage !== undefined && Number.isFinite(Number(e.ratingAverage)))
+    const listRated = list.filter(e => entryAverage(e))
     if (!listRated.length) return 0
-    return listRated.reduce((sum, e) => sum + Number(e.ratingAverage), 0) / listRated.length
+    return listRated.reduce((sum, e) => sum + Number(entryAverage(e)), 0) / listRated.length
   }
 
   const coreAvg = average(coreRows)
@@ -1069,7 +1222,7 @@ function autoScoreKey() {
   const score = liveScore.value
   if (!activeForm.value?.id || !score) return ''
   const ratings = allEntries.value
-    .map(e => `${e.id}:${e.ratingAverage ?? ''}`)
+    .map(e => `${e.id}:${entryAverage(e) ?? ''}`)
     .join('|')
   return `${activeForm.value.id}:${score.score}:${ratings}`
 }
@@ -1130,8 +1283,18 @@ function statusClass(status) {
   return map[status] || 'st-draft'
 }
 
-onMounted(loadForms)
-onMounted(loadPeriodStatus)
+onMounted(() => {
+  loadForms()
+  loadPeriodStatus()
+  startPeriodStatusRefresh()
+})
+onUnmounted(() => {
+  if (periodWatchTimer) clearTimeout(periodWatchTimer)
+  if (periodStatusRefreshTimer) clearInterval(periodStatusRefreshTimer)
+  if (autoScoreTimer) clearTimeout(autoScoreTimer)
+  window.removeEventListener('focus', refreshPeriodStatusOnFocus)
+  document.removeEventListener('visibilitychange', refreshPeriodStatusOnFocus)
+})
 
 let periodWatchTimer = null
 watch(periodYear, () => {
@@ -1149,6 +1312,20 @@ async function loadPeriodStatus() {
   } finally {
     periodStatusLoading.value = false
   }
+}
+
+function startPeriodStatusRefresh() {
+  if (!canSelfServe.value) return
+  if (periodStatusRefreshTimer) clearInterval(periodStatusRefreshTimer)
+  periodStatusRefreshTimer = setInterval(() => {
+    if (!document.hidden && !periodBusy.value) loadPeriodStatus()
+  }, 60000)
+  window.addEventListener('focus', refreshPeriodStatusOnFocus)
+  document.addEventListener('visibilitychange', refreshPeriodStatusOnFocus)
+}
+
+function refreshPeriodStatusOnFocus() {
+  if (!document.hidden && !periodBusy.value) loadPeriodStatus()
 }
 
 // ── API ──
@@ -1684,6 +1861,30 @@ async function doPrint(fileId, tab) {
 .dh-name{font-size:17px;font-weight:700;color:#0F172A;letter-spacing:-.4px;}
 .dh-sub{font-size:12px;color:#64748B;margin-top:3px;}
 
+/* Smart readiness */
+.readiness-trigger{margin-left:auto;margin-right:10px;display:flex;align-items:center;gap:7px;height:34px;padding:0 11px;border:1px solid #DCE7F5;border-radius:10px;background:#FFFFFF;color:#475569;font-size:11px;font-weight:700;cursor:pointer;}
+.readiness-trigger:hover{background:#F5F9FF;border-color:#BFDBFE;color:#1A56B0;}
+.readiness-trigger strong{color:#0F172A;font-size:10.5px;font-weight:800;}
+.readiness-dot{width:7px;height:7px;border-radius:50%;background:#F59E0B;flex-shrink:0;}
+.readiness-dot.ok{background:#22C55E;}
+.readiness-dot.warn{background:#F59E0B;}
+.modal-readiness{max-width:620px;}
+.readiness-summary-card{padding:12px;border:1px solid #DCE7F5;border-radius:12px;background:#F8FBFF;margin-bottom:12px;}
+.readiness-summary-copy{margin-top:5px;color:#64748B;font-size:11.5px;line-height:1.45;}
+.smart-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;}
+.smart-eyebrow{color:#1A56B0;font-size:9.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;}
+.smart-title{margin-top:2px;color:#0F172A;font-size:13px;font-weight:800;}
+.smart-pill{flex-shrink:0;padding:4px 9px;border-radius:999px;font-size:10px;font-weight:800;}
+.smart-pill-ok{background:#DCFCE7;color:#15803D;}
+.smart-pill-warn{background:#FEF3C7;color:#B45309;}
+.smart-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+.smart-grid-modal{grid-template-columns:1fr;}
+.smart-item{display:flex;gap:8px;min-width:0;padding:9px;border-radius:10px;background:#FFFFFF;border:1px solid #E5EEF9;}
+.smart-dot{width:8px;height:8px;flex-shrink:0;margin-top:4px;border-radius:50%;background:#F59E0B;}
+.smart-ok .smart-dot{background:#22C55E;}
+.smart-item-title{color:#0F172A;font-size:11px;font-weight:800;}
+.smart-item-copy{margin-top:2px;color:#64748B;font-size:10.5px;line-height:1.35;}
+
 /* Tabs */
 .dtabs{display:flex;padding:0 24px;border-bottom:1px solid #E8EDF3;flex-shrink:0;background:#fff;}
 .dtab{flex:1 1 0;padding:13px 14px;font-size:13px;font-weight:500;cursor:pointer;border:none;background:transparent;color:#64748B;border-bottom:3px solid transparent;margin-bottom:-1px;transition:all .15s;display:inline-flex;align-items:center;justify-content:center;gap:6px;}
@@ -1902,4 +2103,10 @@ async function doPrint(fileId, tab) {
 /* Transitions */
 .toast-slide-enter-active,.toast-slide-leave-active{transition:all .25s;}
 .toast-slide-enter-from,.toast-slide-leave-to{opacity:0;transform:translateY(8px);}
+
+@media (max-width: 900px) {
+  .dh{align-items:stretch;flex-wrap:wrap;}
+  .readiness-trigger{order:3;width:100%;margin:4px 0 0;justify-content:space-between;}
+  .smart-grid{grid-template-columns:1fr;}
+}
 </style>

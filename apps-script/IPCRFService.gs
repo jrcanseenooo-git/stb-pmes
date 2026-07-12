@@ -659,6 +659,7 @@ const IpcrfService = (() => {
       ...safe,
       updatedAt: new Date().toISOString()
     })
+    _syncEntryToAccomplishment(entryId, safe)
     AuditService.log('UPDATE_ENTRY', 'IPCRF', `Updated entry ${entryId} on form ${formId}`, user)
     _autoRegenDoc(formId, user)
     return updated
@@ -1115,6 +1116,23 @@ const IpcrfService = (() => {
       if (missing.length) sheet.getRange(1, existing.length + 1, 1, missing.length).setValues([missing])
     }
     return sheet
+  }
+
+  function _syncEntryToAccomplishment(entryId, changes) {
+    try {
+      const accSheet = SpreadsheetService.getSheet(SHEET.ACCOMPLISHMENTS)
+      const accRows = SpreadsheetService.getAllRows(accSheet)
+      const linked = accRows.filter(r => r.entryId === entryId && !r.deleted)
+      if (!linked.length) return
+      const syncFields = ['accomplishment', 'ratingEfficiency', 'ratingQuality', 'ratingTimeliness', 'ratingAverage', 'movReferences', 'remarks']
+      const patch = {}
+      syncFields.forEach(f => { if (changes[f] !== undefined) patch[f] = changes[f] })
+      if (!Object.keys(patch).length) return
+      patch.updatedAt = new Date().toISOString()
+      linked.forEach(acc => SpreadsheetService.updateRow(accSheet, acc.id, patch))
+    } catch (e) {
+      Logger.log('[IPCRF] Sync entry→accomplishment skipped: ' + e.message)
+    }
   }
 
   function _autoRegenDoc(formId, user) {

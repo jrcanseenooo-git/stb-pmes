@@ -482,6 +482,7 @@ const IpcrfService = (() => {
       updatedAt: new Date().toISOString()
     })
     AuditService.log('RATE', 'IPCRF', `Rated form ${id}: ${body.finalNumericalRating} (${body.adjectivalRating})`, user)
+    _autoRegenDoc(id, user)
     _notifyUser(row.userId, 'approval',
       `Your ${row.type} has been rated: ${body.finalNumericalRating} – ${body.adjectivalRating}`,
       id, 'IPCRF'
@@ -508,6 +509,7 @@ const IpcrfService = (() => {
       updatedAt:    new Date().toISOString()
     })
     AuditService.log('FINALIZE', 'IPCRF', `Finalized form ${id}`, user)
+    _autoRegenDoc(id, user)
     return updated
   }
 
@@ -566,6 +568,7 @@ const IpcrfService = (() => {
     })
 
     AuditService.log('COMPUTE_SCORE', 'IPCRF', `Computed score for form ${id}: ${score} (${label})`, user)
+    _autoRegenDoc(id, user)
     return { ...updated, entryCount: total, ratedCount: rated }
   }
 
@@ -657,6 +660,7 @@ const IpcrfService = (() => {
       updatedAt: new Date().toISOString()
     })
     AuditService.log('UPDATE_ENTRY', 'IPCRF', `Updated entry ${entryId} on form ${formId}`, user)
+    _autoRegenDoc(formId, user)
     return updated
   }
 
@@ -975,15 +979,18 @@ const IpcrfService = (() => {
   function _routeTargetForStage(row, reviewType, stage) {
     if (stage === 'Division Focal') {
       const focal = FocalAssignmentService.getDivisionFocal(row.divisionId)
-      return { userId: focal ? focal.userId : '', userName: focal ? focal.userName : 'Division Focal' }
+      if (!focal) throw HttpError('No Division Focal assigned for ' + (row.divisionName || row.divisionId) + '. Set up Focal Assignments first.', 400)
+      return { userId: focal.userId, userName: focal.userName }
     }
     if (stage === 'Bureau Focal') {
       const focal = FocalAssignmentService.getBureauFocal()
-      return { userId: focal ? focal.userId : '', userName: focal ? focal.userName : 'Bureau Focal' }
+      if (!focal) throw HttpError('No Bureau Focal assigned. Set up Focal Assignments first.', 400)
+      return { userId: focal.userId, userName: focal.userName }
     }
     if (stage === 'Division Chief') {
       const chief = _divisionChief(row.divisionId)
-      return { userId: chief ? chief.id : '', userName: chief ? _profileEmployeeName(chief) : 'Division Chief' }
+      if (!chief) throw HttpError('No Division Chief found for ' + (row.divisionName || row.divisionId) + '. Ensure a Division Chief user exists.', 400)
+      return { userId: chief.id, userName: _profileEmployeeName(chief) }
     }
     return { userId: '', userName: stage || '' }
   }
@@ -1108,6 +1115,24 @@ const IpcrfService = (() => {
       if (missing.length) sheet.getRange(1, existing.length + 1, 1, missing.length).setValues([missing])
     }
     return sheet
+  }
+
+  function _autoRegenDoc(formId, user) {
+    try {
+      const form = _getForm(formId)
+      if (!form || !form.docFileId) return
+      if (form.targetsGeneratedAt) {
+        PmesDocGenService.generateTargetsDoc(formId, user)
+      }
+      if (form.s1RatingsGeneratedAt) {
+        PmesDocGenService.generateRatingsDoc(formId, user, '1')
+      }
+      if (form.s2RatingsGeneratedAt) {
+        PmesDocGenService.generateRatingsDoc(formId, user, '2')
+      }
+    } catch (e) {
+      Logger.log('[IPCRF] Auto-regen doc skipped for ' + formId + ': ' + e.message)
+    }
   }
 
   return {

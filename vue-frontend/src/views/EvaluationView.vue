@@ -7,7 +7,7 @@
     <!-- Header -->
     <div class="page-hd">
       <div class="page-title-block">
-        <h2 class="page-title">Evaluation</h2>
+        <h2 class="page-title">Evaluation Ratings</h2>
         <p class="page-sub">Innovations Performance Assessment Tool</p>
       </div>
 
@@ -139,20 +139,21 @@
               @click="selectTask(task)">
               <span class="eli-accent" :style="{ background: raterAccent(task.raterType) }"></span>
               <div class="eli-row">
-                <div :class="['eli-av', rterTypeCls(task.raterType)]">{{ task.rateeName?.charAt(0)?.toUpperCase() || '?' }}</div>
+                <!-- <div :class="['eli-av', rterTypeCls(task.raterType)]">{{ task.rateeName?.charAt(0)?.toUpperCase() || '?' }}</div> -->
                 <div class="eli-info">
-                  <div class="eli-name">{{ task.rateeName }}</div>
+                  <div class="eli-name-row">
+                    <span class="eli-name">{{ task.rateeName }}</span>
+                  </div>
                   <div class="eli-meta">S{{ task.semester }} {{ task.year }}{{ task.rateeDivisionId ? ' · ' + task.rateeDivisionId : '' }}</div>
                 </div>
-                <div :class="['eli-dot', task.status === 'Completed' ? 'eli-dot-done' : 'eli-dot-pend']" :title="task.status"></div>
-              </div>
-              <div class="eli-chips">
-                <span :class="['rtype-badge', rterTypeCls(task.raterType)]">{{ raterTypeLabel(task.raterType) }}</span>
-                <span :class="['status-badge', task.status === 'Completed' ? 'st-green' : 'st-draft']">{{ task.status }}</span>
-                <span v-if="task.ipatStatus === 'Final'" class="eli-final">
-                  <svg width="10" height="10" viewBox="0 0 11 11" fill="none"><path d="M5.5 1L1 3.25V6c0 2.3 1.67 4.35 4.5 4.75 2.83-.4 4.5-2.45 4.5-4.75V3.25L5.5 1z" fill="#15803D" stroke="#15803D" stroke-width=".4"/><path d="M3.5 5.5l1.5 1.5 2.5-2.5" stroke="#fff" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                  Finalized
-                </span>
+                <div class="eli-right">
+                  <!-- <span :class="['rtype-badge', rterTypeCls(task.raterType)]">{{ raterTypeLabel(task.raterType) }}</span> -->
+                  <span :class="['eli-status-label', task.status === 'Completed' ? 'eli-sl-done' : 'eli-sl-pend']">{{ task.status }}</span>
+                  <span v-if="task.ipatStatus === 'Final'" class="eli-final">
+                    <svg width="10" height="10" viewBox="0 0 11 11" fill="none"><path d="M5.5 1L1 3.25V6c0 2.3 1.67 4.35 4.5 4.75 2.83-.4 4.5-2.45 4.5-4.75V3.25L5.5 1z" fill="#15803D" stroke="#15803D" stroke-width=".4"/><path d="M3.5 5.5l1.5 1.5 2.5-2.5" stroke="#fff" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    Finalized
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -308,14 +309,6 @@
                   <div v-else class="sscore-val">—</div>
                   <div v-if="activeRecord?.descriptor" :class="['sscore-desc', descriptorClass(activeRecord.descriptor)]">{{ activeRecord.descriptor }}</div>
                 </div>
-              </div>
-
-              <!-- Assignment context banner (rater) -->
-              <div v-if="activeAssignment" class="assignment-banner">
-                <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="5.5" stroke="#1A56B0" stroke-width="1.3"/><path d="M6.5 4v3.5M6.5 9.5v.1" stroke="#1A56B0" stroke-width="1.3" stroke-linecap="round"/></svg>
-                Your role: <strong>{{ raterTypeLabel(activeAssignment.raterType) }}</strong>
-                <span class="banner-desc"> — {{ raterRoleDesc(activeAssignment.raterType) }}</span>
-                <span v-if="!showJFTab"> · CBC only</span>
               </div>
 
               <!-- Tabs -->
@@ -546,7 +539,6 @@
                 </div>
                 <button class="btn btn-submit-rating" :disabled="submittingRating" @click="submitRatings">
                   <span v-if="submittingRating" class="spinner-sm" style="border-top-color:#fff"></span>
-                  <svg v-else width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7l3.5 3.5L12 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
                   {{ submittingRating ? 'Submitting…' : (selectedTask?.status === 'Completed' ? 'Update Ratings' : 'Submit Ratings') }}
                 </button>
               </template>
@@ -1203,12 +1195,12 @@ function raterTypeLabel(type) {
 function raterRoleDesc(type) {
   const desc = {
     Self:          'You are rating yourself',
-    Peer:          'You are their same-level peer',
-    Peer1:         'You are their same-level peer',
-    Peer2:         'You are their same-level peer',
+    Peer:          'Same-level Peer Rating',
+    Peer1:         'Same-level Peer Rating',
+    Peer2:         'Same-level Peer Rating',
     Subordinate:   'You report to this person',
     Supervisor:    'You are the immediate supervisor of this staff',
-    SkipSupervisor:'You are their skip-level supervisor'
+    SkipSupervisor:'Skip-level supervisor rating'
   }
   return desc[type] || ''
 }
@@ -1895,20 +1887,26 @@ function _resetEdap() {
 
 /* ════════════ LEFT PANEL — card polish ════════════ */
 .eval-tp-left{width:500px;background:#FBFDFF;}
-.eli-list{padding:10px;display:flex;flex-direction:column;gap:10px;}
-.eli{position:relative;overflow:hidden;border:1px solid #E6EDF6;border-radius:14px;background:#fff;padding:14px 15px 14px 18px;
-  box-shadow:0 1px 3px rgba(15,23,42,.05);transition:box-shadow .16s,border-color .16s,transform .09s;}
-.eli:hover{border-color:#BFD6F5;box-shadow:0 6px 16px rgba(15,23,42,.09);transform:translateY(-1px);}
+.eli-list{padding:10px;display:flex;flex-direction:column;gap:8px;}
+.eli{position:relative;overflow:hidden;border:1px solid #E6EDF6;border-radius:12px;background:#fff;padding:10px 14px 10px 16px;
+  box-shadow:0 1px 3px rgba(15,23,42,.04);transition:box-shadow .16s,border-color .16s,transform .09s;}
+.eli:hover{border-color:#BFD6F5;box-shadow:0 4px 12px rgba(15,23,42,.08);transform:translateY(-1px);}
 .eli:active{transform:translateY(0);}
-.eli-active{background:#F4F9FF !important;border-color:#93C5FD !important;box-shadow:0 6px 18px rgba(59,130,246,.16);}
-/* Colored rater-type spine down the left edge of each card */
-.eli-accent{position:absolute;left:0;top:0;bottom:0;width:5px;}
-.eli-av{width:42px;height:42px;border-radius:12px;font-size:16px;box-shadow:inset 0 0 0 1px rgba(15,23,42,.05);}
-.eli-name{font-size:14.5px;}
-.eli-meta{font-size:11.5px;}
-.eli-chips{padding-top:9px;border-top:1px dashed #EDF2F8;margin-top:9px;}
-.eli-active .eli-chips{border-top-color:#DBEAFE;}
-.eli-dot{width:9px;height:9px;}
+.eli-active{background:#F4F9FF !important;border-color:#93C5FD !important;box-shadow:0 4px 14px rgba(59,130,246,.14);}
+.eli-accent{position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:0 4px 4px 0;}
+.eli-row{display:flex;align-items:center;gap:10px;}
+.eli-av{width:36px;height:36px;border-radius:10px;font-size:14px;box-shadow:inset 0 0 0 1px rgba(15,23,42,.05);}
+.eli-info{flex:1;min-width:0;}
+.eli-name-row{display:flex;align-items:center;gap:6px;}
+.eli-name{font-size:13.5px;font-weight:700;color:#1E293B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.eli-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.eli-dot-done{background:#22C55E;box-shadow:0 0 0 2px #DCFCE7;}
+.eli-dot-pend{background:#F59E0B;box-shadow:0 0 0 2px #FEF3C7;}
+.eli-meta{font-size:11px;color:#64748B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;}
+.eli-right{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0;}
+.eli-status-label{font-size:10px;font-weight:600;}
+.eli-sl-done{color:#15803D;}
+.eli-sl-pend{color:#94A3B8;}
 
 @media (max-width: 1280px) {
   .page-hd{grid-template-columns:1fr;}

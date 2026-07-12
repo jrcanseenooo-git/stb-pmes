@@ -68,18 +68,22 @@ const PmesDocGenService = (() => {
   // PUBLIC: generate Annex F.2 — Ratings
   // ─────────────────────────────────────────────
   function generateRatingsDoc(formId, user, semester) {
-    const form = _withAccomplishmentFields(_withOwnerProfileFields(IpcrfService.get(formId, user)))
     const sem  = String(semester) === '2' ? '2' : '1'
+    const form = _withAccomplishmentFields(
+      _withOwnerProfileFields(IpcrfService.get(formId, user)),
+      sem
+    )
+    const semForm = _filterEntriesForSemester(form, sem)
 
     const ss    = _getOrCreateFormFile(form)
     const templateId = form.type === 'CCEF' ? CCEF_RATINGS_TEMPLATE_ID : TEMPLATE_ID[form.type]
     const fixedTabName = sem === '2' ? 'S2 Ratings' : 'S1 Ratings'
     const sheet = _addOrReplaceTab(ss, templateId, SOURCE_TAB[form.type].ratings[sem], fixedTabName)
 
-    _fillRatingsHeader(sheet, form, sem)
-    _fillIndicatorSections(sheet, form, 'ratings')
-    _fillFinalRating(sheet, form)
-    _fillFeedbackSection(sheet, form)
+    _fillRatingsHeader(sheet, semForm, sem)
+    _fillIndicatorSections(sheet, semForm, 'ratings')
+    _fillFinalRating(sheet, semForm)
+    _fillFeedbackSection(sheet, semForm)
     _cleanHeaderLogoArea(sheet)
     _trimUnusedColumns(sheet, 'J')
     _forceWrapAndAutosize(sheet)
@@ -181,14 +185,28 @@ const PmesDocGenService = (() => {
     }
   }
 
-  function _withAccomplishmentFields(form) {
+  function _withAccomplishmentFields(form, semester) {
     try {
       const accRows = SpreadsheetService.getAllRows(SpreadsheetService.getSheet(SHEET.ACCOMPLISHMENTS))
         .filter(r => r.formId === form.id && !r.deleted)
       if (!accRows.length) return form
 
       const byEntryId = {}
-      accRows.forEach(r => { if (r.entryId) byEntryId[r.entryId] = r })
+      accRows.forEach(r => {
+        if (!r.entryId) return
+        if (semester) {
+          // For semester-specific doc gen, prefer the accomplishment matching
+          // this semester; fall back to any accomplishment for this entry
+          const accSem = String(r.semester || '')
+          if (accSem === semester || accSem === String(semester)) {
+            byEntryId[r.entryId] = r
+          } else if (!byEntryId[r.entryId]) {
+            byEntryId[r.entryId] = r
+          }
+        } else {
+          byEntryId[r.entryId] = r
+        }
+      })
       return {
         ...form,
         entries: (form.entries || []).map(e => {
@@ -210,6 +228,19 @@ const PmesDocGenService = (() => {
       Logger.log('[DocGen] Could not merge accomplishment fields: ' + e.message)
       return form
     }
+  }
+
+  function _filterEntriesForSemester(form, sem) {
+    const semLabel = sem === '2' ? '2nd Semester' : '1st Semester'
+    const entries = (form.entries || []).filter(e => {
+      const period = String(e.applicableRatingPeriod || '').toLowerCase()
+      if (period.includes('both')) return true
+      if (sem === '1' && (period.includes('1st') || period === '1')) return true
+      if (sem === '2' && (period.includes('2nd') || period === '2')) return true
+      if (!period) return true
+      return false
+    })
+    return { ...form, entries }
   }
 
   function _resolveEmployeeName(form, owner) {

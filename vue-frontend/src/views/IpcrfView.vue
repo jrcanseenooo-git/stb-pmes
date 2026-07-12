@@ -820,15 +820,15 @@
                 </div>
                 <div class="field">
                   <label class="field-label">Efficiency <span class="muted-text">(1-5)</span></label>
-                  <input v-model.number="entryForm.ratingEfficiency" type="number" class="field-input" min="1" max="5" step="1" @input="clampRating('ratingEfficiency', $event)"/>
+                  <input :value="entryForm.ratingEfficiency" type="text" inputmode="decimal" class="field-input rating-field" placeholder="1-5" @input="onRatingInput('ratingEfficiency', $event)" @blur="onRatingBlur('ratingEfficiency', $event)"/>
                 </div>
                 <div class="field">
                   <label class="field-label">Quality <span class="muted-text">(1-5)</span></label>
-                  <input v-model.number="entryForm.ratingQuality" type="number" class="field-input" min="1" max="5" step="1" @input="clampRating('ratingQuality', $event)"/>
+                  <input :value="entryForm.ratingQuality" type="text" inputmode="decimal" class="field-input rating-field" placeholder="1-5" @input="onRatingInput('ratingQuality', $event)" @blur="onRatingBlur('ratingQuality', $event)"/>
                 </div>
                 <div class="field">
                   <label class="field-label">Timeliness <span class="muted-text">(1-5)</span></label>
-                  <input v-model.number="entryForm.ratingTimeliness" type="number" class="field-input" min="1" max="5" step="1" @input="clampRating('ratingTimeliness', $event)"/>
+                  <input :value="entryForm.ratingTimeliness" type="text" inputmode="decimal" class="field-input rating-field" placeholder="1-5" @input="onRatingInput('ratingTimeliness', $event)" @blur="onRatingBlur('ratingTimeliness', $event)"/>
                 </div>
                 <div v-if="computedAvg" class="field">
                   <label class="field-label">Average</label>
@@ -1020,11 +1020,25 @@ const filteredLibrary = computed(() => {
   return items
 })
 
-function clampRating(field, event) {
-  const v = parseInt(event.target.value, 10)
-  if (!v || v < 1) { entryForm.value[field] = ''; event.target.value = '' }
-  else if (v > 5) { entryForm.value[field] = 5; event.target.value = 5 }
-  else { entryForm.value[field] = v; event.target.value = v }
+function onRatingInput(field, event) {
+  const el = event.target
+  const raw = el.value.replace(/[^0-9.]/g, '')
+  if (raw !== el.value) el.value = raw
+  if (raw === '' || raw === '.') { entryForm.value[field] = ''; el.classList.remove('rating-invalid'); return }
+  const n = parseFloat(raw)
+  if (isNaN(n) || n <= 0 || n > 5) {
+    el.classList.add('rating-invalid')
+    setTimeout(() => { el.value = ''; el.classList.remove('rating-invalid'); entryForm.value[field] = '' }, 400)
+  } else {
+    el.classList.remove('rating-invalid')
+    entryForm.value[field] = n
+  }
+}
+function onRatingBlur(field, event) {
+  const el = event.target
+  const n = parseFloat(el.value)
+  if (!el.value || isNaN(n) || n <= 0 || n > 5) { el.value = ''; entryForm.value[field] = ''; el.classList.remove('rating-invalid') }
+  else { entryForm.value[field] = Math.round(n * 100) / 100; el.value = entryForm.value[field] }
 }
 
 const computedAvg = computed(() => {
@@ -2066,6 +2080,8 @@ async function doPrint(fileId, tab) {
 .field-input:focus{border-color:#3B82F6;box-shadow:0 0 0 3px rgba(59,130,246,.1);}
 .field-input::placeholder{color:#CBD5E1;}
 .avg-box{background:#F0FDF4;color:#15803D;font-weight:600;cursor:default;pointer-events:none;}
+.rating-field{text-align:center;font-weight:700;font-size:16px;transition:background .15s,border-color .15s,color .15s;}
+.rating-invalid{background:#FEE2E2 !important;border-color:#EF4444 !important;color:#DC2626 !important;}
 
 /* Type toggle */
 .type-toggle{display:grid;grid-template-columns:1fr 1fr;gap:8px;}

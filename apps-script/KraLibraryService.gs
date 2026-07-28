@@ -32,7 +32,7 @@ const KraLibraryService = (() => {
 
   // ── CREATE (admin only) ──
   function create(body, user) {
-    AuthService.requireRole(user, 'System Administrator', 'Bureau Director', 'Division Chief')
+    AuthService.requirePermission(user, 'manage_libraries')
     const now = new Date().toISOString()
     const entry = {
       id:                     SpreadsheetService.generateId('MKL-'),
@@ -58,7 +58,7 @@ const KraLibraryService = (() => {
 
   // ── UPDATE (admin / bureau director / division chief) ──
   function update(id, body, user) {
-    AuthService.requireRole(user, 'System Administrator', 'Bureau Director', 'Division Chief')
+    AuthService.requirePermission(user, 'manage_libraries')
     const sheet = _getSheet()
     const row   = SpreadsheetService.getRow(sheet, id)
     if (!row) throw HttpError('KRA library entry not found', 404)
@@ -71,7 +71,7 @@ const KraLibraryService = (() => {
 
   // ── SOFT-DELETE (admin only) ──
   function remove(id, user) {
-    AuthService.requireRole(user, 'System Administrator')
+    AuthService.requirePermission(user, 'manage_libraries')
     const sheet = _getSheet()
     const row   = SpreadsheetService.getRow(sheet, id)
     if (!row) throw HttpError('KRA library entry not found', 404)

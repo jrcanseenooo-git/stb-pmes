@@ -655,9 +655,10 @@ const IpcrfService = (() => {
     const { id: _id, formId: _fid, createdAt: _c, ...safe } = body
     ;['ratingEfficiency', 'ratingQuality', 'ratingTimeliness'].forEach(f => {
       if (safe[f] !== undefined && safe[f] !== '' && safe[f] !== null) {
+        if (String(safe[f]).toUpperCase() === 'N/A') { safe[f] = 'N/A'; return }
         const n = Number(safe[f])
-        if (isNaN(n) || n < 1 || n > 5) throw HttpError(f + ' must be between 1 and 5', 400)
-        safe[f] = Math.round(n)
+        if (isNaN(n) || n < 0 || n > 5) throw HttpError(f + ' must be between 0 and 5, or N/A', 400)
+        safe[f] = Math.round(n * 100) / 100
       }
     })
     const autoAverage = _entryAverage({ ...row, ...safe })
@@ -1143,6 +1144,8 @@ const IpcrfService = (() => {
   }
 
   function _autoRegenDoc(formId, user) {
+    const lock = LockService.getScriptLock()
+    if (!lock.tryLock(100)) return
     try {
       const form = _getForm(formId)
       if (!form || !form.docFileId) return
@@ -1157,13 +1160,47 @@ const IpcrfService = (() => {
       }
     } catch (e) {
       Logger.log('[IPCRF] Auto-regen doc skipped for ' + formId + ': ' + e.message)
+    } finally {
+      lock.releaseLock()
     }
+  }
+
+  function deleteForm(formId, user) {
+    const profile = AuthService.getProfile(user)
+    const formSheet = SpreadsheetService.getSheet(SHEET.IPCRF_FORMS)
+    const form = SpreadsheetService.getRow(formSheet, formId)
+    if (!form) throw HttpError('Form not found', 404)
+    if (form.userId !== profile.id && !['System Administrator', 'Bureau Director', 'Assistant Bureau Director'].includes(profile.role)) {
+      throw HttpError('Unauthorized', 403)
+    }
+
+    var counts = {}
+
+    function purge(sheetName, field) {
+      try {
+        var sheet = SpreadsheetService.getSheet(sheetName)
+        var rows = SpreadsheetService.getAllRows(sheet).filter(function(r) { return r[field] === formId })
+        rows.forEach(function(r) { try { SpreadsheetService.hardDeleteRow(sheet, r.id) } catch(e) {} })
+        counts[sheetName] = rows.length
+      } catch(e) { counts[sheetName] = 0 }
+    }
+
+    purge(SHEET.FORM_ENTRIES, 'formId')
+    purge(SHEET.REVISIONS, 'formId')
+    purge(SHEET.REVIEW_COMMENTS, 'formId')
+
+    SpreadsheetService.hardDeleteRow(formSheet, formId)
+    counts[SHEET.IPCRF_FORMS] = 1
+
+    var total = Object.values(counts).reduce(function(s, n) { return s + n }, 0)
+    AuditService.log('DELETE_FORM', 'IPCRF', 'Deleted form ' + formId + ' and ' + total + ' related rows: ' + JSON.stringify(counts), user)
+    return { deleted: total, counts: counts }
   }
 
   return {
     list, reviewQueue, get, create, update,
     submit, route, approve, return_, rate, submitRatings, finalize, computeScore,
-    listEntries, addEntry, updateEntry, deleteEntry,
+    listEntries, addEntry, updateEntry, deleteEntry, deleteForm,
     getFinalRatingForUser, getPeriodStatus,
     listReviewComments, saveReviewComments, listAssignableReviewers
   }

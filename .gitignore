@@ -15,3 +15,9 @@ dist/
 *firebase-adminsdk*.json
 credentials*.json
 secrets*.json
+
+.vercel
+
+# scratch and generated output
+tmp/
+output/

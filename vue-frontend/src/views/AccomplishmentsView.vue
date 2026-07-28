@@ -424,7 +424,7 @@ async function flushSave(row = selectedRow.value, isRetry = false) {
       setTimeout(() => flushSave(row, true), 1500)
     } else {
       saveState.value = 'error'
-      showToast(`Auto-save failed: ${e.message}`, 'error')
+      console.error(e); showToast('Auto-save failed. Please try again.', 'error')
     }
   } finally {
     saveInFlight = false
@@ -463,7 +463,7 @@ function blankForm() {
 }
 
 function initials(name) {
-  return (name || '').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+  return (name || '').split(/\s+/).filter(Boolean).map(w => w[0]).join('').toUpperCase()
 }
 
 function avatarColor(name) {
@@ -579,7 +579,7 @@ async function loadRows() {
     })
     rows.value = response?.items || (Array.isArray(response) ? response : [])
   } catch (e) {
-    showToast(`Could not load: ${e.message}`, 'error')
+    console.error(e); showToast('Could not load accomplishments. Please try again.', 'error')
   } finally {
     loading.value = false
   }
@@ -626,7 +626,7 @@ async function saveEntry() {
     }
     closeFormModal()
   } catch (e) {
-    showToast(e.message, 'error')
+    console.error(e); showToast('Something went wrong. Please try again.', 'error')
   } finally {
     saving.value = false
   }

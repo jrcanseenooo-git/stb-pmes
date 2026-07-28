@@ -38,12 +38,19 @@ const DashboardService = (() => {
 
   function divisions(params, user) {
     const profile  = AuthService.getProfile(user)
-    AuthService.requireRole(user, 'System Administrator', 'Bureau Director', 'Assistant Bureau Director', 'Division Chief')
+    if (!AuthService.hasPermission(profile, 'view_bureau_monitoring') &&
+        !AuthService.hasPermission(profile, 'view_division_monitoring')) {
+      throw HttpError('Access denied to dashboard monitoring', 403)
+    }
 
     const divSheet = SpreadsheetService.getSheet(SHEET.DIVISIONS)
     const accSheet = SpreadsheetService.getSheet(SHEET.ACCOMPLISHMENTS)
-    const divs     = SpreadsheetService.getAllRows(divSheet)
-    const accs     = SpreadsheetService.getAllRows(accSheet).filter(r => !r.deleted)
+    let divs       = SpreadsheetService.getAllRows(divSheet)
+    let accs       = SpreadsheetService.getAllRows(accSheet).filter(r => !r.deleted)
+    if (!AuthService.hasPermission(profile, 'view_bureau_monitoring')) {
+      divs = divs.filter(d => d.id === profile.divisionId)
+      accs = accs.filter(r => r.divisionId === profile.divisionId)
+    }
 
     return divs.map(div => {
       const divAccs = accs.filter(r => r.divisionId === div.id)
@@ -99,16 +106,14 @@ const DashboardService = (() => {
 
   // ── Scope helpers ──
   function applyScope(rows, profile) {
-    if (['System Administrator','Bureau Director'].includes(profile.role)) return rows
-    if (profile.role === 'Assistant Bureau Director') return rows.filter(r => r.divisionId === 'admin-pool')
-    if (profile.role === 'Division Chief') return rows.filter(r => r.divisionId === profile.divisionId)
+    if (AuthService.hasPermission(profile, 'view_bureau_monitoring')) return rows
+    if (AuthService.hasPermission(profile, 'view_division_monitoring')) return rows.filter(r => r.divisionId === profile.divisionId)
     return rows.filter(r => r.userId === profile.id)
   }
 
   function applyUserScope(users, profile) {
-    if (['System Administrator','Bureau Director'].includes(profile.role)) return users
-    if (profile.role === 'Assistant Bureau Director') return users.filter(u => u.divisionId === 'admin-pool')
-    if (profile.role === 'Division Chief') return users.filter(u => u.divisionId === profile.divisionId)
+    if (AuthService.hasPermission(profile, 'view_bureau_monitoring')) return users
+    if (AuthService.hasPermission(profile, 'view_division_monitoring')) return users.filter(u => u.divisionId === profile.divisionId)
     return users.filter(u => u.id === profile.id)
   }
 

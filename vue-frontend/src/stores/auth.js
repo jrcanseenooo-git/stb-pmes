@@ -36,10 +36,10 @@ export const useAuthStore = defineStore('auth', () => {
   const initials = computed(() => {
     const name = fullName.value
     return name
-      .split(' ')
+      .split(/\s+/)
+      .filter(Boolean)
       .map(n => n[0])
       .join('')
-      .slice(0, 2)
       .toUpperCase()
   })
 
@@ -114,9 +114,9 @@ export const useAuthStore = defineStore('auth', () => {
         unsub()
         if (firebaseUser) {
           user.value = firebaseUser
-          // Skip if a login flow already loaded the profile — avoids a
-          // duplicate profile fetch (and duplicate console output) on sign-in.
-          if (!profile.value) await fetchProfile()
+          const profileEmail = String(profile.value?.email || '').toLowerCase()
+          const loginEmail = String(firebaseUser.email || '').toLowerCase()
+          if (!profile.value || profileEmail !== loginEmail) await fetchProfile()
         }
         initialised.value = true
         resolve()

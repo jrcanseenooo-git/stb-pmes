@@ -24,7 +24,7 @@ const AuditService = (() => {
 
   function list(params, user) {
     const profile = AuthService.getProfile(user)
-    const isAdmin = ['System Administrator', 'Bureau Director'].includes(profile.role)
+    const isAdmin = AuthService.hasPermission(profile, 'view_audit')
 
     // FIX: Staff can read their OWN records (needed for Profile → Recent Activity).
     // Admins can read everything (with optional filters).
@@ -52,7 +52,7 @@ const AuditService = (() => {
   }
 
   function export_(params, user) {
-    AuthService.requireRole(user, 'System Administrator', 'Bureau Director')
+    AuthService.requirePermission(user, 'view_audit')
     const { items } = list({ ...params, pageSize: 9999 }, user)
     const headers = ['timestamp','userEmail','userName','role','action','module','details']
     const lines   = [headers.join(',')]

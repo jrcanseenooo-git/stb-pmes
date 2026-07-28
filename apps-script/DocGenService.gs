@@ -420,8 +420,8 @@ const PmesDocGenService = (() => {
     _writeEntries(sheet, rSupportHd + 1, support, col, docType)
 
     if (docType === 'ratings') {
-      sheet.getRange(rCoreHd, 8).setValue(_avg(core))      // col H — Core subtotal average
-      sheet.getRange(rSupportHd, 8).setValue(_avg(support)) // col H — Support subtotal average
+      _setRatingsSectionFormula(sheet, rCoreHd, core.length, form.coreFunctionWeight || 70)
+      _setRatingsSectionFormula(sheet, rSupportHd, support.length, form.supportFunctionWeight || 30)
     }
   }
 
@@ -472,7 +472,7 @@ const PmesDocGenService = (() => {
         sheet.getRange(r, _colNum(col.eff)).setValue(e.ratingEfficiency === '' ? 'N/A' : e.ratingEfficiency)
         sheet.getRange(r, _colNum(col.qual)).setValue(e.ratingQuality === '' ? 'N/A' : e.ratingQuality)
         sheet.getRange(r, _colNum(col.time)).setValue(e.ratingTimeliness === '' ? 'N/A' : e.ratingTimeliness)
-        sheet.getRange(r, _colNum(col.avg)).setValue(e.ratingAverage || _entryAverage(e) || '')
+        sheet.getRange(r, _colNum(col.avg)).setFormula(`=IFERROR(AVERAGE(E${r}:G${r}),"")`)
         sheet.getRange(r, _colNum(col.remarks)).setValue(e.remarks || '')
       }
     })
@@ -485,6 +485,19 @@ const PmesDocGenService = (() => {
       .filter(n => !Number.isNaN(n))
     if (!values.length) return ''
     return Math.round((values.reduce((sum, n) => sum + n, 0) / values.length) * 100000) / 100000
+  }
+
+  function _setRatingsSectionFormula(sheet, headerRow, count, weight) {
+    const subtotalCell = sheet.getRange(headerRow, 8)
+    if (!count) {
+      subtotalCell.clearContent()
+      return
+    }
+
+    const startRow = headerRow + 1
+    const endRow = headerRow + count
+    const multiplier = (Number(weight) || 0) / 100
+    subtotalCell.setFormula(`=IFERROR(AVERAGE(H${startRow}:H${endRow})*${multiplier},"")`)
   }
 
   function _avg(entries) {
@@ -500,13 +513,11 @@ const PmesDocGenService = (() => {
   // ─────────────────────────────────────────────
   function _fillFinalRating(sheet, form) {
     const rFinal = _findRow(sheet, 'FINAL NUMERICAL RATING')
-    const finalRating = form.finalNumericalRating || _finalScore(form)
-    sheet.getRange(rFinal, 10).setValue(form.finalNumericalRating || '')      // col J — template quirk, not col H
-    sheet.getRange(rFinal, 10).setValue(finalRating || '')
+    const rCoreHd = _findRow(sheet, 'Core Functions')
+    const rSupportHd = _findRow(sheet, 'Support Functions')
+    sheet.getRange(rFinal, 10).setFormula(`=IF(COUNT(H${rCoreHd},H${rSupportHd})=0,"",SUM(H${rCoreHd},H${rSupportHd}))`)
     const rAdj = _findRow(sheet, 'ADJECTIVAL RATING')
-    sheet.getRange(rAdj, 10).setValue(form.adjectivalRating || '')           // col J
-
-    sheet.getRange(rAdj, 10).setValue(form.adjectivalRating || _ratingLabel(finalRating) || '')
+    sheet.getRange(rAdj, 10).setFormula(`=IF(J${rFinal}="","",IFS(J${rFinal}>=4.5,"Outstanding",J${rFinal}>=3.5,"Very Satisfactory",J${rFinal}>=2.5,"Satisfactory",J${rFinal}>=1.5,"Unsatisfactory",TRUE,"Poor"))`)
     const sig = _normalizedSignatories(form)
     const rCert = _findRow(sheet, 'We hereby certify that the above accomplishments')
     sheet.getRange(rCert + 1, 2, 5, 9).clearContent()

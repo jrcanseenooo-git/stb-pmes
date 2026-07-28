@@ -33,75 +33,73 @@ const IPATService = (() => {
     {
       id: 'makatao',
       label: 'Makatao',
-      description: 'Human worth, dignity, inclusivity, equity, and human rights in social work and public service',
+      description: 'Reflects the commitment of personnel to uphold the dignity, worth, and rights of every individual by fostering a workplace culture grounded in respect, empathy, inclusivity, and fairness.',
       indicators: [
-        'Championing Equality and Social Justice: actively leads efforts to embed equity and social justice principles into program designs and practices, ensuring that every output serves as a meaningful protection and empowerment mechanism for the most vulnerable sectors',
-        'Embodying Compassion and Respect: consistently models and promotes a culture of compassion and respect in all professional interactions and outputs; actively ensures that program designs and workplace practices honor the diverse identities, backgrounds, and lived experiences of clients and colleagues',
-        'Promoting Cultural Competence: demonstrates awareness, understanding, and respect for diverse cultural identities, beliefs, values, and practices; integrates culturally responsive approaches in communication, service delivery, and decision-making',
-        'Driving Inclusive Practices: actively promotes and integrates inclusive principles into programs, policies, services, and workplace practices; ensures equitable access to opportunities, resources, and participation for individuals of diverse backgrounds',
-        'Empowering Communities: consistently places community well-being and voice at the center of all program development and innovation work; designs and champions meaningful participation mechanisms that position communities as active decision-makers'
+        'Demonstrates cultural competence and unwavering respect for the dignity of all service participants and stakeholders.',
+        'Cultivates a professional environment grounded in mutual trust, empowerment, and psychological safety.',
+        'Exhibits high emotional intelligence by acknowledging and valuing diverse perspectives and stakeholder interests.',
+        'Addresses disagreements and workplace concerns in a constructive, respectful, and solution-oriented manner.',
+        'Ensures that decisions, communications, and actions are free from gender bias and contribute to a safe, respectful, and inclusive work environment for all.'
       ]
     },
     {
       id: 'mapagpalaya',
       label: 'Mapagpalaya',
-      description: 'Empowerment, advocacy, liberation, and transformative social work through innovative programs',
+      description: 'Represents the transformative and liberating power of social work and social development, specifically through the design and implementation of innovative programs.',
       indicators: [
-        'Foster Client Autonomy: promotes client self-determination by ensuring that programs, services, and interventions respect individual choice, encourage informed decision-making, and reduce dependency; creates opportunities for beneficiaries to actively participate in shaping solutions',
-        'Build Resilience and Independence: strengthens the capacity of individuals, families, and communities to overcome challenges, adapt to changing circumstances, and sustain positive outcomes beyond program support',
-        'Collaborate for Change: encourages meaningful partnerships with clients, communities, stakeholders, and colleagues in the design, implementation, and improvement of programs; fosters inclusive participation to drive sustainable social transformation',
-        'Advocate for Freedom from Oppression: promotes the identification and removal of systemic, institutional, and social barriers that hinder equity, inclusion, and access to opportunities; challenges discriminatory practices and advances social justice',
-        'Promote Sustainable Empowerment: ensures that interventions build lasting capacities, local ownership, and self-sustaining systems that continue to generate positive impact over time'
+        'Proactively communicates procedural updates to colleagues to ensure operational continuity and team alignment.',
+        'Inspires collaborative effort and shared commitment toward the achievement of Bureau objectives.',
+        'Upholds collective team decisions and demonstrates professional solidarity in their execution.',
+        'Identifies processes that foster collaboration and establish partnerships to facilitate knowledge exchanges.',
+        'States goals and behavioral objectives of an information campaign utilizing the perspective of the target audience.'
       ]
     },
     {
       id: 'marangal',
       label: 'Marangal',
-      description: 'Ethical excellence, accountability, integrity, and continuous professional development',
+      description: 'Represents the commitment to ethical excellence, accountability, and continuous professional development in social work and public service.',
       indicators: [
-        'Demonstrates honesty, integrity, and fairness in all official transactions and work-related dealings including but not limited to accomplishment of Daily Time Records (DTR), accomplishment reports, and feedback reports',
-        'Practices established policies, guidelines, procedures, and ethical standards in tasks, decisions, outputs, and individual actions that enhance personnel credibility in pursuit of ethical excellence and integrity',
-        'Proper usage of government resources and information; performs effectively during work hours; and uses authority responsibly and only for official purposes',
-        'Demonstrates professionalism and accountability in all interactions with colleagues, clients, and stakeholders by maintaining respectful, ethical, and confidential relationships, promoting transparency, and strengthening public trust',
-        'Demonstrates a commitment to continuous learning and professional growth by actively seeking opportunities to develop knowledge, skills, and competencies'
+        'Demonstrates consistent alignment with organizational policies, professional norms, and administrative protocols.',
+        'Assumes full ownership of work outcomes, focusing on solution-recovery rather than externalizing setbacks.',
+        'Upholds the highest standards of public service ethics, strictly adhering to RA 6713 and RA 3019 in all professional dealings.',
+        'Takes quiet satisfaction in delivering high-quality work that meets the Bureau\'s standards of excellence.',
+        'Exercises ethical transparency by seeking guidance and collaborative input when navigating complex moral or professional dilemmas.'
       ]
     },
     {
       id: 'marunong',
       label: 'Marunong',
-      description: 'Technical knowledge, critical thinking, continuous learning, and innovation in performance of duties',
+      description: 'Refers to an employee\'s ability to demonstrate sound technical knowledge, critical thinking, continuous learning, and innovation in the performance of their duties.',
       indicators: [
-        'Demonstrates technical mastery and functional expertise essential to the office\'s mandates',
-        'Delivers high-quality outputs characterized by precision, thoroughness, and adherence to technical standards',
-        'Exhibits adaptability and openness to emerging methodologies and evolving organizational needs',
-        'Proactively identifies operational bottlenecks and proposes creative, viable solutions within their scope of authority',
-        'Navigates uncertainty with composure, adapting quickly to risks with a solution-oriented mindset'
+        'Translates verbal directions and stakeholder needs into clear insights, ensuring all important details are understood before starting a task.',
+        'Elicits real and potential issues during planning and implementation exercising good judgment through fact-based analysis.',
+        'Identifies and assists with removing barriers and/or resolves issues that are impeding the progress of project team members.',
+        'Identifies reasons for non-compliance or failure to meet expected results; applies varied techniques and methods in gathering data.',
+        'Develops, formulates, and reviews for enhancement the processes, policies, and procedures which govern the execution of tasks, activities, or projects to ensure work is accomplished effectively and efficiently.'
       ]
     },
     {
       id: 'mapagpabago',
       label: 'Mapagpabago',
-      description: 'Transformational leadership, innovation, and pursuit of systemic change for sustainable social development',
+      description: 'Represents the commitment to transformational leadership and the pursuit of systemic change through innovation, continuous improvement, and sustainable social development.',
       indicators: [
-        'Demonstrates Visionary and Purpose-Driven Leadership: aligns actions, decisions, and work outputs with the organization\'s mission, long-term goals, and the broader objective of sustainable social development',
-        'Champions Systemic and Sustainable Reforms: proactively identifies opportunities for improvement and advocates for policies, programs, or practices that address root causes and promote lasting positive change',
-        'Empowers and Inspires Others toward Shared Goals: encourages and motivates colleagues, partners, stakeholders, and communities to actively participate, collaborate, and contribute toward common organizational and development objectives',
-        'Integrates Inclusive and Sustainable Development Principles in Work: promotes inclusive, client-centered, equitable, and sustainable approaches in planning, decision-making, and service delivery, ensuring that no one is left behind',
-        'Initiates and Supports Innovation and Continuous Improvement: demonstrates openness to new ideas and technologies, proposes innovative solutions, and actively supports continuous learning and organizational improvement'
+        'Proactively identifies operational bottlenecks and proposes creative, viable solutions within their scope of authority.',
+        'Shares and teaches knowledge, expertise, lessons learned, new approaches, and trends in the project.',
+        'Leverages updated and appropriate technology to optimize the capture, storage, and dissemination of technical knowledge and project innovations.',
+        'Adopts measures to drive compliance and is proactive in responding to opportunities for improving or streamlining based on experience, feedback, emerging technologies, and new direction.',
+        'Keeps oneself informed of broad agency concerns, national issues which have impact on the agency, as well as emerging trends in social protection and development that may redefine strategy.'
       ]
     }
   ]
 
-  // ── Job Fitness Indicators (7) ───────────────────────────────────────────
-  // Raters: Self + Immediate Supervisor + Skip Supervisor (÷3)
+  // ── Job Fitness Indicators (5) ───────────────────────────────────────────
+  // Raters: Self + Peer + Immediate Supervisor (÷3); A&P computed from DTR
   const JOB_FITNESS_INDICATORS = [
-    'Educational Qualification Fit: possesses academic qualifications that meet or exceed the minimum requirements of the position and are relevant to assigned functions',
-    'Relevant Work Experience Alignment: demonstrates prior experience that directly supports the competencies and technical requirements of the current role',
-    'Training and Skills Applicability: has completed relevant training or learning interventions that are directly applicable to job tasks and improve work performance',
-    'Workplace Conduct Suitability: demonstrates behavior consistent with organizational standards, including respect for policies, colleagues, and institutional protocols',
-    'Attendance and Punctuality Compliance: maintains regular attendance and adheres to prescribed work schedules, with minimal unexcused absences or tardiness',
-    'Commitment to Organizational Objectives: demonstrates alignment with program goals through consistent work engagement and support for organizational priorities',
-    'Physical and Cognitive Work Capacity: maintains sufficient physical stamina and mental focus to perform job duties consistently and safely under normal work conditions'
+    'Educational Qualification Fit: demonstrates and applies academic knowledge, specialized training, or theoretical foundations effectively to execute daily job functions and solve role-specific problems.',
+    'Relevant Work Experience Alignment: demonstrates prior experiences that directly supports the competencies and technical requirements of the current role.',
+    'Training and Skills Applicability: actively integrates skills gained from training or professional development directly into work workflows to improve efficiency.',
+    'Commitment to Organizational Objectives: demonstrates alignment with program goals through consistent work engagement and support for organizational priorities.',
+    'Attendance and Punctuality Compliance: maintains regular attendance and adheres to prescribed work schedules, with minimal unexcused absences or tardiness. Scored based on DTR records using the threshold table.'
   ]
 
   // ── Qualitative Descriptors ──────────────────────────────────────────────
@@ -355,8 +353,7 @@ const IPATService = (() => {
 
   // ─────────────────────────────────────────────
   // JOB FITNESS RATINGS
-  // Raters: Self + Immediate Supervisor only (average of 2)
-  // Per updated spec: only ratee and immediate supervisor rate JF.
+  // Raters: Self + Peer + Immediate Supervisor (average of 3)
   // ─────────────────────────────────────────────
 
   function saveJFRatings(ipatId, body, user) {
@@ -380,7 +377,7 @@ const IPATService = (() => {
         rateeId:      record.rateeId,
         raterId:      r.raterId   || profile.id,
         raterName:    r.raterName || profile.fullName,
-        raterType:    r.raterType || 'Self',   // Self | Supervisor | SkipSupervisor
+        raterType:    r.raterType || 'Self',   // Self | Peer | Supervisor | SkipSupervisor
         indicator:    r.indicator || '',
         indicatorIdx: Number(r.indicatorIdx) || 0,
         rating:       Number(r.rating)       || 1,
@@ -409,16 +406,16 @@ const IPATService = (() => {
     const ratings = getJFRatings(ipatId)
     if (!ratings.length) throw HttpError('No Job Fitness ratings found', 400)
 
-    // JF Indicator Score = (Self + Supervisor) ÷ 2
-    // JF Score = Sum of Indicator Scores ÷ 7
+    // JF Indicator Score = (Self + Peer + Supervisor) ÷ 3
+    // JF Score = Sum of Indicator Scores ÷ 5
     const indicatorScores = JOB_FITNESS_INDICATORS.map((label, idx) => {
       const indRatings = ratings.filter(r => Number(r.indicatorIdx) === idx)
 
-      // JF Indicator Score = (Self-Rating + Immediate Supervisor Rating) ÷ 2
       const self = indRatings.find(r => r.raterType === 'Self')
+      const peer = indRatings.find(r => r.raterType === 'Peer')
       const sup  = indRatings.find(r => r.raterType === 'Supervisor')
 
-      const values = [self, sup].filter(Boolean).map(r => Number(r.rating))
+      const values = [self, peer, sup].filter(Boolean).map(r => Number(r.rating))
       const score  = values.length > 0
         ? round2(values.reduce((s, v) => s + v, 0) / values.length)
         : 0
@@ -490,6 +487,21 @@ const IPATService = (() => {
     }
   }
 
+  function setFPO(ipatId, body, user) {
+    AuthService.requirePermission(user, 'generate_ipat_assignments')
+    const score = Number(body.fpoScore)
+    if (isNaN(score) || score < 0 || score > 5) throw HttpError('FPO score must be between 0 and 5', 400)
+    const recSheet = SpreadsheetService.getSheet(SHEET.IPAT_RECORDS)
+    const record = SpreadsheetService.getRow(recSheet, ipatId)
+    if (!record) throw HttpError('IPAT record not found', 404)
+    SpreadsheetService.updateRow(recSheet, ipatId, {
+      fpoScore: score,
+      updatedAt: new Date().toISOString()
+    })
+    AuditService.log('SET_FPO', 'IPAT', 'Manual FPO score set to ' + score + ' for ' + ipatId, user)
+    return { fpoScore: score }
+  }
+
   // ─────────────────────────────────────────────
   // COMPUTE FINAL OVERALL SCORE
   // Overall = (CBCI × 0.30) + (FPOI × 0.55) + (JFI × 0.15)
@@ -508,7 +520,7 @@ const IPATService = (() => {
 
     let rawFpo = record.fpoScore !== '' && record.fpoScore !== null && record.fpoScore !== undefined ? Number(record.fpoScore) : null
     if (rawFpo !== null && rawFpo > 4) {
-      rawFpo = round2((rawFpo - 1) / 4 * 3 + 1)
+      rawFpo = round2(((rawFpo - 1) / 4) * 3 + 1)
     }
 
     // Build weighted sum from only the available components
@@ -617,7 +629,7 @@ const IPATService = (() => {
     list, get, create, updateRecord, updateStatus,
     saveCBCRatings, computeCBC,
     saveJFRatings,  computeJF,
-    syncFPO,
+    syncFPO, setFPO,
     computeOverall,
     saveEdap, getEdap,
     getThemes, getJFIndicators,

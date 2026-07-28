@@ -130,7 +130,7 @@ onMounted(async () => {
   try {
     const r = await auditApi.list()
     rows.value = r?.items || (Array.isArray(r) ? r : [])
-  } catch (e) { showToast(`Could not load audit log: ${e.message}`, 'error') }
+  } catch (e) { console.error(e); showToast('Could not load audit log. Please try again.', 'error') }
   finally { loading.value = false }
 })
 </script>

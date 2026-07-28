@@ -224,7 +224,7 @@
               </button>
               <button class="quick-btn" @click="$router.push('/kra')">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="3.5" width="13" height="2" rx="1" fill="#7C3AED"/><rect x="1.5" y="7.5" width="9" height="2" rx="1" fill="#7C3AED"/><rect x="1.5" y="11.5" width="11" height="2" rx="1" fill="#7C3AED"/></svg>
-                My IPCRF
+                My IPCRF/CCEF
               </button>
               <button class="quick-btn logout" @click="handleLogout">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 1H3a1 1 0 00-1 1v12a1 1 0 001 1h3" stroke="#EB5757" stroke-width="1.4" stroke-linecap="round"/><path d="M11 11l4-4-4-4M15 7H6" stroke="#EB5757" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -319,10 +319,7 @@ const settings = [
 
 // ── Lifecycle ──
 onMounted(async () => {
-  // Retry fetchProfile if the store only has fallback data (no employeeNo = API failed at login)
-  if (!authStore.employeeNo || authStore.employeeNo === '—') {
-    try { await authStore.fetchProfile() } catch (e) { console.warn("[Profile] fetchProfile retry:", e.message) }
-  }
+  try { await authStore.fetchProfile() } catch (e) { console.warn("[Profile] fetchProfile retry:", e.message) }
   populateForm()
   await Promise.all([fetchPerfStats(), fetchActivity()])
 })
@@ -492,7 +489,7 @@ function handleSetting(label) {
 /* Profile header */
 .profile-header{display:flex;align-items:center;gap:20px;background:#fff;border:1px solid #E2E8F0;border-radius:14px;padding:20px 24px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.04);}
 .avatar-wrap{position:relative;flex-shrink:0;}
-.avatar{width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#2F80ED,#1a6cd4);display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;font-weight:700;}
+.avatar{width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#2F80ED,#1a6cd4);display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;font-weight:700;letter-spacing:-.02em;}
 .avatar-badge{position:absolute;bottom:0;right:0;width:18px;height:18px;background:#27AE60;border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;}
 .profile-info{flex:1;}
 .profile-name{font-size:18px;font-weight:700;color:#0F172A;letter-spacing:-.3px;margin-bottom:2px;}

@@ -9,13 +9,20 @@
           <p class="page-subtitle">Maintain accounts, reviewer routing, and temporary access credentials.</p>
         </div>
         <div class="top-actions">
-          <button v-if="isSystemAdmin" class="btn btn-secondary" @click="toggleFocalPanel">
+          <button v-if="canManageFocalAssignments" class="btn btn-secondary" @click="toggleFocalPanel">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
               <path d="M2 3.5h10M4 7h6M6 10.5h2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
             </svg>
             Focal Assignments
           </button>
-          <button class="btn btn-primary" @click="openAddModal">
+          <button v-if="canManageDatabase" class="btn btn-secondary" @click="toggleMaintenancePanel">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M3 2.5h8M3 7h8M3 11.5h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              <path d="M5 1.5v2M9 6v2M6 10.5v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            Database Maintenance
+          </button>
+          <button v-if="canManageUsers" class="btn btn-primary" @click="openAddModal">
             <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
               <circle cx="6.5" cy="5" r="2.5" stroke="currentColor" stroke-width="1.3"/>
               <path d="M1 12c0-3 2.5-5 5.5-5s5.5 2 5.5 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
@@ -66,7 +73,7 @@
       </div>
     </section>
 
-    <div v-if="isSystemAdmin && showFocalPanel" class="card focal-card">
+    <div v-if="canManageFocalAssignments && showFocalPanel" class="card focal-card">
       <div class="focal-panel-hd">
         <div>
           <span class="card-title">Review Routing</span>
@@ -144,6 +151,78 @@
       </div>
     </div>
 
+    <div v-if="canManageDatabase && showMaintenancePanel" class="card maintenance-card">
+      <div class="maintenance-hd">
+        <div>
+          <span class="card-title">Database Maintenance</span>
+          <h2>Fresh Schema Rebuild</h2>
+          <p>Clear test/transactional records, repair table order, and keep core setup data intact.</p>
+        </div>
+        <span :class="['maintenance-state', maintenancePreview ? 'ready' : 'idle']">
+          {{ maintenanceLoading ? 'Checking...' : maintenancePreview ? 'Preview ready' : 'Not checked' }}
+        </span>
+      </div>
+
+      <div class="maintenance-body">
+        <div class="maintenance-summary">
+          <div class="maintenance-pill keep">
+            <span>Preserve data</span>
+            <strong>{{ maintenancePreview?.preservedDataSheets?.length || 3 }}</strong>
+          </div>
+          <div class="maintenance-pill rebuild">
+            <span>Rebuild sheets</span>
+            <strong>{{ maintenancePreview?.finalSheetOrder?.length || '—' }}</strong>
+          </div>
+          <div class="maintenance-pill remove">
+            <span>Remove unused</span>
+            <strong>{{ maintenancePreview?.removeSheets?.length ?? '—' }}</strong>
+          </div>
+        </div>
+
+        <div class="maintenance-grid">
+          <section class="maintenance-box safe">
+            <h3>Data kept</h3>
+            <p>Rows in these setup tables will remain.</p>
+            <div class="chip-list">
+              <span v-for="name in preservedSheetNames" :key="name" class="schema-chip keep">{{ name }}</span>
+            </div>
+          </section>
+
+          <section class="maintenance-box">
+            <h3>System tables rebuilt</h3>
+            <p>These tabs keep headers only, in the correct sequence.</p>
+            <div class="chip-list scroll">
+              <span v-for="name in rebuiltSheetNames" :key="name" class="schema-chip">{{ name }}</span>
+            </div>
+          </section>
+
+          <section class="maintenance-box danger">
+            <h3>Unused tabs removed</h3>
+            <p>Only non-active legacy tables are removed.</p>
+            <div class="chip-list">
+              <span v-if="!maintenancePreview" class="schema-chip muted-chip">Run preview first</span>
+              <span v-else-if="!maintenancePreview.removeSheets?.length" class="schema-chip muted-chip">None</span>
+              <span v-for="name in maintenancePreview?.removeSheets || []" :key="name" class="schema-chip remove">{{ name }}</span>
+            </div>
+          </section>
+        </div>
+
+        <div class="maintenance-warning">
+          <strong>Backup first.</strong>
+          The rebuild creates a backup copy before changing the database. After rebuild, forms, accomplishments, reviews, notifications, audit rows, and generated document links are cleared.
+        </div>
+      </div>
+
+      <div class="maintenance-actions">
+        <button class="btn" @click="previewMaintenance" :disabled="maintenanceLoading || maintenanceRunning">
+          {{ maintenanceLoading ? 'Checking...' : 'Preview Fresh Schema' }}
+        </button>
+        <button class="btn btn-danger-solid" @click="rebuildFreshDatabase" :disabled="!maintenancePreview || maintenanceLoading || maintenanceRunning">
+          {{ maintenanceRunning ? 'Rebuilding...' : 'Rebuild Fresh Database' }}
+        </button>
+      </div>
+    </div>
+
     <!-- Table card -->
     <div class="card user-card">
       <div class="card-hd user-card-hd">
@@ -162,10 +241,10 @@
               <th>Role</th>
               <th>Division</th>
               <th>Section</th>
-              <th>Temp Password</th>
+              <th v-if="canManageUsers">Temp Password</th>
               <th>Status</th>
               <!-- <th>Last Login</th> -->
-              <th>Actions</th>
+              <th v-if="canManageUsers">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -186,17 +265,17 @@
                 <td><div class="sk-pill"></div></td>
                 <td><div class="sk-line" style="width:120px"></div></td>
                 <td><div class="sk-line" style="width:120px"></div></td>
-                <td><div class="sk-line" style="width:80px"></div></td>
+                <td v-if="canManageUsers"><div class="sk-line" style="width:80px"></div></td>
                 <td><div class="sk-pill" style="width:55px"></div></td>
                 <!-- <td><div class="sk-line" style="width:60px"></div></td> -->
-                <td><div class="sk-actions"></div></td>
+                <td v-if="canManageUsers"><div class="sk-actions"></div></td>
               </tr>
             </template>
 
             <!-- ── Real data rows ── -->
             <template v-else>
               <tr v-for="(u, i) in filteredUsers" :key="u.email" :class="i % 2 === 1 ? 'stripe' : ''">
-                <td>
+                <td v-if="canManageUsers">
                   <div class="user-cell">
                     <div class="av" :style="{ background: u.avatarColor }">{{ u.initials }}</div>
                     <div>
@@ -209,7 +288,7 @@
                 <td><span :class="['role-badge', roleBadgeClass(u.role)]">{{ u.role }}</span></td>
                 <td class="text-xs muted">{{ u.division || '—' }}</td>
                 <td class="text-xs muted">{{ u.section || '—' }}</td>
-                <td>
+                <td v-if="canManageUsers">
                   <div class="flex-row gap-6" v-if="u.tempPassword">
                     <code class="temp-pw">{{ showPw[u.email] ? u.tempPassword : '••••••••' }}</code>
                     <button class="icon-btn-sm" @click="togglePw(u.email)" title="Toggle">
@@ -258,7 +337,7 @@
                 </td>
               </tr>
               <tr v-if="!loading && !filteredUsers.length">
-                <td colspan="9" class="empty-row">
+                <td :colspan="canManageUsers ? 8 : 6" class="empty-row">
                   <svg width="32" height="32" viewBox="0 0 32 32" fill="none" style="margin:0 auto 8px;display:block">
                     <circle cx="16" cy="16" r="14" stroke="#E2E8F0" stroke-width="2"/>
                     <path d="M11 16h10M16 11v10" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round"/>
@@ -360,6 +439,19 @@
                     <option>Women, Older Persons and Persons with Disability Section</option>
                     <option>Other Marginalized Groups Section</option>
                   </select>
+                </div>
+                <div class="field full">
+                  <label class="field-label">Access Groups</label>
+                  <div class="access-group-grid">
+                    <label v-for="group in accessGroupOptions" :key="group.value" class="access-group-option">
+                      <input v-model="form.permissionGroups" type="checkbox" :value="group.value"/>
+                      <span>
+                        <strong>{{ group.label }}</strong>
+                        <small>{{ group.description }}</small>
+                      </span>
+                    </label>
+                  </div>
+                  <p class="field-help">Groups add system permissions without changing the user's official role.</p>
                 </div>
               </div>
             </div>
@@ -488,9 +580,9 @@
 
 <script setup>
 import { ref, computed, h, onMounted, watch } from 'vue'
-import { usersApi, focalAssignmentsApi } from '@/services/api'
-import { useAuthStore } from '@/stores/auth'
+import { usersApi, focalAssignmentsApi, maintenanceApi } from '@/services/api'
 import { useConfirm, CONFIRMS } from '@/composables/useConfirm'
+import { usePermissions } from '@/composables/usePermissions'
 
 // Must match the canonical Divisions seeded in InitSheets.gs exactly.
 // The division <select> binds to the display name only; this resolves it to
@@ -504,12 +596,46 @@ const DIVISION_IDS = {
   'Social Technology Analysis and Evaluation Division': 'staed'
 }
 
+const accessGroupOptions = [
+  {
+    value: 'system-admin',
+    label: 'System Admin Group',
+    description: 'Full system controls including users, libraries, monitoring, and database tools.'
+  },
+  {
+    value: 'bureau-monitor',
+    label: 'Bureau Monitoring',
+    description: 'Can oversee bureau-wide monitoring and audit-style views.'
+  },
+  {
+    value: 'division-monitor',
+    label: 'Division Monitoring',
+    description: 'Can oversee records within the assigned division.'
+  },
+  {
+    value: 'library-manager',
+    label: 'Library Manager',
+    description: 'Can maintain KRA library and assessment content.'
+  },
+  {
+    value: 'user-manager',
+    label: 'User Manager',
+    description: 'Can maintain users and focal assignments.'
+  },
+  {
+    value: 'evaluation-manager',
+    label: 'Evaluation Manager',
+    description: 'Can generate and monitor IPAT evaluation assignments.'
+  }
+]
+
 const search        = ref('')
 const roleFilter    = ref('')
 const statusFilter  = ref('')
 const showModal     = ref(false)
 const showResetModal = ref(false)
 const showFocalPanel = ref(false)
+const showMaintenancePanel = ref(false)
 const editingUser   = ref(null)
 const resetTarget   = ref(null)
 const resetTempPw   = ref('')
@@ -524,9 +650,11 @@ const users         = ref([])
 const focalUsers    = ref([])
 const divisionFocalRows = ref([])
 const bureauFocals = ref({ primaryUserId: '', alternateUserId: '' })
-const authStore = useAuthStore()
-const { confirm } = useConfirm()
-const isSystemAdmin = computed(() => authStore.role === 'System Administrator')
+const maintenanceLoading = ref(false)
+const maintenanceRunning = ref(false)
+const maintenancePreview = ref(null)
+const { canManageUsers, canManageFocalAssignments, canManageDatabase } = usePermissions()
+const { confirm, confirmState } = useConfirm()
 const activeUsersCount = computed(() => users.value.filter(u => u.status === 'Active').length)
 const inactiveUsersCount = computed(() => users.value.filter(u => u.status === 'Inactive').length)
 const pendingUsersCount = computed(() => users.value.filter(u => u.status === 'Pending').length)
@@ -534,6 +662,13 @@ const reviewerUsersCount = computed(() => users.value.filter(u =>
   ['System Administrator', 'Bureau Director', 'Assistant Bureau Director', 'Division Chief', 'Section Head'].includes(u.role)
 ).length)
 const roleOptions = computed(() => [...new Set(users.value.map(u => u.role).filter(Boolean))].sort())
+const preservedSheetNames = computed(() =>
+  maintenancePreview.value?.preservedDataSheets || ['Users', 'Divisions', 'MasterKRALibrary']
+)
+const rebuiltSheetNames = computed(() => {
+  const preserved = new Set(preservedSheetNames.value)
+  return (maintenancePreview.value?.finalSheetOrder || []).filter(name => !preserved.has(name))
+})
 
 const SearchSelect = {
   props: {
@@ -591,7 +726,7 @@ const SearchSelect = {
     function initials(name) {
       const parts = String(name || '').trim().split(/\s+/).filter(Boolean)
       if (!parts.length) return '?'
-      return parts.slice(0, 2).map(p => p[0]).join('').toUpperCase()
+      return parts.map(p => p[0]).join('').toUpperCase()
     }
 
     return () => h('div', { class: 'search-select' }, [
@@ -654,6 +789,10 @@ const SearchSelect = {
 
 // ── Load users on mount ──
 onMounted(async () => {
+  await loadUsers()
+})
+
+async function loadUsers() {
   loading.value = true
   try {
     const result = await usersApi.list()
@@ -664,12 +803,78 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
-})
+}
 
 async function toggleFocalPanel() {
   showFocalPanel.value = !showFocalPanel.value
   if (showFocalPanel.value && !divisionFocalRows.value.length) {
     await loadFocalAssignments()
+  }
+}
+
+async function toggleMaintenancePanel() {
+  showMaintenancePanel.value = !showMaintenancePanel.value
+  if (showMaintenancePanel.value && !maintenancePreview.value) {
+    await previewMaintenance()
+  }
+}
+
+async function previewMaintenance() {
+  maintenanceLoading.value = true
+  try {
+    maintenancePreview.value = await maintenanceApi.previewFreshSchema()
+    showToast('Fresh database preview loaded.')
+  } catch (e) {
+    console.error(e); showToast('Could not load database preview. Please try again.', 'error')
+  } finally {
+    maintenanceLoading.value = false
+  }
+}
+
+async function rebuildFreshDatabase() {
+  if (!maintenancePreview.value) {
+    await previewMaintenance()
+    if (!maintenancePreview.value) return
+  }
+
+  const phrase = maintenancePreview.value.confirmationPhrase
+  const ok = await confirm({
+    type: 'danger',
+    title: 'Rebuild Fresh Database',
+    message: 'This will rebuild the live database schema and clear all transactional records. Core setup data will be preserved.',
+    details: [
+      { label: 'Data preserved', value: preservedSheetNames.value.join(', ') },
+      { label: 'Sheets rebuilt', value: `${maintenancePreview.value.finalSheetOrder?.length || 0} active sheets` },
+      { label: 'Unused tabs removed', value: `${maintenancePreview.value.removeSheets?.length || 0}` }
+    ],
+    note: 'A backup copy will be created first. Type the exact confirmation phrase to continue.',
+    input: {
+      label: 'Confirmation phrase',
+      placeholder: phrase,
+      rows: 2,
+      required: true
+    },
+    confirmLabel: 'Rebuild Database',
+    cancelLabel: 'Cancel'
+  })
+  if (!ok) return
+
+  const typedPhrase = confirmState.inputValue
+  if (typedPhrase !== phrase) {
+    showToast('Confirmation phrase did not match. Database was not changed.', 'error')
+    return
+  }
+
+  maintenanceRunning.value = true
+  try {
+    const result = await maintenanceApi.rebuildFreshSchema(typedPhrase)
+    showToast(`Fresh database rebuilt. Removed ${result.removedSheets?.length || 0} unused sheets.`)
+    maintenancePreview.value = null
+    await Promise.all([loadUsers(), previewMaintenance()])
+  } catch (e) {
+    console.error(e); showToast('Rebuild failed. Please try again.', 'error')
+  } finally {
+    maintenanceRunning.value = false
   }
 }
 
@@ -690,7 +895,7 @@ async function loadFocalAssignments() {
       alternateUserId: row.alternateUserId || ''
     }))
   } catch (e) {
-    showToast(`Could not load focal assignments: ${e.message}`, 'error')
+    console.error(e); showToast('Could not load focal assignments. Please try again.', 'error')
   } finally {
     focalLoading.value = false
   }
@@ -754,7 +959,7 @@ async function saveFocalAssignments() {
     }))
     showToast('Focal assignments saved.')
   } catch (e) {
-    showToast(`Failed: ${e.message}`, 'error')
+    console.error(e); showToast('Something went wrong. Please try again.', 'error')
   } finally {
     focalSaving.value = false
   }
@@ -789,7 +994,7 @@ function mapUser(row) {
   return {
     id:           row.id,
     uid:          row.uid       || '',
-    initials:     name.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase(),
+    initials:     name.split(/\s+/).filter(Boolean).map(n => n[0]).join('').toUpperCase(),
     name,
     email:        row.email        || '',
     role:         row.role         || 'Staff',
@@ -805,6 +1010,8 @@ function mapUser(row) {
     pendingActivation: row.pendingActivation === true || String(row.pendingActivation).toLowerCase() === 'true',
     requestedRole: row.requestedRole || '',
     selfRegistered: row.selfRegistered === true || String(row.selfRegistered).toLowerCase() === 'true',
+    permissionGroups: parseList(row.permissionGroups),
+    permissions: parseList(row.permissions),
     lastLogin:    row.lastLoginAt ? formatDate(row.lastLoginAt) : 'Never',
     tempPassword: row.tempPassword || '',
     avatarColor:  colors[Math.abs(hashStr(row.email)) % colors.length]
@@ -812,6 +1019,14 @@ function mapUser(row) {
 }
 
 function hashStr(s) { return (s||'').split('').reduce((a,c) => a + c.charCodeAt(0), 0) }
+
+function parseList(value) {
+  if (Array.isArray(value)) return value
+  return String(value || '')
+    .split(/[,|]/)
+    .map(item => item.trim())
+    .filter(Boolean)
+}
 
 function formatDate(iso) {
   if (!iso) return 'Never'
@@ -835,6 +1050,7 @@ const defaultForm = () => ({
   fullName:'', email:'',
   role:'', division:'', section:'', position:'',
   employeeNo:'', type:'Regular',
+  permissionGroups: [],
   tempPassword: generatePassword()
 })
 
@@ -873,6 +1089,7 @@ function openEditModal(user) {
     position:     user.position    || '',
     employeeNo:   user.employeeNo  || '',
     type:         user.type        || 'Regular',
+    permissionGroups: [...(user.permissionGroups || [])],
     tempPassword: ''
   }
   showModal.value = true
@@ -905,7 +1122,8 @@ async function saveUser() {
       section:     form.value.section,
       position:    form.value.position,
       employeeNo:  form.value.employeeNo,
-      type:        form.value.type
+      type:        form.value.type,
+      permissionGroups: [...(form.value.permissionGroups || [])]
     }
     if (editingUser.value) {
       const updated = await usersApi.update(editingUser.value.id, payload)
@@ -919,7 +1137,7 @@ async function saveUser() {
     }
     closeModal()
   } catch (e) {
-    showToast(`Failed: ${e.message}`, 'error')
+    console.error(e); showToast('Something went wrong. Please try again.', 'error')
   } finally {
     saving.value = false
   }
@@ -943,7 +1161,7 @@ async function activateUser(user) {
   } : CONFIRMS.activateUser(user.name))
   if (!ok) return
   try   { await usersApi.activate(user.id); user.status = 'Active'; user.pendingActivation = false; showToast(`${user.name} ${isApproval ? 'approved' : 'activated'}.`) }
-  catch (e) { showToast(`Failed: ${e.message}`, 'error') }
+  catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
 }
 
 async function declineUser(user) {
@@ -960,13 +1178,13 @@ async function declineUser(user) {
     await usersApi.decline(user.id)
     users.value = users.value.filter(u => u.id !== user.id)
     showToast(`${user.name}'s registration declined.`, 'warning')
-  } catch (e) { showToast(`Failed: ${e.message}`, 'error') }
+  } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
 }
 async function deactivateUser(user) {
   const ok = await confirm(CONFIRMS.deactivateUser(user.name))
   if (!ok) return
   try   { await usersApi.deactivate(user.id); user.status = 'Inactive'; showToast(`${user.name} deactivated.`, 'warning') }
-  catch (e) { showToast(`Failed: ${e.message}`, 'error') }
+  catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
 }
 
 // ── Reset password ──
@@ -978,7 +1196,7 @@ async function confirmReset() {
     await usersApi.resetPassword(resetTarget.value.id, { tempPassword: resetTempPw.value })
     resetTarget.value.tempPassword = resetTempPw.value
     showToast(`Password reset for ${resetTarget.value.name}.`)
-  } catch (e) { showToast(`Failed: ${e.message}`, 'error') }
+  } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
   finally { showResetModal.value = false }
 }
 
@@ -1035,6 +1253,8 @@ function showToast(msg, type='success') {
 .btn-primary:hover{background:#1e3f61;border-color:#1e3f61;}
 .btn-secondary{background:#F8FAFC;color:#0D2137;border-color:#CBD5E1;}
 .btn-secondary:hover{background:#EEF2F7;border-color:#94A3B8;}
+.btn-danger-solid{background:#B91C1C;color:#fff;border-color:#B91C1C;}
+.btn-danger-solid:hover{background:#991B1B;border-color:#991B1B;}
 .btn:disabled{opacity:.55;cursor:not-allowed;}
 .btn-sm{padding:4px 9px;font-size:11px;}
 .btn-xs{padding:3px 8px;font-size:10px;border-radius:5px;}
@@ -1095,6 +1315,36 @@ function showToast(msg, type='success') {
 :deep(.search-select-option-text span){font-size:10.5px;color:#64748B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 :deep(.search-select-empty){padding:14px;color:#94A3B8;font-size:12px;text-align:center;}
 .focal-actions{display:flex;justify-content:flex-end;gap:8px;padding:0 18px 16px;}
+
+/* Database maintenance */
+.maintenance-card{margin-bottom:14px;overflow:hidden;border-color:#F2D6D6;}
+.maintenance-hd{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:16px 18px;border-bottom:1px solid #F3E6E6;background:linear-gradient(180deg,#FFFBFB,#FFFFFF);}
+.maintenance-hd h2{font-size:18px;line-height:1.2;margin:3px 0 0;color:#071A2F;font-weight:800;}
+.maintenance-hd p{margin:5px 0 0;color:#7183A3;font-size:12.5px;max-width:680px;}
+.maintenance-state{display:inline-flex;align-items:center;padding:4px 9px;border-radius:999px;font-size:11px;font-weight:800;border:1px solid #E2E8F0;background:#F8FAFC;color:#64748B;white-space:nowrap;}
+.maintenance-state.ready{border-color:#BBF7D0;background:#F0FDF4;color:#15803D;}
+.maintenance-body{padding:16px 18px 14px;}
+.maintenance-summary{display:grid;grid-template-columns:repeat(3,minmax(130px,1fr));gap:10px;margin-bottom:14px;}
+.maintenance-pill{border:1px solid #E2E8F0;background:#F8FAFC;border-radius:10px;padding:11px 12px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.maintenance-pill span{font-size:10px;text-transform:uppercase;letter-spacing:.06em;font-weight:900;color:#7183A3;}
+.maintenance-pill strong{font-size:20px;line-height:1;color:#0D2137;}
+.maintenance-pill.keep{border-color:#BBF7D0;background:#F0FDF4;}
+.maintenance-pill.rebuild{border-color:#BFDBFE;background:#EFF6FF;}
+.maintenance-pill.remove{border-color:#FECACA;background:#FEF2F2;}
+.maintenance-grid{display:grid;grid-template-columns:1fr 1.5fr 1fr;gap:12px;align-items:stretch;}
+.maintenance-box{border:1px solid #DDE7F3;background:#fff;border-radius:12px;padding:14px;min-width:0;}
+.maintenance-box.safe{border-color:#BBF7D0;background:#FBFFFC;}
+.maintenance-box.danger{border-color:#FECACA;background:#FFFBFB;}
+.maintenance-box h3{font-size:13px;margin:0 0 4px;color:#0F172A;font-weight:900;}
+.maintenance-box p{font-size:11.5px;color:#7183A3;margin:0 0 10px;line-height:1.45;}
+.chip-list{display:flex;flex-wrap:wrap;gap:6px;align-content:flex-start;}
+.chip-list.scroll{max-height:96px;overflow:auto;padding-right:2px;}
+.schema-chip{display:inline-flex;align-items:center;border:1px solid #DDE7F3;background:#F8FAFC;color:#334155;border-radius:999px;padding:4px 8px;font-size:10.5px;font-weight:800;line-height:1;}
+.schema-chip.keep{border-color:#BBF7D0;background:#DCFCE7;color:#166534;}
+.schema-chip.remove{border-color:#FECACA;background:#FEE2E2;color:#B91C1C;}
+.schema-chip.muted-chip{border-color:#E2E8F0;background:#F8FAFC;color:#94A3B8;}
+.maintenance-warning{margin-top:13px;border:1px solid #FDE68A;background:#FFFBEB;color:#92400E;border-radius:10px;padding:10px 12px;font-size:12px;line-height:1.5;}
+.maintenance-actions{display:flex;justify-content:flex-end;gap:8px;padding:0 18px 16px;}
 @media (max-width: 980px){
   .page-heading{flex-direction:column;align-items:stretch;}
   .top-actions{justify-content:flex-start;}
@@ -1103,6 +1353,8 @@ function showToast(msg, type='success') {
   .focal-routing-shell,.route-table-head,.division-route-row{grid-template-columns:1fr;}
   .route-table-head{display:none;}
   .focal-slot-label.compact{display:inline-flex;}
+  .maintenance-grid,.maintenance-summary{grid-template-columns:1fr;}
+  .maintenance-hd,.maintenance-actions{flex-direction:column;align-items:stretch;}
 }
 @media (max-width: 560px){
   .content{padding:12px;}
@@ -1110,6 +1362,8 @@ function showToast(msg, type='success') {
   .summary-grid{grid-template-columns:1fr;}
   .page-heading h1{font-size:20px;}
   .top-actions .btn{width:100%;justify-content:center;}
+  .form-grid,.access-group-grid{grid-template-columns:1fr;}
+  .full{grid-column:span 1;}
 }
 
 /* Table */
@@ -1199,6 +1453,17 @@ function showToast(msg, type='success') {
 .full{grid-column:span 2;}
 .field-label{font-size:11px;font-weight:600;color:#374151;}
 .req{color:#EF4444;}
+.field-help{margin:2px 0 0;font-size:11px;line-height:1.35;color:#7183A3;}
+.access-group-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.access-group-option{
+  display:grid;grid-template-columns:auto 1fr;gap:9px;align-items:flex-start;
+  border:1px solid #DDE7F3;background:#F8FAFC;border-radius:10px;padding:10px;
+  cursor:pointer;transition:border-color .15s,background .15s,box-shadow .15s;
+}
+.access-group-option:hover{border-color:#BFDBFE;background:#F0F7FF;}
+.access-group-option input{margin-top:2px;accent-color:#0B4BB3;}
+.access-group-option strong{display:block;font-size:12px;color:#0F172A;line-height:1.2;}
+.access-group-option small{display:block;margin-top:3px;font-size:10.5px;color:#7183A3;line-height:1.35;}
 
 .field-input,.field-select{
   padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:9px;
@@ -1240,4 +1505,8 @@ function showToast(msg, type='success') {
 .modal-fade-enter-from,.modal-fade-leave-to{opacity:0;transform:scale(.97);}
 .toast-slide-enter-active,.toast-slide-leave-active{transition:all .25s;}
 .toast-slide-enter-from,.toast-slide-leave-to{opacity:0;transform:translateY(8px);}
+
+@media (max-width: 560px){
+  .access-group-grid{grid-template-columns:1fr;}
+}
 </style>

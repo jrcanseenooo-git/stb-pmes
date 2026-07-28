@@ -70,6 +70,27 @@ const Router = (() => {
         if (id && method === 'DELETE') return KraLibraryService.remove(id, user)
         break
 
+      case 'assessment-categories':
+        if (!id && method === 'GET') return AssessmentCategoryService.list(params, user)
+        if (!id && method === 'POST') return AssessmentCategoryService.create(body, user)
+        if (id === 'seed' && method === 'POST') return AssessmentCategoryService.seed(body, user)
+        if (id && !sub && method === 'GET') return AssessmentCategoryService.get(id, user)
+        if (id && !sub && method === 'PUT') return AssessmentCategoryService.update(id, body, user)
+        if (id && !sub && method === 'DELETE') return AssessmentCategoryService.remove(id, user)
+        break
+
+      case 'assessment-content':
+        if (!id && method === 'GET') return AssessmentContentService.list(params, user)
+        if (!id && method === 'POST') return AssessmentContentService.create(body, user)
+        if (id === 'reorder' && method === 'POST') return AssessmentContentService.reorder(body, user)
+        if (id && !sub && method === 'GET') return AssessmentContentService.get(id, user)
+        if (id && !sub && method === 'PUT') return AssessmentContentService.update(id, body, user)
+        if (id && sub === 'publish') return AssessmentContentService.publish(id, body, user)
+        if (id && sub === 'archive') return AssessmentContentService.archive(id, user)
+        if (id && sub === 'duplicate-version') return AssessmentContentService.duplicateVersion(id, body, user)
+        if (id === 'seed' && method === 'POST') return AssessmentContentService.seed(body, user)
+        break
+
       // ─────────────────────────────────────────
       // Accomplishments
       // ─────────────────────────────────────────
@@ -121,6 +142,16 @@ const Router = (() => {
         if (id === 'export') return AuditService.export_(params, user)
         break
 
+      // Maintenance
+      case 'maintenance':
+        if (id === 'database-reset' && method === 'GET') return DatabaseMaintenanceService.previewReset(user)
+        if (id === 'database-reset' && method === 'POST') return DatabaseMaintenanceService.resetTransactionalData(body, user)
+        if (id === 'normalize-columns' && method === 'GET') return DatabaseMaintenanceService.previewColumnOrder(user)
+        if (id === 'normalize-columns' && method === 'POST') return DatabaseMaintenanceService.normalizeColumnOrder(body, user)
+        if (id === 'fresh-schema' && method === 'GET') return DatabaseMaintenanceService.previewFreshRebuild(user)
+        if (id === 'fresh-schema' && method === 'POST') return DatabaseMaintenanceService.rebuildFreshDatabase(body, user)
+        break
+
       // ─────────────────────────────────────────
       // Deadlines
       // ─────────────────────────────────────────
@@ -138,6 +169,7 @@ const Router = (() => {
         if (id === 'review-queue' && method === 'GET') return IpcrfService.reviewQueue(params, user)
         if (id && !sub && method === 'GET') return IpcrfService.get(id, user)
         if (id && !sub && method === 'PUT') return IpcrfService.update(id, body, user)
+        if (id && !sub && method === 'DELETE') return IpcrfService.deleteForm(id, user)
         if (id && sub === 'submit') return IpcrfService.submit(id, body, user)
         if (id && sub === 'route') return IpcrfService.route(id, body, user)
         if (id && sub === 'approve') return IpcrfService.approve(id, body, user)
@@ -166,6 +198,7 @@ const Router = (() => {
         if (id && !sub && method === 'GET') return IPATService.get(id, user)
         if (id && sub === 'status')         return IPATService.updateStatus(id, body, user)
         if (id && sub === 'sync-fpo')       return IPATService.syncFPO(id, user)
+        if (id && sub === 'set-fpo' && method === 'POST') return IPATService.setFPO(id, body, user)
         if (id && sub === 'cbc' && !subId && method === 'POST')  return IPATService.saveCBCRatings(id, body, user)
         if (id && sub === 'cbc' && subId === 'compute')          return IPATService.computeCBC(id, user)
         if (id && sub === 'jf' && !subId && method === 'POST')   return IPATService.saveJFRatings(id, body, user)

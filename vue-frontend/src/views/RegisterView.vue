@@ -126,7 +126,7 @@ const authStore = useAuthStore()
 
 const identity = computed(() => authStore.identity)
 const initials = computed(() =>
-  (identity.value.name || identity.value.email || '?').split(/[\s@.]+/).filter(Boolean).slice(0, 2).map(s => s[0]).join('').toUpperCase()
+  (identity.value.name || identity.value.email || '?').split(/[\s@.]+/).filter(Boolean).map(s => s[0]).join('').toUpperCase()
 )
 
 // Static option lists live in the frontend so they always render even if the

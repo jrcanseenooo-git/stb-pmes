@@ -6,7 +6,7 @@
  */
 
 const UsersService = (() => {
-  const USER_EXTRA_COLUMNS = ['tempPassword', 'tempPasswordHash', 'mustChangePassword', 'pendingActivation', 'requestedRole', 'selfRegistered', 'firstName', 'middleName', 'lastName', 'suffix']
+  const USER_EXTRA_COLUMNS = ['tempPassword', 'tempPasswordHash', 'mustChangePassword', 'permissionGroups', 'permissions', 'pendingActivation', 'requestedRole', 'selfRegistered', 'firstName', 'middleName', 'lastName', 'suffix']
 
   // ── SELF-REGISTER (Google-authenticated user with no PMES account yet) ──
   // Identity (uid/email) is taken from the verified token, never the form.
@@ -63,7 +63,7 @@ const UsersService = (() => {
 
   // ── DECLINE a pending registration (admin) ──
   function decline(id, user) {
-    AuthService.requireRole(user, 'System Administrator')
+    AuthService.requirePermission(user, 'manage_users')
     const sheet = _usersSheet()
     const row   = SpreadsheetService.getRow(sheet, id)
     if (!row) throw HttpError('User not found', 404)
@@ -84,7 +84,9 @@ const UsersService = (() => {
     const profile = AuthService.getProfile(user)
 
     // Scope by role — staff only see their division
-    if (!['System Administrator','Bureau Director','Assistant Bureau Director'].includes(profile.role)) {
+    const canManageUsers = AuthService.hasPermission(profile, 'manage_users')
+    const canViewBureau = AuthService.hasPermission(profile, 'view_bureau_monitoring')
+    if (!canManageUsers && !canViewBureau) {
       rows = rows.filter(r => r.divisionId === profile.divisionId)
     }
 
@@ -114,8 +116,9 @@ const UsersService = (() => {
     // Same scoping as list(): you can always read yourself; admins/bureau read
     // anyone; everyone else is limited to their own division. This closes the
     // IDOR where any authenticated user could enumerate every user record by id.
-    const isAdmin = ['System Administrator', 'Bureau Director', 'Assistant Bureau Director'].includes(profile.role)
-    if (!isAdmin && row.id !== profile.id && row.divisionId !== profile.divisionId) {
+    const canManageUsers = AuthService.hasPermission(profile, 'manage_users')
+    const canViewBureau = AuthService.hasPermission(profile, 'view_bureau_monitoring')
+    if (!canManageUsers && !canViewBureau && row.id !== profile.id && row.divisionId !== profile.divisionId) {
       throw HttpError('Access denied to this user record', 403)
     }
     return _safeUser(row)
@@ -123,7 +126,7 @@ const UsersService = (() => {
 
   // ── CREATE user — also creates Firebase Auth account ──
   function create(body, user) {
-    AuthService.requireRole(user, 'System Administrator')
+    AuthService.requirePermission(user, 'manage_users')
 
     const sheet = _usersSheet()
     const now   = new Date().toISOString()
@@ -136,6 +139,8 @@ const UsersService = (() => {
       email:              body.email        || '',
       fullName:           body.fullName     || '',
       role:               body.role         || 'Staff',
+      permissionGroups:   _normaliseList(body.permissionGroups),
+      permissions:        _normaliseList(body.permissions),
       positionLevel:      body.positionLevel || resolvePositionLevel(body.position || ''),
       divisionId:         body.divisionId   || '',
       divisionName:       body.division     || body.divisionName || '',
@@ -198,8 +203,8 @@ const UsersService = (() => {
   // ── UPDATE user ──
   function update(id, body, user) {
     const profile = AuthService.getProfile(user)
-    const allowedRoles = ['System Administrator','Bureau Director','Assistant Bureau Director']
-    if (!allowedRoles.includes(profile.role) && id !== profile.id) {
+    const canManageUsers = AuthService.hasPermission(profile, 'manage_users')
+    if (!canManageUsers && id !== profile.id) {
       throw HttpError('Insufficient permissions', 403)
     }
 
@@ -207,6 +212,12 @@ const UsersService = (() => {
     const existing = SpreadsheetService.getRow(sheet, id)
     if (!existing) throw HttpError('User not found', 404)
     const updateBody = { ...body }
+    if (Object.prototype.hasOwnProperty.call(updateBody, 'permissionGroups')) {
+      updateBody.permissionGroups = _normaliseList(updateBody.permissionGroups)
+    }
+    if (Object.prototype.hasOwnProperty.call(updateBody, 'permissions')) {
+      updateBody.permissions = _normaliseList(updateBody.permissions)
+    }
 
     // A tempPassword in the update body means this is a password reset.
     // Previously this only ever changed what's displayed in the Sheet —
@@ -252,7 +263,7 @@ const UsersService = (() => {
 
   // ── ACTIVATE user ──
   function activate(id, user) {
-    AuthService.requireRole(user, 'System Administrator')
+    AuthService.requirePermission(user, 'manage_users')
     const sheet   = _usersSheet()
     const row     = SpreadsheetService.getRow(sheet, id)
     if (!row) throw HttpError('User not found', 404)
@@ -278,7 +289,7 @@ const UsersService = (() => {
 
   // ── DEACTIVATE user ──
   function deactivate(id, user) {
-    AuthService.requireRole(user, 'System Administrator')
+    AuthService.requirePermission(user, 'manage_users')
     const sheet = _usersSheet()
     const row   = SpreadsheetService.getRow(sheet, id)
     if (!row) throw HttpError('User not found', 404)
@@ -303,7 +314,7 @@ const UsersService = (() => {
 
   // ── RESET PASSWORD ──
   function resetPassword(id, body, user) {
-    AuthService.requireRole(user, 'System Administrator')
+    AuthService.requirePermission(user, 'manage_users')
     const sheet = _usersSheet()
     const row   = SpreadsheetService.getRow(sheet, id)
     if (!row) throw HttpError('User not found', 404)
@@ -464,6 +475,15 @@ const UsersService = (() => {
   function _safeUser(row) {
     const { passwordHash, tempPassword, tempPasswordHash, ...safe } = row || {}
     return safe
+  }
+
+  function _normaliseList(value) {
+    if (Array.isArray(value)) return value.map(String).map(s => s.trim()).filter(Boolean).join(',')
+    return String(value || '')
+      .split(/[,|]/)
+      .map(s => s.trim())
+      .filter(Boolean)
+      .join(',')
   }
 
   return { list, get, create, update, updateOwnProfile, activate, deactivate, resetPassword, selfRegister, decline }

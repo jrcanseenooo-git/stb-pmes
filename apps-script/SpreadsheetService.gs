@@ -143,6 +143,7 @@ const SpreadsheetService = (() => {
   }
 
   return {
+    getSpreadsheet,
     getSheet, getAllRows, getRow,
     appendRow, updateRow,
     hardDeleteRow, softDelete,

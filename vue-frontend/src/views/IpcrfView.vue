@@ -664,6 +664,39 @@
               </svg>
             </button>
           </div>
+          <template v-if="showFormRecreateWarning">
+            <div class="modal-body">
+              <div class="regen-warning">
+                <div style="text-align:center;margin-bottom:12px">
+                  <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+                    <circle cx="20" cy="20" r="18" stroke="#EF4444" stroke-width="2.5" fill="#FEF2F2"/>
+                    <path d="M20 13v9" stroke="#EF4444" stroke-width="2.5" stroke-linecap="round"/>
+                    <circle cx="20" cy="27" r="1.5" fill="#EF4444"/>
+                  </svg>
+                </div>
+                <p style="font-weight:600;font-size:14px;color:#DC2626;text-align:center;margin-bottom:8px">
+                  A {{ newForm.type }} form for {{ newForm.year }} already exists
+                </p>
+                <p style="font-size:13px;color:#64748B;text-align:center;margin-bottom:14px">
+                  Creating a new form will permanently delete the existing form and all its related data:
+                </p>
+                <ul style="font-size:12px;color:#64748B;margin:0 0 0 18px;padding:0;line-height:1.8">
+                  <li>All form entries (KRAs &amp; Success Indicators)</li>
+                  <li>All revision history</li>
+                  <li>All review comments</li>
+                  <li>Generated documents for this form</li>
+                </ul>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button class="btn" @click="showFormRecreateWarning = false; existingFormForYear = null">Go Back</button>
+              <button class="btn btn-danger" :disabled="creating" @click="createForm">
+                <span v-if="creating" class="spinner-sm"></span>
+                {{ deletingOldForm ? 'Deleting old form...' : creating ? 'Creating...' : 'Delete & Create New' }}
+              </button>
+            </div>
+          </template>
+          <template v-else>
           <div class="modal-body">
             <div class="form-grid">
               <div class="field full">
@@ -712,6 +745,7 @@
               {{ creating ? 'Creating...' : 'Create Form' }}
             </button>
           </div>
+          </template>
         </div>
       </div>
     </teleport>
@@ -819,16 +853,16 @@
                   <textarea v-model="entryForm.accomplishment" class="field-input" rows="2"></textarea>
                 </div>
                 <div class="field">
-                  <label class="field-label">Efficiency <span class="muted-text">(1-5)</span></label>
-                  <input :value="entryForm.ratingEfficiency" type="text" inputmode="decimal" class="field-input rating-field" placeholder="1-5" @input="onRatingInput('ratingEfficiency', $event)" @blur="onRatingBlur('ratingEfficiency', $event)"/>
+                  <label class="field-label">Efficiency <span class="muted-text">(0-5)</span></label>
+                  <input :value="entryForm.ratingEfficiency" type="text" inputmode="decimal" class="field-input rating-field" placeholder="0-5 or N/A" @input="onRatingInput('ratingEfficiency', $event)" @blur="onRatingBlur('ratingEfficiency', $event)"/>
                 </div>
                 <div class="field">
-                  <label class="field-label">Quality <span class="muted-text">(1-5)</span></label>
-                  <input :value="entryForm.ratingQuality" type="text" inputmode="decimal" class="field-input rating-field" placeholder="1-5" @input="onRatingInput('ratingQuality', $event)" @blur="onRatingBlur('ratingQuality', $event)"/>
+                  <label class="field-label">Quality <span class="muted-text">(0-5)</span></label>
+                  <input :value="entryForm.ratingQuality" type="text" inputmode="decimal" class="field-input rating-field" placeholder="0-5 or N/A" @input="onRatingInput('ratingQuality', $event)" @blur="onRatingBlur('ratingQuality', $event)"/>
                 </div>
                 <div class="field">
-                  <label class="field-label">Timeliness <span class="muted-text">(1-5)</span></label>
-                  <input :value="entryForm.ratingTimeliness" type="text" inputmode="decimal" class="field-input rating-field" placeholder="1-5" @input="onRatingInput('ratingTimeliness', $event)" @blur="onRatingBlur('ratingTimeliness', $event)"/>
+                  <label class="field-label">Timeliness <span class="muted-text">(0-5)</span></label>
+                  <input :value="entryForm.ratingTimeliness" type="text" inputmode="decimal" class="field-input rating-field" placeholder="0-5 or N/A" @input="onRatingInput('ratingTimeliness', $event)" @blur="onRatingBlur('ratingTimeliness', $event)"/>
                 </div>
                 <div v-if="computedAvg" class="field">
                   <label class="field-label">Average</label>
@@ -917,6 +951,9 @@ const activeTab      = ref('indicators')
 const allEntries     = ref([])
 const showFormModal    = ref(false)
 const showNewFormModal = ref(false)
+const showFormRecreateWarning = ref(false)
+const existingFormForYear = ref(null)
+const deletingOldForm = ref(false)
 const showReadinessModal = ref(false)
 
 // Library
@@ -961,7 +998,12 @@ const newForm = ref({
 })
 
 watch(showNewFormModal, (open) => {
-  if (open) newForm.value.type = myFormType.value
+  if (open) {
+    newForm.value.type = myFormType.value
+  } else {
+    showFormRecreateWarning.value = false
+    existingFormForYear.value = null
+  }
 })
 
 watch(
@@ -1022,11 +1064,13 @@ const filteredLibrary = computed(() => {
 
 function onRatingInput(field, event) {
   const el = event.target
+  const upper = el.value.toUpperCase()
+  if (upper === 'N' || upper === 'N/' || upper === 'N/A') { el.classList.remove('rating-invalid'); return }
   const raw = el.value.replace(/[^0-9.]/g, '')
   if (raw !== el.value) el.value = raw
   if (raw === '' || raw === '.') { entryForm.value[field] = ''; el.classList.remove('rating-invalid'); return }
   const n = parseFloat(raw)
-  if (isNaN(n) || n <= 0 || n > 5) {
+  if (isNaN(n) || n < 0 || n > 5) {
     el.classList.add('rating-invalid')
     setTimeout(() => { el.value = ''; el.classList.remove('rating-invalid'); entryForm.value[field] = '' }, 400)
   } else {
@@ -1036,8 +1080,10 @@ function onRatingInput(field, event) {
 }
 function onRatingBlur(field, event) {
   const el = event.target
+  if (el.value.toUpperCase() === 'N/A') { entryForm.value[field] = 'N/A'; el.value = 'N/A'; el.classList.remove('rating-invalid'); return }
   const n = parseFloat(el.value)
-  if (!el.value || isNaN(n) || n <= 0 || n > 5) { el.value = ''; entryForm.value[field] = ''; el.classList.remove('rating-invalid') }
+  if (!el.value) { el.value = ''; entryForm.value[field] = ''; el.classList.remove('rating-invalid') }
+  else if (isNaN(n) || n < 0 || n > 5) { el.value = ''; entryForm.value[field] = ''; el.classList.remove('rating-invalid') }
   else { entryForm.value[field] = Math.round(n * 100) / 100; el.value = entryForm.value[field] }
 }
 
@@ -1349,7 +1395,7 @@ async function loadForms() {
     const r = await ipcrfApi.listForms(authStore.profileId ? { userId: authStore.profileId } : {})
     forms.value = r?.items || (Array.isArray(r) ? r : [])
   } catch (e) {
-    showToast(`Could not load forms: ${e.message}`, 'error')
+    console.error(e); showToast('Could not load forms. Please try again.', 'error')
   } finally {
     loading.value = false
   }
@@ -1389,7 +1435,7 @@ async function openFormModal(form) {
     const r = await ipcrfApi.listEntries(form.id)
     allEntries.value = Array.isArray(r) ? r : []
   } catch (e) {
-    showToast(e.message, 'error')
+    console.error(e); showToast('Something went wrong. Please try again.', 'error')
   } finally {
     entriesLoading.value = false
   }
@@ -1405,19 +1451,45 @@ async function openFormModal(form) {
 
 async function createForm() {
   if (creating.value) return
-  const ok = await confirm(CONFIRMS.createForm(newForm.value.type, newForm.value.year))
-  if (!ok) return
+
+  const existing = forms.value.find(f =>
+    f.year === newForm.value.year &&
+    f.type === newForm.value.type &&
+    f.employeeEmail === authStore.email
+  )
+
+  if (existing && !showFormRecreateWarning.value) {
+    existingFormForYear.value = existing
+    showFormRecreateWarning.value = true
+    return
+  }
+
+  if (!showFormRecreateWarning.value) {
+    const ok = await confirm(CONFIRMS.createForm(newForm.value.type, newForm.value.year))
+    if (!ok) return
+  }
+
   creating.value = true
   try {
+    if (existingFormForYear.value) {
+      deletingOldForm.value = true
+      await ipcrfApi.deleteForm(existingFormForYear.value.id)
+      forms.value = forms.value.filter(f => f.id !== existingFormForYear.value.id)
+      deletingOldForm.value = false
+    }
+
     const f = await ipcrfApi.createForm(newForm.value)
     forms.value.unshift(f)
     showNewFormModal.value = false
+    showFormRecreateWarning.value = false
+    existingFormForYear.value = null
     showToast('Form created successfully.')
     await openFormModal(f)
   } catch (e) {
-    showToast(e.message, 'error')
+    console.error(e); showToast('Something went wrong. Please try again.', 'error')
   } finally {
     creating.value = false
+    deletingOldForm.value = false
   }
 }
 
@@ -1425,19 +1497,19 @@ async function createForm() {
 async function quickSubmit(form)  {
   const ok = await confirm(CONFIRMS.submitForm(form.type, form.year))
   if (!ok) return
-  try { const u = await ipcrfApi.submitForm(form.id);  _syncList(form.id, u); showToast('Submitted') } catch (e) { showToast(e.message, 'error') }
+  try { const u = await ipcrfApi.submitForm(form.id);  _syncList(form.id, u); showToast('Submitted') } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
 }
 async function quickApprove(form) {
   if (!canReviewForm(form)) return
   const ok = await confirm(CONFIRMS.approveForm(form.employeeName, form.type))
   if (!ok) return
-  try { const u = await ipcrfApi.approveForm(form.id); _syncList(form.id, u); showToast('Approved') } catch (e) { showToast(e.message, 'error') }
+  try { const u = await ipcrfApi.approveForm(form.id); _syncList(form.id, u); showToast('Approved') } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
 }
 async function quickReturn(form)  {
   if (!canReviewForm(form)) return
   const ok = await confirm(CONFIRMS.returnForm(form.employeeName))
   if (!ok) return
-  try { const u = await ipcrfApi.returnForm(form.id, { remarks: confirmState.inputValue });  _syncList(form.id, u); showToast('Returned') } catch (e) { showToast(e.message, 'error') }
+  try { const u = await ipcrfApi.returnForm(form.id, { remarks: confirmState.inputValue });  _syncList(form.id, u); showToast('Returned') } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
 }
 function _syncList(id, u) { const i = forms.value.findIndex(f => f.id === id); if (i !== -1) forms.value[i] = { ...forms.value[i], ...u } }
 
@@ -1529,7 +1601,7 @@ async function saveEntry() {
       queueAutoComputeScore()
     }
     closeEntry()
-  } catch (e) { showToast(e.message, 'error') }
+  } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
   finally { savingEntry.value = false }
 }
 
@@ -1543,31 +1615,31 @@ async function doDelete() {
     showToast('Indicator removed')
     confirmDel.value.show = false
     queueAutoComputeScore()
-  } catch (e) { showToast(e.message, 'error') }
+  } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
   finally { deletingEntry.value = false }
 }
 
 async function doSubmit()  {
   const ok = await confirm(CONFIRMS.submitForm(activeForm.value.type, activeForm.value.year))
   if (!ok) return
-  try { const u = await ipcrfApi.submitForm(activeForm.value.id);  _sync(u); showToast('Submitted') }       catch (e) { showToast(e.message, 'error') }
+  try { const u = await ipcrfApi.submitForm(activeForm.value.id);  _sync(u); showToast('Submitted') }       catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
 }
 async function doApprove() {
   if (!canReviewActiveForm.value) return
   const ok = await confirm(CONFIRMS.approveForm(activeForm.value.employeeName, activeForm.value.type))
   if (!ok) return
-  try { const u = await ipcrfApi.approveForm(activeForm.value.id); _sync(u); showToast('Approved') }       catch (e) { showToast(e.message, 'error') }
+  try { const u = await ipcrfApi.approveForm(activeForm.value.id); _sync(u); showToast('Approved') }       catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
 }
 async function doReturn()  {
   if (!canReviewActiveForm.value) return
   const ok = await confirm(CONFIRMS.returnForm(activeForm.value.employeeName))
   if (!ok) return
-  try { const u = await ipcrfApi.returnForm(activeForm.value.id, { remarks: confirmState.inputValue });  _sync(u); showToast('Returned for revision') } catch (e) { showToast(e.message, 'error') }
+  try { const u = await ipcrfApi.returnForm(activeForm.value.id, { remarks: confirmState.inputValue });  _sync(u); showToast('Returned for revision') } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
 }
 async function doCompute() {
   const ok = await confirm(CONFIRMS.computeScore(activeForm.value.employeeName))
   if (!ok) return
-  try { const u = await ipcrfApi.computeScore(activeForm.value.id); _sync(u); showToast(`${u.finalNumericalRating} - ${u.adjectivalRating}`) } catch (e) { showToast(e.message, 'error') }
+  try { const u = await ipcrfApi.computeScore(activeForm.value.id); _sync(u); showToast(`${u.finalNumericalRating} - ${u.adjectivalRating}`) } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
 }
 
 async function doMarkRated() {
@@ -1589,7 +1661,7 @@ async function doMarkRated() {
     })
     _sync(u)
     showToast('Form marked as Rated')
-  } catch (e) { showToast(e.message, 'error') }
+  } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
   finally { ratingBusy.value = false }
 }
 
@@ -1609,7 +1681,7 @@ async function doSubmitRatings() {
     const u = await ipcrfApi.submitRatings(activeForm.value.id)
     _sync(u)
     showToast('Ratings submitted for Division Chief review.')
-  } catch (e) { showToast(e.message, 'error') }
+  } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
   finally { ratingBusy.value = false }
 }
 
@@ -1629,7 +1701,7 @@ async function doFinalize() {
     const u = await ipcrfApi.finalizeForm(activeForm.value.id, finalizeForm.value)
     _sync(u)
     showToast('Form finalized')
-  } catch (e) { showToast(e.message, 'error') }
+  } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
   finally { ratingBusy.value = false }
 }
 
@@ -1703,7 +1775,7 @@ async function doPeriodGenerate(kind, sem) {
       docMissing:       false
     }
     showToast(`${semLabel} Ratings document generated`)
-  } catch (e) { showToast(e.message, 'error') }
+  } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
   finally { periodBusy.value = ''; loadPeriodStatus() }
 }
 
@@ -1722,7 +1794,7 @@ async function doPrint(fileId, tab) {
     const blob  = new Blob([bytes], { type: 'application/pdf' })
     const url   = URL.createObjectURL(blob)
     window.open(url, '_blank')
-  } catch (e) { showToast(e.message, 'error') }
+  } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
   finally { docGen.value.printing = false }
 }
 </script>
@@ -1833,6 +1905,7 @@ async function doPrint(fileId, tab) {
 .btn-warn:hover{background:#FEF9C3;}
 .btn-danger{background:#EF4444;color:#fff;border-color:#EF4444;}
 .btn-danger:hover{background:#DC2626;}
+.regen-warning{background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:18px 16px;}
 .btn-sm{padding:5px 12px;font-size:11px;}
 .btn-xs{padding:4px 7px;font-size:10.5px;border-radius:6px;white-space:nowrap;}
 .btn-icon-only{padding:5px;width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;}

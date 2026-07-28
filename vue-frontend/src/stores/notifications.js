@@ -11,12 +11,13 @@ export const useNotificationsStore = defineStore('notifications', () => {
     notifications.value.filter(n => !n.read).length
   )
 
-  async function fetchAll() {
-    loading.value = true
+  async function fetchAll(options = {}) {
+    const silent = options.silent === true
+    if (!silent) loading.value = true
     try {
       notifications.value = await notificationsApi.list()
     } finally {
-      loading.value = false
+      if (!silent) loading.value = false
     }
   }
 

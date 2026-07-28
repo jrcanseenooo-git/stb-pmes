@@ -12,7 +12,7 @@ const FocalAssignmentService = (() => {
   ]
 
   function list(params, user) {
-    AuthService.requireRole(user, 'System Administrator', 'Bureau Director', 'Assistant Bureau Director')
+    AuthService.requirePermission(user, 'manage_focal_assignments')
 
     const assignments = _activeAssignments()
     const users = _activeUsers()
@@ -51,7 +51,7 @@ const FocalAssignmentService = (() => {
   }
 
   function save(body, user) {
-    const profile = AuthService.requireRole(user, 'System Administrator')
+    const profile = AuthService.requirePermission(user, 'manage_focal_assignments')
     const now = new Date().toISOString()
     const sheet = _sheet()
     const usersById = _indexBy(_activeUsers(), 'id')

@@ -8,6 +8,7 @@ function initializeSheets() {
       'role', 'divisionId', 'divisionName', 'section', 'position', 'employeeNo',
       'type', 'positionLevel', 'sgLevel',
       'tempPassword', 'tempPasswordHash', 'mustChangePassword',
+      'permissionGroups', 'permissions',
       'active', 'createdAt', 'updatedAt', 'lastLoginAt'
     ],
     Divisions: [
@@ -132,6 +133,13 @@ function initializeSheets() {
       'tardinessTotal', 'undertimeTotal', 'absenceTotal', 'approvedLeaveTotal',
       'rating', 'label',
       'computedBy', 'computedAt', 'createdAt'
+    ],
+    AssessmentContent: [
+      'id', 'domain', 'category', 'questionText', 'guidanceText', 'sequence',
+      'scaleType', 'required', 'evidenceRequired',
+      'applicableRaters', 'applicableLevels',
+      'status', 'period', 'version', 'hasBeenUsed', 'changeNotes',
+      'createdBy', 'createdByName', 'createdAt', 'updatedAt', 'archivedAt'
     ]
   }
 
@@ -207,6 +215,16 @@ function seedDivisions(ss) {
 
 // ── Utility: delete ALL sheets and rebuild from all init functions ──
 function nukeAndRebuildSheets_DANGER() {
+  Logger.log('nukeAndRebuildSheets_DANGER is disabled. Use clearTransactionalData_KEEP_USERS_DIVISIONS_KRAS instead.')
+  try {
+    SpreadsheetApp.getUi().alert(
+      'Disabled for safety',
+      'This function deletes Users, Divisions, and MasterKRALibrary. Use clearTransactionalData_KEEP_USERS_DIVISIONS_KRAS instead.',
+      SpreadsheetApp.getUi().ButtonSet.OK
+    )
+  } catch (e) {}
+  return
+
   let confirmed = false
   try {
     const ui = SpreadsheetApp.getUi()
@@ -250,6 +268,16 @@ function nukeAndRebuildSheets_DANGER() {
 
 // ── Utility: clear all data rows (keep headers) – use with caution ──
 function clearAllData_DANGER() {
+  Logger.log('clearAllData_DANGER is disabled. Use clearTransactionalData_KEEP_USERS_DIVISIONS_KRAS instead.')
+  try {
+    SpreadsheetApp.getUi().alert(
+      'Disabled for safety',
+      'This function clears every sheet. Use clearTransactionalData_KEEP_USERS_DIVISIONS_KRAS instead.',
+      SpreadsheetApp.getUi().ButtonSet.OK
+    )
+  } catch (e) {}
+  return
+
   // Must be run from a menu trigger (not the Run button) for getUi() to work
   let confirmed = false
   try {
@@ -275,4 +303,53 @@ function clearAllData_DANGER() {
     }
   })
   Logger.log('All data cleared.')
+}
+
+// Safe reset: clear transactional/test rows only.
+// Preserves all sheet tabs, headers, Users, Divisions, and MasterKRALibrary.
+function clearTransactionalData_KEEP_USERS_DIVISIONS_KRAS() {
+  let confirmed = false
+  try {
+    const ui = SpreadsheetApp.getUi()
+    const result = ui.alert(
+      'Reset transactional PMES data?',
+      'This will clear data rows from transactional sheets only.\n\nPreserved sheets:\n- Users\n- Divisions\n- MasterKRALibrary\n\nA backup copy of the database will be created before clearing. Continue?',
+      ui.ButtonSet.YES_NO
+    )
+    confirmed = (result === ui.Button.YES)
+  } catch (e) {
+    Logger.log('clearTransactionalData_KEEP_USERS_DIVISIONS_KRAS must be run from the Apps Script editor UI. Aborting.')
+    return
+  }
+
+  if (!confirmed) return
+
+  const ss = SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID'))
+  const backup = DriveApp.getFileById(ss.getId()).makeCopy(
+    'PMES Database Backup ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd-HHmmss')
+  )
+  const preserved = {
+    Users: true,
+    Divisions: true,
+    MasterKRALibrary: true
+  }
+  let deletedRows = 0
+
+  ss.getSheets().forEach(sheet => {
+    if (preserved[sheet.getName()]) return
+    const rows = Math.max(sheet.getLastRow() - 1, 0)
+    if (rows > 0) {
+      sheet.getRange(2, 1, rows, Math.max(sheet.getLastColumn(), 1)).clearContent()
+      deletedRows += rows
+    }
+  })
+
+  Logger.log('Transactional data cleared. Deleted rows: ' + deletedRows + '. Backup: ' + backup.getUrl())
+  try {
+    SpreadsheetApp.getUi().alert(
+      'Reset complete',
+      'Transactional data cleared.\n\nDeleted rows: ' + deletedRows + '\nBackup created: ' + backup.getName(),
+      SpreadsheetApp.getUi().ButtonSet.OK
+    )
+  } catch (e) {}
 }

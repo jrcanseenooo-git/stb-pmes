@@ -380,10 +380,10 @@
                   </div>
 
                   <div class="rq-ratings-row rq-field-wide">
-                    <div class="rq-rate-col"><span>Efficiency</span><input v-model="editableEntries[entry.id].ratingEfficiency" inputmode="decimal"/></div>
-                    <div class="rq-rate-col"><span>Quality</span><input v-model="editableEntries[entry.id].ratingQuality" inputmode="decimal"/></div>
-                    <div class="rq-rate-col"><span>Timeliness</span><input v-model="editableEntries[entry.id].ratingTimeliness" inputmode="decimal"/></div>
-                    <div class="rq-rate-col rq-avg"><span>Average</span><input v-model="editableEntries[entry.id].ratingAverage" inputmode="decimal" readonly title="Auto-computed from E/Q/T"/></div>
+                    <div class="rq-rate-col"><span>Efficiency</span><input :value="editableEntries[entry.id].ratingEfficiency" inputmode="decimal" class="rating-field" placeholder="0-5 or N/A" @input="onRqRatingInput(entry.id, 'ratingEfficiency', $event)" @blur="onRqRatingBlur(entry.id, 'ratingEfficiency', $event)"/></div>
+                    <div class="rq-rate-col"><span>Quality</span><input :value="editableEntries[entry.id].ratingQuality" inputmode="decimal" class="rating-field" placeholder="0-5 or N/A" @input="onRqRatingInput(entry.id, 'ratingQuality', $event)" @blur="onRqRatingBlur(entry.id, 'ratingQuality', $event)"/></div>
+                    <div class="rq-rate-col"><span>Timeliness</span><input :value="editableEntries[entry.id].ratingTimeliness" inputmode="decimal" class="rating-field" placeholder="0-5 or N/A" @input="onRqRatingInput(entry.id, 'ratingTimeliness', $event)" @blur="onRqRatingBlur(entry.id, 'ratingTimeliness', $event)"/></div>
+                    <div class="rq-rate-col rq-avg"><span>Average</span><input :value="editableEntries[entry.id].ratingAverage" inputmode="decimal" readonly title="Auto-computed from E/Q/T"/></div>
                   </div>
 
                   <div class="rq-mov-remarks rq-field-wide">
@@ -449,10 +449,10 @@
                   </div>
 
                   <div class="rq-ratings-row rq-field-wide">
-                    <div class="rq-rate-col"><span>Efficiency</span><input v-model="editableEntries[entry.id].ratingEfficiency" inputmode="decimal"/></div>
-                    <div class="rq-rate-col"><span>Quality</span><input v-model="editableEntries[entry.id].ratingQuality" inputmode="decimal"/></div>
-                    <div class="rq-rate-col"><span>Timeliness</span><input v-model="editableEntries[entry.id].ratingTimeliness" inputmode="decimal"/></div>
-                    <div class="rq-rate-col rq-avg"><span>Average</span><input v-model="editableEntries[entry.id].ratingAverage" inputmode="decimal" readonly title="Auto-computed from E/Q/T"/></div>
+                    <div class="rq-rate-col"><span>Efficiency</span><input :value="editableEntries[entry.id].ratingEfficiency" inputmode="decimal" class="rating-field" placeholder="0-5 or N/A" @input="onRqRatingInput(entry.id, 'ratingEfficiency', $event)" @blur="onRqRatingBlur(entry.id, 'ratingEfficiency', $event)"/></div>
+                    <div class="rq-rate-col"><span>Quality</span><input :value="editableEntries[entry.id].ratingQuality" inputmode="decimal" class="rating-field" placeholder="0-5 or N/A" @input="onRqRatingInput(entry.id, 'ratingQuality', $event)" @blur="onRqRatingBlur(entry.id, 'ratingQuality', $event)"/></div>
+                    <div class="rq-rate-col"><span>Timeliness</span><input :value="editableEntries[entry.id].ratingTimeliness" inputmode="decimal" class="rating-field" placeholder="0-5 or N/A" @input="onRqRatingInput(entry.id, 'ratingTimeliness', $event)" @blur="onRqRatingBlur(entry.id, 'ratingTimeliness', $event)"/></div>
+                    <div class="rq-rate-col rq-avg"><span>Average</span><input :value="editableEntries[entry.id].ratingAverage" inputmode="decimal" readonly title="Auto-computed from E/Q/T"/></div>
                   </div>
 
                   <div class="rq-mov-remarks rq-field-wide">
@@ -693,6 +693,33 @@ function recomputeAverages() {
   })
 }
 
+function onRqRatingInput(entryId, field, event) {
+  const el = event.target
+  const upper = el.value.toUpperCase()
+  if (upper === 'N' || upper === 'N/' || upper === 'N/A') { el.classList.remove('rating-invalid'); return }
+  const raw = el.value.replace(/[^0-9.]/g, '')
+  if (raw !== el.value) el.value = raw
+  if (raw === '' || raw === '.') { editableEntries.value[entryId][field] = ''; el.classList.remove('rating-invalid'); scheduleAutosave(); return }
+  const n = parseFloat(raw)
+  if (isNaN(n) || n < 0 || n > 5) {
+    el.classList.add('rating-invalid')
+    setTimeout(() => { el.value = ''; el.classList.remove('rating-invalid'); editableEntries.value[entryId][field] = ''; scheduleAutosave() }, 400)
+  } else {
+    el.classList.remove('rating-invalid')
+    editableEntries.value[entryId][field] = n
+    scheduleAutosave()
+  }
+}
+function onRqRatingBlur(entryId, field, event) {
+  const el = event.target
+  if (el.value.toUpperCase() === 'N/A') { editableEntries.value[entryId][field] = 'N/A'; el.value = 'N/A'; el.classList.remove('rating-invalid'); scheduleAutosave(); return }
+  const n = parseFloat(el.value)
+  if (!el.value) { el.value = ''; editableEntries.value[entryId][field] = ''; el.classList.remove('rating-invalid') }
+  else if (isNaN(n) || n < 0 || n > 5) { el.value = ''; editableEntries.value[entryId][field] = ''; el.classList.remove('rating-invalid') }
+  else { editableEntries.value[entryId][field] = Math.round(n * 100) / 100; el.value = editableEntries.value[entryId][field] }
+  scheduleAutosave()
+}
+
 function dirtyEntryIds() {
   return entries.value
     .filter(entry => {
@@ -749,7 +776,7 @@ async function flushReviewSaves(isRetry = false) {
       setTimeout(() => flushReviewSaves(true), 1500)
     } else {
       saveState.value = 'error'
-      showToast(`Auto-save failed: ${e.message}`, 'error')
+      console.error(e); showToast('Auto-save failed. Please try again.', 'error')
     }
   } finally {
     saveInFlight = false
@@ -787,7 +814,7 @@ async function loadMyForms() {
     myForms.value = all.filter(f => ['Submitted', 'Approved', 'Rated', 'Returned'].includes(f.status))
     if (!selectedForm.value && myForms.value.length) await selectForm(myForms.value[0])
   } catch (e) {
-    showToast(`Could not load your forms: ${e.message}`, 'error')
+    console.error(e); showToast('Could not load your forms. Please try again.', 'error')
   } finally {
     myFormsLoading.value = false
   }
@@ -806,7 +833,7 @@ async function loadQueue() {
       reviewComments.value = {}
     }
   } catch (e) {
-    showToast(`Could not load review queue: ${e.message}`, 'error')
+    console.error(e); showToast('Could not load review queue. Please try again.', 'error')
   } finally {
     loading.value = false
   }
@@ -839,7 +866,7 @@ async function selectForm(form) {
     lastSavedComments.value = { ...reviewComments.value }
     saveState.value = 'idle'
   } catch (e) {
-    showToast(e.message, 'error')
+    console.error(e); showToast('Something went wrong. Please try again.', 'error')
   } finally {
     entriesLoading.value = false
   }
@@ -884,8 +911,7 @@ async function completeSelected() {
   routing.value = true
   routingAction.value = 'complete'
   try {
-    await saveEntryEditsSilently()
-    await saveCommentsSilently()
+    await Promise.all([saveEntryEditsSilently(), saveCommentsSilently()])
     if (isDCReviewer.value && !isTargetsReview.value) {
       await ipcrfApi.rateForm(selectedForm.value.id, {
         finalNumericalRating: selectedForm.value.finalNumericalRating || '',
@@ -901,7 +927,7 @@ async function completeSelected() {
     showToast('Marked complete.')
     await loadQueue()
   } catch (e) {
-    showToast(e.message, 'error')
+    console.error(e); showToast('Something went wrong. Please try again.', 'error')
   } finally {
     routing.value = false
     routingAction.value = ''
@@ -956,8 +982,7 @@ async function confirmAssign(person) {
   routing.value = true
   routingAction.value = 'assign'
   try {
-    await saveEntryEditsSilently()
-    await saveCommentsSilently()
+    await Promise.all([saveEntryEditsSilently(), saveCommentsSilently()])
     const updated = await ipcrfApi.routeForm(selectedForm.value.id, {
       reviewType: reviewTypeForForm(selectedForm.value),
       action: 'assign',
@@ -967,7 +992,7 @@ async function confirmAssign(person) {
     showToast(`Routed to ${person.fullName}.`)
     await loadQueue()
   } catch (e) {
-    showToast(e.message, 'error')
+    console.error(e); showToast('Something went wrong. Please try again.', 'error')
   } finally {
     routing.value = false
     routingAction.value = ''
@@ -996,14 +1021,13 @@ async function returnSelected() {
   routing.value = true
   routingAction.value = 'return'
   try {
-    await saveEntryEditsSilently()
-    await saveCommentsSilently()
+    await Promise.all([saveEntryEditsSilently(), saveCommentsSilently()])
     const updated = await ipcrfApi.returnForm(selectedForm.value.id, { remarks: confirmState.inputValue })
     syncSelected(updated)
     showToast('Form returned for revision.', 'warning')
     await loadQueue()
   } catch (e) {
-    showToast(e.message, 'error')
+    console.error(e); showToast('Something went wrong. Please try again.', 'error')
   } finally {
     routing.value = false
     routingAction.value = ''
@@ -1093,7 +1117,7 @@ const vClickOutside = {
 function initials(name) {
   const parts = String(name || '').trim().split(/\s+/).filter(Boolean)
   if (!parts.length) return '?'
-  return parts.slice(0, 2).map(p => p[0]).join('').toUpperCase()
+  return parts.map(p => p[0]).join('').toUpperCase()
 }
 
 function stageTone(stage) {
@@ -1211,8 +1235,8 @@ const routeSteps = computed(() => {
 .rq-item-status { font-size: 10.5px; color: var(--muted); margin-right: auto; }
 .rq-period { font-size: 10.5px; font-weight: 700; color: var(--ink-soft); background: var(--slate-soft); border-radius: 6px; padding: 2px 7px; }
 
-.rq-avatar { width: 30px; height: 30px; border-radius: 9px; background: var(--accent-soft); color: var(--accent-strong); display: flex; align-items: center; justify-content: center; font-size: 11.5px; font-weight: 800; flex-shrink: 0; }
-.rq-avatar.lg { width: 44px; height: 44px; border-radius: 12px; font-size: 15px; }
+.rq-avatar { width: 30px; height: 30px; border-radius: 9px; background: var(--accent-soft); color: var(--accent-strong); display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 800; flex-shrink: 0; letter-spacing: -.02em; }
+.rq-avatar.lg { width: 44px; height: 44px; border-radius: 12px; font-size: 13px; }
 
 .rq-chip { font-size: 9.5px; font-weight: 800; letter-spacing: .3px; border-radius: 6px; padding: 3px 7px; flex-shrink: 0; }
 .rq-stage-pill { font-size: 10px; font-weight: 700; border-radius: 999px; padding: 3px 9px; }
@@ -1422,4 +1446,6 @@ const routeSteps = computed(() => {
   .rq-ratings-row { grid-template-columns: repeat(2, 1fr); }
   .rq-mov-remarks { grid-template-columns: 1fr; }
 }
+.rating-field{text-align:center;font-weight:700;font-size:16px;transition:background .15s,border-color .15s,color .15s;}
+.rating-invalid{background:#FEE2E2 !important;border-color:#EF4444 !important;color:#DC2626 !important;}
 </style>

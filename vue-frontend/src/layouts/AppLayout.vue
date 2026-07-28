@@ -32,7 +32,7 @@
             </transition>
           </RouterLink>
 
-          <RouterLink v-if="canManageUsers" to="/kra" class="nav-item" active-class="active" :title="collapsed ? 'KRA Library' : ''">
+          <RouterLink v-if="canManageLibraries" to="/kra" class="nav-item" active-class="active" :title="collapsed ? 'KRA Library' : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.4" />
@@ -123,7 +123,8 @@
           <div v-if="!collapsed" class="nav-label">Administration</div>
           <div v-else class="nav-divider"></div>
 
-          <RouterLink to="/reports" class="nav-item" active-class="active" :title="collapsed ? 'Reports' : ''">
+          <!-- Reports hidden until ReportsService backend is implemented -->
+          <!--<RouterLink to="/reports" class="nav-item" active-class="active" :title="collapsed ? 'Reports' : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.4" />
@@ -133,9 +134,9 @@
             <transition name="fade">
               <span v-if="!collapsed" class="nav-label-text">Reports</span>
             </transition>
-          </RouterLink>
+          </RouterLink>-->
 
-          <RouterLink to="/audit" class="nav-item" active-class="active" :title="collapsed ? 'Audit Trail' : ''">
+          <RouterLink v-if="canViewAudit" to="/audit" class="nav-item" active-class="active" :title="collapsed ? 'Audit Trail' : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <path d="M8 1.5L2 4v4.5c0 3.5 2.5 6 6 6.5 3.5-.5 6-3 6-6.5V4L8 1.5z"
@@ -148,7 +149,7 @@
             </transition>
           </RouterLink>
 
-          <RouterLink v-if="canManageUsers" to="/users" class="nav-item" active-class="active" :title="collapsed ? 'User Management' : ''">
+          <RouterLink v-if="canAccessUserManagement" to="/users" class="nav-item" active-class="active" :title="collapsed ? 'User Management' : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <circle cx="8" cy="5.5" r="2.5" stroke="currentColor" stroke-width="1.4" />
@@ -213,17 +214,17 @@
         </div>
 
         <div class="topbar-right">
-          <div class="sem-pill">
-            <span class="live-dot"></span>
-            {{ currentSemester }}
-          </div>
-
           <div class="search-wrap">
             <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
               <circle cx="5.5" cy="5.5" r="4" stroke="#94A3B8" stroke-width="1.3" />
               <path d="M9 9l2.5 2.5" stroke="#94A3B8" stroke-width="1.3" stroke-linecap="round" />
             </svg>
             <input v-model="search" type="text" placeholder="Search..." />
+          </div>
+
+          <div class="sem-pill">
+            <span class="live-dot"></span>
+            {{ currentSemester }}
           </div>
 
           <div class="icon-btn" @click.stop="showNotifs = !showNotifs">
@@ -266,13 +267,14 @@
             </template>
           </div>
 
-          <button class="export-btn" @click="handleExport">
+          <!-- Export hidden until Reports module is implemented -->
+          <!--<button class="export-btn" @click="handleExport">
             <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
               <path d="M6.5 1v7M4 6l2.5 2.5L9 6M2 10v1a1 1 0 001 1h7a1 1 0 001-1v-1"
                 stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
             Export
-          </button>
+          </button>-->
 
           <div class="topbar-avatar" @click="$router.push('/profile')" :title="authStore.fullName">
             {{ authStore.initials || 'U' }}
@@ -303,13 +305,18 @@ import PasswordChangePrompt from '@/components/common/PasswordChangePrompt.vue'
 import LogoutConfirmModal from '@/components/common/LogoutConfirmModal.vue'
 
 const authStore = useAuthStore()
-const { canManageUsers } = usePermissions()
+const { canManageUsers, canManageLibraries, canManageFocalAssignments, canManageDatabase, canViewAudit } = usePermissions()
 const notifStore = useNotificationsStore()
 const { confirm } = useConfirm()
 
 // Unread notifications tied to the Accomplishments module — drives the sidebar nav badge
 const accomplishmentsUnread = computed(() =>
   notifStore.notifications.filter(n => !n.read && n.module === 'Accomplishments').length
+)
+const canAccessUserManagement = computed(() =>
+  canManageUsers.value ||
+  canManageFocalAssignments.value ||
+  canManageDatabase.value
 )
 const route = useRoute()
 const router = useRouter()
@@ -325,6 +332,7 @@ const showNotifs = ref(false)
 const isMobile = ref(false)
 const showPwPrompt = ref(false)
 const showLogoutConfirm = ref(false)
+let notificationTimer = null
 
 const titleMap = {
   '/dashboard': { title: 'Dashboard', sub: 'Bureau Overview' },
@@ -478,6 +486,19 @@ function checkMobile() {
   if (isMobile.value) collapsed.value = true
 }
 
+async function refreshRealtimeShell() {
+  if (!authStore.hasAccess) return
+  try {
+    await notifStore.fetchAll({ silent: true })
+  } catch {
+    // Background refresh should never interrupt the user.
+  }
+}
+
+function handleVisibilityChange() {
+  if (!document.hidden) refreshRealtimeShell()
+}
+
 const vClickOutside = {
   mounted(el, binding) {
     el._clickOutside = (e) => {
@@ -493,11 +514,17 @@ const vClickOutside = {
 onMounted(() => {
   checkMobile()
   window.addEventListener('resize', checkMobile)
-  notifStore.fetchAll()
+  window.addEventListener('focus', refreshRealtimeShell)
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+  refreshRealtimeShell()
+  notificationTimer = window.setInterval(refreshRealtimeShell, 30000)
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', checkMobile)
+  window.removeEventListener('focus', refreshRealtimeShell)
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
+  if (notificationTimer) window.clearInterval(notificationTimer)
 })
 </script>
 

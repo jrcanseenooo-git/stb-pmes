@@ -4,9 +4,9 @@
     <!-- Stats -->
     <div class="stats-grid">
       <div class="stat-card stat-blue">
-        <div class="stat-label">Total Personnel</div>
-        <div class="stat-value">{{ stats.totalPersonnel }}</div>
-        <div class="stat-sub">Active accounts</div>
+        <div class="stat-label">{{ primaryStat.label }}</div>
+        <div class="stat-value">{{ primaryStat.value }}</div>
+        <div class="stat-sub">{{ primaryStat.sub }}</div>
         <div class="stat-icon blue">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <circle cx="8" cy="5" r="2.5" stroke="currentColor" stroke-width="1.4" />
@@ -171,26 +171,40 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDashboardStore } from '@/stores/dashboard'
 import { useAuthStore } from '@/stores/auth'
 import { useNotificationsStore } from '@/stores/notifications'
+import { usePermissions } from '@/composables/usePermissions'
 
 const router     = useRouter()
 const dashStore  = useDashboardStore()
 const authStore  = useAuthStore()
 const notifStore = useNotificationsStore()
+const { isAdmin, isDirector, isAsstDir, isDivChief, canViewAllDivisions } = usePermissions()
 
 const activeTab = ref('IPCR')
+let dashboardTimer = null
 
 onMounted(async () => {
   if (!authStore.initialised) await authStore.init()
   if (authStore.isAuthenticated) {
-    dashStore.fetchAll({ type: activeTab.value }).catch(() => { })
+    refreshDashboard()
+    dashboardTimer = window.setInterval(refreshDashboard, 45000)
+    window.addEventListener('focus', refreshDashboard)
     if (!notifStore.notifications.length) notifStore.fetchAll().catch(() => { })
   }
 })
+
+onUnmounted(() => {
+  if (dashboardTimer) window.clearInterval(dashboardTimer)
+  window.removeEventListener('focus', refreshDashboard)
+})
+
+function refreshDashboard() {
+  return dashStore.fetchAll({ type: activeTab.value, silent: true }).catch(() => { })
+}
 
 // ── Period tag ──
 const currentSemester = computed(() => {
@@ -201,6 +215,26 @@ const currentSemester = computed(() => {
 // ── Stat cards (dashboard/summary) ──
 const stats = computed(() => dashStore.summary || {
   totalPersonnel: '—', totalTargets: 0, completionRate: 0, delayed: 0, pending: 0, completed: 0
+})
+
+const canSeePersonnelSummary = computed(() =>
+  canViewAllDivisions.value || isAdmin.value || isDirector.value || isAsstDir.value || isDivChief.value
+)
+
+const primaryStat = computed(() => {
+  if (canSeePersonnelSummary.value) {
+    return {
+      label: 'Total Personnel',
+      value: stats.value.totalPersonnel,
+      sub: 'Active accounts'
+    }
+  }
+
+  return {
+    label: 'My Targets',
+    value: stats.value.totalTargets,
+    sub: 'Recorded for this period'
+  }
 })
 
 // ── Division performance (dashboard/divisions) ──
@@ -260,7 +294,7 @@ const maxBar = computed(() => Math.max(...bars.value.map(b => b.val), 1))
 function setTab(t) {
   if (activeTab.value === t) return
   activeTab.value = t
-  dashStore.fetchActivity({ type: t }).catch(() => { })
+  refreshDashboard()
 }
 
 // ── Notifications (real store, same one AppLayout uses) ──

@@ -154,7 +154,7 @@ async function generate() {
     showToast('Report generated successfully')
     if (result?.id) recentReports.value.unshift(result)
   } catch (e) {
-    showToast(e.message, 'error')
+    console.error(e); showToast('Something went wrong. Please try again.', 'error')
   } finally {
     generating.value = false
   }

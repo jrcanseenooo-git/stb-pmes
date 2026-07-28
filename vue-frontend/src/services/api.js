@@ -1,6 +1,8 @@
 import { auth } from '@/firebase'
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL
+const BASE_URL = import.meta.env.DEV
+  ? '/gas'
+  : (import.meta.env.VITE_API_PROXY_URL || '/api/gas')
 
 // ── Core transport ─────────────────────────────
 
@@ -28,9 +30,8 @@ async function parseApiResponse(res) {
 }
 
 // Single transport for every call: POST with a JSON body carrying route,
-// method, token and payload. Nothing sensitive (token, form data) ever appears
-// in the URL, and there is no URL-length limit to overflow. No custom headers,
-// so it stays a CORS "simple request" that the Apps Script /exec endpoint answers.
+// method, token and payload. The browser talks to a same-origin proxy so Apps
+// Script CORS never blocks local or production usage.
 async function gasSend(method, route, data = {}) {
   const token = await getToken()
   const res = await fetch(BASE_URL, {
@@ -94,6 +95,11 @@ export const focalAssignmentsApi = {
   })
 }
 
+export const maintenanceApi = {
+  previewFreshSchema: () => gasGet('maintenance/fresh-schema'),
+  rebuildFreshSchema: (confirmation) => gasWrite('POST', 'maintenance/fresh-schema', { confirmation })
+}
+
 // ── KRAs & Success Indicators ──────────────────
 
 export const kraApi = {
@@ -117,6 +123,29 @@ export const kraLibraryApi = {
   create: (data)     => gasWrite('POST',   'kra-library',       data),
   update: (id, data) => gasWrite('PUT',    `kra-library/${id}`, data),
   delete: (id)       => gasWrite('DELETE', `kra-library/${id}`)
+}
+
+export const assessmentCategoryApi = {
+  list:   (p = {})     => gasGet('assessment-categories', p),
+  get:    (id)         => gasGet(`assessment-categories/${id}`),
+  create: (data)       => gasWrite('POST',   'assessment-categories', data),
+  update: (id, data)   => gasWrite('PUT',    `assessment-categories/${id}`, data),
+  remove: (id)         => gasWrite('DELETE', `assessment-categories/${id}`),
+  seed:   (data = {})  => gasWrite('POST',   'assessment-categories/seed', data)
+}
+
+export const assessmentContentApi = {
+  list:             (p = {})        => gasGet('assessment-content', p),
+  get:              (id)            => gasGet(`assessment-content/${id}`),
+  create:           (data)          => gasWrite('POST',  'assessment-content', data),
+  update:           (id, data)      => gasWrite('PUT',   `assessment-content/${id}`, data),
+  publish:          (id, data = {}) => gasWrite('PATCH', `assessment-content/${id}/publish`, data),
+  archive:          (id)            => gasWrite('PATCH', `assessment-content/${id}/archive`),
+  duplicateVersion: (id, data = {}) => gasWrite('POST',  `assessment-content/${id}/duplicate-version`, data),
+  reorder:          (payload = [])  => gasWrite('POST',  'assessment-content/reorder', {
+    rows: JSON.stringify(payload)
+  }),
+  seed:             (data = {})     => gasWrite('POST',  'assessment-content/seed', data)
 }
 
 // ── Accomplishments ────────────────────────────
@@ -170,6 +199,7 @@ export const ipatApi = {
 
   // Functional Performance Output — pulled from the ratee's own IPCRF/CCEF
   syncFPO:      (id)            => gasWrite('POST',  `ipat/${id}/sync-fpo`),
+  setFPO:       (id, fpoScore)  => gasWrite('POST',  `ipat/${id}/set-fpo`, { fpoScore }),
 
   // Core Behavioral Competencies
   saveCBCRatings: (id, ratings) => gasWrite('POST',  `ipat/${id}/cbc`,         { ratings: JSON.stringify(ratings) }),
@@ -244,6 +274,7 @@ export const ipcrfApi = {
   get:          (id)                   => gasGet(`ipcrf/${id}`),
   create:       (data)                 => gasWrite('POST',  'ipcrf',                   data),
   update:       (id, data)             => gasWrite('PUT',   `ipcrf/${id}`,             data),
+  deleteForm:   (id)                   => gasWrite('DELETE', `ipcrf/${id}`),
   submit:       (id, data = {})        => gasWrite('PATCH', `ipcrf/${id}/submit`,      data),
   reviewQueue:  (p = {})               => gasGet('ipcrf/review-queue',                 p),
   route:        (id, data = {})        => gasWrite('PATCH', `ipcrf/${id}/route`,       data),
@@ -312,6 +343,8 @@ export const peerAssignmentsApi = {
 // e.g. import { ipcrf as ipcrfApi, kraLibrary as kraLibraryApi } from '@/services/api'
 export { ipcrfApi as ipcrf }
 export { kraLibraryApi as kraLibrary }
+export { assessmentContentApi as assessmentContent }
+export { assessmentCategoryApi as assessmentCategory }
 
 // ── Default export ─────────────────────────────
 
@@ -320,8 +353,11 @@ export default {
   dashboardApi,
   usersApi,
   focalAssignmentsApi,
+  maintenanceApi,
   kraApi,
   kraLibraryApi,
+  assessmentCategoryApi,
+  assessmentContentApi,
   accomplishmentsApi,
   movApi,
   evaluationApi,

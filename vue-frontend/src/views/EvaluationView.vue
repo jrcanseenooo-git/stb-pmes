@@ -13,7 +13,7 @@
 
       <div class="page-hd-side">
         <!-- Domain weight bar -->
-        <div class="domain-bar" aria-label="Evaluation domain weights">
+        <!-- <div class="domain-bar" aria-label="Evaluation domain weights">
           <div class="domain-item d-cbc">
             <div class="domain-pct">30%</div>
             <div class="domain-text">
@@ -45,7 +45,7 @@
               <div class="domain-sub">1.00 - 4.00 Scale</div>
             </div>
           </div>
-        </div>
+        </div> -->
 
         <div class="page-actions">
           <button v-if="canAdmin" class="btn btn-outline" @click="openGenerateModal">
@@ -60,7 +60,7 @@
     </div>
 
     <!-- View toggle -->
-    <div class="view-tabs">
+    <!-- <div class="view-tabs">
       <button :class="['view-tab', activeView === 'my-tasks' && 'active']" @click="activeView = 'my-tasks'">
         My Rating Tasks
         <span v-if="pendingTaskCount > 0" class="view-tab-badge">{{ pendingTaskCount }}</span>
@@ -71,7 +71,7 @@
       <button v-if="canAdmin" :class="['view-tab', activeView === 'all' && 'active']" @click="switchToAll">
         All Assessments
       </button>
-    </div>
+    </div> -->
 
     <!-- ══ TWO-PANEL BODY ══ -->
     <div class="eval-tp-shell">
@@ -119,6 +119,19 @@
           </div>
         </div>
 
+        <div class="view-tabs">
+          <button :class="['view-tab', activeView === 'my-tasks' && 'active']" @click="activeView = 'my-tasks'">
+            My Rating Tasks
+            <span v-if="pendingTaskCount > 0" class="view-tab-badge">{{ pendingTaskCount }}</span>
+          </button>
+          <button :class="['view-tab', activeView === 'my-results' && 'active']" @click="switchToMyResults">
+            My Results
+          </button>
+          <button v-if="canAdmin" :class="['view-tab', activeView === 'all' && 'active']" @click="switchToAll">
+            All Assessments
+          </button>
+        </div>
+
         <!-- MY TASKS LIST -->
         <template v-if="activeView === 'my-tasks'">
           <div v-if="loadingTasks" class="eli-list">
@@ -144,7 +157,7 @@
                   <div class="eli-name-row">
                     <span class="eli-name">{{ task.rateeName }}</span>
                   </div>
-                  <div class="eli-meta">S{{ task.semester }} {{ task.year }}{{ task.rateeDivisionId ? ' · ' + task.rateeDivisionId : '' }}</div>
+                  <div class="eli-meta">S{{ task.semester }} {{ task.year }}{{ taskDivisionLabel(task) ? ' · ' + taskDivisionLabel(task) : '' }}</div>
                 </div>
                 <div class="eli-right">
                   <!-- <span :class="['rtype-badge', rterTypeCls(task.raterType)]">{{ raterTypeLabel(task.raterType) }}</span> -->
@@ -178,7 +191,7 @@
               :class="['eli', selectedResult && selectedResult.id === res.id ? 'eli-active' : '']"
               @click="selectResult(res)">
               <div class="eli-row">
-                <div class="eli-av eli-av-res">{{ res.rateeName?.charAt(0)?.toUpperCase() || '?' }}</div>
+                <div class="eli-av eli-av-res">{{ initials(res.rateeName) }}</div>
                 <div class="eli-info">
                   <div class="eli-name">{{ res.rateeName }}</div>
                   <div class="eli-meta">{{ res.divisionName }}</div>
@@ -211,25 +224,25 @@
             <p>{{ records.length === 0 ? 'No assessments yet' : 'No matches' }}</p>
             <span>{{ records.length === 0 ? 'Generate assignments to start.' : 'Try adjusting your filters.' }}</span>
           </div>
-          <div v-else class="eli-list">
+          <div v-else class="eli-list all-records-list">
             <div v-for="rec in filteredRecords" :key="rec.id"
-              :class="['eli', selectedRecord && selectedRecord.id === rec.id ? 'eli-active' : '']"
+              :class="['eli', 'all-record-card', selectedRecord && selectedRecord.id === rec.id ? 'eli-active' : '']"
               @click="selectRecord(rec)">
               <div class="eli-row">
-                <div class="eli-av eli-av-rec">{{ rec.rateeName?.charAt(0)?.toUpperCase() || '?' }}</div>
+                <div class="eli-av eli-av-rec">{{ initials(rec.rateeName) }}</div>
                 <div class="eli-info">
                   <div class="eli-name">{{ rec.rateeName }}</div>
                   <div class="eli-meta">{{ rec.divisionName || '—' }}</div>
                 </div>
                 <span :class="['status-badge', statusClass(rec.status)]">{{ rec.status }}</span>
               </div>
-              <div class="eli-chips">
+              <!-- <div class="eli-chips">
                 <span class="eli-period-pill">S{{ rec.semester }} {{ rec.year }}</span>
                 <template v-if="rec.overallScore">
                   <span class="eli-score-big">{{ rec.overallScore }}</span>
                   <span v-if="rec.descriptor" :class="['eli-desc-chip', descriptorClass(rec.descriptor)]">{{ rec.descriptor }}</span>
                 </template>
-              </div>
+              </div> -->
             </div>
           </div>
         </template>
@@ -252,27 +265,6 @@
 
         <!-- INLINE ASSESSMENT / RATING FORM (rater task or admin record) -->
         <template v-else-if="selectedTask || selectedRecord">
-          <div class="eval-form-hd">
-            <div class="eval-form-hd-main">
-              <div :class="['eval-form-av', activeAssignment ? rterTypeCls(activeAssignment.raterType) : 'eli-av-rec']">
-                {{ ((activeRecord || selectedTask || selectedRecord).rateeName || '?').charAt(0).toUpperCase() }}
-              </div>
-              <div class="eval-form-hd-info">
-                <div class="eval-form-title">{{ (activeRecord || selectedTask || selectedRecord).rateeName }}</div>
-                <div class="eval-form-sub" v-if="activeAssignment">{{ raterRoleDesc(activeAssignment.raterType) }}</div>
-                <div class="eval-form-sub" v-else>{{ activeRecord?.divisionName || selectedRecord?.divisionName || '—' }}<template v-if="activeRecord?.position"> · {{ activeRecord.position }}</template></div>
-              </div>
-            </div>
-            <div class="eval-form-hd-right">
-              <span v-if="activeAssignment" :class="['rtype-badge', rterTypeCls(activeAssignment.raterType)]">{{ raterTypeLabel(activeAssignment.raterType) }}</span>
-              <span v-else-if="activeRecord" :class="['status-badge', statusClass(activeRecord.status)]">{{ activeRecord.status }}</span>
-              <span class="period-badge">S{{ (activeRecord || selectedTask || selectedRecord).semester }} {{ (activeRecord || selectedTask || selectedRecord).year }}</span>
-              <button class="eval-form-close" @click="closeDetailModal" title="Back to list">
-                <svg width="14" height="14" viewBox="0 0 15 15" fill="none"><path d="M2 2l11 11M13 2L2 13" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
-              </button>
-            </div>
-          </div>
-
           <!-- loading -->
           <div v-if="loadingDetail && !loadedRec" class="detail-loading">
             <span class="spinner-sm" style="border-color:rgba(0,0,0,.12);border-top-color:#1A56B0"></span>
@@ -287,7 +279,101 @@
           </div>
 
           <template v-else>
-            <div class="eval-form-scroll">
+            <div class="assessment-layout">
+              <aside class="assessment-sidebar">
+                <div class="sidebar-employee">
+                  <div :class="['sidebar-avatar', activeAssignment ? rterTypeCls(activeAssignment.raterType) : 'eli-av-rec']">
+                    {{ initials((activeRecord || selectedTask || selectedRecord).rateeName) }}
+                  </div>
+                  <div class="sidebar-employee-info">
+                    <div class="sidebar-employee-name">{{ (activeRecord || selectedTask || selectedRecord).rateeName }}</div>
+                    <div class="sidebar-employee-desc" v-if="activeAssignment">{{ raterRoleDesc(activeAssignment.raterType) }}</div>
+                    <div class="sidebar-employee-desc" v-else>
+                      {{ activeRecord?.divisionName || selectedRecord?.divisionName || '—' }}
+                      <template v-if="activeRecord?.position"> · {{ activeRecord.position }}</template>
+                    </div>
+                    <div class="sidebar-badges">
+                      <span v-if="activeAssignment" :class="['rtype-badge', rterTypeCls(activeAssignment.raterType)]">{{ raterTypeLabel(activeAssignment.raterType) }}</span>
+                      <span v-else-if="activeRecord" :class="['status-badge', statusClass(activeRecord.status)]">{{ activeRecord.status }}</span>
+                      <span class="period-badge">S{{ (activeRecord || selectedTask || selectedRecord).semester }} {{ (activeRecord || selectedTask || selectedRecord).year }}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <nav class="sidebar-domains" aria-label="Assessment domains">
+                  <button v-if="showCBCTab" :class="['sidebar-domain', activeTab === 'cbc' && 'active']" @click="activeTab = 'cbc'">
+                    <span class="sidebar-domain-top">
+                      <span class="sidebar-domain-title">Core Behavioral Competencies</span>
+                      <span class="sidebar-domain-arrow">›</span>
+                    </span>
+                    <span class="sidebar-domain-progress">{{ cbcAnsweredCount }} / {{ cbcTotalCount }}</span>
+                    <span class="sidebar-domain-bar">
+                      <span class="sidebar-domain-fill" :style="{ width: cbcProgress + '%' }"></span>
+                    </span>
+                  </button>
+                  <button v-if="!activeAssignment" :class="['sidebar-domain', activeTab === 'fpo' && 'active']" @click="activeTab = 'fpo'">
+                    <span class="sidebar-domain-top">
+                      <span class="sidebar-domain-title">Functional Performance Output</span>
+                      <span class="sidebar-domain-arrow">›</span>
+                    </span>
+                    <span class="sidebar-domain-progress">{{ activeRecord?.fpoScore ? 'Synced' : 'Needs sync' }}</span>
+                    <span class="sidebar-domain-bar">
+                      <span class="sidebar-domain-fill" :style="{ width: (activeRecord?.fpoScore ? 100 : 0) + '%' }"></span>
+                    </span>
+                  </button>
+                  <button v-if="showJFTab" :class="['sidebar-domain', activeTab === 'jf' && 'active']" @click="activeTab = 'jf'">
+                    <span class="sidebar-domain-top">
+                      <span class="sidebar-domain-title">Job Fitness</span>
+                      <span class="sidebar-domain-arrow">›</span>
+                    </span>
+                    <span class="sidebar-domain-progress">{{ jfAnsweredCount }} / {{ JF_INDICATORS.length }}</span>
+                    <span class="sidebar-domain-bar">
+                      <span class="sidebar-domain-fill" :style="{ width: (JF_INDICATORS.length ? Math.round(jfAnsweredCount / JF_INDICATORS.length * 100) : 0) + '%' }"></span>
+                    </span>
+                  </button>
+                  <!-- <button v-if="!activeAssignment" :class="['sidebar-domain', activeTab === 'edap' && 'active', edapRequired && 'needs-action']" @click="activeTab = 'edap'">
+                    <span class="sidebar-domain-top">
+                      <span class="sidebar-domain-title">D. Employee Development &amp; Action Plan</span>
+                      <span class="sidebar-domain-arrow">›</span>
+                    </span>
+                    <span class="sidebar-domain-progress">{{ edapRequired ? 'Required' : 'Optional' }}</span>
+                    <span class="sidebar-domain-bar">
+                      <span class="sidebar-domain-fill" :style="{ width: (edapRequired ? 0 : 100) + '%' }"></span>
+                    </span>
+                  </button> -->
+                </nav>
+
+                <div class="sidebar-card">
+                  <div class="sidebar-card-title">Rating Scale</div>
+                  <div class="sidebar-scale-item">
+                    <span class="sidebar-scale-number">1</span>
+                    <div><strong>Never</strong><small>The behavior is never demonstrated.</small></div>
+                  </div>
+                  <div class="sidebar-scale-item">
+                    <span class="sidebar-scale-number">2</span>
+                    <div><strong>Rarely</strong><small>The behavior is rarely demonstrated.</small></div>
+                  </div>
+                  <div class="sidebar-scale-item">
+                    <span class="sidebar-scale-number">3</span>
+                    <div><strong>Frequently</strong><small>The behavior is frequently demonstrated.</small></div>
+                  </div>
+                  <div class="sidebar-scale-item">
+                    <span class="sidebar-scale-number">4</span>
+                    <div><strong>Always</strong><small>The behavior is consistently demonstrated.</small></div>
+                  </div>
+                </div>
+              </aside>
+
+              <main class="assessment-content">
+                <div class="assessment-content-header">
+                  <div class="assessment-content-title">
+                    <h3>{{ activeDomainTitle }}</h3>
+                    <p>{{ activeDomainDescription }}</p>
+                  </div>
+                  <button class="eval-form-close" @click="closeDetailModal" title="Back to list">
+                    <svg width="14" height="14" viewBox="0 0 15 15" fill="none"><path d="M2 2l11 11M13 2L2 13" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+                  </button>
+                </div>
 
               <!-- Finalized note (rater) -->
               <div v-if="activeAssignment && selectedTask && selectedTask.ipatStatus === 'Final'" class="rp-final-note" style="margin-bottom:14px">
@@ -297,11 +383,11 @@
 
               <!-- Score summary (admin/self view only) -->
               <div v-if="!activeAssignment" class="score-summary-bar">
-                <div class="sscore"><div class="sscore-lbl">CBC (30%)</div><div :class="['sscore-val', activeRecord?.cbcScore ? 'has-val' : '']">{{ activeRecord?.cbcScore || '—' }}</div></div>
+                <div class="sscore"><div class="sscore-lbl">CBC (30%)</div><div :class="['sscore-val', activeRecord?.cbcScore ? 'has-val' : '']">{{ cbcWeighted }}</div></div>
                 <div class="sscore-op">+</div>
-                <div class="sscore"><div class="sscore-lbl">FPO (55%)</div><div :class="['sscore-val', activeRecord?.fpoScore ? 'has-val' : '']">{{ activeRecord?.fpoScore || '—' }}</div></div>
+                <div class="sscore"><div class="sscore-lbl">FPO (55%)</div><div :class="['sscore-val', activeRecord?.fpoScore ? 'has-val' : '']">{{ fpoWeighted }}</div></div>
                 <div class="sscore-op">+</div>
-                <div class="sscore"><div class="sscore-lbl">JF (15%)</div><div :class="['sscore-val', activeRecord?.jfScore ? 'has-val' : '']">{{ activeRecord?.jfScore || '—' }}</div></div>
+                <div class="sscore"><div class="sscore-lbl">JF (15%)</div><div :class="['sscore-val', activeRecord?.jfScore ? 'has-val' : '']">{{ jfWeighted }}</div></div>
                 <div class="sscore-op">=</div>
                 <div class="sscore sscore-overall">
                   <div class="sscore-lbl">Overall</div>
@@ -311,36 +397,9 @@
                 </div>
               </div>
 
-              <!-- Tabs -->
-              <div class="dtabs">
-                <button :class="['dtab', activeTab === 'cbc' && 'active']" @click="activeTab = 'cbc'">A. Core Behavioral Competencies</button>
-                <button v-if="!activeAssignment" :class="['dtab', activeTab === 'fpo' && 'active']" @click="activeTab = 'fpo'">B. Functional Performance Output</button>
-                <button v-if="showJFTab" :class="['dtab', activeTab === 'jf'  && 'active']" @click="activeTab = 'jf'">C. Job Fitness</button>
-                <button v-if="!activeAssignment" :class="['dtab', activeTab === 'edap' && 'active', edapRequired && 'dtab-alert']" @click="activeTab = 'edap'">
-                  <svg v-if="edapRequired" width="11" height="11" viewBox="0 0 11 11" fill="none" style="margin-right:4px;flex-shrink:0"><path d="M5.5 1L1 10h9L5.5 1z" fill="#F59E0B" stroke="#F59E0B" stroke-width=".5" stroke-linejoin="round"/><path d="M5.5 4.5v2.5M5.5 8.5v.1" stroke="#fff" stroke-width="1" stroke-linecap="round"/></svg>
-                  D. Employee Development &amp; Action Plan
-                </button>
-              </div>
-
               <!-- ── CBC TAB ── -->
               <div v-if="activeTab === 'cbc'" class="modal-body-scroll">
                 <template v-if="activeAssignment">
-                  <div class="rating-progress-wrap">
-                    <div class="rating-progress-label">
-                      <span>Core Behavioral Competencies</span>
-                      <span :class="['rating-progress-count', cbcAnsweredCount >= cbcTotalCount ? 'all-done' : '']">
-                        {{ cbcAnsweredCount }} / {{ cbcTotalCount }} answered
-                        <svg v-if="cbcAnsweredCount >= cbcTotalCount" width="14" height="14" viewBox="0 0 14 14" fill="none" style="vertical-align:-2px;margin-left:3px"><circle cx="7" cy="7" r="6" fill="#16A34A"/><path d="M4 7l2 2 4-4" stroke="#fff" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                      </span>
-                    </div>
-                    <div class="rating-progress-bar"><div class="rating-progress-fill" :style="{ width: cbcProgress + '%' }"></div></div>
-                  </div>
-                  <div class="scale-legend">
-                    <span class="scale-pill"><strong>1</strong> Never</span>
-                    <span class="scale-pill"><strong>2</strong> Rarely</span>
-                    <span class="scale-pill"><strong>3</strong> Frequently</span>
-                    <span class="scale-pill"><strong>4</strong> Always</span>
-                  </div>
                   <div v-if="showValidation && cbcAnsweredCount < cbcTotalCount" class="validation-banner">
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" fill="#FEF2F2" stroke="#EF4444" stroke-width="1.2"/><path d="M7 4v4M7 9.5v.5" stroke="#EF4444" stroke-width="1.3" stroke-linecap="round"/></svg>
                     Please answer all <strong>{{ cbcTotalCount - cbcAnsweredCount }}</strong> remaining question{{ cbcTotalCount - cbcAnsweredCount !== 1 ? 's' : '' }} before submitting.
@@ -348,12 +407,18 @@
                 </template>
                 <template v-else>
                   <div class="tab-intro">
-                    Rate each behavioral indicator using the <strong>1–4 Likert scale</strong>:
-                    <span class="scale-hint">1 = Never · 2 = Rarely · 3 = Frequently · 4 = Always</span>
+                    <template v-if="canAdmin">
+                      Viewing submitted ratings for each HEARTWORK behavioral indicator.
+                      <span class="scale-hint">1 = Never · 2 = Rarely · 3 = Frequently · 4 = Always</span>
+                    </template>
+                    <template v-else>
+                      Rate each behavioral indicator using the <strong>1–4 Likert scale</strong>:
+                      <span class="scale-hint">1 = Never · 2 = Rarely · 3 = Frequently · 4 = Always</span>
+                    </template>
                   </div>
                   <div class="rater-row">
                     <div class="rater-selector">
-                      <span class="rater-label">Rating as:</span>
+                      <span class="rater-label">{{ canAdmin ? 'Viewing ratings from:' : 'Rating as:' }}</span>
                       <select v-model="cbcRaterType" class="field-input" style="width:220px">
                         <option value="Self">Self (15%)</option>
                         <option value="Peer">Peer (15%)</option>
@@ -366,7 +431,7 @@
                     </div>
                     <div class="has-sub-note">
                       Subordinates: <strong>{{ activeRecord?.hasSubordinate ? 'Yes' : 'No' }}</strong>
-                      {{ !activeRecord?.hasSubordinate ? '— Peer1 + Peer2 each 15%' : '' }}
+                      {{ !activeRecord?.hasSubordinate ? '- Peer1 + Peer2 each 15%' : '' }}
                     </div>
                   </div>
                 </template>
@@ -385,13 +450,18 @@
                       <div class="ind-num">{{ idx + 1 }}</div>
                       <div class="ind-text">{{ ind }}</div>
                       <div class="ind-rating">
-                        <button v-for="n in [1,2,3,4]" :key="n" :class="['rating-btn', getCBCRating(theme.id, idx) === n && 'selected']" :title="['Never','Rarely','Frequently','Always'][n-1]" @click="setCBCRating(theme.id, idx, n)">{{ n }}</button>
+                        <template v-if="!activeAssignment && canAdmin">
+                          <span v-for="n in [1,2,3,4]" :key="n" :class="['rating-btn', getCBCRating(theme.id, idx) === n && 'selected', 'rating-readonly']">{{ n }}</span>
+                        </template>
+                        <template v-else>
+                          <button v-for="n in [1,2,3,4]" :key="n" :class="['rating-btn', getCBCRating(theme.id, idx) === n && 'selected']" :title="['Never','Rarely','Frequently','Always'][n-1]" @click="setCBCRating(theme.id, idx, n)">{{ n }}</button>
+                        </template>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <div v-if="!activeAssignment" class="action-bar">
+                <div v-if="!activeAssignment && !canAdmin" class="action-bar">
                   <button class="btn btn-primary" :disabled="savingCBC" @click="saveCBCRatings"><span v-if="savingCBC" class="spinner-sm"></span>{{ savingCBC ? 'Saving…' : 'Save CBC Ratings' }}</button>
                   <button class="btn" :disabled="computingCBC" @click="computeCBC">{{ computingCBC ? 'Computing…' : 'Compute CBC Score' }}</button>
                 </div>
@@ -400,49 +470,47 @@
               <!-- ── FPO TAB ── -->
               <div v-if="activeTab === 'fpo'" class="modal-body-scroll">
                 <div class="tab-intro">
-                  The <strong>Functional Performance Output</strong> domain uses the employee's <strong>IPCRF/DPCR Final Numerical Rating</strong> (1–5 scale) as the basis. It constitutes <strong>55%</strong> of the overall IPAT score. This score is pulled directly from the employee's own rated IPCRF/CCEF for the same period — it is never entered by hand here.
+                  The <strong>Functional Performance Output</strong> domain uses the employee's <strong>IPCRF/DPCR Final Numerical Rating</strong> (1–5 scale) as the basis. It constitutes <strong>55%</strong> of the overall IPAT score.
                 </div>
                 <div class="fpo-panel">
                   <div class="fpo-current">
-                    <div class="fpo-label">Current IPCRF/CCEF Score (1–5 scale)</div>
-                    <div class="fpo-score">{{ activeRecord?.fpoScore || '—' }}</div>
-                    <div v-if="activeRecord?.fpoScore" class="fpo-converted">Converted to 4-pt IPAT scale: <strong>{{ convertFPO(activeRecord.fpoScore) }}</strong></div>
+                    <div class="fpo-label">FPO Weighted Score</div>
+                    <div class="fpo-score">{{ fpoWeighted }}</div>
+                    <div v-if="activeRecord?.fpoScore" class="fpo-converted">Raw IPCRF score: <strong>{{ activeRecord.fpoScore }}</strong> × 0.55</div>
                   </div>
                   <div class="fpo-update">
-                    <label class="field-label">{{ activeRecord?.fpoScore ? 'Refresh from IPCRF/CCEF' : 'Pull from IPCRF/CCEF' }}</label>
+                    <label class="field-label">Auto-sync from IPCRF/CCEF</label>
                     <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
                       <button class="btn btn-primary" :disabled="syncingFPO" @click="syncFPOScore"><span v-if="syncingFPO" class="spinner-sm"></span>{{ syncingFPO ? 'Syncing…' : (activeRecord?.fpoScore ? 'Re-sync Score' : 'Sync Score') }}</button>
                     </div>
                     <span v-if="fpoSource" style="font-size:10px;color:#16A34A;margin-top:6px;display:block">Pulled from {{ fpoSource.type }} ({{ fpoSource.status }}) — S{{ fpoSource.semester }} {{ fpoSource.year }}{{ fpoSource.adjectivalRating ? ' · ' + fpoSource.adjectivalRating : '' }}</span>
-                    <span v-else style="font-size:10px;color:#94A3B8;margin-top:4px;display:block">Requires the employee's IPCRF/CCEF for this period to be Rated or Finalized.</span>
+                    <span v-else style="font-size:10px;color:#94A3B8;margin-top:4px;display:block">Pulls automatically from the employee's IPCRF/CCEF for this period.</span>
                   </div>
                 </div>
-                <div class="fpo-formula">
-                  <div class="formula-label">Scale Conversion (IPCRF 5-pt → IPAT 4-pt)</div>
-                  <div class="formula-text">Converted = ((IPCRF Score − 1) ÷ 4) × 3 + 1</div>
-                  <div class="formula-examples"><span>5.00 → 4.00</span><span>4.50 → 3.63</span><span>4.00 → 3.25</span><span>3.50 → 2.88</span><span>3.00 → 2.50</span><span>2.50 → 2.13</span></div>
+                <div v-if="canAdmin" class="fpo-manual-panel">
+                  <div class="fpo-manual-title">Manual FPO Entry</div>
+                  <p class="fpo-manual-hint">For periods where IPCRF/CCEF is unavailable (e.g. 1st Semester), enter the FPO score manually.</p>
+                  <div class="fpo-manual-row">
+                    <div class="fpo-manual-input-group">
+                      <label class="field-label">IPCRF Score (1–5)</label>
+                      <input v-model="fpoManualInput" type="number" step="0.01" min="1" max="5" class="field-input fpo-manual-field" placeholder="e.g. 4.5" @blur="onFpoManualBlur" @keyup.enter="$event.target.blur()"/>
+                    </div>
+                    <div v-if="fpoManualInput && Number(fpoManualInput) >= 1 && Number(fpoManualInput) <= 5" class="fpo-manual-result">
+                      <span class="fpo-calc-formula">{{ fpoManualInput }} × 0.55</span>
+                      <span class="fpo-calc-eq">=</span>
+                      <span class="fpo-calc-value">{{ fpoManualWeighted }}</span>
+                    </div>
+                    <div class="fpo-manual-status">
+                      <span v-if="savingFpoManual" class="fpo-saving-indicator"><span class="spinner-sm"></span> Saving…</span>
+                      <span v-if="fpoManualSaved" class="fpo-saved-indicator">Saved</span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
               <!-- ── JF TAB ── -->
               <div v-if="activeTab === 'jf'" class="modal-body-scroll">
                 <template v-if="activeAssignment">
-                  <div class="rating-progress-wrap">
-                    <div class="rating-progress-label">
-                      <span>Job Fitness</span>
-                      <span :class="['rating-progress-count', jfAnsweredCount >= JF_INDICATORS.length ? 'all-done' : '']">
-                        {{ jfAnsweredCount }} / {{ JF_INDICATORS.length }} answered
-                        <svg v-if="jfAnsweredCount >= JF_INDICATORS.length" width="14" height="14" viewBox="0 0 14 14" fill="none" style="vertical-align:-2px;margin-left:3px"><circle cx="7" cy="7" r="6" fill="#16A34A"/><path d="M4 7l2 2 4-4" stroke="#fff" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                      </span>
-                    </div>
-                    <div class="rating-progress-bar"><div class="rating-progress-fill" :style="{ width: (jfAnsweredCount / JF_INDICATORS.length * 100) + '%' }"></div></div>
-                  </div>
-                  <div class="scale-legend">
-                    <span class="scale-pill"><strong>1</strong> Never</span>
-                    <span class="scale-pill"><strong>2</strong> Rarely</span>
-                    <span class="scale-pill"><strong>3</strong> Frequently</span>
-                    <span class="scale-pill"><strong>4</strong> Always</span>
-                  </div>
                   <div v-if="showValidation && jfAnsweredCount < JF_INDICATORS.length" class="validation-banner">
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" fill="#FEF2F2" stroke="#EF4444" stroke-width="1.2"/><path d="M7 4v4M7 9.5v.5" stroke="#EF4444" stroke-width="1.3" stroke-linecap="round"/></svg>
                     Please answer all <strong>{{ JF_INDICATORS.length - jfAnsweredCount }}</strong> remaining question{{ JF_INDICATORS.length - jfAnsweredCount !== 1 ? 's' : '' }} before submitting.
@@ -450,13 +518,20 @@
                 </template>
                 <template v-else>
                   <div class="tab-intro">
-                    <strong>Job Fitness</strong> is rated by the Ratee (Self) and Immediate Supervisor only. JF Indicator Score = (Self + Supervisor) ÷ 2
-                    <span class="scale-hint">1 = Never · 2 = Rarely · 3 = Frequently · 4 = Always</span>
+                    <template v-if="canAdmin">
+                      Viewing submitted Job Fitness ratings. JF Indicator Score = (Self + Peer + Supervisor) ÷ 3
+                      <span class="scale-hint">1 = Never · 2 = Rarely · 3 = Frequently · 4 = Always</span>
+                    </template>
+                    <template v-else>
+                      <strong>Job Fitness</strong> is rated by the Ratee (Self), Peer, and Immediate Supervisor. JF Indicator Score = (Self + Peer + Supervisor) ÷ 3
+                      <span class="scale-hint">1 = Never · 2 = Rarely · 3 = Frequently · 4 = Always</span>
+                    </template>
                   </div>
                   <div class="rater-selector" style="margin-bottom:16px">
-                    <span class="rater-label">Rating as:</span>
+                    <span class="rater-label">{{ canAdmin ? 'Viewing ratings from:' : 'Rating as:' }}</span>
                     <select v-model="jfRaterType" class="field-input" style="width:220px">
                       <option value="Self">Self (Ratee)</option>
+                      <option value="Peer">Peer</option>
                       <option value="Supervisor">Immediate Supervisor</option>
                     </select>
                   </div>
@@ -470,14 +545,20 @@
                     <div class="jf-num">{{ idx + 1 }}</div>
                     <div class="jf-info">
                       <div class="jf-label">{{ ind }}</div>
-                      <input v-model="jfEvidence[idx]" type="text" class="jf-evidence" placeholder="Supporting evidence / document reference (optional)"/>
+                      <input v-if="!canAdmin || activeAssignment" v-model="jfEvidence[idx]" type="text" class="jf-evidence" placeholder="Supporting evidence / document reference (optional)"/>
+                      <div v-else-if="jfEvidence[idx]" class="jf-evidence-readonly">{{ jfEvidence[idx] }}</div>
                     </div>
                     <div class="ind-rating">
-                      <button v-for="n in [1,2,3,4]" :key="n" :class="['rating-btn', getJFRating(idx) === n && 'selected']" :title="['Never','Rarely','Frequently','Always'][n-1]" @click="setJFRating(idx, n)">{{ n }}</button>
+                      <template v-if="!activeAssignment && canAdmin">
+                        <span v-for="n in [1,2,3,4]" :key="n" :class="['rating-btn', getJFRating(idx) === n && 'selected', 'rating-readonly']">{{ n }}</span>
+                      </template>
+                      <template v-else>
+                        <button v-for="n in [1,2,3,4]" :key="n" :class="['rating-btn', getJFRating(idx) === n && 'selected']" :title="['Never','Rarely','Frequently','Always'][n-1]" @click="setJFRating(idx, n)">{{ n }}</button>
+                      </template>
                     </div>
                   </div>
                 </div>
-                <div v-if="!activeAssignment" class="action-bar">
+                <div v-if="!activeAssignment && !canAdmin" class="action-bar">
                   <button class="btn btn-primary" :disabled="savingJF" @click="saveJFRatings"><span v-if="savingJF" class="spinner-sm"></span>{{ savingJF ? 'Saving…' : 'Save Job Fitness Ratings' }}</button>
                   <button class="btn" :disabled="computingJF" @click="computeJF">{{ computingJF ? 'Computing…' : 'Compute JF Score' }}</button>
                 </div>
@@ -529,8 +610,6 @@
                 </template>
               </div>
 
-            </div>
-
             <!-- Sticky footer actions -->
             <div class="eval-form-footer">
               <template v-if="activeAssignment">
@@ -542,17 +621,19 @@
                   {{ submittingRating ? 'Submitting…' : (selectedTask?.status === 'Completed' ? 'Update Ratings' : 'Submit Ratings') }}
                 </button>
               </template>
-              <template v-else-if="activeRecord?.status !== 'Final'">
+              <template v-else-if="!canAdmin && activeRecord?.status !== 'Final'">
                 <button v-if="activeRecord?.status === 'Computed'" class="btn btn-finalize" @click="finalizeRecord">
                   <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1L2 3.5V6.5c0 2.76 2 5.15 4.5 5.5C9 11.65 11 9.26 11 6.5V3.5L6.5 1z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M4.5 6.5l1.5 1.5 2.5-2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
                   Finalize Assessment
                 </button>
                 <button class="btn btn-primary" :disabled="computingOverall" @click="computeOverall"><span v-if="computingOverall" class="spinner-sm"></span>{{ computingOverall ? 'Computing…' : 'Compute Overall Score' }}</button>
               </template>
-              <span v-else class="finalized-badge">
+              <span v-else-if="!canAdmin" class="finalized-badge">
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1L1.5 3.25V6c0 2.5 1.8 4.65 4.5 5 2.7-.35 4.5-2.5 4.5-5V3.25L6 1z" fill="#15803D" stroke="#15803D" stroke-width=".5" stroke-linejoin="round"/><path d="M3.75 6l1.5 1.5L9 4.5" stroke="#fff" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 Finalized
               </span>
+            </div>
+              </main>
             </div>
           </template>
         </template>
@@ -584,9 +665,9 @@
                 <div v-if="selectedResult.descriptor" class="rp-score-desc">{{ selectedResult.descriptor }}</div>
               </div>
               <div class="rp-score-grid">
-                <div class="rp-score-block"><div class="rp-score-lbl">CBC</div><div class="rp-score-val">{{ selectedResult.cbcScore ?? '—' }}</div><div class="rp-score-pct">30%</div></div>
-                <div class="rp-score-block"><div class="rp-score-lbl">FPO</div><div class="rp-score-val">{{ selectedResult.fpoScore ?? '—' }}</div><div class="rp-score-pct">55%</div></div>
-                <div class="rp-score-block"><div class="rp-score-lbl">JF</div><div class="rp-score-val">{{ selectedResult.jfScore ?? '—' }}</div><div class="rp-score-pct">15%</div></div>
+                <div class="rp-score-block"><div class="rp-score-lbl">CBC</div><div class="rp-score-val">{{ selectedResult.cbcScore ? (Math.round(selectedResult.cbcScore * 0.30 * 100) / 100).toFixed(2) : '—' }}</div><div class="rp-score-pct">30%</div></div>
+                <div class="rp-score-block"><div class="rp-score-lbl">FPO</div><div class="rp-score-val">{{ selectedResult.fpoScore ? (Math.round((selectedResult.fpoScore > 4 ? ((selectedResult.fpoScore - 1) / 4 * 3 + 1) : selectedResult.fpoScore) * 0.55 * 100) / 100).toFixed(2) : '—' }}</div><div class="rp-score-pct">55%</div></div>
+                <div class="rp-score-block"><div class="rp-score-lbl">JF</div><div class="rp-score-val">{{ selectedResult.jfScore ? (Math.round(selectedResult.jfScore * 0.15 * 100) / 100).toFixed(2) : '—' }}</div><div class="rp-score-pct">15%</div></div>
               </div>
             </template>
           </div>
@@ -690,13 +771,28 @@
           <div class="modal-body">
             <div v-if="generateResult" class="gen-result">
               <div class="gen-result-title">Assignments Generated</div>
-              <div class="gen-result-stat">{{ generateResult.generated }} assignments · {{ generateResult.ratees }} employees</div>
+              <div class="gen-result-stat">{{ generateResult.generated }} assignments · {{ generateResult.ratees }} employee/s</div>
               <div class="gen-result-breakdown">
                 <span v-for="(count, type) in generateResult.breakdown" :key="type" class="gen-chip">
                   {{ type }}: {{ count }}
                 </span>
               </div>
               <p class="gen-result-note">Users can now open the Evaluation module to view and submit their assigned ratings.</p>
+            </div>
+            <div v-else-if="showRegenConfirm" class="regen-warning">
+              <div class="regen-warning-icon">
+                <svg width="48" height="48" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="22" fill="#FEF2F2" stroke="#EF4444" stroke-width="2"/><path d="M24 14v14M24 32v2" stroke="#EF4444" stroke-width="2.5" stroke-linecap="round"/></svg>
+              </div>
+              <h3 class="regen-warning-title">Assignments Already Exist</h3>
+              <p class="regen-warning-text">Evaluation data already exists for <strong>Semester {{ generateForm.semester }}, {{ generateForm.year }}</strong>. Regenerating will permanently delete:</p>
+              <ul class="regen-warning-list">
+                <li>All IPAT records for this period</li>
+                <li>All CBC ratings submitted by raters</li>
+                <li>All Job Fitness ratings submitted by raters</li>
+                <li>All EDAP entries linked to this period</li>
+                <li>All rater assignments for this period</li>
+              </ul>
+              <p class="regen-warning-text" style="color:#EF4444;font-weight:600">This action cannot be undone. All submitted ratings will be lost.</p>
             </div>
             <div v-else class="form-grid">
               <div class="field">
@@ -715,7 +811,7 @@
                   <strong>What this does:</strong>
                   <ul style="margin:6px 0 0 18px;padding:0;font-size:12px;line-height:1.7">
                     <li>Creates IPAT records for all active employees</li>
-                    <li>Assigns Self, Peer1/Peer2 (or Peer+Subordinate), Supervisor, and Skip Supervisor raters based on position and section</li>
+                    <li>Assigns Self, Peer1/Peer2 (or Peer+Subordinate), JF Peer, Supervisor, and Skip Supervisor raters based on position and section</li>
                     <li>Avoids repeating same Peer/Subordinate from the previous cycle</li>
                     <li>Employees will see their assigned ratees in <em>My Rating Tasks</em></li>
                   </ul>
@@ -724,8 +820,12 @@
             </div>
           </div>
           <div class="modal-footer">
-            <button class="btn" @click="showGenerateModal = false; generateResult = null">{{ generateResult ? 'Close' : 'Cancel' }}</button>
-            <button v-if="!generateResult" class="btn btn-primary" :disabled="generating" @click="generateAssignments">
+            <button class="btn" @click="showGenerateModal = false; generateResult = null; showRegenConfirm = false">{{ generateResult ? 'Close' : 'Cancel' }}</button>
+            <button v-if="showRegenConfirm" class="btn btn-danger" :disabled="generating" @click="generateAssignments">
+              <span v-if="generating" class="spinner-sm"></span>
+              {{ resetting ? 'Deleting data…' : generating ? 'Regenerating…' : 'Delete All & Regenerate' }}
+            </button>
+            <button v-else-if="!generateResult" class="btn btn-primary" :disabled="generating" @click="generateAssignments">
               <span v-if="generating" class="spinner-sm"></span>
               {{ generating ? 'Generating…' : 'Generate Assignments' }}
             </button>
@@ -747,81 +847,64 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
-import { ipatApi, ipatAssignmentsApi, usersApi } from '@/services/api'
-import { useAuthStore } from '@/stores/auth'
+import { ipatApi, ipatAssignmentsApi, usersApi, assessmentContentApi, assessmentCategoryApi } from '@/services/api'
+import { usePermissions } from '@/composables/usePermissions'
 
-const authStore = useAuthStore()
+const { hasPermission } = usePermissions()
 
-// ── HEARTWORK Themes (exact per IPAT document) ──
-const HEARTWORK_THEMES = [
-  {
-    id: 'makatao', label: 'Makatao',
-    description: 'Human worth, dignity, inclusivity, equity, and human rights in social work and public service',
-    indicators: [
-      'Championing Equality and Social Justice: actively leads efforts to embed equity and social justice principles into program designs and practices, ensuring that every output serves as a meaningful protection and empowerment mechanism for the most vulnerable sectors',
-      'Embodying Compassion and Respect: consistently models and promotes a culture of compassion and respect in all professional interactions and outputs; actively ensures that program designs and workplace practices honor the diverse identities, backgrounds, and lived experiences of clients and colleagues',
-      'Promoting Cultural Competence: demonstrates awareness, understanding, and respect for diverse cultural identities, beliefs, values, and practices; integrates culturally responsive approaches in communication, service delivery, and decision-making',
-      'Driving Inclusive Practices: actively promotes and integrates inclusive principles into programs, policies, services, and workplace practices; ensures equitable access to opportunities, resources, and participation for individuals of diverse backgrounds',
-      'Empowering Communities: consistently places community well-being and voice at the center of all program development and innovation work; designs and champions meaningful participation mechanisms that position communities as active decision-makers'
-    ]
-  },
-  {
-    id: 'mapagpalaya', label: 'Mapagpalaya',
-    description: 'Empowerment, advocacy, liberation, and transformative social work through innovative programs',
-    indicators: [
-      'Foster Client Autonomy: promotes client self-determination by ensuring that programs, services, and interventions respect individual choice, encourage informed decision-making, and reduce dependency; creates opportunities for beneficiaries to actively participate in shaping solutions',
-      'Build Resilience and Independence: strengthens the capacity of individuals, families, and communities to overcome challenges, adapt to changing circumstances, and sustain positive outcomes beyond program support',
-      'Collaborate for Change: encourages meaningful partnerships with clients, communities, stakeholders, and colleagues in the design, implementation, and improvement of programs; fosters inclusive participation to drive sustainable social transformation',
-      'Advocate for Freedom from Oppression: promotes the identification and removal of systemic, institutional, and social barriers that hinder equity, inclusion, and access to opportunities; challenges discriminatory practices and advances social justice',
-      'Promote Sustainable Empowerment: ensures that interventions build lasting capacities, local ownership, and self-sustaining systems that continue to generate positive impact over time'
-    ]
-  },
-  {
-    id: 'marangal', label: 'Marangal',
-    description: 'Ethical excellence, accountability, integrity, and continuous professional development',
-    indicators: [
-      'Demonstrates honesty, integrity, and fairness in all official transactions and work-related dealings including but not limited to accomplishment of Daily Time Records (DTR), accomplishment reports, and feedback reports',
-      'Practices established policies, guidelines, procedures, and ethical standards in tasks, decisions, outputs, and individual actions that enhance personnel credibility in pursuit of ethical excellence and integrity',
-      'Proper usage of government resources and information; performs effectively during work hours; and uses authority responsibly and only for official purposes',
-      'Demonstrates professionalism and accountability in all interactions with colleagues, clients, and stakeholders by maintaining respectful, ethical, and confidential relationships, promoting transparency, and strengthening public trust',
-      'Demonstrates a commitment to continuous learning and professional growth by actively seeking opportunities to develop knowledge, skills, and competencies'
-    ]
-  },
-  {
-    id: 'marunong', label: 'Marunong',
-    description: 'Technical knowledge, critical thinking, continuous learning, and innovation in performance of duties',
-    indicators: [
-      'Demonstrates technical mastery and functional expertise essential to the office\'s mandates',
-      'Delivers high-quality outputs characterized by precision, thoroughness, and adherence to technical standards',
-      'Exhibits adaptability and openness to emerging methodologies and evolving organizational needs',
-      'Proactively identifies operational bottlenecks and proposes creative, viable solutions within their scope of authority',
-      'Navigates uncertainty with composure, adapting quickly to risks with a solution-oriented mindset'
-    ]
-  },
-  {
-    id: 'mapagpabago', label: 'Mapagpabago',
-    description: 'Transformational leadership, innovation, and pursuit of systemic change for sustainable social development',
-    indicators: [
-      'Demonstrates Visionary and Purpose-Driven Leadership: aligns actions, decisions, and work outputs with the organization\'s mission, long-term goals, and the broader objective of sustainable social development',
-      'Champions Systemic and Sustainable Reforms: proactively identifies opportunities for improvement and advocates for policies, programs, or practices that address root causes and promote lasting positive change',
-      'Empowers and Inspires Others toward Shared Goals: encourages and motivates colleagues, partners, stakeholders, and communities to actively participate, collaborate, and contribute toward common objectives',
-      'Integrates Inclusive and Sustainable Development Principles in Work: promotes inclusive, client-centered, equitable, and sustainable approaches in planning, decision-making, and service delivery',
-      'Initiates and Supports Innovation and Continuous Improvement: demonstrates openness to new ideas and technologies, proposes innovative solutions, and actively supports continuous learning and organizational improvement'
-    ]
+// ── Assessment content fetched from backend ──
+const assessmentQuestions  = ref([])
+const assessmentCategories = ref([])
+const loadingAssessment    = ref(false)
+
+const categoryLookup = computed(() => {
+  const map = {}
+  assessmentCategories.value.forEach(c => { map[c.categoryId] = c })
+  return map
+})
+
+const HEARTWORK_THEMES = computed(() => {
+  const cbcQuestions = assessmentQuestions.value.filter(q => q.domain === 'cbc' && q.status === 'Active')
+  const grouped = {}
+  cbcQuestions.forEach(q => {
+    if (!grouped[q.category]) {
+      const cat = categoryLookup.value[q.category]
+      grouped[q.category] = {
+        id: q.category,
+        label: cat?.categoryName || q.category,
+        description: cat?.description || q.guidanceText || '',
+        sequence: cat?.sequence || 0,
+        indicators: []
+      }
+    }
+    grouped[q.category].indicators.push(q.questionText)
+  })
+  return Object.values(grouped).sort((a, b) => (a.sequence || 0) - (b.sequence || 0))
+})
+
+const JF_INDICATORS = computed(() =>
+  assessmentQuestions.value
+    .filter(q => q.domain === 'jf' && q.status === 'Active')
+    .sort((a, b) => (a.sequence || 0) - (b.sequence || 0))
+    .map(q => q.questionText)
+)
+
+async function loadAssessmentContent() {
+  if (assessmentQuestions.value.length) return
+  loadingAssessment.value = true
+  try {
+    const [qData, cData] = await Promise.all([
+      assessmentContentApi.list({ status: 'Active', pageSize: 500 }),
+      assessmentCategoryApi.list({ status: 'Active', pageSize: 200 })
+    ])
+    assessmentQuestions.value  = qData?.items || (Array.isArray(qData) ? qData : [])
+    assessmentCategories.value = cData?.items || (Array.isArray(cData) ? cData : [])
+  } catch (e) {
+    console.error(e)
+  } finally {
+    loadingAssessment.value = false
   }
-]
-
-// ── Job Fitness Indicators (7) ──
-// Raters: Self + Immediate Supervisor + Skip Supervisor ÷ 3
-const JF_INDICATORS = [
-  'Educational Qualification Fit: possesses academic qualifications that meet or exceed the minimum requirements of the position and are relevant to assigned functions',
-  'Relevant Work Experience Alignment: demonstrates prior experience that directly supports the competencies and technical requirements of the current role',
-  'Training and Skills Applicability: has completed relevant training or learning interventions that are directly applicable to job tasks and improve work performance',
-  'Workplace Conduct Suitability: demonstrates behavior consistent with organizational standards, including respect for policies, colleagues, and institutional protocols',
-  'Attendance and Punctuality Compliance: maintains regular attendance and adheres to prescribed work schedules, with minimal unexcused absences or tardiness',
-  'Commitment to Organizational Objectives: demonstrates alignment with program goals through consistent work engagement and support for organizational priorities',
-  'Physical and Cognitive Work Capacity: maintains sufficient physical stamina and mental focus to perform job duties consistently and safely under normal work conditions'
-]
+}
 
 // ── State ──
 const records      = ref([])
@@ -832,8 +915,7 @@ const search       = ref('')
 const filterDiv    = ref('')
 
 // View toggle
-const ADMIN_ROLES = ['System Administrator', 'Bureau Director', 'Assistant Bureau Director', 'Division Chief']
-const canAdmin    = computed(() => ADMIN_ROLES.includes(authStore.role))
+const canAdmin = hasPermission('generate_ipat_assignments')
 const activeView  = ref('my-tasks')
 
 // My Tasks state
@@ -862,6 +944,8 @@ const showGenerateModal = ref(false)
 const generateForm  = ref({ semester: String(new Date().getMonth() < 6 ? 1 : 2), year: currentYear })
 const generating    = ref(false)
 const generateResult = ref(null)
+const showRegenConfirm = ref(false)
+const resetting     = ref(false)
 
 const showCreateModal = ref(false)
 const activeRecord    = ref(null)
@@ -879,6 +963,46 @@ const computingCBC = ref(false)
 
 const fpoSource  = ref(null)
 const syncingFPO = ref(false)
+const fpoManualInput  = ref('')
+const savingFpoManual = ref(false)
+const fpoManualSaved  = ref(false)
+
+const cbcWeighted = computed(() => {
+  const s = Number(activeRecord.value?.cbcScore)
+  if (!s) return '—'
+  return (Math.round(s * 0.30 * 100) / 100).toFixed(2)
+})
+const fpoWeighted = computed(() => {
+  let s = Number(activeRecord.value?.fpoScore)
+  if (!s) return '—'
+  if (s > 4) s = Math.round(((s - 1) / 4 * 3 + 1) * 100) / 100
+  return (Math.round(s * 0.55 * 100) / 100).toFixed(2)
+})
+const jfWeighted = computed(() => {
+  const s = Number(activeRecord.value?.jfScore)
+  if (!s) return '—'
+  return (Math.round(s * 0.15 * 100) / 100).toFixed(2)
+})
+const fpoManualWeighted = computed(() => {
+  let s = Number(fpoManualInput.value)
+  if (!s || s < 1 || s > 5) return ''
+  if (s > 4) s = Math.round(((s - 1) / 4 * 3 + 1) * 100) / 100
+  return (Math.round(s * 0.55 * 100) / 100).toFixed(2)
+})
+
+async function onFpoManualBlur() {
+  const val = Number(fpoManualInput.value)
+  if (!val || val < 1 || val > 5 || !activeRecord.value) return
+  savingFpoManual.value = true
+  fpoManualSaved.value = false
+  try {
+    await ipatApi.setFPO(activeRecord.value.id, val)
+    _syncRecord({ fpoScore: val })
+    fpoManualSaved.value = true
+    setTimeout(() => { fpoManualSaved.value = false }, 2500)
+  } catch (e) { console.error(e); showToast('Failed to save FPO score', 'error') }
+  finally { savingFpoManual.value = false }
+}
 
 const jfRaterType = ref('Self')
 const jfRatings   = ref({})
@@ -931,10 +1055,16 @@ const statusTabs = [
 const canCreate = computed(() => canAdmin.value)
 const canSelectRatee = computed(() => canAdmin.value)
 
-// JF tab visible when admin view or when assignment rater type can rate JF (Self / Supervisor)
+// JF tab visible when admin view, JFPeer assignment, or when assignment rater type can rate JF (Self / Supervisor)
 const showJFTab = computed(() => {
   if (!activeAssignment.value) return true
-  return ['Self', 'Supervisor'].includes(activeAssignment.value.raterType)
+  return ['Self', 'Supervisor', 'JFPeer'].includes(activeAssignment.value.raterType)
+})
+
+// CBC tab hidden for JFPeer assignments (they only rate JF)
+const showCBCTab = computed(() => {
+  if (!activeAssignment.value) return true
+  return activeAssignment.value.raterType !== 'JFPeer'
 })
 
 const availableDivisions = computed(() => {
@@ -954,20 +1084,70 @@ const filteredRecords = computed(() => {
 })
 
 // Rater progress computeds
-const cbcTotalCount    = computed(() => HEARTWORK_THEMES.reduce((s, t) => s + t.indicators.length, 0))
+const cbcTotalCount    = computed(() => HEARTWORK_THEMES.value.reduce((s, t) => s + t.indicators.length, 0))
 const cbcAnsweredCount = computed(() => Object.keys(cbcRatings.value).length)
-const cbcProgress      = computed(() => Math.round(cbcAnsweredCount.value / cbcTotalCount.value * 100))
-const jfAnsweredCount  = computed(() => JF_INDICATORS.filter((_, idx) => getJFRating(idx) !== null).length)
+const cbcProgress      = computed(() => cbcTotalCount.value ? Math.round(cbcAnsweredCount.value / cbcTotalCount.value * 100) : 0)
+const jfAnsweredCount  = computed(() => JF_INDICATORS.value.filter((_, idx) => getJFRating(idx) !== null).length)
 // Combined rater progress across the tabs the current rater must answer (CBC + JF when applicable)
-const raterTotal        = computed(() => cbcTotalCount.value + (showJFTab.value ? JF_INDICATORS.length : 0))
-const raterAnsweredTotal = computed(() => cbcAnsweredCount.value + (showJFTab.value ? jfAnsweredCount.value : 0))
+const raterTotal        = computed(() => (showCBCTab.value ? cbcTotalCount.value : 0) + (showJFTab.value ? JF_INDICATORS.value.length : 0))
+const raterAnsweredTotal = computed(() => (showCBCTab.value ? cbcAnsweredCount.value : 0) + (showJFTab.value ? jfAnsweredCount.value : 0))
 const allRaterAnswered  = computed(() => raterAnsweredTotal.value >= raterTotal.value)
+const activeDomainTitle = computed(() => {
+  const labels = {
+    cbc: 'Core Behavioral Competencies',
+    fpo: 'Functional Performance and Output',
+    jf: 'Job Fitness',
+    edap: 'Employee Development and Action Plan'
+  }
+  return labels[activeTab.value] || ''
+})
+const activeDomainDescription = computed(() => {
+  const desc = {
+    cbc: 'Rate each HEARTWORK behavior using the 1-4 scale.',
+    fpo: 'Review the synced IPCRF/CCEF final numerical rating.',
+    jf: 'Rate job fitness indicators and optional supporting evidence.',
+    edap: 'Document development actions when lower domain scores require intervention.'
+  }
+  return desc[activeTab.value] || ''
+})
+const activeProgressAnswered = computed(() => {
+  if (activeTab.value === 'jf') return jfAnsweredCount.value
+  if (activeTab.value === 'fpo') return activeRecord.value?.fpoScore ? 1 : 0
+  if (activeTab.value === 'edap') return edapRequired.value ? 0 : 1
+  return cbcAnsweredCount.value
+})
+const activeProgressTotal = computed(() => {
+  if (activeTab.value === 'jf') return JF_INDICATORS.value.length
+  if (activeTab.value === 'fpo' || activeTab.value === 'edap') return 1
+  return cbcTotalCount.value
+})
+const activeProgressPercent = computed(() => {
+  if (!activeProgressTotal.value) return 0
+  return Math.round((activeProgressAnswered.value / activeProgressTotal.value) * 100)
+})
 function themeAnsweredCount(theme) {
   return theme.indicators.filter((_, idx) => getCBCRating(theme.id, idx) !== null).length
 }
 
 // ── Helpers ──
 function showToast(msg, type = 'success') { toast.value = { show: true, msg, type }; setTimeout(() => { toast.value.show = false }, 3500) }
+function initials(name) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean)
+  if (!parts.length) return '?'
+  return parts.map(p => p[0]).join('').toUpperCase()
+}
+function taskDivisionLabel(task) {
+  const raw = task?.rateeDivisionName || task?.divisionName || task?.rateeDivisionId || ''
+  const normalized = String(raw).trim()
+  if (!normalized) return ''
+  const divisionNames = {
+    dfd: 'Design Formulation Division',
+    pid: 'Pilot Implementation Division',
+    staed: 'Social Technology Analysis and Evaluation Division',
+    ap: 'Admin Pool'
+  }
+  return divisionNames[normalized.toLowerCase()] || normalized.toUpperCase()
+}
 function statusClass(s) { return { Draft: 'st-draft', Computed: 'st-blue', Final: 'st-green' }[s] || 'st-draft' }
 function descriptorClass(d) {
   if (!d) return ''
@@ -976,7 +1156,6 @@ function descriptorClass(d) {
   if (d.includes('Needs'))        return 'desc-needs'
   return 'desc-immediate'
 }
-function convertFPO(score) { return Math.round(((Number(score) - 1) / 4 * 3 + 1) * 100) / 100 }
 function round2(v) { return Math.round(v * 100) / 100 }
 
 // CBC helpers
@@ -984,7 +1163,7 @@ function cbcKey(themeId, idx) { return `${themeId}_${idx}` }
 function getCBCRating(themeId, idx) { return cbcRatings.value[cbcKey(themeId, idx)] || null }
 function setCBCRating(themeId, idx, n) { cbcRatings.value[cbcKey(themeId, idx)] = n }
 function themeAvg(themeId) {
-  const theme = HEARTWORK_THEMES.find(t => t.id === themeId)
+  const theme = HEARTWORK_THEMES.value.find(t => t.id === themeId)
   if (!theme) return null
   const scores = theme.indicators.map((_, idx) => getCBCRating(themeId, idx)).filter(v => v !== null)
   if (!scores.length) return null
@@ -1018,7 +1197,7 @@ function _populateJFRatings(raterType, ratings) {
 watch(cbcRaterType, (type) => { if (loadedRec.value) _populateCBCRatings(type, loadedRec.value.cbcRatings) })
 watch(jfRaterType,  (type) => { if (loadedRec.value) _populateJFRatings(type,  loadedRec.value.jfRatings) })
 
-onMounted(() => { loadMyTasks() })
+onMounted(() => { loadAssessmentContent(); loadMyTasks() })
 
 // ── My Tasks ──
 async function loadMyTasks() {
@@ -1037,7 +1216,7 @@ async function loadMyTasks() {
       myTasks.value = []
       return
     }
-    showToast(`Could not load tasks: ${e.message}`, 'error')
+    console.error(e); showToast('Could not load tasks. Please try again.', 'error')
   }
   finally { loadingTasks.value = false }
 }
@@ -1053,7 +1232,7 @@ async function loadMyResults() {
     const data = await ipatAssignmentsApi.getMyResults({ semester: tasksSemester.value, year: tasksYear.value })
     myResults.value = data || []
   } catch (e) {
-    showToast(`Could not load results: ${e.message}`, 'error')
+    console.error(e); showToast('Could not load results. Please try again.', 'error')
   } finally {
     loadingResults.value = false
   }
@@ -1095,9 +1274,9 @@ async function openFromAssignment(task) {
   loadedRec.value        = null
   activeAssignment.value = task
   cbcRaterType.value     = task.raterType
-  jfRaterType.value      = ['Self', 'Supervisor'].includes(task.raterType) ? task.raterType : 'Self'
+  jfRaterType.value      = task.raterType === 'JFPeer' ? 'Peer' : (['Self', 'Peer', 'Supervisor'].includes(task.raterType) ? task.raterType : (task.raterType?.startsWith('Peer') ? 'Peer' : 'Self'))
   showValidation.value   = false
-  activeTab.value        = 'cbc'
+  activeTab.value        = task.raterType === 'JFPeer' ? 'jf' : 'cbc'
   if (task.ipatRecordId) {
     await openDetailModal({ id: task.ipatRecordId, rateeName: task.rateeName, semester: task.semester, year: task.year })
   }
@@ -1116,45 +1295,57 @@ async function submitRatings() {
   const assignment = activeAssignment.value
   if (!assignment) return
 
-  const cbcOk = cbcAnsweredCount.value >= cbcTotalCount.value
-  const jfOk  = !showJFTab.value || jfAnsweredCount.value >= JF_INDICATORS.length
+  const isJFPeer = assignment.raterType === 'JFPeer'
+  const cbcOk = isJFPeer || cbcAnsweredCount.value >= cbcTotalCount.value
+  const jfOk  = !showJFTab.value || jfAnsweredCount.value >= JF_INDICATORS.value.length
 
   if (!cbcOk || !jfOk) {
     showValidation.value = true
     if (!cbcOk) { activeTab.value = 'cbc' }
     else if (!jfOk) { activeTab.value = 'jf' }
     const missing = (!cbcOk ? cbcTotalCount.value - cbcAnsweredCount.value : 0) +
-                    (!jfOk  ? JF_INDICATORS.length - jfAnsweredCount.value : 0)
+                    (!jfOk  ? JF_INDICATORS.value.length - jfAnsweredCount.value : 0)
     showToast(`Please answer all ${missing} remaining question${missing !== 1 ? 's' : ''} before submitting.`, 'error')
     return
   }
 
   submittingRating.value = true
   try {
-    // Save CBC ratings
-    const cbcPayload = []
-    HEARTWORK_THEMES.forEach(theme => {
-      theme.indicators.forEach((_, idx) => {
-        const rating = getCBCRating(theme.id, idx)
-        if (rating !== null) cbcPayload.push({ themeId: theme.id, themeName: theme.label, indicatorIdx: idx, rating, raterType: assignment.raterType })
+    const saves = []
+    if (!isJFPeer) {
+      const cbcPayload = []
+      HEARTWORK_THEMES.value.forEach(theme => {
+        theme.indicators.forEach((_, idx) => {
+          const rating = getCBCRating(theme.id, idx)
+          if (rating !== null) cbcPayload.push({ themeId: theme.id, themeName: theme.label, indicatorIdx: idx, rating, raterType: assignment.raterType })
+        })
       })
-    })
-    await ipatApi.saveCBCRatings(activeRecord.value.id, cbcPayload)
-
-    // Save JF ratings if applicable
-    if (showJFTab.value) {
-      const jfPayload = JF_INDICATORS.map((_, idx) => ({
-        indicatorIdx: idx, rating: getJFRating(idx), evidence: jfEvidence.value[idx] || '', raterType: assignment.raterType
-      })).filter(r => r.rating !== null)
-      await ipatApi.saveJFRatings(activeRecord.value.id, jfPayload)
+      saves.push(ipatApi.saveCBCRatings(activeRecord.value.id, cbcPayload))
     }
-
+    if (showJFTab.value) {
+      const jfRaterType = isJFPeer ? 'Peer' : assignment.raterType
+      const jfPayload = JF_INDICATORS.value.map((_, idx) => ({
+        indicatorIdx: idx, rating: getJFRating(idx), evidence: jfEvidence.value[idx] || '', raterType: jfRaterType
+      })).filter(r => r.rating !== null)
+      saves.push(ipatApi.saveJFRatings(activeRecord.value.id, jfPayload))
+    }
+    await Promise.all(saves)
     await ipatAssignmentsApi.markCompleted(assignment.id)
     showToast('Ratings submitted successfully!')
     closeDetailModal()
-    loadMyTasks()
+    await loadMyTasks()
+    const allDone = myTasks.value.length > 0 && myTasks.value.every(t => t.status === 'Completed')
+    if (allDone) {
+      selectedTask.value = null
+      selectedRecord.value = null
+      activeRecord.value = null
+      activeView.value = 'my-results'
+      showToast('All rating tasks completed! Computing results…')
+      await loadMyResults()
+      if (myResults.value.length) selectedResult.value = myResults.value[0]
+    }
   } catch (e) {
-    showToast(e.message || 'Failed to submit ratings. Please try again.', 'error')
+    console.error(e); showToast('Failed to submit ratings. Please try again.', 'error')
   } finally {
     submittingRating.value = false
   }
@@ -1163,44 +1354,67 @@ async function submitRatings() {
 // ── Generate Assignments ──
 function openGenerateModal() {
   generateResult.value = null
+  showRegenConfirm.value = false
   generateForm.value   = { semester: String(new Date().getMonth() < 6 ? 1 : 2), year: currentYear }
   showGenerateModal.value = true
 }
 
 async function generateAssignments() {
   if (!generateForm.value.semester || !generateForm.value.year) { showToast('Semester and year required', 'error'); return }
+
+  // Check if assignments already exist for this period
+  if (!showRegenConfirm.value) {
+    try {
+      const existing = await ipatAssignmentsApi.list({ semester: generateForm.value.semester, year: generateForm.value.year })
+      if (existing && existing.length > 0) {
+        showRegenConfirm.value = true
+        return
+      }
+    } catch (e) { /* proceed if check fails */ }
+  }
+
   generating.value = true
   try {
+    // If regenerating, reset all IPAT data for this period first
+    if (showRegenConfirm.value) {
+      resetting.value = true
+      await ipatAssignmentsApi.deleteForPeriod(generateForm.value.semester, generateForm.value.year)
+      resetting.value = false
+    }
+    showRegenConfirm.value = false
     const result = await ipatAssignmentsApi.generate(generateForm.value)
     generateResult.value = result
-    showToast(`Generated ${result.generated} assignments`)
-  } catch (e) { showToast(e.message, 'error') }
-  finally { generating.value = false }
+    showToast(`Generated ${result.generated} assignments for ${result.ratees} employee(s)`)
+    await loadRecords()
+  } catch (e) { console.error(e); showToast(e?.message || 'Something went wrong. Please try again.', 'error') }
+  finally { generating.value = false; resetting.value = false }
 }
 
 // ── Rater type helpers ──
 function raterTypeLabel(type) {
   const labels = {
-    Self:          'Self',
-    Peer:          'Peer',
-    Peer1:         'Peer 1',
-    Peer2:         'Peer 2',
-    Subordinate:   'Subordinate',
-    Supervisor:    'Supervisor',
-    SkipSupervisor:'Skip Supervisor'
+    Self:           'Self-Rating',
+    Peer:           'Peer Rating',
+    Peer1:          'Peer Rating 1',
+    Peer2:          'Peer Rating (subtitute to subordinate)',
+    JFPeer:         'Job Fitness Peer Rating',
+    Subordinate:    'Immediate Supervisor Rating',
+    Supervisor:     'Subordinate Rating',
+    SkipSupervisor: 'Skip Supervisor Rating'
   }
   return labels[type] || type
 }
 
 function raterRoleDesc(type) {
   const desc = {
-    Self:          'You are rating yourself',
-    Peer:          'Same-level Peer Rating',
-    Peer1:         'Same-level Peer Rating',
-    Peer2:         'Same-level Peer Rating',
-    Subordinate:   'You report to this person',
-    Supervisor:    'You are the immediate supervisor of this staff',
-    SkipSupervisor:'Skip-level supervisor rating'
+    Self:           "You are completing your self-assessment.",
+    Peer:           "You are rating a colleague at the same organizational level.",
+    Peer1:          "You are assigned as the employee’s first peer rater.",
+    Peer2:          "You are assigned as the employee’s second peer rater.",
+    JFPeer:         "You are assigned as the employee’s Job Fitness peer rater.",
+    Subordinate:    "You are rating your immediate supervisor.",
+    Supervisor:     "You are rating an employee under your direct supervision.",
+    SkipSupervisor: "You are rating an employee supervised by one of your direct subordinates."
   }
   return desc[type] || ''
 }
@@ -1211,6 +1425,7 @@ function rterTypeCls(type) {
     Peer:          'rt-peer',
     Peer1:         'rt-peer',
     Peer2:         'rt-peer',
+    JFPeer:        'rt-peer',
     Subordinate:   'rt-sub',
     Supervisor:    'rt-sup',
     SkipSupervisor:'rt-skip'
@@ -1225,6 +1440,7 @@ function raterAccent(type) {
     Peer:          '#8B5CF6',
     Peer1:         '#8B5CF6',
     Peer2:         '#8B5CF6',
+    JFPeer:        '#8B5CF6',
     Subordinate:   '#F59E0B',
     Supervisor:    '#22C55E',
     SkipSupervisor:'#F97316'
@@ -1237,7 +1453,7 @@ async function loadRecords() {
   try {
     const r = await ipatApi.list()
     records.value = r?.items || (Array.isArray(r) ? r : [])
-  } catch (e) { showToast(`Could not load assessments: ${e.message}`, 'error') }
+  } catch (e) { console.error(e); showToast('Could not load assessments. Please try again.', 'error') }
   finally { loading.value = false }
 }
 
@@ -1277,7 +1493,7 @@ async function createRecord() {
     showCreateModal.value = false
     showToast('Assessment record created')
     selectRecord(rec)
-  } catch (e) { showToast(e.message, 'error') }
+  } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
   finally { creating.value = false }
 }
 
@@ -1288,28 +1504,30 @@ async function openDetailModal(rec) {
   jfRatings.value       = {}
   jfEvidence.value      = {}
   fpoSource.value       = null
+  fpoManualInput.value  = ''
+  fpoManualSaved.value  = false
   loadedRec.value       = null
   loadingDetail.value   = true
   _resetEdap()
   try {
-    const full = await ipatApi.get(rec.id)
+    const [full, edap] = await Promise.all([
+      ipatApi.get(rec.id),
+      ipatApi.getEdap(rec.id).catch(() => null)
+    ])
     loadedRec.value = full
     activeRecord.value = { ...rec, ...full }
+    fpoManualInput.value = full.fpoScore ? String(full.fpoScore) : ''
     _populateCBCRatings(cbcRaterType.value, full.cbcRatings)
     _populateJFRatings(jfRaterType.value,   full.jfRatings)
-    // Load existing EDAP if any
-    try {
-      const edap = await ipatApi.getEdap(rec.id)
-      if (edap) {
-        edapRows.value       = edap.rows?.length ? edap.rows : [defaultEdapRow()]
-        edapSem1Status.value = edap.sem1Status || 'not-started'
-        edapSem1Notes.value  = edap.sem1Notes  || ''
-        edapSem2Status.value = edap.sem2Status || 'not-started'
-        edapSem2Notes.value  = edap.sem2Notes  || ''
-      }
-    } catch { /* no edap yet */ }
+    if (edap) {
+      edapRows.value       = edap.rows?.length ? edap.rows : [defaultEdapRow()]
+      edapSem1Status.value = edap.sem1Status || 'not-started'
+      edapSem1Notes.value  = edap.sem1Notes  || ''
+      edapSem2Status.value = edap.sem2Status || 'not-started'
+      edapSem2Notes.value  = edap.sem2Notes  || ''
+    }
   } catch (e) {
-    showToast(`Could not load full record: ${e.message}`, 'error')
+    console.error(e); showToast('Could not load record. Please try again.', 'error')
   } finally {
     loadingDetail.value = false
   }
@@ -1324,11 +1542,10 @@ function _syncRecord(updated) {
 // ── CBC ──
 async function saveCBCRatings() {
   const ratings = []
-  HEARTWORK_THEMES.forEach(theme => {
+  HEARTWORK_THEMES.value.forEach(theme => {
     theme.indicators.forEach((_, idx) => {
       const rating = getCBCRating(theme.id, idx)
       if (rating !== null) {
-        // Only send minimal fields — full indicator text causes URL to exceed GAS limits
         const effectiveType = activeAssignment.value?.raterType || cbcRaterType.value
         ratings.push({ themeId: theme.id, themeName: theme.label, indicatorIdx: idx, rating, raterType: effectiveType })
       }
@@ -1341,7 +1558,7 @@ async function saveCBCRatings() {
     showToast(`${ratings.length} CBC ratings saved`)
     const full = await ipatApi.get(activeRecord.value.id)
     if (full) loadedRec.value = full
-  } catch (e) { showToast(e.message, 'error') }
+  } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
   finally { savingCBC.value = false }
 }
 
@@ -1351,7 +1568,7 @@ async function computeCBC() {
     const r = await ipatApi.computeCBC(activeRecord.value.id)
     _syncRecord({ cbcScore: r.cbcScore })
     showToast(`CBC Score: ${r.cbcScore}`)
-  } catch (e) { showToast(e.message, 'error') }
+  } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
   finally { computingCBC.value = false }
 }
 
@@ -1363,18 +1580,18 @@ async function syncFPOScore() {
     _syncRecord({ fpoScore: r.fpoScore })
     fpoSource.value = r.source
     showToast(`FPO score pulled from ${r.source.type}: ${r.fpoScore}`)
-  } catch (e) { showToast(e.message, 'error') }
+  } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
   finally { syncingFPO.value = false }
 }
 
 // ── JF ──
 async function saveJFRatings() {
-  const ratings = JF_INDICATORS.map((_, idx) => ({
+  const ratings = JF_INDICATORS.value.map((_, idx) => ({
     // Only send minimal fields — full indicator text causes URL to exceed GAS limits
     indicatorIdx: idx,
     rating: getJFRating(idx) || 1,
     evidence: jfEvidence.value[idx] || '',
-    raterType: activeAssignment.value?.raterType || jfRaterType.value
+    raterType: activeAssignment.value?.raterType === 'JFPeer' ? 'Peer' : (activeAssignment.value?.raterType?.startsWith('Peer') ? 'Peer' : (activeAssignment.value?.raterType || jfRaterType.value))
   })).filter((_, idx) => getJFRating(idx) !== null)
   if (!ratings.length) { showToast('Please rate at least one indicator', 'error'); return }
   savingJF.value = true
@@ -1383,7 +1600,7 @@ async function saveJFRatings() {
     showToast(`${ratings.length} Job Fitness ratings saved`)
     const full = await ipatApi.get(activeRecord.value.id)
     if (full) loadedRec.value = full
-  } catch (e) { showToast(e.message, 'error') }
+  } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
   finally { savingJF.value = false }
 }
 
@@ -1393,7 +1610,7 @@ async function computeJF() {
     const r = await ipatApi.computeJF(activeRecord.value.id)
     _syncRecord({ jfScore: r.jfScore })
     showToast(`Job Fitness Score: ${r.jfScore}`)
-  } catch (e) { showToast(e.message, 'error') }
+  } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
   finally { computingJF.value = false }
 }
 
@@ -1404,7 +1621,7 @@ async function computeOverall() {
     const r = await ipatApi.computeOverall(activeRecord.value.id)
     _syncRecord({ overallScore: r.overallScore, descriptor: r.descriptor, cbcScore: r.cbcScore, fpoScore: r.fpoScore, jfScore: r.jfScore, status: 'Computed' })
     showToast(`Overall: ${r.overallScore} — ${r.descriptor}`)
-  } catch (e) { showToast(e.message, 'error') }
+  } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
   finally { computingOverall.value = false }
 }
 
@@ -1413,7 +1630,7 @@ async function finalizeRecord() {
     await ipatApi.updateStatus(activeRecord.value.id, 'Final')
     _syncRecord({ status: 'Final' })
     showToast('Assessment finalized')
-  } catch (e) { showToast(e.message, 'error') }
+  } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
 }
 
 // ── EDAP ──
@@ -1430,7 +1647,7 @@ async function saveEdap() {
       sem2Notes:  edapSem2Notes.value
     })
     showToast('EDAP saved')
-  } catch (e) { showToast(e.message, 'error') }
+  } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
   finally { savingEdap.value = false }
 }
 
@@ -1447,10 +1664,10 @@ function _resetEdap() {
 .eval-page{padding:0;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;font-size:13px;color:#1A2332;min-height:100%;}
 
 /* ── Two-panel shell ── */
-.eval-tp-shell{display:flex;min-height:620px;border:1px solid #DDE7F3;border-radius:14px;overflow:hidden;background:#fff;margin-top:4px;box-shadow:0 10px 28px rgba(15,23,42,.05);}
-.eval-tp-left{width:470px;flex-shrink:0;border-right:1px solid #E2E8F0;display:flex;flex-direction:column;overflow-y:auto;max-height:86vh;scrollbar-width:thin;scrollbar-color:#CBD5E1 transparent;background:#FBFDFF;}
+.eval-tp-shell{display:flex;height:86vh;border:1px solid #DDE7F3;border-radius:14px;overflow:hidden;background:#fff;margin-top:4px;box-shadow:0 10px 28px rgba(15,23,42,.05);}
+.eval-tp-left{width:450px;flex-shrink:0;border-right:1px solid #E2E8F0;display:flex;flex-direction:column;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#CBD5E1 transparent;background:#FBFDFF;}
 .eval-tp-left .tasks-period-bar,.eval-tp-left .filter-bar{border-bottom:1px solid #E8EEF7;padding:14px 18px;flex-shrink:0;background:#FFFFFF;}
-.eval-tp-right{flex:1;min-width:0;display:flex;flex-direction:column;overflow-y:auto;max-height:86vh;scrollbar-width:thin;scrollbar-color:#E2E8F0 transparent;}
+.eval-tp-right{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;scrollbar-width:thin;scrollbar-color:#E2E8F0 transparent;}
 
 /* ── List items ── */
 .eli-list{flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:9px;}
@@ -1459,7 +1676,7 @@ function _resetEdap() {
 .eli-active{background:#F2F7FF !important;border-color:#3B82F6 !important;border-left:3px solid #3B82F6;padding-left:11px;box-shadow:0 8px 20px rgba(59,130,246,.12);}
 .eli-sk{pointer-events:none;}
 .eli-row{display:flex;align-items:center;gap:10px;}
-.eli-av{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0;}
+.eli-av{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;letter-spacing:-.02em;}
 .eli-av-res{background:#F0FDF4;color:#15803D;}
 .eli-av-rec{background:#F1F5F9;color:#475569;}
 .eli-info{flex:1;min-width:0;}
@@ -1609,6 +1826,8 @@ function _resetEdap() {
 .btn:disabled{opacity:.55;cursor:not-allowed;}
 .btn-primary{background:#0D2137;color:#fff;border-color:#0D2137;}
 .btn-primary:hover:not(:disabled){background:#1e3f61;}
+.btn-danger{background:#DC2626;color:#fff;border-color:#DC2626;}
+.btn-danger:hover:not(:disabled){background:#B91C1C;}
 .btn-xs{padding:4px 9px;font-size:11px;}
 .req{color:#EF4444;}
 
@@ -1658,12 +1877,12 @@ function _resetEdap() {
 .theme-desc{font-size:11px;color:#64748B;flex:1;}
 .theme-avg{font-size:12px;font-weight:700;color:#0F172A;background:#F0FDF4;border:1px solid #BBF7D0;padding:2px 10px;border-radius:20px;flex-shrink:0;}
 .indicator-list{display:flex;flex-direction:column;gap:7px;}
-.indicator-row{display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px solid #EAF0F7;border-radius:10px;background:#fff;transition:border-color .12s,background .12s,box-shadow .12s;}
+.indicator-row{display:grid;grid-template-columns:24px minmax(0,1fr) auto;align-items:center;gap:12px;padding:12px 14px;border:1px solid #EAF0F7;border-radius:10px;background:#fff;transition:border-color .12s,background .12s,box-shadow .12s;}
 .indicator-row:hover{border-color:#C7DBF5;background:#FAFCFF;box-shadow:0 4px 12px rgba(15,23,42,.045);}
 .ind-num{width:22px;height:22px;border-radius:50%;background:#F1F5F9;color:#64748B;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .ind-text{flex:1;font-size:12px;color:#374151;line-height:1.5;}
-.ind-rating{display:flex;gap:4px;flex-shrink:0;}
-.rating-btn{min-width:40px;height:36px;padding:0 10px;border-radius:9px;border:1.5px solid #D8E3F0;background:#fff;font-size:13px;font-weight:800;color:#475569;cursor:pointer;transition:all .12s;display:flex;align-items:center;justify-content:center;}
+.ind-rating{display:grid;grid-template-columns:repeat(4,36px);gap:6px;justify-content:end;flex-shrink:0;}
+.rating-btn{min-width:0;width:36px;height:36px;padding:0;border-radius:9px;border:1.5px solid #D8E3F0;background:#fff;font-size:13px;font-weight:800;color:#475569;cursor:pointer;transition:all .12s;display:flex;align-items:center;justify-content:center;}
 .rating-btn:hover:not(.selected){background:#EFF6FF;border-color:#93C5FD;color:#1A56B0;}
 .rating-btn.selected{background:#1A56B0;border-color:#1A56B0;color:#fff;box-shadow:0 2px 8px rgba(26,86,176,.25);}
 
@@ -1703,11 +1922,23 @@ function _resetEdap() {
 .fpo-converted{font-size:11px;color:#64748B;margin-top:6px;}
 .fpo-update{display:flex;flex-direction:column;}
 .fpo-auto-note{font-size:11px;color:#64748B;background:#F8FAFC;border:1px solid #F1F5F9;border-radius:8px;padding:10px 12px;line-height:1.5;}
-.fpo-formula{background:#F8FAFC;border:1px solid #F1F5F9;border-radius:8px;padding:12px 14px;}
-.formula-label{font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;}
-.formula-text{font-size:12px;color:#374151;font-family:'SF Mono','Fira Mono',monospace;margin-bottom:8px;}
-.formula-examples{display:flex;gap:10px;flex-wrap:wrap;}
-.formula-examples span{font-size:11px;color:#64748B;background:#fff;border:1px solid #E2E8F0;padding:2px 8px;border-radius:6px;}
+
+.fpo-manual-panel{background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:16px;margin-bottom:16px;}
+.fpo-manual-title{font-size:13px;font-weight:700;color:#92400E;margin-bottom:4px;}
+.fpo-manual-hint{font-size:11px;color:#A16207;line-height:1.5;margin-bottom:12px;}
+.fpo-manual-row{display:flex;align-items:flex-end;gap:12px;}
+.fpo-manual-input-group{flex:0 0 140px;margin-right:auto;}
+.fpo-manual-field{width:100%;font-size:18px;font-weight:700;text-align:center;padding:8px 12px;}
+.fpo-manual-result{display:flex;align-items:baseline;gap:6px;padding-bottom:6px;margin-right:40px;}
+.fpo-calc-formula{font-size:13px;color:#64748B;white-space:nowrap;}
+.fpo-calc-eq{font-size:15px;color:#94A3B8;font-weight:600;}
+.fpo-calc-value{font-size:24px;font-weight:800;color:#0F172A;line-height:1;}
+.fpo-manual-status{display:flex;align-items:center;padding-bottom:8px;}
+.fpo-saving-indicator{font-size:11px;color:#94A3B8;display:flex;align-items:center;gap:4px;}
+.fpo-saved-indicator{font-size:11px;font-weight:600;color:#16A34A;}
+.rating-readonly{cursor:default;opacity:.5;}
+.rating-readonly.selected{opacity:1;background:#1E40AF;color:#fff;border-color:#1E40AF;}
+.jf-evidence-readonly{font-size:11px;color:#64748B;margin-top:2px;font-style:italic;}
 
 /* JF tab */
 .jf-list{display:flex;flex-direction:column;gap:6px;}
@@ -1787,10 +2018,10 @@ function _resetEdap() {
 .toast-slide-enter-from,.toast-slide-leave-to{opacity:0;transform:translateY(8px);}
 
 /* View tabs */
-.view-tabs{display:flex;gap:4px;margin-bottom:10px;}
-.view-tab{display:inline-flex;align-items:center;gap:6px;padding:7px 16px;border-radius:20px;font-size:12px;font-weight:500;border:1px solid #E2E8F0;background:#fff;color:#64748B;cursor:pointer;transition:all .15s;}
-.view-tab.active{background:#0D2137;color:#fff;border-color:#0D2137;}
-.view-tab-badge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#EF4444;color:#fff;font-size:10px;font-weight:700;}
+.view-tabs {display: flex;width: 100%;gap: 8px;margin-top: 8px;margin-bottom: 5px;padding: 0 12px;box-sizing: border-box;}
+.view-tab {flex: 1;min-width: 0;height: 36px;padding: 6px 12px;display: flex;align-items: center;justify-content: center;gap: 7px;border: 1px solid #dbe4f0;border-radius: 18px;background: #ffffff;color: #52627a;font-size: 13px;font-weight: 600;line-height: 1;cursor: pointer;white-space: nowrap;}
+.view-tab.active {background: #071d36;border-color: #071d36;color: #ffffff;}
+.view-tab-badge {display: inline-flex;align-items: center;justify-content: center;min-width: 18px;height: 18px;padding: 0 5px;border-radius: 999px;background: #ef4444;color: #ffffff;font-size: 10px;font-weight: 700;line-height: 1;}
 
 /* My Tasks */
 .tasks-period-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
@@ -1813,6 +2044,12 @@ function _resetEdap() {
 
 /* Generate modal */
 .gen-info-box{background:#F0F9FF;border:1px solid #BAE6FD;border-radius:8px;padding:12px 14px;font-size:12px;color:#0369A1;}
+.regen-warning{text-align:center;padding:12px 0;}
+.regen-warning-icon{margin-bottom:12px;}
+.regen-warning-title{font-size:16px;font-weight:700;color:#DC2626;margin:0 0 8px;}
+.regen-warning-text{font-size:13px;color:#374151;margin:0 0 10px;line-height:1.6;}
+.regen-warning-list{text-align:left;margin:0 auto 14px;padding:0 0 0 22px;font-size:12px;line-height:1.8;color:#6B7280;max-width:340px;}
+.regen-warning-list li::marker{color:#EF4444;}
 .gen-result{text-align:center;padding:20px 0;}
 .gen-result-title{font-size:16px;font-weight:700;color:#15803D;margin-bottom:6px;}
 .gen-result-stat{font-size:13px;color:#374151;margin-bottom:12px;}
@@ -1861,10 +2098,46 @@ function _resetEdap() {
 .variance-banner strong{color:#92400E;}
 
 /* ════════════ INLINE ASSESSMENT FORM (right panel) ════════════ */
+.assessment-layout{display:grid;grid-template-columns:380px minmax(0,1fr);flex:1;min-height:0;overflow:hidden;background:#fff;height:100%;}
+.assessment-sidebar{min-width:0;overflow-y:auto;border-right:1px solid #E2E8F0;background:#FFFFFF;padding:18px 14px;scrollbar-width:thin;scrollbar-color:#CBD5E1 transparent;}
+.sidebar-employee{display:flex;align-items:flex-start;gap:11px;padding-bottom:16px;margin-bottom:14px;border-bottom:1px solid #E8EEF7;}
+.sidebar-avatar{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;letter-spacing:-.04em;flex-shrink:0;box-shadow:inset 0 0 0 1px rgba(15,23,42,.05);}
+.sidebar-employee-info{min-width:0;flex:1;}
+.sidebar-employee-name{font-size:14px;font-weight:800;color:#0F172A;line-height:1.25;overflow-wrap:anywhere;margin-bottom:4px;}
+.sidebar-employee-desc{font-size:11.5px;color:#64748B;line-height:1.45;margin-bottom:8px;}
+.sidebar-badges{display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
+.sidebar-domains{display:flex;flex-direction:column;gap:9px;margin-bottom:14px;}
+.sidebar-domain{width:100%;display:flex;flex-direction:column;align-items:stretch;gap:7px;padding:12px;border:1px solid #E5EDF7;border-radius:12px;background:#FBFDFF;color:#475569;text-align:left;cursor:pointer;transition:background .14s,border-color .14s,color .14s,box-shadow .14s,transform .14s;}
+.sidebar-domain:hover{background:#F8FBFF;color:#1A56B0;border-color:#BFDBFE;box-shadow:0 5px 14px rgba(15,23,42,.06);transform:translateY(-1px);}
+.sidebar-domain.active{background:#EFF6FF;color:#1A56B0;border-color:#BFDBFE;border-left:4px solid #1A56B0;padding-left:9px;box-shadow:0 5px 14px rgba(26,86,176,.08);}
+.sidebar-domain.needs-action:not(.active){background:#FFFBEB;color:#92400E;border-color:#FDE68A;}
+.sidebar-domain-top{display:grid;grid-template-columns:minmax(0,1fr) 18px;align-items:center;gap:8px;}
+.sidebar-domain-title{font-size:11.5px;font-weight:800;line-height:1.25;}
+.sidebar-domain-arrow{width:18px;height:18px;border-radius:999px;display:flex;align-items:center;justify-content:center;color:#94A3B8;background:#F1F5F9;font-size:18px;font-weight:800;line-height:1;transition:background .14s,color .14s,transform .14s;}
+.sidebar-domain:hover .sidebar-domain-arrow,.sidebar-domain.active .sidebar-domain-arrow{background:#DBEAFE;color:#1A56B0;transform:translateX(1px);}
+.sidebar-domain-progress{align-self:flex-start;font-size:10.5px;font-weight:700;color:#64748B;background:#F1F5F9;border-radius:999px;padding:2px 7px;}
+.sidebar-domain.active .sidebar-domain-progress{background:#DBEAFE;color:#1A56B0;}
+.sidebar-domain-bar{display:block;width:100%;height:5px;border-radius:999px;background:#E2E8F0;overflow:hidden;}
+.sidebar-domain-fill{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,#1A56B0,#3B82F6);transition:width .25s ease;}
+.sidebar-card{border:1px solid #E5EDF7;border-radius:12px;background:#FBFDFF;padding:12px;margin-bottom:12px;}
+.sidebar-card-title{font-size:10px;font-weight:800;color:#64748B;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;}
+.sidebar-scale-item{display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-top:1px solid #EDF2F8;}
+.sidebar-scale-item:first-of-type{border-top:0;padding-top:0;}
+.sidebar-scale-item:last-child{padding-bottom:0;}
+.sidebar-scale-number{width:24px;height:24px;border-radius:8px;background:#EFF6FF;color:#1A56B0;font-size:12px;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.sidebar-scale-item strong{display:block;font-size:11.5px;color:#0F172A;line-height:1.2;}
+.sidebar-scale-item small{display:block;font-size:10.5px;color:#64748B;line-height:1.3;margin-top:2px;}
+.assessment-content{min-width:0;min-height:0;overflow-y:auto;display:flex;flex-direction:column;background:#FBFDFF;scrollbar-width:thin;scrollbar-color:#CBD5E1 transparent;}
+.assessment-content-header{position:sticky;top:0;z-index:5;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:16px 20px;border-bottom:1px solid #E2E8F0;background:rgba(255,255,255,.96);backdrop-filter:blur(6px);}
+.assessment-content-title{min-width:0;}
+.assessment-content-title h3{font-size:16px;font-weight:800;color:#0F172A;letter-spacing:-.02em;margin:0 0 3px;line-height:1.2;}
+.assessment-content-title p{font-size:11.5px;color:#64748B;margin:0;line-height:1.4;}
+.assessment-content .rp-final-note{margin:14px 20px 0 !important;}
+.assessment-content .score-summary-bar{margin:0;border-bottom:1px solid #E6EEF8;}
 .eval-form-hd{position:sticky;top:0;z-index:6;display:flex;align-items:center;justify-content:space-between;gap:12px;
   padding:16px 24px;border-bottom:1px solid #E8EDF3;background:linear-gradient(180deg,#FFFFFF,#F8FAFF);flex-shrink:0;}
 .eval-form-hd-main{display:flex;align-items:center;gap:12px;min-width:0;}
-.eval-form-av{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;flex-shrink:0;}
+.eval-form-av{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0;letter-spacing:-.02em;}
 .eval-form-hd-info{min-width:0;}
 .eval-form-title{font-size:16px;font-weight:800;color:#0F172A;letter-spacing:-.3px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .eval-form-sub{font-size:12px;color:#64748B;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -1873,29 +2146,27 @@ function _resetEdap() {
 .eval-form-close:hover{background:#FEF2F2;border-color:#FECACA;color:#EF4444;}
 .eval-form-scroll{display:block;}
 /* Neutralize the modal-era scroll wrappers so the whole panel scrolls as one */
-.eval-form-scroll .modal-body-scroll{flex:none;overflow:visible;padding:18px 24px 22px;}
-.eval-form-scroll .dtabs{position:sticky;top:74px;z-index:5;background:#fff;}
-.eval-form-scroll .score-summary-bar,.eval-form-scroll .assignment-banner{margin:0;}
-.eval-form-scroll .assignment-banner{margin:14px 24px 0;}
+.assessment-content .modal-body-scroll{flex:none;overflow:visible;padding:18px 20px 22px;}
+.assessment-content .assignment-banner{margin:14px 20px 0;}
 
 /* Sticky footer with the primary action */
 .eval-form-footer{position:sticky;bottom:0;z-index:6;display:flex;align-items:center;justify-content:flex-end;gap:14px;
-  padding:12px 24px;border-top:1px solid #E8EDF3;background:rgba(255,255,255,.96);backdrop-filter:blur(6px);flex-shrink:0;}
+  margin-top:auto;padding:12px 20px;border-top:1px solid #E2E8F0;background:rgba(255,255,255,.97);backdrop-filter:blur(6px);flex-shrink:0;}
 .eval-footer-progress{margin-right:auto;}
 .eval-footer-count{font-size:12px;font-weight:700;color:#B45309;background:#FEF3E2;padding:5px 12px;border-radius:20px;}
 .eval-footer-count.done{color:#047857;background:#ECFDF5;}
 
 /* ════════════ LEFT PANEL — card polish ════════════ */
-.eval-tp-left{width:500px;background:#FBFDFF;}
-.eli-list{padding:10px;display:flex;flex-direction:column;gap:8px;}
-.eli{position:relative;overflow:hidden;border:1px solid #E6EDF6;border-radius:12px;background:#fff;padding:10px 14px 10px 16px;
-  box-shadow:0 1px 3px rgba(15,23,42,.04);transition:box-shadow .16s,border-color .16s,transform .09s;}
+.eval-tp-left{width:560px;background:#FBFDFF;}
+.eli-list{padding:12px;display:flex;flex-direction:column;gap:10px;}
+.eli{position:relative;overflow:visible;border:1px solid #E6EDF6;border-radius:12px;background:#fff;padding:13px 14px 13px 16px;
+  min-height:0;box-shadow:0 1px 3px rgba(15,23,42,.04);transition:box-shadow .16s,border-color .16s,transform .09s;}
 .eli:hover{border-color:#BFD6F5;box-shadow:0 4px 12px rgba(15,23,42,.08);transform:translateY(-1px);}
 .eli:active{transform:translateY(0);}
 .eli-active{background:#F4F9FF !important;border-color:#93C5FD !important;box-shadow:0 4px 14px rgba(59,130,246,.14);}
 .eli-accent{position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:0 4px 4px 0;}
 .eli-row{display:flex;align-items:center;gap:10px;}
-.eli-av{width:36px;height:36px;border-radius:10px;font-size:14px;box-shadow:inset 0 0 0 1px rgba(15,23,42,.05);}
+.eli-av{width:36px;height:36px;border-radius:10px;font-size:11px;box-shadow:inset 0 0 0 1px rgba(15,23,42,.05);}
 .eli-info{flex:1;min-width:0;}
 .eli-name-row{display:flex;align-items:center;gap:6px;}
 .eli-name{font-size:13.5px;font-weight:700;color:#1E293B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -1907,11 +2178,26 @@ function _resetEdap() {
 .eli-status-label{font-size:10px;font-weight:600;}
 .eli-sl-done{color:#15803D;}
 .eli-sl-pend{color:#94A3B8;}
+.all-records-list{gap:10px;}
+.all-record-card{display:flex;flex-direction:column;gap:9px;padding-bottom:14px;overflow:hidden;}
+.all-record-card .eli-row{align-items:flex-start;}
+.all-record-card .eli-av{margin-top:1px;}
+.all-record-card .status-badge{flex-shrink:0;margin-top:2px;}
+.all-record-card .eli-chips{margin-left:46px;min-height:22px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
+.all-record-card .eli-period-pill{line-height:1.2;}
+.all-record-card .eli-score-big{line-height:1;}
+
+@media (max-width: 1440px) {
+  .eval-tp-left{width:430px;}
+  .assessment-layout{grid-template-columns:300px minmax(0,1fr);}
+}
 
 @media (max-width: 1280px) {
   .page-hd{grid-template-columns:1fr;}
   .page-hd-side{justify-content:flex-start;flex-wrap:wrap;}
   .domain-bar{overflow-x:auto;max-width:100%;}
+  .eval-tp-left{width:360px;}
+  .assessment-layout{grid-template-columns:260px minmax(0,1fr);}
 }
 
 @media (max-width: 1120px) {
@@ -1919,6 +2205,14 @@ function _resetEdap() {
   .domain-label{font-size:9.5px;}
   .eval-form-hd{align-items:flex-start;}
   .eval-form-hd-main{min-width:0;}
+  .eval-tp-left{width:280px;}
+  .eli-name{font-size:12.5px;}
+  .eli-meta{font-size:10.5px;}
+  .assessment-layout{grid-template-columns:1fr;overflow:visible;}
+  .assessment-sidebar{border-right:0;border-bottom:1px solid #E2E8F0;overflow:visible;}
+  .sidebar-domains{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+  .assessment-content{overflow-y:visible;}
+  .eval-tp-right{max-height:none;overflow:visible;}
 }
 
 @media (max-width: 980px) {
@@ -1927,5 +2221,81 @@ function _resetEdap() {
   .eval-tp-right{max-height:none;}
   .indicator-row,.jf-row{align-items:stretch;flex-direction:column;}
   .ind-rating{align-self:flex-end;}
+}
+
+@media (max-width: 720px) {
+  .sidebar-domains{grid-template-columns:1fr;}
+  .indicator-row{grid-template-columns:24px minmax(0,1fr);}
+  .ind-rating{grid-column:2;justify-content:start;margin-top:6px;align-self:auto;}
+  .jf-row{display:grid;grid-template-columns:24px minmax(0,1fr);align-items:start;}
+  .jf-row .jf-info{grid-column:2;}
+  .jf-row .ind-rating{grid-column:2;}
+  .eval-form-footer{align-items:stretch;flex-direction:column;}
+  .eval-footer-progress{margin-right:0;}
+}
+
+/* Fix All Assessments filters overflowing the left panel */
+.eval-tp-left {
+  overflow-x: hidden;
+}
+
+/* Arrange the status tabs and filters in separate rows */
+.eval-tp-left .filter-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+  gap: 10px;
+  box-sizing: border-box;
+}
+
+/* Status buttons */
+.eval-tp-left .status-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  width: 100%;
+  min-width: 0;
+}
+
+/* Search and division filter row */
+.eval-tp-left .filter-right {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  gap: 8px;
+}
+
+/* Prevent the search wrapper from forcing extra width */
+.eval-tp-left .srch-wrap {
+  width: 100%;
+  min-width: 0;
+}
+
+/* Search input fills only its available grid space */
+.eval-tp-left .srch-inp {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/* Division select stays inside the left panel */
+.eval-tp-left .filter-right .filter-select {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 1100px) {
+  .eval-tp-left .filter-right {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

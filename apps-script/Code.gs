@@ -25,7 +25,10 @@ const SHEET = {
   IPAT_CBC_RATINGS:  'IPATCBCRatings',
   IPAT_JF_RATINGS:   'IPATJFRatings',
   IPAT_EDAP:         'IPATEdap',
-  IPAT_ASSIGNMENTS:  'IPATRaterAssignments'
+  IPAT_ASSIGNMENTS:  'IPATRaterAssignments',
+
+  ASSESSMENT_CONTENT:    'AssessmentContent',
+  ASSESSMENT_CATEGORIES: 'AssessmentCategories'
 }
 
 // ── Entry point: HTTP GET ──

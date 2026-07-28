@@ -28,7 +28,7 @@
           <span>Performance Monitoring</span>
           <span>Evaluation System</span>
         </h1>
-        <p class="login-title-sub">Accountability, Accomplishments, and Performance evaluation</p>
+        <p class="login-title-sub">Accountability, Accomplishments, and Performance Evaluation</p>
       </div>
 
       <div class="form-shell">

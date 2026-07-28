@@ -16,9 +16,9 @@
 
       <nav class="sb-nav">
         <div class="nav-group">
-          <div v-if="!collapsed" class="nav-label">Overview</div>
+          <div v-if="!collapsed" class="nav-label">{{ canAccessFullSystem ? 'Overview' : 'Main' }}</div>
 
-          <RouterLink to="/dashboard" class="nav-item" active-class="active" :title="collapsed ? 'Dashboard' : ''">
+          <RouterLink v-if="canAccessFullSystem" to="/dashboard" class="nav-item" active-class="active" :title="collapsed ? 'Dashboard' : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <rect x="1" y="1" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.4" />
@@ -57,11 +57,11 @@
           </RouterLink>
         </div>
 
-        <div class="nav-group">
+        <div v-if="canAccessFullSystem" class="nav-group">
           <div v-if="!collapsed" class="nav-label">Monitoring</div>
           <div v-else class="nav-divider"></div>
 
-          <RouterLink to="/ipcrf" class="nav-item" active-class="active" :title="collapsed ? 'KRA & Targets' : ''">
+          <RouterLink v-if="canAccessFullSystem" to="/ipcrf" class="nav-item" active-class="active" :title="collapsed ? 'KRA & Targets' : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.4" />
@@ -74,7 +74,7 @@
             </transition>
           </RouterLink>
 
-          <RouterLink to="/accomplishments" class="nav-item" active-class="active" :title="collapsed ? 'Accomplishments' : ''">
+          <RouterLink v-if="canAccessFullSystem" to="/accomplishments" class="nav-item" active-class="active" :title="collapsed ? 'Accomplishments' : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <rect x="1.5" y="1.5" width="13" height="13" rx="2" stroke="currentColor" stroke-width="1.4" />
@@ -92,7 +92,7 @@
             <span v-if="collapsed && accomplishmentsUnread > 0" class="nav-badge-dot"></span>
           </RouterLink>
 
-          <RouterLink to="/review" class="nav-item" active-class="active" :title="collapsed ? 'Review' : ''">
+          <RouterLink v-if="canAccessFullSystem" to="/review" class="nav-item" active-class="active" :title="collapsed ? 'Review' : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.4" />
@@ -120,7 +120,7 @@
         </div>
 
         <div class="nav-group">
-          <div v-if="!collapsed" class="nav-label">Administration</div>
+          <div v-if="!collapsed" class="nav-label">{{ canAccessFullSystem ? 'Administration' : 'Account' }}</div>
           <div v-else class="nav-divider"></div>
 
           <!-- Reports hidden until ReportsService backend is implemented -->
@@ -305,7 +305,7 @@ import PasswordChangePrompt from '@/components/common/PasswordChangePrompt.vue'
 import LogoutConfirmModal from '@/components/common/LogoutConfirmModal.vue'
 
 const authStore = useAuthStore()
-const { canManageUsers, canManageLibraries, canManageFocalAssignments, canManageDatabase, canViewAudit } = usePermissions()
+const { canManageUsers, canManageLibraries, canManageFocalAssignments, canManageDatabase, canViewAudit, canAccessFullSystem } = usePermissions()
 const notifStore = useNotificationsStore()
 const { confirm } = useConfirm()
 
@@ -612,6 +612,7 @@ onUnmounted(() => {
   font-size: 14px;
   font-weight: 800;
   line-height: 1;
+  margin-top: 10px;
 }
 
 .brand-sub {

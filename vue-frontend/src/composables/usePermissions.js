@@ -35,6 +35,23 @@ export function usePermissions() {
   const canViewAudit = computed(() => permissions.value.includes('view_audit') || isAdmin.value || isDirector.value)
   const canGenerateReports = computed(() => isAdmin.value || isDirector.value || isAsstDir.value || isDivChief.value || isSectionHead.value)
   const canManageDatabase = computed(() => permissions.value.includes('manage_database') || isAdmin.value)
+  const evaluationOnlyRollout = computed(() =>
+    import.meta.env.VITE_EVALUATION_ONLY_ROLLOUT !== 'false'
+  )
+  const canAccessFullSystem = computed(() =>
+    !evaluationOnlyRollout.value ||
+    isAdmin.value ||
+    permissions.value.includes('manage_users') ||
+    permissions.value.includes('manage_focal_assignments') ||
+    permissions.value.includes('manage_database') ||
+    permissions.value.includes('manage_libraries') ||
+    permissions.value.includes('manage_assessment_content') ||
+    permissions.value.includes('view_audit') ||
+    permissionGroups.value.includes('system-admin') ||
+    permissionGroups.value.includes('user-manager') ||
+    permissionGroups.value.includes('library-manager') ||
+    permissionGroups.value.includes('database-manager')
+  )
   const divisionScope = computed(() => {
     if (canViewAllDivisions.value) return null
     if (permissions.value.includes('view_division_monitoring') || isDivChief.value) return authStore.profile?.divisionId ?? null
@@ -46,6 +63,6 @@ export function usePermissions() {
     isAdmin, isDirector, isAsstDir, isDivChief, isSectionHead, isStaff,
     canViewAllDivisions, canApprove, canManageUsers, canManageLibraries,
     canManageFocalAssignments, canViewAudit, canGenerateReports,
-    canManageDatabase, divisionScope
+    canManageDatabase, evaluationOnlyRollout, canAccessFullSystem, divisionScope
   }
 }

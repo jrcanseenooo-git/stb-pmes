@@ -67,6 +67,26 @@ const router = createRouter({
   routes,
 });
 
+const EVALUATION_ONLY_ROLLOUT = import.meta.env.VITE_EVALUATION_ONLY_ROLLOUT !== 'false'
+const EVALUATION_ROLLOUT_ALLOWED_PATHS = new Set(['/evaluation', '/profile'])
+
+function hasFullSystemAccess(profile) {
+  const permissions = profile?.permissions || []
+  const groups = profile?.permissionGroups || []
+  return !EVALUATION_ONLY_ROLLOUT ||
+    profile?.role === 'System Administrator' ||
+    permissions.includes('manage_users') ||
+    permissions.includes('manage_focal_assignments') ||
+    permissions.includes('manage_database') ||
+    permissions.includes('manage_libraries') ||
+    permissions.includes('manage_assessment_content') ||
+    permissions.includes('view_audit') ||
+    groups.includes('system-admin') ||
+    groups.includes('user-manager') ||
+    groups.includes('library-manager') ||
+    groups.includes('database-manager')
+}
+
 // ── Auth guard ──
 router.beforeEach(async (to) => {
   // Strip open-redirect payloads from the ?redirect query param
@@ -99,6 +119,13 @@ router.beforeEach(async (to) => {
   // Signed in but not yet provisioned / approved in PMES
   if (auth.needsRegistration) return { path: "/auth/register" };
   if (auth.needsActivation)   return { path: "/auth/pending" };
+  if (
+    EVALUATION_ONLY_ROLLOUT &&
+    !hasFullSystemAccess(auth.profile) &&
+    !EVALUATION_ROLLOUT_ALLOWED_PATHS.has(to.path)
+  ) {
+    return { path: "/evaluation" };
+  }
   return true;
 });
 

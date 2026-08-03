@@ -37,6 +37,8 @@ function setCors(req, res) {
 }
 
 export default async function handler(req, res) {
+  res.setHeader('Cache-Control', 'no-store, max-age=0')
+
   if (!setCors(req, res)) {
     return res.status(403).json({
       success: false,
@@ -67,6 +69,13 @@ export default async function handler(req, res) {
 
   try {
     const body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {})
+    let routeForLog = ''
+    try {
+      routeForLog = JSON.parse(body || '{}').route || ''
+    } catch {
+      routeForLog = ''
+    }
+
     const upstream = await fetch(targetUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -74,6 +83,9 @@ export default async function handler(req, res) {
     })
 
     const text = await upstream.text()
+    if (!upstream.ok) {
+      console.error('[PMES API] Apps Script returned status', upstream.status, 'for route', routeForLog || '(unknown)')
+    }
     res.status(upstream.ok ? 200 : upstream.status)
     res.setHeader('Content-Type', 'application/json; charset=utf-8')
     return res.send(text)

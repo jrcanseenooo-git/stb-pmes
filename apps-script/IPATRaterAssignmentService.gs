@@ -63,6 +63,12 @@ const IPATRaterAssignmentService = (() => {
     return String(row.semester) === String(semester) && String(row.year) === String(year)
   }
 
+  function _canReplacePendingRater(existingAssignment, nextAssignment) {
+    if (!existingAssignment || !nextAssignment) return false
+    if (String(existingAssignment.raterId || '') === String(nextAssignment.raterId || '')) return false
+    return String(existingAssignment.status || 'Pending') !== 'Completed'
+  }
+
   function _recordScore(record, assignments) {
     const linked = assignments.filter(a => String(a.ipatRecordId) === String(record.id))
     const completed = linked.filter(a => a.status === 'Completed').length
@@ -295,6 +301,7 @@ const IPATRaterAssignmentService = (() => {
     const now = new Date().toISOString()
 
     const assignments = []
+    const replacedAssignments = []
     const evaluatable = allUsers.filter(u => isEvaluatable(u.role))
     const touchedRateeIds = new Set()
     const createdRecordIds = new Set()
@@ -354,13 +361,31 @@ const IPATRaterAssignmentService = (() => {
       }
 
       const existingForRatee = existingAssign.filter(a => String(a.rateeId) === String(ratee.id))
-      const existingByRole = new Set(existingForRatee.map(a => a.raterType))
+      const existingByRole = {}
+      existingForRatee.forEach(a => {
+        if (!existingByRole[a.raterType]) existingByRole[a.raterType] = a
+      })
 
       // Store only missing rater roles. Existing assignments and submitted
       // ratings are preserved, so admins can safely backfill late accounts.
       raterList.forEach(a => {
-        if (existingByRole.has(a.raterType)) return
-        assignments.push({
+        const existingAssignment = existingByRole[a.raterType]
+        if (existingAssignment) {
+          if (_canReplacePendingRater(existingAssignment, a)) {
+            SpreadsheetService.updateRow(assignSheet, existingAssignment.id, {
+              raterId: a.raterId,
+              raterName: a.raterName,
+              updatedAt: now
+            })
+            existingAssignment.raterId = a.raterId
+            existingAssignment.raterName = a.raterName
+            existingAssignment.updatedAt = now
+            replacedAssignments.push(existingAssignment)
+            touchedRateeIds.add(ratee.id)
+          }
+          return
+        }
+        const newAssignment = {
           id:             SpreadsheetService.generateId('RASN-'),
           semester,
           year,
@@ -376,8 +401,9 @@ const IPATRaterAssignmentService = (() => {
           status:         'Pending',
           createdAt:      now,
           updatedAt:      now
-        })
-        existingByRole.add(a.raterType)
+        }
+        assignments.push(newAssignment)
+        existingByRole[a.raterType] = newAssignment
         touchedRateeIds.add(ratee.id)
       })
     })
@@ -389,9 +415,11 @@ const IPATRaterAssignmentService = (() => {
 
     const breakdown = {}
     assignments.forEach(a => { breakdown[a.raterType] = (breakdown[a.raterType] || 0) + 1 })
+    replacedAssignments.forEach(a => { breakdown[a.raterType] = (breakdown[a.raterType] || 0) + 1 })
 
     return {
       generated:  assignments.length,
+      replaced:   replacedAssignments.length,
       ratees:     touchedRateeIds.size,
       recordsCreated: createdRecordIds.size,
       existing:   new Set(existingAssign.map(a => a.rateeId)).size,

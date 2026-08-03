@@ -180,7 +180,7 @@
                   <div class="setting-label">{{ s.label }}</div>
                   <div class="setting-sub">{{ s.sub }}</div>
                 </div>
-                <button class="setting-action" @click="handleSetting(s.label)">{{ s.action }}</button>
+                <span class="setting-action">{{ s.action }}</span>
               </div>
             </div>
           </div>
@@ -314,9 +314,9 @@ const daysLeft = computed(() => {
 
 // ── Account settings ──
 const settings = [
-  { label:'Change Password',     sub:'Last changed 3 months ago',         action:'Change',  icon:'M1 7s2-5 6-5 6 5 6 5-2 5-6 5-6-5-6-5zM8 7a2 2 0 01-2 2 2 2 0 01-2-2 2 2 0 012-2 2 2 0 012 2z', iconBg:'#EBF4FF', iconColor:'#2F80ED' },
-  { label:'Email Notifications', sub:'Receive deadline & approval alerts', action:'Manage',  icon:'M1 4a1 1 0 011-1h10a1 1 0 011 1v6a1 1 0 01-1 1H2a1 1 0 01-1-1V4zM1 5l6 4 6-4', iconBg:'#E6F4EA', iconColor:'#27AE60' },
-  { label:'Two-Factor Auth',     sub:'Not yet enabled',                    action:'Enable',  icon:'M7 1L1 3.5v4c0 3 2.5 5 6 5.5 3.5-.5 6-2.5 6-5.5v-4L7 1z', iconBg:'#FEF3E2', iconColor:'#C8882A' }
+  { label:'Change Password',     sub:'Coming soon', action:'Planned', icon:'M1 7s2-5 6-5 6 5 6 5-2 5-6 5-6-5-6-5zM8 7a2 2 0 01-2 2 2 2 0 01-2-2 2 2 0 012-2 2 2 0 012 2z', iconBg:'#EBF4FF', iconColor:'#2F80ED' },
+  { label:'Email Notifications', sub:'Coming soon', action:'Planned', icon:'M1 4a1 1 0 011-1h10a1 1 0 011 1v6a1 1 0 01-1 1H2a1 1 0 01-1-1V4zM1 5l6 4 6-4', iconBg:'#E6F4EA', iconColor:'#27AE60' },
+  { label:'Two-Factor Auth',     sub:'Coming soon', action:'Planned', icon:'M7 1L1 3.5v4c0 3 2.5 5 6 5.5 3.5-.5 6-2.5 6-5.5v-4L7 1z', iconBg:'#FEF3E2', iconColor:'#C8882A' }
 ]
 
 // ── Lifecycle ──
@@ -478,10 +478,6 @@ function activityColor(action) {
   return '#94A3B8'
 }
 
-function handleSetting(label) {
-  if (label === 'Sign Out') handleLogout()
-  // TODO: wire Change Password, Email Notifications, Two-Factor Auth modals
-}
 </script>
 
 <style scoped>
@@ -553,8 +549,7 @@ function handleSetting(label) {
 .setting-info{flex:1;}
 .setting-label{font-size:12px;font-weight:600;color:#0F172A;}
 .setting-sub{font-size:11px;color:#94A3B8;}
-.setting-action{font-size:11px;color:#2F80ED;font-weight:500;background:none;border:none;cursor:pointer;padding:4px 8px;border-radius:5px;transition:background .15s;}
-.setting-action:hover{background:#EBF4FF;}
+.setting-action{font-size:11px;color:#64748B;font-weight:600;background:#F1F5F9;border:1px solid #E2E8F0;padding:4px 8px;border-radius:999px;}
 
 /* Period */
 .period-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}

@@ -1333,8 +1333,8 @@ async function loadAssessmentQuestions() {
     assessmentQuestions.value = rows.map(normalizeQuestion)
   } catch (e) {
     console.error(e)
-    if (!assessmentQuestions.value.length) assessmentQuestions.value = seedAssessmentQuestions()
-    showToast('Assessment content is shown from starter data until the live service is ready.', 'error')
+    assessmentQuestions.value = []
+    showToast('Could not load live assessment content. Please refresh or contact the system administrator.', 'error')
   } finally {
     assessmentLoaded.value = true
     loadingQuestions.value = false

@@ -1,8 +1,15 @@
 import { auth } from '@/firebase'
 
+function normalizeApiBaseUrl(value, fallback) {
+  const raw = String(value || '').trim()
+  if (!raw) return fallback
+  if (/^https?:\/\//i.test(raw) || raw.startsWith('/')) return raw
+  return `/${raw.replace(/^\/+/, '')}`
+}
+
 const BASE_URL = import.meta.env.DEV
-  ? '/gas'
-  : (import.meta.env.VITE_API_PROXY_URL || '/api/gas')
+  ? normalizeApiBaseUrl(import.meta.env.VITE_API_PROXY_URL, '/gas')
+  : normalizeApiBaseUrl(import.meta.env.VITE_API_PROXY_URL, '/api/gas')
 
 // ── Core transport ─────────────────────────────
 
@@ -25,8 +32,23 @@ async function parseApiResponse(res) {
     // Google returned an HTML error page (transient outage, etc.)
     throw new Error('The server returned an unexpected response. Please try again.')
   }
-  if (!data.success) throw new Error(data.message || 'API error')
+  if (!data.success) {
+    if (import.meta.env.DEV && data.message) {
+      console.warn('[PMES] API request was rejected:', data.message)
+    }
+    throw new Error(userSafeApiMessage(res))
+  }
   return data.data
+}
+
+function userSafeApiMessage(res) {
+  if (res.status === 401) return 'Your session expired. Please sign in again.'
+  if (res.status === 403) return 'You do not have permission to perform this action.'
+  if (res.status === 404) return 'The requested record could not be found.'
+  if (res.status === 409) return 'This record was already updated. Please refresh and try again.'
+  if (res.status === 429) return 'Too many requests. Please wait a moment and try again.'
+  if (res.status >= 500) return 'Something went wrong on the server. Please try again.'
+  return 'Could not complete the request. Please check your input and try again.'
 }
 
 // Single transport for every call: POST with a JSON body carrying route,
@@ -36,6 +58,8 @@ async function gasSend(method, route, data = {}) {
   const token = await getToken()
   const res = await fetch(BASE_URL, {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    cache: 'no-store',
     body: JSON.stringify({ route, _method: method, token: token || '', ...(data || {}) })
   })
   return parseApiResponse(res)

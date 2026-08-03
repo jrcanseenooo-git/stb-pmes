@@ -114,7 +114,7 @@
             </div>
             <select v-model="filterDiv" class="filter-select">
               <option value="">All Divisions</option>
-              <option v-for="d in availableDivisions" :key="d.id" :value="d.id">{{ d.name }}</option>
+              <option v-for="d in availableDivisions" :key="d.key" :value="d.key">{{ d.name }}</option>
             </select>
           </div>
         </div>
@@ -1318,15 +1318,15 @@ const showCBCTab = computed(() => {
 
 const availableDivisions = computed(() => {
   const byName = new Map()
-  const addDivision = (division, preferExisting = true) => {
+  const addDivision = (division) => {
     const id = division.id || division.divisionId
     const name = division.name || division.divisionName
     const key = divisionKey(name)
     if (!id || !name || !key) return
-    if (!preferExisting || !byName.has(key)) byName.set(key, { id, name })
+    if (!byName.has(key)) byName.set(key, { id, name, key })
   }
 
-  divisionOptions.value.forEach(d => addDivision(d, false))
+  divisionOptions.value.forEach(d => addDivision(d))
   records.value.forEach(r => addDivision({ id: r.divisionId, name: r.divisionName || r.divisionId }))
   FALLBACK_DIVISIONS.forEach(d => addDivision(d))
 
@@ -1336,7 +1336,13 @@ const availableDivisions = computed(() => {
 const filteredRecords = computed(() => {
   let r = records.value
   if (activeStatus.value !== 'All') r = r.filter(x => x.status === activeStatus.value)
-  if (filterDiv.value) r = r.filter(x => x.divisionId === filterDiv.value)
+  if (filterDiv.value) {
+    r = r.filter(x => {
+      const nameKey = divisionKey(x.divisionName || x.divisionId)
+      const idKey = divisionKey(x.divisionId)
+      return nameKey === filterDiv.value || idKey === filterDiv.value
+    })
+  }
   if (search.value) { const q = search.value.toLowerCase(); r = r.filter(x => (x.rateeName || '').toLowerCase().includes(q)) }
   return r
 })
@@ -1481,7 +1487,6 @@ async function loadMyTasks() {
   const requestedSemester = String(tasksSemester.value)
   const requestedYear = String(tasksYear.value)
   loadingTasks.value = true
-  myTasks.value = []
   try {
     const data = await ipatAssignmentsApi.getMyRatees({ semester: requestedSemester, year: requestedYear })
     if (requestedSemester !== String(tasksSemester.value) || requestedYear !== String(tasksYear.value)) return
@@ -1570,7 +1575,7 @@ async function loadDivisionOptions() {
       }))
       .filter(d => d.id && d.name)
   } catch (e) {
-    divisionOptions.value = []
+    console.warn('[Evaluation] Could not load division options:', e?.message || e)
   }
 }
 
@@ -1761,10 +1766,14 @@ function raterAccent(type) {
 }
 
 async function loadRecords() {
+  const requestedSemester = String(tasksSemester.value)
+  const requestedYear = String(tasksYear.value)
   loading.value = true
   try {
-    const r = await ipatApi.list({ pageSize: 500 })
-    records.value = r?.items || (Array.isArray(r) ? r : [])
+    const r = await ipatApi.list({ pageSize: 500, semester: requestedSemester, year: requestedYear })
+    if (requestedSemester !== String(tasksSemester.value) || requestedYear !== String(tasksYear.value)) return
+    const freshRecords = r?.items || (Array.isArray(r) ? r : [])
+    records.value = freshRecords
     if (activeView.value === 'all') {
       const selectedId = selectedRecord.value?.id || activeRecord.value?.id
       const refreshed = selectedId ? records.value.find(row => row.id === selectedId) : null
@@ -1777,7 +1786,12 @@ async function loadRecords() {
         loadedRec.value = null
       }
     }
-  } catch (e) { console.error(e); showToast('Could not load assessments. Please try again.', 'error') }
+  } catch (e) {
+    console.error(e)
+    showToast(records.value.length
+      ? 'Could not refresh assessments. Showing the last loaded data.'
+      : 'Could not load assessments. Please try again.', 'error')
+  }
   finally { loading.value = false }
 }
 

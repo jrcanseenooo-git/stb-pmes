@@ -478,7 +478,7 @@ async function confirmLogout() {
 }
 
 function handleExport() {
-  alert('Export feature — connect to ReportsService to generate PDF/Excel')
+  router.push('/reports')
 }
 
 function checkMobile() {

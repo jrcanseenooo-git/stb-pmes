@@ -96,11 +96,19 @@ function handleRequest(e, method) {
   } catch (err) {
     Logger.log('PMES Error: ' + err.message + '\n' + err.stack)
     const code = err.statusCode || 500
-    const clientMsg = code >= 500
-      ? 'An unexpected error occurred. Please try again later.'
-      : err.message
+    const clientMsg = safeClientErrorMessage(code)
     return respond(code, false, null, clientMsg)
   }
+}
+
+function safeClientErrorMessage(code) {
+  if (code === 400) return 'The request could not be processed. Please check your input and try again.'
+  if (code === 401) return 'Your session expired. Please sign in again.'
+  if (code === 403) return 'You do not have permission to perform this action.'
+  if (code === 404) return 'The requested record could not be found.'
+  if (code === 409) return 'This record was already updated. Please refresh and try again.'
+  if (code === 429) return 'Too many requests. Please wait a moment and try again.'
+  return 'An unexpected error occurred. Please try again later.'
 }
 
 // ── Helpers ──

@@ -27,6 +27,222 @@
 
 const IPATService = (() => {
 
+  function writeContiguousRows(sheet, updates, columnCount) {
+    if (!updates.length) return
+    updates.sort((a, b) => a.rowNumber - b.rowNumber)
+
+    let startRow = updates[0].rowNumber
+    let rows = [updates[0].row]
+
+    for (let i = 1; i < updates.length; i++) {
+      const update = updates[i]
+      const expectedRow = startRow + rows.length
+      if (update.rowNumber === expectedRow) {
+        rows.push(update.row)
+      } else {
+        sheet.getRange(startRow, 1, rows.length, columnCount).setValues(rows)
+        startRow = update.rowNumber
+        rows = [update.row]
+      }
+    }
+
+    sheet.getRange(startRow, 1, rows.length, columnCount).setValues(rows)
+  }
+
+  function getRowContext(sheet, id) {
+    const values = sheet.getDataRange().getValues()
+    const headers = values[0] || []
+    const idIdx = headers.indexOf('id')
+    for (let i = 1; i < values.length; i++) {
+      if (String(values[i][idIdx]) === String(id)) {
+        const record = {}
+        headers.forEach((h, idx) => { record[h] = values[i][idx] })
+        return { headers, rowValues: values[i], rowNumber: i + 1, record }
+      }
+    }
+    return null
+  }
+
+  function writeRowContext(sheet, ctx, updates) {
+    const row = ctx.headers.map((h, idx) => {
+      const val = Object.prototype.hasOwnProperty.call(updates, h) ? updates[h] : ctx.rowValues[idx]
+      return val === undefined || val === null ? '' : val
+    })
+    sheet.getRange(ctx.rowNumber, 1, 1, ctx.headers.length).setValues([row])
+    return { ...ctx.record, ...updates }
+  }
+
+  const CBC_DEDUCTION_HEADERS = [
+    'cbcBaseScore',
+    'cbcNteLevel',
+    'cbcNteDeductionPct',
+    'cbcOffenseLevel',
+    'cbcOffenseDeduction',
+    'cbcDeductionNote',
+    'cbcDeductionBy',
+    'cbcDeductionByName',
+    'cbcDeductionAt'
+  ]
+
+  const CONDUCT_LEVELS = {
+    none: {
+      label: 'None',
+      ntePct: 0,
+      offensePoints: 0
+    },
+    light: {
+      label: 'Light offense',
+      ntePct: 5,
+      offensePoints: 0.25
+    },
+    less_grave: {
+      label: 'Less grave offense',
+      ntePct: 10,
+      offensePoints: 0.5
+    },
+    serious_grave: {
+      label: 'Serious/Grave offense',
+      ntePct: 15,
+      offensePoints: 1
+    }
+  }
+
+  function ensureRecordSchema() {
+    const sheet = SpreadsheetService.getSheet(SHEET.IPAT_RECORDS)
+    const lastColumn = Math.max(sheet.getLastColumn(), 1)
+    const headers = sheet.getRange(1, 1, 1, lastColumn).getValues()[0].map(String)
+    const missing = CBC_DEDUCTION_HEADERS.filter(h => headers.indexOf(h) < 0)
+    if (missing.length) {
+      sheet.getRange(1, headers.length + 1, 1, missing.length).setValues([missing])
+      sheet.getRange(1, headers.length + 1, 1, missing.length)
+        .setBackground('#0F2742')
+        .setFontColor('#FFFFFF')
+        .setFontWeight('bold')
+      SpreadsheetApp.flush()
+    }
+    return sheet
+  }
+
+  function normalizeConductLevel(level) {
+    const raw = String(level || 'none').trim().toLowerCase().replace(/[\s-]+/g, '_').replace(/\//g, '_')
+    if (raw === 'serious' || raw === 'grave' || raw === 'seriousgrave' || raw === 'serious_grave_offense') return 'serious_grave'
+    if (raw === 'lessgrave' || raw === 'less_grave_offense') return 'less_grave'
+    if (raw === 'light_offense') return 'light'
+    return CONDUCT_LEVELS[raw] ? raw : 'none'
+  }
+
+  function getDeductionValues(record) {
+    const nteLevel = normalizeConductLevel(record.cbcNteLevel)
+    const offenseLevel = normalizeConductLevel(record.cbcOffenseLevel)
+    const ntePct = Number(record.cbcNteDeductionPct) || CONDUCT_LEVELS[nteLevel].ntePct || 0
+    const offenseDeduction = Number(record.cbcOffenseDeduction) || CONDUCT_LEVELS[offenseLevel].offensePoints || 0
+    return {
+      nteLevel,
+      nteLabel: CONDUCT_LEVELS[nteLevel].label,
+      ntePct,
+      offenseLevel,
+      offenseLabel: CONDUCT_LEVELS[offenseLevel].label,
+      offenseDeduction,
+      hasDeduction: ntePct > 0 || offenseDeduction > 0
+    }
+  }
+
+  function applyCbcDeductions(baseScore, record) {
+    const base = Number(baseScore)
+    if (!Number.isFinite(base) || base <= 0) {
+      return { baseScore: '', adjustedScore: '', cbcWeightedScore: '', ...getDeductionValues(record) }
+    }
+
+    const d = getDeductionValues(record)
+    const basePct = Math.max(0, Math.min(100, (base / 4) * 100))
+    const afterNtePct = Math.max(0, basePct - d.ntePct)
+    const afterNteScore = Math.max(0, Math.min(4, (afterNtePct / 100) * 4))
+    const cbcWeightedScore = afterNteScore * 0.30
+    return {
+      ...d,
+      baseScore: round2(base),
+      basePct: round2(basePct),
+      afterNteScore: round2(afterNteScore),
+      adjustedScore: round2(afterNteScore),
+      finalOverallDeduction: round2(d.offenseDeduction),
+      cbcWeightedScore: round2(cbcWeightedScore)
+    }
+  }
+
+  function canEditCbcDeduction(profile, record) {
+    if (!profile || !record) return false
+    if (profile.role === 'System Administrator') return true
+    return profile.role === 'Division Chief' && String(profile.divisionId || '') === String(record.divisionId || '')
+  }
+
+  function decorateCbcDeduction(row, profile) {
+    if (!row) return row
+    const canEdit = canEditCbcDeduction(profile, row)
+    const isRatee = profile && String(profile.id || '') === String(row.rateeId || '')
+    const values = applyCbcDeductions(row.cbcBaseScore || row.cbcScore, row)
+    const decorated = {
+      ...row,
+      cbcDeductionCanEdit: canEdit,
+      cbcDeductionVisible: canEdit || isRatee,
+      cbcDeductionHasDeduction: values.hasDeduction,
+      cbcDeductionSummary: values
+    }
+    if (!canEdit) {
+      delete decorated.cbcDeductionNote
+      delete decorated.cbcDeductionBy
+      delete decorated.cbcDeductionByName
+    }
+    return decorated
+  }
+
+  function calculateOverall(record, fpoScoreOverride) {
+    const rawCbc = record.cbcScore !== '' && record.cbcScore !== null && record.cbcScore !== undefined ? Number(record.cbcScore) : null
+    const rawJf  = record.jfScore  !== '' && record.jfScore  !== null && record.jfScore  !== undefined ? Number(record.jfScore)  : null
+
+    let rawFpo = fpoScoreOverride !== undefined
+      ? Number(fpoScoreOverride)
+      : (record.fpoScore !== '' && record.fpoScore !== null && record.fpoScore !== undefined ? Number(record.fpoScore) : null)
+    if (rawFpo !== null && rawFpo > 4) {
+      rawFpo = round2(((rawFpo - 1) / 4) * 3 + 1)
+    }
+
+    let weightedSum = 0
+    let totalWeight = 0
+    if (rawCbc !== null) { weightedSum += rawCbc * 0.30; totalWeight += 0.30 }
+    if (rawFpo !== null) { weightedSum += rawFpo * 0.55; totalWeight += 0.55 }
+    if (rawJf  !== null) { weightedSum += rawJf  * 0.15; totalWeight += 0.15 }
+
+    if (totalWeight === 0) throw HttpError('No component scores available to compute overall', 400)
+
+    const offenseDeduction = Number(record.cbcOffenseDeduction || 0)
+    const overallScore = round2(Math.max(0, (weightedSum / totalWeight) - offenseDeduction))
+    return {
+      cbcScore: rawCbc !== null ? rawCbc : 0,
+      normalizedFpoScore: rawFpo !== null ? rawFpo : 0,
+      jfScore: rawJf !== null ? rawJf : 0,
+      overallScore,
+      descriptor: qualitativeDescriptor(overallScore)
+    }
+  }
+
+  function recomputeOverallForRecord(recSheet, ipatId, fallbackRecord) {
+    const latest = SpreadsheetService.getRow(recSheet, ipatId) || fallbackRecord
+    if (!latest) return null
+    try {
+      const computed = calculateOverall(latest)
+      SpreadsheetService.updateRow(recSheet, ipatId, {
+        overallScore: computed.overallScore,
+        descriptor: computed.descriptor,
+        status: 'Computed',
+        updatedAt: new Date().toISOString()
+      })
+      return computed
+    } catch (e) {
+      Logger.log('[PMES] recomputeOverallForRecord skipped for ' + ipatId + ': ' + e.message)
+      return null
+    }
+  }
+
   // ── HEARTWORK Competency Themes ──────────────────────────────────────────
   // Exact indicators per the Innovations Unified Performance Audit Tool document
   const HEARTWORK_THEMES = [
@@ -93,7 +309,7 @@ const IPATService = (() => {
   ]
 
   // ── Job Fitness Indicators (5) ───────────────────────────────────────────
-  // Raters: Self + Peer + Immediate Supervisor (÷3); A&P computed from DTR
+  // Raters: Self + Immediate Supervisor (÷2)
   const JOB_FITNESS_INDICATORS = [
     'Educational Qualification Fit: demonstrates and applies academic knowledge, specialized training, or theoretical foundations effectively to execute daily job functions and solve role-specific problems.',
     'Relevant Work Experience Alignment: demonstrates prior experiences that directly supports the competencies and technical requirements of the current role.',
@@ -105,13 +321,60 @@ const IPATService = (() => {
   // ── Qualitative Descriptors ──────────────────────────────────────────────
   function qualitativeDescriptor(score) {
     const s = Number(score)
-    if (s >= 3.50) return 'Excellent Alignment'
-    if (s >= 2.50) return 'Satisfactory Alignment'
-    if (s >= 1.50) return 'Needs Development'
+    if (s >= 4.00) return 'Outstanding'
+    if (s >= 3.50) return 'Very Satisfactory'
+    if (s >= 2.75) return 'Satisfactory'
+    if (s >= 2.00) return 'Needs Improvement'
     return 'Requires Immediate Intervention'
   }
 
   function round2(v) { return Math.round(v * 100) / 100 }
+
+  function isObsoleteAssignment(row) {
+    return ['JFPeer', 'JobFitnessPeer'].includes(String(row && row.raterType || ''))
+  }
+
+  function activeProtocolAssignments(rows) {
+    return (rows || []).filter(r => !isObsoleteAssignment(r))
+  }
+
+  function samePeriod(row, semester, year) {
+    return String(row.semester) === String(semester) && String(row.year) === String(year)
+  }
+
+  function recordScore(record, assignments) {
+    const linked = assignments.filter(a => String(a.ipatRecordId) === String(record.id))
+    const completed = linked.filter(a => a.status === 'Completed').length
+    const hasScore = record.overallScore || record.cbcScore || record.jfScore || record.fpoScore ? 1 : 0
+    const created = record.createdAt ? new Date(record.createdAt).getTime() : 0
+    return (linked.length * 1000) + (completed * 100) + (hasScore * 10) - (created || 0) / 10000000000000
+  }
+
+  function findCanonicalRecord(records, assignments, rateeId, semester, year) {
+    const matches = records.filter(r => String(r.rateeId) === String(rateeId) && samePeriod(r, semester, year))
+    if (!matches.length) return null
+    return matches.sort((a, b) => recordScore(b, assignments) - recordScore(a, assignments))[0]
+  }
+
+  function collapseCanonicalRecords(rows) {
+    let assignments = []
+    try {
+      assignments = activeProtocolAssignments(SpreadsheetService.getAllRows(SpreadsheetService.getSheet(SHEET.IPAT_ASSIGNMENTS)))
+    } catch (e) {
+      return rows
+    }
+
+    const grouped = {}
+    rows.forEach(r => {
+      const key = [r.rateeId, r.semester, r.year].map(String).join('|')
+      if (!grouped[key]) grouped[key] = []
+      grouped[key].push(r)
+    })
+
+    return Object.keys(grouped)
+      .map(key => findCanonicalRecord(grouped[key], assignments, grouped[key][0].rateeId, grouped[key][0].semester, grouped[key][0].year))
+      .filter(Boolean)
+  }
 
   // ─────────────────────────────────────────────
   // IPAT RECORDS — CRUD
@@ -119,7 +382,7 @@ const IPATService = (() => {
 
   function list(params, user) {
     const profile = AuthService.getProfile(user)
-    const sheet   = SpreadsheetService.getSheet(SHEET.IPAT_RECORDS)
+    const sheet   = ensureRecordSchema()
     let rows      = SpreadsheetService.getAllRows(sheet)
 
     if (!['System Administrator', 'Bureau Director', 'Assistant Bureau Director'].includes(profile.role)) {
@@ -136,12 +399,15 @@ const IPATService = (() => {
     if (params.status)     rows = rows.filter(r => r.status     === params.status)
     if (params.divisionId) rows = rows.filter(r => r.divisionId === params.divisionId)
 
+    rows = collapseCanonicalRecords(rows)
     rows.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    rows = rows.map(r => decorateCbcDeduction(r, profile))
     return SpreadsheetService.paginate(rows, params.page, params.pageSize)
   }
 
   function get(id, user) {
-    const sheet = SpreadsheetService.getSheet(SHEET.IPAT_RECORDS)
+    const profile = AuthService.getProfile(user)
+    const sheet = ensureRecordSchema()
     const row   = SpreadsheetService.getRow(sheet, id)
     if (!row) throw HttpError('IPAT record not found', 404)
     row.cbcRatings = getCBCRatings(id)
@@ -163,13 +429,13 @@ const IPATService = (() => {
       }
     }
 
-    return row
+    return decorateCbcDeduction(row, profile)
   }
 
   function create(body, user) {
     const profile = AuthService.getProfile(user)
     const now     = new Date().toISOString()
-    const sheet   = SpreadsheetService.getSheet(SHEET.IPAT_RECORDS)
+    const sheet   = ensureRecordSchema()
 
     const existing = SpreadsheetService.getAllRows(sheet).find(r =>
       r.rateeId  === (body.rateeId || profile.id) &&
@@ -198,7 +464,16 @@ const IPATService = (() => {
       year,
       hasSubordinate: body.hasSubordinate === true || body.hasSubordinate === 'true' || false,
       status:         'Draft',
+      cbcBaseScore:   '',
       cbcScore:       '',
+      cbcNteLevel:    'none',
+      cbcNteDeductionPct: '',
+      cbcOffenseLevel: 'none',
+      cbcOffenseDeduction: '',
+      cbcDeductionNote: '',
+      cbcDeductionBy: '',
+      cbcDeductionByName: '',
+      cbcDeductionAt: '',
       fpoScore:       sourceForm ? sourceForm.finalNumericalRating : '',
       jfScore:        '',
       overallScore:   '',
@@ -214,14 +489,14 @@ const IPATService = (() => {
   }
 
   function updateRecord(id, body, user) {
-    const sheet   = SpreadsheetService.getSheet(SHEET.IPAT_RECORDS)
+    const sheet   = ensureRecordSchema()
     const updated = SpreadsheetService.updateRow(sheet, id, { ...body, updatedAt: new Date().toISOString() })
     AuditService.log('UPDATE', 'IPAT', `Updated record ${id}`, user)
     return updated
   }
 
   function updateStatus(id, body, user) {
-    const sheet   = SpreadsheetService.getSheet(SHEET.IPAT_RECORDS)
+    const sheet   = ensureRecordSchema()
     const updated = SpreadsheetService.updateRow(sheet, id, {
       status: body.status || body,
       updatedAt: new Date().toISOString()
@@ -245,14 +520,28 @@ const IPATService = (() => {
     if (typeof ratings === 'string') { try { ratings = JSON.parse(ratings) } catch(e) { ratings = [] } }
     if (!Array.isArray(ratings)) ratings = []
 
-    ratings.forEach(r => {
-      const existing = SpreadsheetService.getAllRows(sheet).find(row =>
-        row.ipatId        === ipatId &&
-        row.raterId       === (r.raterId || profile.id) &&
-        row.themeId       === r.themeId &&
-        String(row.indicatorIdx) === String(r.indicatorIdx)
-      )
+    const keyFor = (row) => [
+      row.ipatId,
+      row.raterId,
+      row.themeId,
+      String(row.indicatorIdx)
+    ].join('|')
+    const values = sheet.getDataRange().getValues()
+    const headers = values[0] || []
+    const rowFor = (data, base) => headers.map((h, idx) => {
+      const val = Object.prototype.hasOwnProperty.call(data, h) ? data[h] : (base ? base[idx] : '')
+      return val === undefined || val === null ? '' : val
+    })
+    const existingByKey = {}
+    for (let i = 1; i < values.length; i++) {
+      const obj = {}
+      headers.forEach((h, idx) => { obj[h] = values[i][idx] })
+      if (obj.id) existingByKey[keyFor(obj)] = { obj, values: values[i], rowNumber: i + 1 }
+    }
+    const rowsToUpdate = []
+    const rowsToAppend = []
 
+    ratings.forEach(r => {
       const ratingRow = {
         ipatId,
         rateeId:      record.rateeId,
@@ -268,17 +557,26 @@ const IPATService = (() => {
         year:         record.year,
         updatedAt:    now
       }
+      const key = keyFor(ratingRow)
+      const existing = existingByKey[key]
 
       if (existing) {
-        SpreadsheetService.updateRow(sheet, existing.id, ratingRow)
+        rowsToUpdate.push({ rowNumber: existing.rowNumber, row: rowFor(ratingRow, existing.values) })
       } else {
-        SpreadsheetService.appendRow(sheet, {
+        const newRow = {
           id: SpreadsheetService.generateId('CBC-'),
           ...ratingRow,
           createdAt: now
-        })
+        }
+        rowsToAppend.push(rowFor(newRow))
+        existingByKey[key] = { obj: newRow, values: null, rowNumber: null }
       }
     })
+
+    writeContiguousRows(sheet, rowsToUpdate, headers.length)
+    if (rowsToAppend.length) {
+      sheet.getRange(sheet.getLastRow() + 1, 1, rowsToAppend.length, headers.length).setValues(rowsToAppend)
+    }
 
     AuditService.log('SAVE_CBC', 'IPAT', `Saved ${ratings.length} CBC ratings for ${ipatId}`, user)
     return { saved: ratings.length }
@@ -340,20 +638,93 @@ const IPATService = (() => {
       return { themeId: theme.id, themeLabel: theme.label, score: themeScore, indicatorScores }
     })
 
-    const cbcScore = round2(
+    const cbcBaseScore = round2(
       themeScores.reduce((s, t) => s + t.score, 0) / themeScores.length
     )
+    const adjusted = applyCbcDeductions(cbcBaseScore, record)
+    const cbcScore = adjusted.adjustedScore
 
-    const recSheet = SpreadsheetService.getSheet(SHEET.IPAT_RECORDS)
-    SpreadsheetService.updateRow(recSheet, ipatId, { cbcScore, updatedAt: new Date().toISOString() })
+    const recSheet = ensureRecordSchema()
+    const updatedRecord = SpreadsheetService.updateRow(recSheet, ipatId, {
+      cbcBaseScore,
+      cbcScore,
+      cbcNteDeductionPct: adjusted.ntePct || '',
+      cbcOffenseDeduction: adjusted.offenseDeduction || '',
+      updatedAt: new Date().toISOString()
+    })
+    const overall = recomputeOverallForRecord(recSheet, ipatId, updatedRecord)
 
-    AuditService.log('COMPUTE_CBC', 'IPAT', `CBC=${cbcScore} for ${ipatId}`, user)
-    return { cbcScore, themeScores }
+    AuditService.log('COMPUTE_CBC', 'IPAT', `CBC=${cbcScore} base=${cbcBaseScore} NTE=${adjusted.ntePct}% CBC weighted=${adjusted.cbcWeightedScore} offense=${adjusted.offenseDeduction} for ${ipatId}`, user)
+    return {
+      cbcScore,
+      cbcBaseScore,
+      cbcDeductionSummary: adjusted,
+      themeScores,
+      overallScore: overall ? overall.overallScore : '',
+      descriptor: overall ? overall.descriptor : ''
+    }
+  }
+
+  function setCbcDeduction(ipatId, body, user) {
+    const profile = AuthService.getProfile(user)
+    const recSheet = ensureRecordSchema()
+    const record = SpreadsheetService.getRow(recSheet, ipatId)
+    if (!record) throw HttpError('IPAT record not found', 404)
+    if (!canEditCbcDeduction(profile, record)) throw HttpError('Unauthorized', 403)
+
+    const nteLevel = normalizeConductLevel(body.cbcNteLevel || body.nteLevel)
+    const offenseLevel = normalizeConductLevel(body.cbcOffenseLevel || body.offenseLevel)
+    const draft = {
+      ...record,
+      cbcNteLevel: nteLevel,
+      cbcNteDeductionPct: CONDUCT_LEVELS[nteLevel].ntePct || '',
+      cbcOffenseLevel: offenseLevel,
+      cbcOffenseDeduction: CONDUCT_LEVELS[offenseLevel].offensePoints || '',
+      cbcDeductionNote: String(body.cbcDeductionNote || body.note || '').trim(),
+      cbcDeductionBy: profile.id,
+      cbcDeductionByName: profile.fullName,
+      cbcDeductionAt: new Date().toISOString()
+    }
+
+    const base = record.cbcBaseScore || record.cbcScore || ''
+    const adjusted = applyCbcDeductions(base, draft)
+    const updates = {
+      cbcBaseScore: adjusted.baseScore || base || '',
+      cbcScore: adjusted.adjustedScore || record.cbcScore || '',
+      cbcNteLevel: draft.cbcNteLevel,
+      cbcNteDeductionPct: draft.cbcNteDeductionPct,
+      cbcOffenseLevel: draft.cbcOffenseLevel,
+      cbcOffenseDeduction: draft.cbcOffenseDeduction,
+      cbcDeductionNote: draft.cbcDeductionNote,
+      cbcDeductionBy: draft.cbcDeductionBy,
+      cbcDeductionByName: draft.cbcDeductionByName,
+      cbcDeductionAt: draft.cbcDeductionAt,
+      updatedAt: new Date().toISOString()
+    }
+
+    const merged = { ...record, ...updates }
+    if (merged.cbcScore || merged.fpoScore || merged.jfScore) {
+      try {
+        const overall = calculateOverall(merged)
+        updates.overallScore = overall.overallScore
+        updates.descriptor = overall.descriptor
+        updates.status = 'Computed'
+      } catch(e) {
+        Logger.log('[PMES] setOffensesDeduction overall recompute skipped: ' + e.message)
+      }
+    }
+
+    const updated = SpreadsheetService.updateRow(recSheet, ipatId, updates)
+
+    AuditService.log('SET_CBC_DEDUCTION', 'IPAT',
+      `Updated confidential offenses deduction for ${ipatId}: NTE=${nteLevel}, offense=${offenseLevel}`, user)
+
+    return decorateCbcDeduction(updated, profile)
   }
 
   // ─────────────────────────────────────────────
   // JOB FITNESS RATINGS
-  // Raters: Self + Peer + Immediate Supervisor (average of 3)
+  // Raters: Self + Immediate Supervisor (average of 2)
   // ─────────────────────────────────────────────
 
   function saveJFRatings(ipatId, body, user) {
@@ -364,20 +735,36 @@ const IPATService = (() => {
     let ratings = body.ratings || []
     if (typeof ratings === 'string') { try { ratings = JSON.parse(ratings) } catch(e) { ratings = [] } }
     if (!Array.isArray(ratings)) ratings = []
+    ratings = ratings.filter(r => ['Self', 'Supervisor'].includes(String(r.raterType || 'Self')))
+    if (!ratings.length) throw HttpError('No valid Job Fitness ratings submitted', 400)
+
+    const keyFor = (row) => [
+      row.ipatId,
+      row.raterId,
+      String(row.indicatorIdx)
+    ].join('|')
+    const values = sheet.getDataRange().getValues()
+    const headers = values[0] || []
+    const rowFor = (data, base) => headers.map((h, idx) => {
+      const val = Object.prototype.hasOwnProperty.call(data, h) ? data[h] : (base ? base[idx] : '')
+      return val === undefined || val === null ? '' : val
+    })
+    const existingByKey = {}
+    for (let i = 1; i < values.length; i++) {
+      const obj = {}
+      headers.forEach((h, idx) => { obj[h] = values[i][idx] })
+      if (obj.id) existingByKey[keyFor(obj)] = { obj, values: values[i], rowNumber: i + 1 }
+    }
+    const rowsToUpdate = []
+    const rowsToAppend = []
 
     ratings.forEach(r => {
-      const existing = SpreadsheetService.getAllRows(sheet).find(row =>
-        row.ipatId   === ipatId &&
-        row.raterId  === (r.raterId || profile.id) &&
-        String(row.indicatorIdx) === String(r.indicatorIdx)
-      )
-
       const ratingRow = {
         ipatId,
         rateeId:      record.rateeId,
         raterId:      r.raterId   || profile.id,
         raterName:    r.raterName || profile.fullName,
-        raterType:    r.raterType || 'Self',   // Self | Peer | Supervisor | SkipSupervisor
+        raterType:    r.raterType || 'Self',   // Self | Supervisor
         indicator:    r.indicator || '',
         indicatorIdx: Number(r.indicatorIdx) || 0,
         rating:       Number(r.rating)       || 1,
@@ -386,36 +773,44 @@ const IPATService = (() => {
         year:         record.year,
         updatedAt:    now
       }
+      const key = keyFor(ratingRow)
+      const existing = existingByKey[key]
 
       if (existing) {
-        SpreadsheetService.updateRow(sheet, existing.id, ratingRow)
+        rowsToUpdate.push({ rowNumber: existing.rowNumber, row: rowFor(ratingRow, existing.values) })
       } else {
-        SpreadsheetService.appendRow(sheet, {
+        const newRow = {
           id: SpreadsheetService.generateId('JF-'),
           ...ratingRow,
           createdAt: now
-        })
+        }
+        rowsToAppend.push(rowFor(newRow))
+        existingByKey[key] = { obj: newRow, values: null, rowNumber: null }
       }
     })
+
+    writeContiguousRows(sheet, rowsToUpdate, headers.length)
+    if (rowsToAppend.length) {
+      sheet.getRange(sheet.getLastRow() + 1, 1, rowsToAppend.length, headers.length).setValues(rowsToAppend)
+    }
 
     AuditService.log('SAVE_JF', 'IPAT', `Saved ${ratings.length} JF ratings for ${ipatId}`, user)
     return { saved: ratings.length }
   }
 
   function computeJF(ipatId, user) {
-    const ratings = getJFRatings(ipatId)
+    const ratings = getJFRatings(ipatId).filter(r => ['Self', 'Supervisor'].includes(String(r.raterType || '')))
     if (!ratings.length) throw HttpError('No Job Fitness ratings found', 400)
 
-    // JF Indicator Score = (Self + Peer + Supervisor) ÷ 3
+    // JF Indicator Score = (Self + Supervisor) ÷ 2
     // JF Score = Sum of Indicator Scores ÷ 5
     const indicatorScores = JOB_FITNESS_INDICATORS.map((label, idx) => {
       const indRatings = ratings.filter(r => Number(r.indicatorIdx) === idx)
 
       const self = indRatings.find(r => r.raterType === 'Self')
-      const peer = indRatings.find(r => r.raterType === 'Peer')
       const sup  = indRatings.find(r => r.raterType === 'Supervisor')
 
-      const values = [self, peer, sup].filter(Boolean).map(r => Number(r.rating))
+      const values = [self, sup].filter(Boolean).map(r => Number(r.rating))
       const score  = values.length > 0
         ? round2(values.reduce((s, v) => s + v, 0) / values.length)
         : 0
@@ -440,10 +835,18 @@ const IPATService = (() => {
     }
 
     const recSheet = SpreadsheetService.getSheet(SHEET.IPAT_RECORDS)
-    SpreadsheetService.updateRow(recSheet, ipatId, { jfScore, updatedAt: new Date().toISOString() })
+    const updatedRecord = SpreadsheetService.updateRow(recSheet, ipatId, { jfScore, updatedAt: new Date().toISOString() })
+    const overall = recomputeOverallForRecord(recSheet, ipatId, updatedRecord)
 
     AuditService.log('COMPUTE_JF', 'IPAT', `JF=${jfScore} for ${ipatId}`, user)
-    return { jfScore, indicatorScores, jfVarianceFlagged, jfVarianceGap }
+    return {
+      jfScore,
+      indicatorScores,
+      jfVarianceFlagged,
+      jfVarianceGap,
+      overallScore: overall ? overall.overallScore : '',
+      descriptor: overall ? overall.descriptor : ''
+    }
   }
 
   // ─────────────────────────────────────────────
@@ -465,9 +868,15 @@ const IPATService = (() => {
     }
 
     const recSheet = SpreadsheetService.getSheet(SHEET.IPAT_RECORDS)
-    SpreadsheetService.updateRow(recSheet, ipatId, {
+    const ctx = getRowContext(recSheet, ipatId)
+    if (!ctx) throw HttpError('IPAT record not found', 404)
+    const computed = calculateOverall(ctx.record, sourceForm.finalNumericalRating)
+    writeRowContext(recSheet, ctx, {
       fpoScore:    sourceForm.finalNumericalRating,
       ipcrfFormId: sourceForm.id,
+      overallScore: computed.overallScore,
+      descriptor: computed.descriptor,
+      status: 'Computed',
       updatedAt:   new Date().toISOString()
     })
 
@@ -476,6 +885,11 @@ const IPATService = (() => {
 
     return {
       fpoScore: sourceForm.finalNumericalRating,
+      normalizedFpoScore: computed.normalizedFpoScore,
+      cbcScore: computed.cbcScore,
+      jfScore: computed.jfScore,
+      overallScore: computed.overallScore,
+      descriptor: computed.descriptor,
       source: {
         formId:            sourceForm.id,
         type:               sourceForm.type,
@@ -492,14 +906,26 @@ const IPATService = (() => {
     const score = Number(body.fpoScore)
     if (isNaN(score) || score < 0 || score > 5) throw HttpError('FPO score must be between 0 and 5', 400)
     const recSheet = SpreadsheetService.getSheet(SHEET.IPAT_RECORDS)
-    const record = SpreadsheetService.getRow(recSheet, ipatId)
-    if (!record) throw HttpError('IPAT record not found', 404)
-    SpreadsheetService.updateRow(recSheet, ipatId, {
+    const ctx = getRowContext(recSheet, ipatId)
+    if (!ctx) throw HttpError('IPAT record not found', 404)
+    const computed = calculateOverall(ctx.record, score)
+    writeRowContext(recSheet, ctx, {
       fpoScore: score,
+      overallScore: computed.overallScore,
+      descriptor: computed.descriptor,
+      status: 'Computed',
       updatedAt: new Date().toISOString()
     })
     AuditService.log('SET_FPO', 'IPAT', 'Manual FPO score set to ' + score + ' for ' + ipatId, user)
-    return { fpoScore: score }
+    return {
+      ipatId,
+      fpoScore: score,
+      normalizedFpoScore: computed.normalizedFpoScore,
+      cbcScore: computed.cbcScore,
+      jfScore: computed.jfScore,
+      overallScore: computed.overallScore,
+      descriptor: computed.descriptor
+    }
   }
 
   // ─────────────────────────────────────────────
@@ -508,7 +934,7 @@ const IPATService = (() => {
   // ─────────────────────────────────────────────
 
   function computeOverall(ipatId, user) {
-    const recSheet = SpreadsheetService.getSheet(SHEET.IPAT_RECORDS)
+    const recSheet = ensureRecordSchema()
     const record   = SpreadsheetService.getRow(recSheet, ipatId)
     if (!record) throw HttpError('IPAT record not found', 404)
 
@@ -533,7 +959,8 @@ const IPATService = (() => {
     if (totalWeight === 0) throw HttpError('No component scores available to compute overall', 400)
 
     // Normalize so missing components don't drag the score down
-    const overall    = round2(weightedSum / totalWeight)
+    const offenseDeduction = Number(record.cbcOffenseDeduction || 0)
+    const overall    = round2(Math.max(0, (weightedSum / totalWeight) - offenseDeduction))
     const descriptor = qualitativeDescriptor(overall)
 
     const cbc = rawCbc !== null ? rawCbc : 0
@@ -548,7 +975,7 @@ const IPATService = (() => {
     })
 
     AuditService.log('COMPUTE_OVERALL', 'IPAT',
-      `Overall=${overall} (${descriptor}) CBC=${rawCbc} FPO=${rawFpo} JF=${rawJf} weights=${round2(totalWeight)} for ${ipatId}`, user)
+      `Overall=${overall} (${descriptor}) CBC=${rawCbc} FPO=${rawFpo} JF=${rawJf} offenseDeduction=${offenseDeduction} weights=${round2(totalWeight)} for ${ipatId}`, user)
 
     return { ipatId, cbcScore: cbc, fpoScore: fpo, jfScore: jf, overallScore: overall, descriptor }
   }
@@ -571,7 +998,7 @@ const IPATService = (() => {
   }
 
   function _getRecord(id) {
-    const sheet = SpreadsheetService.getSheet(SHEET.IPAT_RECORDS)
+    const sheet = ensureRecordSchema()
     const row   = SpreadsheetService.getRow(sheet, id)
     if (!row) throw HttpError('IPAT record not found', 404)
     return row
@@ -628,12 +1055,14 @@ const IPATService = (() => {
   return {
     list, get, create, updateRecord, updateStatus,
     saveCBCRatings, computeCBC,
+    setCbcDeduction,
     saveJFRatings,  computeJF,
     syncFPO, setFPO,
     computeOverall,
     saveEdap, getEdap,
     getThemes, getJFIndicators,
-    getCBCRatings, getJFRatings
+    getCBCRatings, getJFRatings,
+    ensureRecordSchema
   }
 
 })()

@@ -14,6 +14,9 @@ function initializeSheets() {
     Divisions: [
       'id', 'name', 'code', 'chiefId', 'chiefName', 'parentId', 'color', 'active', 'createdAt'
     ],
+    SystemSettings: [
+      'id', 'key', 'value', 'description', 'updatedBy', 'updatedByName', 'updatedAt'
+    ],
     KRAs: [
       'id', 'title', 'description', 'functionType', 'applicableTo',
       'semester', 'year', 'weight', 'active', 'createdAt', 'updatedAt'

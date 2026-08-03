@@ -35,9 +35,11 @@ export function usePermissions() {
   const canViewAudit = computed(() => permissions.value.includes('view_audit') || isAdmin.value || isDirector.value)
   const canGenerateReports = computed(() => isAdmin.value || isDirector.value || isAsstDir.value || isDivChief.value || isSectionHead.value)
   const canManageDatabase = computed(() => permissions.value.includes('manage_database') || isAdmin.value)
-  const evaluationOnlyRollout = computed(() =>
-    import.meta.env.VITE_EVALUATION_ONLY_ROLLOUT !== 'false'
-  )
+  const evaluationOnlyRollout = computed(() => {
+    const mode = authStore.profile?.systemAccessMode
+    if (mode) return mode !== 'full_access'
+    return import.meta.env.VITE_EVALUATION_ONLY_ROLLOUT !== 'false'
+  })
   const canAccessFullSystem = computed(() =>
     !evaluationOnlyRollout.value ||
     isAdmin.value ||

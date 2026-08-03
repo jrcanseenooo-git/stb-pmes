@@ -236,7 +236,7 @@ async function submit() {
     })
     router.push('/auth/pending')
   } catch (e) {
-    error.value = e.message || 'Could not submit registration. Please try again.'
+    error.value = 'Could not submit registration. Please check your details and try again.'
   } finally {
     submitting.value = false
   }

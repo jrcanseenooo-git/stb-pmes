@@ -167,8 +167,32 @@ const loginMethod = ref('')
 const error       = ref('')
 
 const domain      = import.meta.env.VITE_ALLOWED_EMAIL_DOMAIN || 'dswd.gov.ph'
-const redirect = String(route.query.redirect || '') || '/dashboard'
 const currentYear = computed(() => new Date().getFullYear())
+
+const ALLOWED_REDIRECT_PATHS = new Set([
+  '/dashboard',
+  '/evaluation',
+  '/ipcrf',
+  '/accomplishments',
+  '/review',
+  '/mov',
+  '/reports',
+  '/audit',
+  '/users',
+  '/profile',
+  '/kra'
+])
+
+function safeRedirectTarget(value) {
+  const raw = String(value || '').trim()
+  if (!raw || raw.startsWith('//') || /^[a-z][a-z\d+.-]*:/i.test(raw)) return '/dashboard'
+
+  const normalized = raw.startsWith('/') ? raw : `/${raw}`
+  const basePath = normalized.split('?')[0].split('#')[0]
+  return ALLOWED_REDIRECT_PATHS.has(basePath) ? normalized : '/dashboard'
+}
+
+const redirect = computed(() => safeRedirectTarget(route.query.redirect))
 
 async function handleEmailLogin() {
   error.value       = ''
@@ -176,9 +200,9 @@ async function handleEmailLogin() {
   loginMethod.value = 'email'
   try {
     await authStore.loginWithEmail(email.value, password.value)
-    router.push(redirect)
+    router.push(redirect.value)
   } catch (e) {
-    error.value = e.message
+    error.value = e?.message || 'Sign-in failed. Please check your account and try again.'
   } finally {
     loading.value     = false
     loginMethod.value = ''
@@ -191,10 +215,11 @@ async function handleGoogleLogin() {
   loginMethod.value = 'google'
   try {
     await authStore.loginWithGoogle()
-    router.push(redirect)
+    router.push(redirect.value)
   } catch (e) {
-    if (!e.message.includes('popup-closed')) {
-      error.value = e.message
+    const message = e?.message || ''
+    if (!message.includes('popup-closed')) {
+      error.value = message || 'Google sign-in failed. Please try again.'
     }
   } finally {
     loading.value     = false

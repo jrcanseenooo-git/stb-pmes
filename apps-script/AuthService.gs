@@ -177,10 +177,14 @@ const AuthService = (() => {
     // intentionally returned so the frontend can force the user to replace it.
     const { passwordHash, tempPassword, tempPasswordHash, mustChangePassword, ...safe } = row
     const effective = getEffectiveAccess(row)
+    const systemAccessMode = typeof SystemSettingsService !== 'undefined'
+      ? SystemSettingsService.getAccessMode()
+      : 'evaluation_only'
     return {
       ...safe,
       permissionGroups: effective.groups,
       permissions: effective.permissions,
+      systemAccessMode: systemAccessMode,
       mustChangePassword: mustChangePassword === true || String(mustChangePassword).toLowerCase() === 'true'
     }
   }

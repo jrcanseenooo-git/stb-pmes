@@ -12,7 +12,10 @@ function initIPATSheets() {
   _createSheetIfMissing(ss, 'IPATRecords', [
     'id','rateeId','rateeName','divisionId','divisionName','position','positionLevel',
     'semester','year','hasSubordinate','status',
-    'cbcScore','fpoScore','jfScore','overallScore','descriptor',
+    'cbcBaseScore','cbcScore',
+    'cbcNteLevel','cbcNteDeductionPct','cbcOffenseLevel','cbcOffenseDeduction',
+    'cbcDeductionNote','cbcDeductionBy','cbcDeductionByName','cbcDeductionAt',
+    'fpoScore','jfScore','overallScore','descriptor',
     'ipcrfFormId','createdAt','updatedAt'
   ])
 

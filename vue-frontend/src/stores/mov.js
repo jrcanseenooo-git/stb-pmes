@@ -44,7 +44,8 @@ export const useMovStore = defineStore('mov', () => {
       toast.success(`${file.name} uploaded successfully`)
       return result
     } catch (e) {
-      toast.error(`Upload failed: ${e.message}`)
+      console.error('[MOV] Upload failed', e)
+      toast.error('Upload failed. Please check the file and try again.')
       throw e
     } finally {
       uploading.value = false

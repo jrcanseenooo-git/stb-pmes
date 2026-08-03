@@ -16,7 +16,7 @@ export const useKraStore = defineStore('kra', () => {
     try {
       kras.value = await kraApi.list(params)
     } catch (e) {
-      error.value = e.message
+      error.value = 'Could not load KRA records. Please try again.'
     } finally {
       loading.value = false
     }
@@ -27,7 +27,7 @@ export const useKraStore = defineStore('kra', () => {
     try {
       indicators.value = await kraApi.listSI(kraId)
     } catch (e) {
-      error.value = e.message
+      error.value = 'Could not load KRA indicators. Please try again.'
     } finally {
       loading.value = false
     }

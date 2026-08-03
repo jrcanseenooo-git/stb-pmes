@@ -46,6 +46,11 @@ const Router = (() => {
         if (id && sub === 'reset-password') return UsersService.resetPassword(id, body, user)
         break
 
+      case 'system-settings':
+        if (!id && method === 'GET') return SystemSettingsService.list(user)
+        if (!id && method === 'PUT') return SystemSettingsService.update(body, user)
+        break
+
       // ─────────────────────────────────────────
       // KRAs & Success Indicators
       // ─────────────────────────────────────────
@@ -201,6 +206,7 @@ const Router = (() => {
         if (id && sub === 'set-fpo' && method === 'POST') return IPATService.setFPO(id, body, user)
         if (id && sub === 'cbc' && !subId && method === 'POST')  return IPATService.saveCBCRatings(id, body, user)
         if (id && sub === 'cbc' && subId === 'compute')          return IPATService.computeCBC(id, user)
+        if (id && sub === 'cbc-deduction' && method === 'POST')  return IPATService.setCbcDeduction(id, body, user)
         if (id && sub === 'jf' && !subId && method === 'POST')   return IPATService.saveJFRatings(id, body, user)
         if (id && sub === 'jf' && subId === 'compute')           return IPATService.computeJF(id, user)
         if (id && sub === 'compute')                             return IPATService.computeOverall(id, user)
@@ -213,11 +219,11 @@ const Router = (() => {
       // IPAT Rater Assignments
       case 'ipat-assignments':
         if (!id && method === 'GET')                     return IPATRaterAssignmentService.list(params, user)
-        if (!id && method === 'DELETE')                  return IPATRaterAssignmentService.deleteForPeriod(params.semester, params.year, user)
         if (id === 'generate'  && method === 'POST')     return IPATRaterAssignmentService.generateAssignments(body, user)
         if (id === 'my-ratees'   && method === 'GET')     return IPATRaterAssignmentService.getMyRatees(params, user)
         if (id === 'my-results'  && method === 'GET')     return IPATRaterAssignmentService.getMyResults(params, user)
         if (id && sub === 'ratee-assignments' && method === 'GET') return IPATRaterAssignmentService.getRateeAssignments(id, params, user)
+        if (id && sub === 'submit-ratings' && method === 'POST') return IPATRaterAssignmentService.submitAssignmentRatings(id, body, user)
         if (id && sub === 'complete' && method === 'POST') return IPATRaterAssignmentService.markCompleted(id, user)
         break
 

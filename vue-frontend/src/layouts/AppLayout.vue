@@ -1092,6 +1092,288 @@ onUnmounted(() => {
   max-width: 100%;
 }
 
+@media (min-width: 2200px) {
+  .shell {
+    --sidebar-w: 260px;
+    --sidebar-collapsed-w: 72px;
+    --topbar-h: 64px;
+  }
+
+  .sb-brand {
+    gap: 13px;
+    padding: 0 18px;
+  }
+
+  .brand-icon {
+    width: 39px;
+    height: 39px;
+  }
+
+  .brand-name {
+    font-size: 15.5px;
+  }
+
+  .brand-sub {
+    font-size: 9.5px;
+  }
+
+  .sb-nav {
+    padding: 13px 11px;
+  }
+
+  .nav-item {
+    min-height: 46px;
+    padding: 11px 14px;
+    border-radius: 14px;
+  }
+
+  .nav-label-text,
+  .topbar-title {
+    font-size: 16px;
+  }
+
+  .topbar {
+    padding: 0 20px;
+  }
+
+  .topbar-sub,
+  .topbar-sep {
+    font-size: 12.5px;
+  }
+
+  .search-wrap {
+    width: 230px;
+    height: 36px;
+  }
+
+  .sem-pill,
+  .icon-btn,
+  .export-btn {
+    min-height: 36px;
+  }
+
+  .page-body {
+    padding: 22px 28px;
+    background-size: 40px 40px;
+  }
+
+  .page-body :deep(.page-title),
+  .page-body :deep(.page-heading),
+  .page-body :deep(h1) {
+    font-size: 23px;
+    line-height: 1.2;
+  }
+
+  .page-body :deep(.page-sub),
+  .page-body :deep(.page-subtitle),
+  .page-body :deep(.subtitle) {
+    font-size: 13.5px;
+    line-height: 1.45;
+  }
+
+  .page-body :deep(.content-card),
+  .page-body :deep(.card),
+  .page-body :deep(.panel),
+  .page-body :deep(.section-card) {
+    border-radius: 16px;
+  }
+
+  .page-body :deep(.content-card) {
+    padding: 20px 22px;
+  }
+
+  .page-body :deep(.card-hd),
+  .page-body :deep(.card-header),
+  .page-body :deep(.panel-header) {
+    padding: 17px 20px;
+  }
+
+  .page-body :deep(.card-title),
+  .page-body :deep(.panel-title) {
+    font-size: 13.5px;
+  }
+
+  .page-body :deep(.card-subtitle),
+  .page-body :deep(.panel-subtitle) {
+    font-size: 13px;
+  }
+
+  .page-body :deep(.btn),
+  .page-body :deep(button.btn),
+  .page-body :deep(.filter-select),
+  .page-body :deep(.form-input),
+  .page-body :deep(.form-select),
+  .page-body :deep(input),
+  .page-body :deep(select),
+  .page-body :deep(textarea) {
+    font-size: 13.5px;
+  }
+
+  .page-body :deep(.btn) {
+    min-height: 38px;
+    padding: 8px 15px;
+  }
+
+  .page-body :deep(.btn-sm) {
+    min-height: 32px;
+    padding: 6px 12px;
+  }
+
+  .page-body :deep(.filter-select),
+  .page-body :deep(.form-input),
+  .page-body :deep(.form-select),
+  .page-body :deep(input),
+  .page-body :deep(select) {
+    min-height: 40px;
+  }
+
+  .page-body :deep(textarea) {
+    min-height: 96px;
+  }
+
+  .page-body :deep(.table-wrap),
+  .page-body :deep(.table-container),
+  .page-body :deep(.table-responsive) {
+    border-radius: 16px;
+  }
+
+  .page-body :deep(.data-table),
+  .page-body :deep(.tbl),
+  .page-body :deep(.table-row),
+  .page-body :deep(.table-cell) {
+    font-size: 13.5px;
+  }
+
+  .page-body :deep(.data-table th),
+  .page-body :deep(.tbl th),
+  .page-body :deep(.table-hd) {
+    font-size: 11.5px;
+  }
+
+  .page-body :deep(.data-table td),
+  .page-body :deep(.data-table th),
+  .page-body :deep(.tbl td),
+  .page-body :deep(.tbl th) {
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+
+  .page-body :deep(.modal) {
+    border-radius: 18px;
+  }
+
+  .page-body :deep(.modal-title) {
+    font-size: 17px;
+  }
+
+  .page-body :deep(.modal-sub),
+  .page-body :deep(.modal-message) {
+    font-size: 13.5px;
+  }
+
+  .page-body :deep(.modal-hd),
+  .page-body :deep(.modal-body),
+  .page-body :deep(.modal-footer) {
+    padding-left: 28px;
+    padding-right: 28px;
+  }
+
+  .page-body :deep(.empty-title),
+  .page-body :deep(.rp-empty-title),
+  .page-body :deep(.eval-rp-empty-title) {
+    font-size: 16px;
+  }
+
+  .page-body :deep(.empty-sub),
+  .page-body :deep(.rp-empty-sub),
+  .page-body :deep(.eval-rp-empty-sub) {
+    font-size: 13px;
+  }
+}
+
+@media (min-width: 2800px) {
+  .shell {
+    --sidebar-w: 290px;
+    --sidebar-collapsed-w: 78px;
+    --topbar-h: 70px;
+  }
+
+  .page-body {
+    padding: 30px 40px;
+    background-size: 46px 46px;
+  }
+
+  .page-body :deep(> *) {
+    max-width: 2440px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .page-body :deep(.page-title),
+  .page-body :deep(.page-heading),
+  .page-body :deep(h1) {
+    font-size: 26px;
+  }
+
+  .page-body :deep(.page-sub),
+  .page-body :deep(.page-subtitle),
+  .page-body :deep(.subtitle) {
+    font-size: 15px;
+  }
+
+  .page-body :deep(.content-card) {
+    padding: 26px 30px;
+  }
+
+  .page-body :deep(.card-title),
+  .page-body :deep(.panel-title) {
+    font-size: 15px;
+  }
+
+  .page-body :deep(.btn),
+  .page-body :deep(button.btn),
+  .page-body :deep(.filter-select),
+  .page-body :deep(.form-input),
+  .page-body :deep(.form-select),
+  .page-body :deep(input),
+  .page-body :deep(select),
+  .page-body :deep(textarea),
+  .page-body :deep(.data-table),
+  .page-body :deep(.tbl),
+  .page-body :deep(.table-row),
+  .page-body :deep(.table-cell) {
+    font-size: 15px;
+  }
+
+  .page-body :deep(.btn) {
+    min-height: 42px;
+    padding: 10px 18px;
+  }
+
+  .page-body :deep(.filter-select),
+  .page-body :deep(.form-input),
+  .page-body :deep(.form-select),
+  .page-body :deep(input),
+  .page-body :deep(select) {
+    min-height: 44px;
+  }
+
+  .page-body :deep(.data-table th),
+  .page-body :deep(.tbl th),
+  .page-body :deep(.table-hd) {
+    font-size: 12.5px;
+  }
+
+  .page-body :deep(.modal-title) {
+    font-size: 19px;
+  }
+
+  .page-body :deep(.modal-sub),
+  .page-body :deep(.modal-message) {
+    font-size: 15px;
+  }
+}
+
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity .15s ease;
@@ -1152,6 +1434,74 @@ onUnmounted(() => {
 
   .export-btn {
     display: none;
+  }
+
+  .page-body :deep(.page-title),
+  .page-body :deep(.page-heading),
+  .page-body :deep(h1) {
+    font-size: 18px;
+    line-height: 1.25;
+  }
+
+  .page-body :deep(.page-sub),
+  .page-body :deep(.page-subtitle),
+  .page-body :deep(.subtitle) {
+    font-size: 12px;
+    line-height: 1.4;
+    white-space: normal;
+  }
+
+  .page-body :deep(.content-card),
+  .page-body :deep(.card),
+  .page-body :deep(.panel),
+  .page-body :deep(.section-card) {
+    border-radius: 14px;
+  }
+
+  .page-body :deep(.content-card) {
+    padding: 12px;
+  }
+
+  .page-body :deep(.filter-bar),
+  .page-body :deep(.top-actions),
+  .page-body :deep(.page-actions) {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  .page-body :deep(.btn),
+  .page-body :deep(button.btn),
+  .page-body :deep(.filter-select),
+  .page-body :deep(.form-input),
+  .page-body :deep(.form-select),
+  .page-body :deep(input),
+  .page-body :deep(select),
+  .page-body :deep(textarea) {
+    max-width: 100%;
+    font-size: 13px;
+  }
+
+  .page-body :deep(.table-wrap),
+  .page-body :deep(.table-container),
+  .page-body :deep(.table-responsive) {
+    border-radius: 12px;
+  }
+
+  .page-body :deep(.modal-overlay) {
+    padding: 10px;
+    align-items: flex-end;
+  }
+
+  .page-body :deep(.modal) {
+    max-height: 94vh;
+    border-radius: 16px;
+  }
+
+  .page-body :deep(.modal-hd),
+  .page-body :deep(.modal-body),
+  .page-body :deep(.modal-footer) {
+    padding-left: 16px;
+    padding-right: 16px;
   }
 }
 </style>

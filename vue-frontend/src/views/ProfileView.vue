@@ -141,13 +141,15 @@
             <span class="card-title">Recent Activity</span>
           </div>
           <div class="card-body pd-0">
-            <div v-if="activityLoading" class="activity-row" v-for="i in 4" :key="i">
-              <div class="skeleton-dot"></div>
-              <div style="flex:1">
-                <div class="skeleton" style="width:80%;height:12px;margin-bottom:4px"></div>
-                <div class="skeleton" style="width:40%;height:10px"></div>
+            <template v-if="activityLoading">
+              <div v-for="i in 4" :key="i" class="activity-row">
+                <div class="skeleton-dot"></div>
+                <div style="flex:1">
+                  <div class="skeleton" style="width:80%;height:12px;margin-bottom:4px"></div>
+                  <div class="skeleton" style="width:40%;height:10px"></div>
+                </div>
               </div>
-            </div>
+            </template>
             <div v-else-if="activity.length === 0" class="empty-activity">No recent activity.</div>
             <div v-else v-for="a in activity" :key="a.id" class="activity-row">
               <div class="activity-dot" :style="{ background: activityColor(a.action) }"></div>

@@ -159,8 +159,10 @@ export const useAuthStore = defineStore('auth', () => {
     } catch (e) {
       if (e.code === 'auth/popup-closed-by-user') {
         error.value = 'Sign-in popup was closed. Please try again.'
+      } else if (e.code === 'auth/network-request-failed') {
+        error.value = 'Network error. Check your connection and try again.'
       } else {
-        error.value = e.message
+        error.value = 'Google sign-in failed. Please try again.'
       }
       throw new Error(error.value)
     } finally {
@@ -180,8 +182,8 @@ export const useAuthStore = defineStore('auth', () => {
   // ── Human-readable Firebase errors ──
   function friendlyError(code) {
     const map = {
-      'auth/user-not-found':         'No account found with this email.',
-      'auth/wrong-password':         'Incorrect password. Please try again.',
+      'auth/user-not-found':         'Invalid email or password.',
+      'auth/wrong-password':         'Invalid email or password.',
       'auth/invalid-email':          'Invalid email address.',
       'auth/too-many-requests':      'Too many attempts. Please wait and try again.',
       'auth/network-request-failed': 'Network error. Check your connection.',

@@ -12,7 +12,8 @@ const DatabaseMaintenanceService = (() => {
   const PRESERVED_SHEETS = [
     SHEET.USERS,
     SHEET.DIVISIONS,
-    SHEET.MASTER_KRA_LIBRARY
+    SHEET.MASTER_KRA_LIBRARY,
+    SHEET.SYSTEM_SETTINGS
   ]
   const ACTIVE_SCHEMA = [
     {
@@ -45,6 +46,11 @@ const DatabaseMaintenanceService = (() => {
       'efficiencyGuide', 'qualityGuide', 'timelinessGuide',
       'meansOfVerification', 'applicableTo', 'functionType', 'remarks', 'active'
       ]
+    },
+    {
+      name: SHEET.SYSTEM_SETTINGS,
+      preserveData: true,
+      headers: ['id', 'key', 'value', 'description', 'updatedBy', 'updatedByName', 'updatedAt']
     },
     {
       name: SHEET.FOCAL_ASSIGNMENTS,
@@ -132,7 +138,10 @@ const DatabaseMaintenanceService = (() => {
       headers: [
         'id','rateeId','rateeName','divisionId','divisionName','position','positionLevel',
         'semester','year','hasSubordinate','status',
-        'cbcScore','fpoScore','jfScore','overallScore','descriptor',
+        'cbcBaseScore','cbcScore',
+        'cbcNteLevel','cbcNteDeductionPct','cbcOffenseLevel','cbcOffenseDeduction',
+        'cbcDeductionNote','cbcDeductionBy','cbcDeductionByName','cbcDeductionAt',
+        'fpoScore','jfScore','overallScore','descriptor',
         'ipcrfFormId','createdAt','updatedAt'
       ]
     },

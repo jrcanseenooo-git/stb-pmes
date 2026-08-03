@@ -52,6 +52,27 @@
         </div>
       </div>
 
+      <div v-if="canManageUsers" class="access-mode-strip">
+        <div class="access-mode-copy">
+          <span>System Access Mode</span>
+          <strong>{{ accessModeLabel }}</strong>
+          <p>{{ accessModeDescription }}</p>
+        </div>
+        <div class="access-mode-controls">
+          <label
+            v-for="mode in systemAccessModes"
+            :key="mode.value"
+            :class="['access-mode-option', systemAccessMode === mode.value && 'is-selected']"
+          >
+            <input v-model="systemAccessMode" type="radio" :value="mode.value" />
+            <span>{{ mode.label }}</span>
+          </label>
+          <button class="btn btn-primary" :disabled="systemSettingsSaving || systemSettingsLoading" @click="saveSystemSettings">
+            {{ systemSettingsSaving ? 'Saving...' : 'Save Mode' }}
+          </button>
+        </div>
+      </div>
+
       <div class="control-strip">
         <div class="search-box">
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
@@ -580,9 +601,10 @@
 
 <script setup>
 import { ref, computed, h, onMounted, watch } from 'vue'
-import { usersApi, focalAssignmentsApi, maintenanceApi } from '@/services/api'
+import { usersApi, focalAssignmentsApi, maintenanceApi, systemSettingsApi } from '@/services/api'
 import { useConfirm, CONFIRMS } from '@/composables/useConfirm'
 import { usePermissions } from '@/composables/usePermissions'
+import { useAuthStore } from '@/stores/auth'
 
 // Must match the canonical Divisions seeded in InitSheets.gs exactly.
 // The division <select> binds to the display name only; this resolves it to
@@ -653,8 +675,24 @@ const bureauFocals = ref({ primaryUserId: '', alternateUserId: '' })
 const maintenanceLoading = ref(false)
 const maintenanceRunning = ref(false)
 const maintenancePreview = ref(null)
+const systemSettingsLoading = ref(false)
+const systemSettingsSaving = ref(false)
+const systemAccessMode = ref('evaluation_only')
+const systemAccessModes = ref([
+  {
+    value: 'evaluation_only',
+    label: 'Evaluation Monitoring only',
+    description: 'Regular users can only access Evaluation and Profile Settings. Hidden module links redirect to Evaluation.'
+  },
+  {
+    value: 'full_access',
+    label: 'Full module access',
+    description: 'Users can access the modules allowed by their role and permissions.'
+  }
+])
 const { canManageUsers, canManageFocalAssignments, canManageDatabase } = usePermissions()
 const { confirm, confirmState } = useConfirm()
+const authStore = useAuthStore()
 const activeUsersCount = computed(() => users.value.filter(u => u.status === 'Active').length)
 const inactiveUsersCount = computed(() => users.value.filter(u => u.status === 'Inactive').length)
 const pendingUsersCount = computed(() => users.value.filter(u => u.status === 'Pending').length)
@@ -669,6 +707,12 @@ const rebuiltSheetNames = computed(() => {
   const preserved = new Set(preservedSheetNames.value)
   return (maintenancePreview.value?.finalSheetOrder || []).filter(name => !preserved.has(name))
 })
+const accessModeLabel = computed(() =>
+  systemAccessModes.value.find(mode => mode.value === systemAccessMode.value)?.label || 'Evaluation Monitoring only'
+)
+const accessModeDescription = computed(() =>
+  systemAccessModes.value.find(mode => mode.value === systemAccessMode.value)?.description || ''
+)
 
 const SearchSelect = {
   props: {
@@ -790,6 +834,7 @@ const SearchSelect = {
 // ── Load users on mount ──
 onMounted(async () => {
   await loadUsers()
+  if (canManageUsers.value) await loadSystemSettings()
 })
 
 async function loadUsers() {
@@ -802,6 +847,55 @@ async function loadUsers() {
     showToast('Could not load users from database.', 'error')
   } finally {
     loading.value = false
+  }
+}
+
+async function loadSystemSettings() {
+  systemSettingsLoading.value = true
+  try {
+    const data = await systemSettingsApi.get()
+    systemAccessMode.value = data.accessMode || 'evaluation_only'
+    if (Array.isArray(data.modes) && data.modes.length) {
+      systemAccessModes.value = data.modes
+    }
+  } catch (e) {
+    console.warn('[SystemSettings]', e.message)
+    showToast('Could not load system access mode.', 'error')
+  } finally {
+    systemSettingsLoading.value = false
+  }
+}
+
+async function saveSystemSettings() {
+  const selected = systemAccessModes.value.find(mode => mode.value === systemAccessMode.value)
+  const ok = await confirm({
+    type: 'info',
+    title: 'Change System Access Mode',
+    message: `Set PMES access mode to "${selected?.label || systemAccessMode.value}"?`,
+    details: [
+      { label: 'Selected mode', value: selected?.label || systemAccessMode.value },
+      { label: 'Effect', value: selected?.description || 'Updates module access rules.' }
+    ],
+    note: 'This affects regular users after their profile refreshes or next sign-in. Your own navigation will refresh immediately.',
+    confirmLabel: 'Save Mode',
+    cancelLabel: 'Cancel'
+  })
+  if (!ok) return
+
+  systemSettingsSaving.value = true
+  try {
+    const data = await systemSettingsApi.update({ accessMode: systemAccessMode.value })
+    systemAccessMode.value = data.accessMode || systemAccessMode.value
+    if (Array.isArray(data.modes) && data.modes.length) {
+      systemAccessModes.value = data.modes
+    }
+    await authStore.fetchProfile()
+    showToast('System access mode updated.')
+  } catch (e) {
+    console.error(e)
+    showToast('Could not update system access mode. Please try again.', 'error')
+  } finally {
+    systemSettingsSaving.value = false
   }
 }
 
@@ -1239,6 +1333,14 @@ function showToast(msg, type='success') {
 .summary-item{border:1px solid #E2E8F0;background:#F8FAFC;border-radius:10px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
 .summary-item span{font-size:11px;color:#7183A3;font-weight:700;text-transform:uppercase;letter-spacing:.05em;}
 .summary-item strong{font-size:20px;color:#0D2137;line-height:1;}
+.access-mode-strip{display:grid;grid-template-columns:minmax(260px,1fr) auto;gap:16px;align-items:center;border:1px solid #DDE7F3;background:#F8FAFC;border-radius:11px;padding:13px 14px;margin-bottom:14px;}
+.access-mode-copy span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#2F80ED;font-weight:800;margin-bottom:3px;}
+.access-mode-copy strong{display:block;font-size:15px;color:#0D2137;line-height:1.2;}
+.access-mode-copy p{margin:4px 0 0;color:#7183A3;font-size:12px;line-height:1.35;}
+.access-mode-controls{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap;}
+.access-mode-option{display:inline-flex;align-items:center;gap:7px;min-height:36px;padding:8px 11px;border:1px solid #DDE7F3;border-radius:9px;background:#fff;color:#475569;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;}
+.access-mode-option input{width:13px;height:13px;accent-color:#0B4DB3;}
+.access-mode-option.is-selected{border-color:#2F80ED;background:#EBF4FF;color:#0B4DB3;box-shadow:0 0 0 3px rgba(47,128,237,.08);}
 .control-strip{display:grid;grid-template-columns:minmax(260px,1fr) 190px 150px;gap:10px;align-items:center;}
 .search-box{display:flex;align-items:center;gap:8px;background:#fff;border:1.5px solid #DDE7F3;border-radius:9px;padding:9px 12px;min-width:0;}
 .search-box:focus-within{border-color:#2F80ED;box-shadow:0 0 0 3px rgba(47,128,237,.09);}
@@ -1349,6 +1451,8 @@ function showToast(msg, type='success') {
   .page-heading{flex-direction:column;align-items:stretch;}
   .top-actions{justify-content:flex-start;}
   .summary-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .access-mode-strip{grid-template-columns:1fr;}
+  .access-mode-controls{justify-content:flex-start;}
   .control-strip{grid-template-columns:1fr;}
   .focal-routing-shell,.route-table-head,.division-route-row{grid-template-columns:1fr;}
   .route-table-head{display:none;}

@@ -102,6 +102,11 @@ export const maintenanceApi = {
 
 // ── KRAs & Success Indicators ──────────────────
 
+export const systemSettingsApi = {
+  get:    () => gasGet('system-settings'),
+  update: (data) => gasWrite('PUT', 'system-settings', data)
+}
+
 export const kraApi = {
   list:        (p = {})            => gasGet('kras',                                        p),
   get:         (id)                => gasGet(`kras/${id}`),
@@ -204,6 +209,7 @@ export const ipatApi = {
   // Core Behavioral Competencies
   saveCBCRatings: (id, ratings) => gasWrite('POST',  `ipat/${id}/cbc`,         { ratings: JSON.stringify(ratings) }),
   computeCBC:     (id)          => gasWrite('POST',  `ipat/${id}/cbc/compute`),
+  setCbcDeduction:(id, data)     => gasWrite('POST',  `ipat/${id}/cbc-deduction`, data),
 
   // Job Fitness
   saveJFRatings:  (id, ratings) => gasWrite('POST',  `ipat/${id}/jf`,          { ratings: JSON.stringify(ratings) }),
@@ -229,8 +235,11 @@ export const ipatAssignmentsApi = {
   getMyRatees:    (p = {})          => gasGet('ipat-assignments/my-ratees',  p),
   getMyResults:   (p = {})          => gasGet('ipat-assignments/my-results', p),
   getRateeAssign: (rateeId, p = {}) => gasGet(`ipat-assignments/${rateeId}/ratee-assignments`, p),
-  markCompleted:  (id)              => gasWrite('POST',   `ipat-assignments/${id}/complete`),
-  deleteForPeriod:(semester, year)  => gasWrite('DELETE', 'ipat-assignments', { semester, year })
+  submitRatings:  (id, data)        => gasWrite('POST',   `ipat-assignments/${id}/submit-ratings`, {
+    cbcRatings: JSON.stringify(data?.cbcRatings || []),
+    jfRatings:  JSON.stringify(data?.jfRatings  || [])
+  }),
+  markCompleted:  (id)              => gasWrite('POST',   `ipat-assignments/${id}/complete`)
 }
 
 // ── Reports ────────────────────────────────────

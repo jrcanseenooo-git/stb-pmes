@@ -19,6 +19,7 @@ const SHEET = {
   IPCRF_FORMS:        'IPCRForms',
   FORM_ENTRIES:       'FormEntries',
   MASTER_KRA_LIBRARY: 'MasterKRALibrary',
+  SYSTEM_SETTINGS:    'SystemSettings',
 
   // ── IPAT (Innovations Performance Assessment Tool) ──
   IPAT_RECORDS:      'IPATRecords',

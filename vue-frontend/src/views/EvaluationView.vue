@@ -120,7 +120,7 @@
         </div>
 
         <div class="view-tabs">
-          <button :class="['view-tab', activeView === 'my-tasks' && 'active']" @click="activeView = 'my-tasks'">
+          <button :class="['view-tab', activeView === 'my-tasks' && 'active']" @click="switchToMyTasks">
             My Rating Tasks
             <span v-if="pendingTaskCount > 0" class="view-tab-badge">{{ pendingTaskCount }}</span>
           </button>
@@ -201,9 +201,10 @@
               </div>
               <div class="eli-chips">
                 <span class="eli-period-pill">S{{ res.semester }} {{ res.year }}</span>
-                <template v-if="res.overallScore">
-                  <span class="eli-score-big">{{ res.overallScore }}</span>
-                  <span v-if="res.descriptor" :class="['eli-desc-chip', descriptorClass(res.descriptor)]">{{ res.descriptor }}</span>
+                <template v-if="displayOverallScore(res)">
+                  <span class="eli-score-big">{{ displayOverallScore(res) }}</span>
+                  <span class="eli-score-percent">{{ scoreEquivalentPct(displayOverallScore(res)) }}</span>
+                  <span v-if="displayDescriptor(res)" :class="['eli-desc-chip', descriptorClass(displayDescriptor(res))]">{{ displayDescriptor(res) }}</span>
                 </template>
               </div>
             </div>
@@ -391,10 +392,14 @@
                 <div class="sscore-op">=</div>
                 <div class="sscore sscore-overall">
                   <div class="sscore-lbl">Overall</div>
-                  <div v-if="activeRecord?.overallScore" :class="['sscore-val', descriptorClass(activeRecord.descriptor)]" style="font-size:22px;font-weight:800">{{ activeRecord.overallScore }}</div>
+                  <div v-if="displayOverallScore(activeRecord)" :class="['sscore-val', descriptorClass(displayDescriptor(activeRecord))]" style="font-size:22px;font-weight:800">{{ displayOverallScore(activeRecord) }}</div>
                   <div v-else class="sscore-val">—</div>
-                  <div v-if="activeRecord?.descriptor" :class="['sscore-desc', descriptorClass(activeRecord.descriptor)]">{{ activeRecord.descriptor }}</div>
+                  <div v-if="displayDescriptor(activeRecord)" :class="['sscore-desc', descriptorClass(displayDescriptor(activeRecord))]">{{ displayDescriptor(activeRecord) }}</div>
                 </div>
+                <button v-if="canEditCbcDeduction(activeRecord)" class="conduct-deduction-btn" @click="openCbcDeductionModal">
+                  Conduct Deduction
+                  <span v-if="hasCbcDeduction(activeRecord)" class="conduct-dot"></span>
+                </button>
               </div>
 
               <!-- ── CBC TAB ── -->
@@ -519,11 +524,11 @@
                 <template v-else>
                   <div class="tab-intro">
                     <template v-if="canAdmin">
-                      Viewing submitted Job Fitness ratings. JF Indicator Score = (Self + Peer + Supervisor) ÷ 3
+                      Viewing submitted Job Fitness ratings. JF Indicator Score = (Self + Supervisor) ÷ 2
                       <span class="scale-hint">1 = Never · 2 = Rarely · 3 = Frequently · 4 = Always</span>
                     </template>
                     <template v-else>
-                      <strong>Job Fitness</strong> is rated by the Ratee (Self), Peer, and Immediate Supervisor. JF Indicator Score = (Self + Peer + Supervisor) ÷ 3
+                      <strong>Job Fitness</strong> is rated by the Ratee (Self) and Immediate Supervisor only. JF Indicator Score = (Self + Supervisor) ÷ 2
                       <span class="scale-hint">1 = Never · 2 = Rarely · 3 = Frequently · 4 = Always</span>
                     </template>
                   </div>
@@ -531,7 +536,6 @@
                     <span class="rater-label">{{ canAdmin ? 'Viewing ratings from:' : 'Rating as:' }}</span>
                     <select v-model="jfRaterType" class="field-input" style="width:220px">
                       <option value="Self">Self (Ratee)</option>
-                      <option value="Peer">Peer</option>
                       <option value="Supervisor">Immediate Supervisor</option>
                     </select>
                   </div>
@@ -660,14 +664,35 @@
               </div>
             </div>
             <template v-else>
-              <div :class="['rp-score-hero', descriptorClass(selectedResult.descriptor)]">
-                <div class="rp-score-big">{{ selectedResult.overallScore ?? '—' }}</div>
-                <div v-if="selectedResult.descriptor" class="rp-score-desc">{{ selectedResult.descriptor }}</div>
+              <div :class="['rp-score-hero', descriptorClass(displayDescriptor(selectedResult))]">
+                <div class="rp-score-big">{{ displayOverallScore(selectedResult) ?? '—' }}</div>
+                <div v-if="displayOverallScore(selectedResult)" class="rp-score-equivalent">{{ scoreEquivalentPct(displayOverallScore(selectedResult)) }} equivalent</div>
+                <div v-if="displayDescriptor(selectedResult)" class="rp-score-desc">{{ displayDescriptor(selectedResult) }}</div>
               </div>
               <div class="rp-score-grid">
-                <div class="rp-score-block"><div class="rp-score-lbl">CBC</div><div class="rp-score-val">{{ selectedResult.cbcScore ? (Math.round(selectedResult.cbcScore * 0.30 * 100) / 100).toFixed(2) : '—' }}</div><div class="rp-score-pct">30%</div></div>
-                <div class="rp-score-block"><div class="rp-score-lbl">FPO</div><div class="rp-score-val">{{ selectedResult.fpoScore ? (Math.round((selectedResult.fpoScore > 4 ? ((selectedResult.fpoScore - 1) / 4 * 3 + 1) : selectedResult.fpoScore) * 0.55 * 100) / 100).toFixed(2) : '—' }}</div><div class="rp-score-pct">55%</div></div>
-                <div class="rp-score-block"><div class="rp-score-lbl">JF</div><div class="rp-score-val">{{ selectedResult.jfScore ? (Math.round(selectedResult.jfScore * 0.15 * 100) / 100).toFixed(2) : '—' }}</div><div class="rp-score-pct">15%</div></div>
+                <div class="rp-score-block">
+                  <div class="rp-score-lbl">CBC</div>
+                  <div class="rp-score-val">{{ cbcWeightedScore(selectedResult) }}</div>
+                  <div class="rp-score-pct">30% weight</div>
+                  <div v-if="selectedResult.cbcScore" class="rp-score-equivalent-sm">{{ scoreEquivalentPct(selectedResult.cbcScore) }} equivalent</div>
+                </div>
+                <div class="rp-score-block">
+                  <div class="rp-score-lbl">FPO</div>
+                  <div class="rp-score-val">{{ weightedDomainScore(selectedResult.fpoScore, 0.55, true) }}</div>
+                  <div class="rp-score-pct">55% weight</div>
+                  <div v-if="selectedResult.fpoScore" class="rp-score-equivalent-sm">{{ scoreEquivalentPct(selectedResult.fpoScore, true) }} equivalent</div>
+                </div>
+                <div class="rp-score-block">
+                  <div class="rp-score-lbl">JF</div>
+                  <div class="rp-score-val">{{ weightedDomainScore(selectedResult.jfScore, 0.15) }}</div>
+                  <div class="rp-score-pct">15% weight</div>
+                  <div v-if="selectedResult.jfScore" class="rp-score-equivalent-sm">{{ scoreEquivalentPct(selectedResult.jfScore) }} equivalent</div>
+                </div>
+              </div>
+              <div v-if="hasCbcDeduction(selectedResult)" class="private-deduction-note">
+                <div class="private-deduction-title">Offenses deduction applied</div>
+                <div>{{ cbcDeductionText(selectedResult) }}</div>
+                <small>This notice is shown only to you and authorized reviewers.</small>
               </div>
             </template>
           </div>
@@ -761,8 +786,8 @@
               </svg>
             </div>
             <div>
-              <h3 class="modal-title">Generate Rater Assignments</h3>
-              <p class="modal-sub">Automatically assigns peer, subordinate, supervisor, and skip-supervisor raters</p>
+              <h3 class="modal-title">Generate / Backfill Rater Assignments</h3>
+              <p class="modal-sub">Creates missing rater assignments without changing completed ratings</p>
             </div>
             <button class="modal-close" @click="showGenerateModal = false">
               <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M2 2l11 11M13 2L2 13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
@@ -770,29 +795,14 @@
           </div>
           <div class="modal-body">
             <div v-if="generateResult" class="gen-result">
-              <div class="gen-result-title">Assignments Generated</div>
-              <div class="gen-result-stat">{{ generateResult.generated }} assignments · {{ generateResult.ratees }} employee/s</div>
+              <div class="gen-result-title">Backfill Complete</div>
+              <div class="gen-result-stat">{{ generateResult.generated }} missing assignment/s · {{ generateResult.ratees }} employee/s checked</div>
               <div class="gen-result-breakdown">
                 <span v-for="(count, type) in generateResult.breakdown" :key="type" class="gen-chip">
                   {{ type }}: {{ count }}
                 </span>
               </div>
-              <p class="gen-result-note">Users can now open the Evaluation module to view and submit their assigned ratings.</p>
-            </div>
-            <div v-else-if="showRegenConfirm" class="regen-warning">
-              <div class="regen-warning-icon">
-                <svg width="48" height="48" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="22" fill="#FEF2F2" stroke="#EF4444" stroke-width="2"/><path d="M24 14v14M24 32v2" stroke="#EF4444" stroke-width="2.5" stroke-linecap="round"/></svg>
-              </div>
-              <h3 class="regen-warning-title">Assignments Already Exist</h3>
-              <p class="regen-warning-text">Evaluation data already exists for <strong>Semester {{ generateForm.semester }}, {{ generateForm.year }}</strong>. Regenerating will permanently delete:</p>
-              <ul class="regen-warning-list">
-                <li>All IPAT records for this period</li>
-                <li>All CBC ratings submitted by raters</li>
-                <li>All Job Fitness ratings submitted by raters</li>
-                <li>All EDAP entries linked to this period</li>
-                <li>All rater assignments for this period</li>
-              </ul>
-              <p class="regen-warning-text" style="color:#EF4444;font-weight:600">This action cannot be undone. All submitted ratings will be lost.</p>
+              <p class="gen-result-note">Existing ratings were preserved. Users with newly added assignments can now open Evaluation to complete them.</p>
             </div>
             <div v-else class="form-grid">
               <div class="field">
@@ -810,8 +820,9 @@
                 <div class="gen-info-box">
                   <strong>What this does:</strong>
                   <ul style="margin:6px 0 0 18px;padding:0;font-size:12px;line-height:1.7">
-                    <li>Creates IPAT records for all active employees</li>
-                    <li>Assigns Self, Peer1/Peer2 (or Peer+Subordinate), JF Peer, Supervisor, and Skip Supervisor raters based on position and section</li>
+                    <li>Creates missing IPAT records for active employees</li>
+                    <li>Backfills missing Self, CBC Peer, Supervisor, and Skip Supervisor assignments</li>
+                    <li>Preserves existing assignments, submitted ratings, computed scores, and EDAP entries</li>
                     <li>Avoids repeating same Peer/Subordinate from the previous cycle</li>
                     <li>Employees will see their assigned ratees in <em>My Rating Tasks</em></li>
                   </ul>
@@ -820,14 +831,83 @@
             </div>
           </div>
           <div class="modal-footer">
-            <button class="btn" @click="showGenerateModal = false; generateResult = null; showRegenConfirm = false">{{ generateResult ? 'Close' : 'Cancel' }}</button>
-            <button v-if="showRegenConfirm" class="btn btn-danger" :disabled="generating" @click="generateAssignments">
+            <button class="btn" @click="showGenerateModal = false; generateResult = null">{{ generateResult ? 'Close' : 'Cancel' }}</button>
+            <button v-if="!generateResult" class="btn btn-primary" :disabled="generating" @click="generateAssignments">
               <span v-if="generating" class="spinner-sm"></span>
-              {{ resetting ? 'Deleting data…' : generating ? 'Regenerating…' : 'Delete All & Regenerate' }}
+              {{ generating ? 'Checking and backfilling…' : 'Generate / Backfill Assignments' }}
             </button>
-            <button v-else-if="!generateResult" class="btn btn-primary" :disabled="generating" @click="generateAssignments">
-              <span v-if="generating" class="spinner-sm"></span>
-              {{ generating ? 'Generating…' : 'Generate Assignments' }}
+          </div>
+        </div>
+      </div>
+    </teleport>
+
+    <!-- ══════════════════════ CBC CONDUCT DEDUCTION MODAL ══════════════════════ -->
+    <teleport to="body">
+      <div v-if="showCbcDeductionModal" class="modal-overlay" @click.self="closeCbcDeductionModal">
+        <div class="modal conduct-modal">
+          <div class="modal-hd">
+            <div class="modal-icon warning-icon">!</div>
+            <div>
+              <h3 class="modal-title">Offenses Deduction</h3>
+              <p class="modal-sub">Confidential adjustment for NTE and actual commission of offense</p>
+            </div>
+            <button class="modal-close" @click="closeCbcDeductionModal">
+              <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M2 2l11 11M13 2L2 13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+            </button>
+          </div>
+          <div class="modal-body conduct-modal-body">
+            <div class="conduct-ratee-card">
+              <strong>{{ activeRecord?.rateeName }}</strong>
+              <span>S{{ activeRecord?.semester }} {{ activeRecord?.year }} · {{ activeRecord?.divisionName }}</span>
+            </div>
+            <div class="form-grid">
+              <div class="field">
+                <label class="field-label">NTE Offense Level</label>
+                <select v-model="cbcDeductionForm.cbcNteLevel" class="field-input">
+                  <option value="none">None</option>
+                  <option value="light">Light offense (-5%)</option>
+                  <option value="less_grave">Less grave offense (-10%)</option>
+                  <option value="serious_grave">Serious/Grave offense (-15%)</option>
+                </select>
+              </div>
+              <div class="field">
+                <label class="field-label">Actual Commission Offense Level</label>
+                <select v-model="cbcDeductionForm.cbcOffenseLevel" class="field-input">
+                  <option value="none">None</option>
+                  <option value="light">Light offense (-0.25)</option>
+                  <option value="less_grave">Less grave offense (-0.50)</option>
+                  <option value="serious_grave">Serious/Grave offense (-1.00)</option>
+                </select>
+              </div>
+              <div class="field full">
+                <label class="field-label">Confidential Basis / Notes</label>
+                <textarea v-model="cbcDeductionForm.cbcDeductionNote" class="field-input" rows="4" placeholder="Optional confidential reference for authorized reviewers only"></textarea>
+              </div>
+            </div>
+            <div class="conduct-preview">
+              <div>
+                <span>CBC percentage raw score</span>
+                <strong>{{ cbcDeductionPreview.basePct !== null ? `${cbcDeductionPreview.basePct}%` : '—' }}</strong>
+              </div>
+              <div>
+                <span>NTE deduction</span>
+                <strong>{{ cbcDeductionPreview.ntePct ? `-${cbcDeductionPreview.ntePct}%` : 'None' }}</strong>
+              </div>
+              <div>
+                <span>Final score offense deduction</span>
+                <strong>{{ cbcDeductionPreview.offenseDeduction ? `-${cbcDeductionPreview.offenseDeduction}` : 'None' }}</strong>
+              </div>
+              <div class="conduct-preview-final">
+                <span>CBC contribution to overall</span>
+                <strong>{{ cbcDeductionPreview.cbcWeightedScore ?? '—' }}</strong>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn" @click="closeCbcDeductionModal">Cancel</button>
+            <button class="btn btn-primary" :disabled="savingCbcDeduction" @click="saveCbcDeduction">
+              <span v-if="savingCbcDeduction" class="spinner-sm"></span>
+              {{ savingCbcDeduction ? 'Saving…' : 'Save Deduction' }}
             </button>
           </div>
         </div>
@@ -847,7 +927,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
-import { ipatApi, ipatAssignmentsApi, usersApi, assessmentContentApi, assessmentCategoryApi } from '@/services/api'
+import { dashboardApi, ipatApi, ipatAssignmentsApi, usersApi, assessmentContentApi, assessmentCategoryApi } from '@/services/api'
 import { usePermissions } from '@/composables/usePermissions'
 
 const { hasPermission } = usePermissions()
@@ -913,6 +993,17 @@ const creating     = ref(false)
 const activeStatus = ref('All')
 const search       = ref('')
 const filterDiv    = ref('')
+const divisionOptions = ref([])
+const FALLBACK_DIVISIONS = [
+  { id: 'dfd', name: 'Design Formulation Division' },
+  { id: 'pid', name: 'Pilot Implementation Division' },
+  { id: 'staed', name: 'Social Technology Analysis and Evaluation Division' },
+  { id: 'ap', name: 'Admin Pool' }
+]
+
+function divisionKey(name) {
+  return String(name || '').trim().toLowerCase().replace(/\s+/g, ' ')
+}
 
 // View toggle
 const canAdmin = hasPermission('generate_ipat_assignments')
@@ -944,8 +1035,6 @@ const showGenerateModal = ref(false)
 const generateForm  = ref({ semester: String(new Date().getMonth() < 6 ? 1 : 2), year: currentYear })
 const generating    = ref(false)
 const generateResult = ref(null)
-const showRegenConfirm = ref(false)
-const resetting     = ref(false)
 
 const showCreateModal = ref(false)
 const activeRecord    = ref(null)
@@ -960,6 +1049,13 @@ const cbcRaterType = ref('Self')
 const cbcRatings   = ref({})
 const savingCBC    = ref(false)
 const computingCBC = ref(false)
+const showCbcDeductionModal = ref(false)
+const savingCbcDeduction = ref(false)
+const cbcDeductionForm = ref({
+  cbcNteLevel: 'none',
+  cbcOffenseLevel: 'none',
+  cbcDeductionNote: ''
+})
 
 const fpoSource  = ref(null)
 const syncingFPO = ref(false)
@@ -968,9 +1064,7 @@ const savingFpoManual = ref(false)
 const fpoManualSaved  = ref(false)
 
 const cbcWeighted = computed(() => {
-  const s = Number(activeRecord.value?.cbcScore)
-  if (!s) return '—'
-  return (Math.round(s * 0.30 * 100) / 100).toFixed(2)
+  return cbcWeightedScore(activeRecord.value)
 })
 const fpoWeighted = computed(() => {
   let s = Number(activeRecord.value?.fpoScore)
@@ -990,14 +1084,160 @@ const fpoManualWeighted = computed(() => {
   return (Math.round(s * 0.55 * 100) / 100).toFixed(2)
 })
 
+function normalizedFourPointScore(value, isFpo = false) {
+  let score = Number(value)
+  if (!Number.isFinite(score) || score <= 0) return null
+  if (isFpo && score > 4) score = ((score - 1) / 4) * 3 + 1
+  return Math.max(0, Math.min(4, score))
+}
+
+function weightedDomainScore(value, weight, isFpo = false) {
+  const score = normalizedFourPointScore(value, isFpo)
+  if (score === null) return '—'
+  return (Math.round(score * weight * 100) / 100).toFixed(2)
+}
+
+function cbcWeightedScore(record) {
+  const score = normalizedFourPointScore(record?.cbcScore)
+  if (score === null) return '—'
+  const weighted = score * 0.30
+  return (Math.round(weighted * 100) / 100).toFixed(2)
+}
+
+function scoreEquivalentPct(value, isFpo = false) {
+  const score = normalizedFourPointScore(value, isFpo)
+  if (score === null) return '—'
+  const pct = Math.max(0, Math.min(100, (score / 4) * 100))
+  return `${Number(pct.toFixed(1)).toLocaleString()}%`
+}
+
+const CONDUCT_LEVELS = {
+  none: { label: 'None', ntePct: 0, offenseDeduction: 0 },
+  light: { label: 'Light offense', ntePct: 5, offenseDeduction: 0.25 },
+  less_grave: { label: 'Less grave offense', ntePct: 10, offenseDeduction: 0.5 },
+  serious_grave: { label: 'Serious/Grave offense', ntePct: 15, offenseDeduction: 1 }
+}
+
+function normalizeConductLevel(level) {
+  return CONDUCT_LEVELS[level] ? level : 'none'
+}
+
+function cbcDeductionValues(record) {
+  const nteLevel = normalizeConductLevel(record?.cbcNteLevel || record?.cbcDeductionSummary?.nteLevel || 'none')
+  const offenseLevel = normalizeConductLevel(record?.cbcOffenseLevel || record?.cbcDeductionSummary?.offenseLevel || 'none')
+  const ntePct = Number(record?.cbcNteDeductionPct ?? record?.cbcDeductionSummary?.ntePct ?? CONDUCT_LEVELS[nteLevel].ntePct) || 0
+  const offenseDeduction = Number(record?.cbcOffenseDeduction ?? record?.cbcDeductionSummary?.offenseDeduction ?? CONDUCT_LEVELS[offenseLevel].offenseDeduction) || 0
+  return { nteLevel, offenseLevel, ntePct, offenseDeduction }
+}
+
+function applyCbcDeductionPreview(baseScore, data) {
+  const base = Number(baseScore)
+  const nteLevel = normalizeConductLevel(data?.cbcNteLevel || 'none')
+  const offenseLevel = normalizeConductLevel(data?.cbcOffenseLevel || 'none')
+  const ntePct = CONDUCT_LEVELS[nteLevel].ntePct
+  const offenseDeduction = CONDUCT_LEVELS[offenseLevel].offenseDeduction
+  if (!Number.isFinite(base) || base <= 0) {
+    return { baseScore: null, basePct: null, ntePct, offenseDeduction, adjustedScore: null, cbcWeightedScore: null, finalOverallDeduction: offenseDeduction }
+  }
+  const basePct = Math.max(0, Math.min(100, (base / 4) * 100))
+  const afterNtePct = Math.max(0, basePct - ntePct)
+  const adjustedScore = Math.max(0, Math.min(4, (afterNtePct / 100) * 4))
+  const cbcWeightedScore = adjustedScore * 0.30
+  return { baseScore: round2(base), basePct: round2(basePct), ntePct, offenseDeduction, adjustedScore: round2(adjustedScore), cbcWeightedScore: round2(cbcWeightedScore), finalOverallDeduction: offenseDeduction }
+}
+
+const cbcDeductionPreview = computed(() =>
+  applyCbcDeductionPreview(activeRecord.value?.cbcBaseScore || activeRecord.value?.cbcScore, cbcDeductionForm.value)
+)
+
+function canEditCbcDeduction(record) {
+  return Boolean(record?.cbcDeductionCanEdit || canAdmin)
+}
+
+function hasCbcDeduction(record) {
+  const v = cbcDeductionValues(record)
+  return Boolean(record?.cbcDeductionHasDeduction || v.ntePct || v.offenseDeduction)
+}
+
+function cbcDeductionText(record) {
+  const v = cbcDeductionValues(record)
+  const parts = []
+  if (v.ntePct) parts.push(`NTE ${CONDUCT_LEVELS[v.nteLevel]?.label || 'offense'} deducted ${v.ntePct}% from the CBC raw percentage score`)
+  if (v.offenseDeduction) parts.push(`Actual commission offense level ${CONDUCT_LEVELS[v.offenseLevel]?.label || 'offense'} deducted ${v.offenseDeduction} point${v.offenseDeduction === 1 ? '' : 's'} from the final overall score`)
+  return parts.length ? `${parts.join('. ')}.` : 'No conduct deduction is applied.'
+}
+
+function openCbcDeductionModal() {
+  if (!activeRecord.value) return
+  cbcDeductionForm.value = {
+    cbcNteLevel: normalizeConductLevel(activeRecord.value.cbcNteLevel),
+    cbcOffenseLevel: normalizeConductLevel(activeRecord.value.cbcOffenseLevel),
+    cbcDeductionNote: activeRecord.value.cbcDeductionNote || ''
+  }
+  showCbcDeductionModal.value = true
+}
+
+function closeCbcDeductionModal() {
+  showCbcDeductionModal.value = false
+}
+
+function derivedOverallScore(record) {
+  if (!record) return null
+  const cbc = normalizedFourPointScore(record.cbcScore)
+  const fpo = normalizedFourPointScore(record.fpoScore, true)
+  const jf = normalizedFourPointScore(record.jfScore)
+
+  let weightedSum = 0
+  let totalWeight = 0
+  if (cbc !== null) {
+    weightedSum += cbc * 0.30
+    totalWeight += 0.30
+  }
+  if (fpo !== null) { weightedSum += fpo * 0.55; totalWeight += 0.55 }
+  if (jf !== null) { weightedSum += jf * 0.15; totalWeight += 0.15 }
+  if (!totalWeight) return null
+
+  const v = cbcDeductionValues(record)
+  return round2(Math.max(0, (weightedSum / totalWeight) - v.offenseDeduction))
+}
+
+function descriptorForScore(score) {
+  const s = Number(score)
+  if (!Number.isFinite(s)) return ''
+  if (s >= 4.00) return 'Outstanding'
+  if (s >= 3.50) return 'Very Satisfactory'
+  if (s >= 2.75) return 'Satisfactory'
+  if (s >= 2.00) return 'Needs Improvement'
+  return 'Requires Immediate Intervention'
+}
+
+function displayOverallScore(record) {
+  const derived = derivedOverallScore(record)
+  if (derived !== null) return derived
+  const stored = Number(record?.overallScore)
+  return Number.isFinite(stored) && stored > 0 ? stored : null
+}
+
+function displayDescriptor(record) {
+  const score = displayOverallScore(record)
+  return descriptorForScore(score) || record?.descriptor || ''
+}
+
 async function onFpoManualBlur() {
   const val = Number(fpoManualInput.value)
   if (!val || val < 1 || val > 5 || !activeRecord.value) return
   savingFpoManual.value = true
   fpoManualSaved.value = false
   try {
-    await ipatApi.setFPO(activeRecord.value.id, val)
-    _syncRecord({ fpoScore: val })
+    const r = await ipatApi.setFPO(activeRecord.value.id, val)
+    _syncRecord({
+      fpoScore: r.fpoScore ?? val,
+      cbcScore: r.cbcScore,
+      jfScore: r.jfScore,
+      overallScore: r.overallScore,
+      descriptor: r.descriptor,
+      status: 'Computed'
+    })
     fpoManualSaved.value = true
     setTimeout(() => { fpoManualSaved.value = false }, 2500)
   } catch (e) { console.error(e); showToast('Failed to save FPO score', 'error') }
@@ -1055,24 +1295,42 @@ const statusTabs = [
 const canCreate = computed(() => canAdmin.value)
 const canSelectRatee = computed(() => canAdmin.value)
 
-// JF tab visible when admin view, JFPeer assignment, or when assignment rater type can rate JF (Self / Supervisor)
+function isJobFitnessOnlyAssignment(assignment) {
+  const type = String(assignment?.raterType || '').toLowerCase()
+  return type.includes('job fitness')
+}
+
+function defaultTabForCurrentContext() {
+  return isJobFitnessOnlyAssignment(activeAssignment.value) ? 'jf' : 'cbc'
+}
+
+// JF tab visible when admin view or when assignment rater type can rate JF (Self / Supervisor)
 const showJFTab = computed(() => {
   if (!activeAssignment.value) return true
-  return ['Self', 'Supervisor', 'JFPeer'].includes(activeAssignment.value.raterType)
+  return ['Self', 'Supervisor'].includes(activeAssignment.value.raterType) || isJobFitnessOnlyAssignment(activeAssignment.value)
 })
 
-// CBC tab hidden for JFPeer assignments (they only rate JF)
+// CBC tab hidden for explicit Job Fitness-only assignments.
 const showCBCTab = computed(() => {
   if (!activeAssignment.value) return true
-  return activeAssignment.value.raterType !== 'JFPeer'
+  return !isJobFitnessOnlyAssignment(activeAssignment.value)
 })
 
 const availableDivisions = computed(() => {
-  const seen = new Map()
-  records.value.forEach(r => {
-    if (r.divisionId && !seen.has(r.divisionId)) seen.set(r.divisionId, r.divisionName || r.divisionId)
-  })
-  return [...seen.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name))
+  const byName = new Map()
+  const addDivision = (division, preferExisting = true) => {
+    const id = division.id || division.divisionId
+    const name = division.name || division.divisionName
+    const key = divisionKey(name)
+    if (!id || !name || !key) return
+    if (!preferExisting || !byName.has(key)) byName.set(key, { id, name })
+  }
+
+  divisionOptions.value.forEach(d => addDivision(d, false))
+  records.value.forEach(r => addDivision({ id: r.divisionId, name: r.divisionName || r.divisionId }))
+  FALLBACK_DIVISIONS.forEach(d => addDivision(d))
+
+  return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name))
 })
 
 const filteredRecords = computed(() => {
@@ -1151,7 +1409,7 @@ function taskDivisionLabel(task) {
 function statusClass(s) { return { Draft: 'st-draft', Computed: 'st-blue', Final: 'st-green' }[s] || 'st-draft' }
 function descriptorClass(d) {
   if (!d) return ''
-  if (d.includes('Excellent'))    return 'desc-excellent'
+  if (d.includes('Outstanding'))  return 'desc-excellent'
   if (d.includes('Satisfactory')) return 'desc-satisfactory'
   if (d.includes('Needs'))        return 'desc-needs'
   return 'desc-immediate'
@@ -1196,15 +1454,37 @@ function _populateJFRatings(raterType, ratings) {
 // Re-populate when the user switches which rater type they're editing
 watch(cbcRaterType, (type) => { if (loadedRec.value) _populateCBCRatings(type, loadedRec.value.cbcRatings) })
 watch(jfRaterType,  (type) => { if (loadedRec.value) _populateJFRatings(type,  loadedRec.value.jfRatings) })
+watch([tasksSemester, tasksYear], handlePeriodChange)
 
-onMounted(() => { loadAssessmentContent(); loadMyTasks() })
+onMounted(() => {
+  loadAssessmentContent()
+  loadDivisionOptions()
+  loadMyTasks()
+})
+
+async function handlePeriodChange() {
+  selectedTask.value = null
+  selectedRecord.value = null
+  selectedResult.value = null
+  activeRecord.value = null
+  loadedRec.value = null
+  activeAssignment.value = null
+  showValidation.value = false
+
+  if (activeView.value === 'my-tasks') await loadMyTasks()
+  else if (activeView.value === 'my-results') await loadMyResults()
+  else if (activeView.value === 'all') await loadRecords()
+}
 
 // ── My Tasks ──
 async function loadMyTasks() {
+  const requestedSemester = String(tasksSemester.value)
+  const requestedYear = String(tasksYear.value)
   loadingTasks.value = true
   myTasks.value = []
   try {
-    const data = await ipatAssignmentsApi.getMyRatees({ semester: tasksSemester.value, year: tasksYear.value })
+    const data = await ipatAssignmentsApi.getMyRatees({ semester: requestedSemester, year: requestedYear })
+    if (requestedSemester !== String(tasksSemester.value) || requestedYear !== String(tasksYear.value)) return
     myTasks.value = Array.isArray(data) ? data : (data?.items || [])
     // Auto-open the first pending task so the rating form is front-and-center
     // on arrival instead of an empty panel — rating is the module's main job.
@@ -1223,14 +1503,30 @@ async function loadMyTasks() {
 
 async function switchToMyResults() {
   activeView.value = 'my-results'
-  if (!myResults.value.length) loadMyResults()
+  selectedTask.value = null
+  selectedRecord.value = null
+  activeRecord.value = null
+  activeAssignment.value = null
+  showValidation.value = false
+
+  if (!myResults.value.length) {
+    await loadMyResults()
+  } else if (!selectedResult.value && myResults.value.length) {
+    selectResult(myResults.value[0])
+  }
 }
 
 async function loadMyResults() {
+  const requestedSemester = String(tasksSemester.value)
+  const requestedYear = String(tasksYear.value)
   loadingResults.value = true
   try {
-    const data = await ipatAssignmentsApi.getMyResults({ semester: tasksSemester.value, year: tasksYear.value })
+    const data = await ipatAssignmentsApi.getMyResults({ semester: requestedSemester, year: requestedYear })
+    if (requestedSemester !== String(tasksSemester.value) || requestedYear !== String(tasksYear.value)) return
     myResults.value = data || []
+    if (activeView.value === 'my-results') {
+      selectedResult.value = myResults.value[0] || null
+    }
   } catch (e) {
     console.error(e); showToast('Could not load results. Please try again.', 'error')
   } finally {
@@ -1238,9 +1534,44 @@ async function loadMyResults() {
   }
 }
 
+function switchToMyTasks() {
+  activeView.value = 'my-tasks'
+  selectedResult.value = null
+  selectedRecord.value = null
+
+  if (selectedTask.value) return
+  const nextTask = myTasks.value.find(t => t.status !== 'Completed') || myTasks.value[0]
+  if (nextTask) selectTask(nextTask)
+  else {
+    activeRecord.value = null
+    activeAssignment.value = null
+    showValidation.value = false
+  }
+}
+
 async function switchToAll() {
   activeView.value = 'all'
-  if (!records.value.length) loadRecords()
+  selectedTask.value = null
+  selectedResult.value = null
+  activeAssignment.value = null
+  activeRecord.value = null
+  showValidation.value = false
+  await loadRecords()
+}
+
+async function loadDivisionOptions() {
+  try {
+    const data = await dashboardApi.divisions({ pageSize: 200 })
+    const rows = Array.isArray(data) ? data : (data?.items || [])
+    divisionOptions.value = rows
+      .map(d => ({
+        id: d.id || d.divisionId,
+        name: d.name || d.divisionName
+      }))
+      .filter(d => d.id && d.name)
+  } catch (e) {
+    divisionOptions.value = []
+  }
 }
 
 // ── Inline selection: clicking a card loads its form directly in the right panel ──
@@ -1274,9 +1605,9 @@ async function openFromAssignment(task) {
   loadedRec.value        = null
   activeAssignment.value = task
   cbcRaterType.value     = task.raterType
-  jfRaterType.value      = task.raterType === 'JFPeer' ? 'Peer' : (['Self', 'Peer', 'Supervisor'].includes(task.raterType) ? task.raterType : (task.raterType?.startsWith('Peer') ? 'Peer' : 'Self'))
+  jfRaterType.value      = ['Self', 'Supervisor'].includes(task.raterType) ? task.raterType : 'Self'
   showValidation.value   = false
-  activeTab.value        = task.raterType === 'JFPeer' ? 'jf' : 'cbc'
+  activeTab.value        = isJobFitnessOnlyAssignment(task) ? 'jf' : 'cbc'
   if (task.ipatRecordId) {
     await openDetailModal({ id: task.ipatRecordId, rateeName: task.rateeName, semester: task.semester, year: task.year })
   }
@@ -1295,8 +1626,8 @@ async function submitRatings() {
   const assignment = activeAssignment.value
   if (!assignment) return
 
-  const isJFPeer = assignment.raterType === 'JFPeer'
-  const cbcOk = isJFPeer || cbcAnsweredCount.value >= cbcTotalCount.value
+  const isJobFitnessOnly = isJobFitnessOnlyAssignment(assignment)
+  const cbcOk = isJobFitnessOnly || cbcAnsweredCount.value >= cbcTotalCount.value
   const jfOk  = !showJFTab.value || jfAnsweredCount.value >= JF_INDICATORS.value.length
 
   if (!cbcOk || !jfOk) {
@@ -1311,29 +1642,29 @@ async function submitRatings() {
 
   submittingRating.value = true
   try {
-    const saves = []
-    if (!isJFPeer) {
-      const cbcPayload = []
+    let cbcPayload = []
+    let jfPayload = []
+    if (!isJobFitnessOnly) {
       HEARTWORK_THEMES.value.forEach(theme => {
         theme.indicators.forEach((_, idx) => {
           const rating = getCBCRating(theme.id, idx)
           if (rating !== null) cbcPayload.push({ themeId: theme.id, themeName: theme.label, indicatorIdx: idx, rating, raterType: assignment.raterType })
         })
       })
-      saves.push(ipatApi.saveCBCRatings(activeRecord.value.id, cbcPayload))
     }
     if (showJFTab.value) {
-      const jfRaterType = isJFPeer ? 'Peer' : assignment.raterType
-      const jfPayload = JF_INDICATORS.value.map((_, idx) => ({
+      const jfRaterType = ['Self', 'Supervisor'].includes(assignment.raterType) ? assignment.raterType : 'Self'
+      jfPayload = JF_INDICATORS.value.map((_, idx) => ({
         indicatorIdx: idx, rating: getJFRating(idx), evidence: jfEvidence.value[idx] || '', raterType: jfRaterType
       })).filter(r => r.rating !== null)
-      saves.push(ipatApi.saveJFRatings(activeRecord.value.id, jfPayload))
     }
-    await Promise.all(saves)
-    await ipatAssignmentsApi.markCompleted(assignment.id)
+    await ipatAssignmentsApi.submitRatings(assignment.id, { cbcRatings: cbcPayload, jfRatings: jfPayload })
+    assignment.status = 'Completed'
+    if (selectedTask.value?.id === assignment.id) selectedTask.value = { ...selectedTask.value, status: 'Completed' }
+    activeAssignment.value = { ...assignment }
+    myTasks.value = myTasks.value.map(t => t.id === assignment.id ? { ...t, status: 'Completed' } : t)
     showToast('Ratings submitted successfully!')
     closeDetailModal()
-    await loadMyTasks()
     const allDone = myTasks.value.length > 0 && myTasks.value.every(t => t.status === 'Completed')
     if (allDone) {
       selectedTask.value = null
@@ -1354,7 +1685,6 @@ async function submitRatings() {
 // ── Generate Assignments ──
 function openGenerateModal() {
   generateResult.value = null
-  showRegenConfirm.value = false
   generateForm.value   = { semester: String(new Date().getMonth() < 6 ? 1 : 2), year: currentYear }
   showGenerateModal.value = true
 }
@@ -1362,32 +1692,18 @@ function openGenerateModal() {
 async function generateAssignments() {
   if (!generateForm.value.semester || !generateForm.value.year) { showToast('Semester and year required', 'error'); return }
 
-  // Check if assignments already exist for this period
-  if (!showRegenConfirm.value) {
-    try {
-      const existing = await ipatAssignmentsApi.list({ semester: generateForm.value.semester, year: generateForm.value.year })
-      if (existing && existing.length > 0) {
-        showRegenConfirm.value = true
-        return
-      }
-    } catch (e) { /* proceed if check fails */ }
-  }
-
   generating.value = true
   try {
-    // If regenerating, reset all IPAT data for this period first
-    if (showRegenConfirm.value) {
-      resetting.value = true
-      await ipatAssignmentsApi.deleteForPeriod(generateForm.value.semester, generateForm.value.year)
-      resetting.value = false
-    }
-    showRegenConfirm.value = false
     const result = await ipatAssignmentsApi.generate(generateForm.value)
     generateResult.value = result
-    showToast(`Generated ${result.generated} assignments for ${result.ratees} employee(s)`)
+    const generated = Number(result.generated || 0)
+    const ratees = Number(result.ratees || 0)
+    showToast(generated
+      ? `Added ${generated} missing assignment(s) for ${ratees} employee(s)`
+      : 'Assignments are already complete for this period')
     await loadRecords()
-  } catch (e) { console.error(e); showToast(e?.message || 'Something went wrong. Please try again.', 'error') }
-  finally { generating.value = false; resetting.value = false }
+  } catch (e) { console.error('[Evaluation] Could not generate assignments', e); showToast('Could not generate assignments. Please try again or contact the system administrator.', 'error') }
+  finally { generating.value = false }
 }
 
 // ── Rater type helpers ──
@@ -1397,7 +1713,6 @@ function raterTypeLabel(type) {
     Peer:           'Peer Rating',
     Peer1:          'Peer Rating 1',
     Peer2:          'Peer Rating (subtitute to subordinate)',
-    JFPeer:         'Job Fitness Peer Rating',
     Subordinate:    'Immediate Supervisor Rating',
     Supervisor:     'Subordinate Rating',
     SkipSupervisor: 'Skip Supervisor Rating'
@@ -1411,7 +1726,6 @@ function raterRoleDesc(type) {
     Peer:           "You are rating a colleague at the same organizational level.",
     Peer1:          "You are assigned as the employee’s first peer rater.",
     Peer2:          "You are assigned as the employee’s second peer rater.",
-    JFPeer:         "You are assigned as the employee’s Job Fitness peer rater.",
     Subordinate:    "You are rating your immediate supervisor.",
     Supervisor:     "You are rating an employee under your direct supervision.",
     SkipSupervisor: "You are rating an employee supervised by one of your direct subordinates."
@@ -1425,7 +1739,6 @@ function rterTypeCls(type) {
     Peer:          'rt-peer',
     Peer1:         'rt-peer',
     Peer2:         'rt-peer',
-    JFPeer:        'rt-peer',
     Subordinate:   'rt-sub',
     Supervisor:    'rt-sup',
     SkipSupervisor:'rt-skip'
@@ -1440,7 +1753,6 @@ function raterAccent(type) {
     Peer:          '#8B5CF6',
     Peer1:         '#8B5CF6',
     Peer2:         '#8B5CF6',
-    JFPeer:        '#8B5CF6',
     Subordinate:   '#F59E0B',
     Supervisor:    '#22C55E',
     SkipSupervisor:'#F97316'
@@ -1451,8 +1763,20 @@ function raterAccent(type) {
 async function loadRecords() {
   loading.value = true
   try {
-    const r = await ipatApi.list()
+    const r = await ipatApi.list({ pageSize: 500 })
     records.value = r?.items || (Array.isArray(r) ? r : [])
+    if (activeView.value === 'all') {
+      const selectedId = selectedRecord.value?.id || activeRecord.value?.id
+      const refreshed = selectedId ? records.value.find(row => row.id === selectedId) : null
+      if (refreshed) {
+        selectedRecord.value = refreshed
+        activeRecord.value = { ...activeRecord.value, ...refreshed }
+      } else {
+        selectedRecord.value = null
+        activeRecord.value = null
+        loadedRec.value = null
+      }
+    }
   } catch (e) { console.error(e); showToast('Could not load assessments. Please try again.', 'error') }
   finally { loading.value = false }
 }
@@ -1499,7 +1823,7 @@ async function createRecord() {
 
 async function openDetailModal(rec) {
   activeRecord.value    = rec
-  activeTab.value       = 'cbc'
+  activeTab.value       = defaultTabForCurrentContext()
   cbcRatings.value      = {}
   jfRatings.value       = {}
   jfEvidence.value      = {}
@@ -1537,6 +1861,13 @@ function _syncRecord(updated) {
   activeRecord.value = { ...activeRecord.value, ...updated }
   const i = records.value.findIndex(r => r.id === activeRecord.value.id)
   if (i !== -1) records.value[i] = activeRecord.value
+  if (selectedRecord.value?.id === activeRecord.value.id) {
+    selectedRecord.value = { ...selectedRecord.value, ...updated }
+  }
+  if (selectedResult.value?.id === activeRecord.value.id) {
+    selectedResult.value = { ...selectedResult.value, ...updated }
+  }
+  myResults.value = myResults.value.map(r => r.id === activeRecord.value.id ? { ...r, ...updated } : r)
 }
 
 // ── CBC ──
@@ -1566,10 +1897,33 @@ async function computeCBC() {
   computingCBC.value = true
   try {
     const r = await ipatApi.computeCBC(activeRecord.value.id)
-    _syncRecord({ cbcScore: r.cbcScore })
+    _syncRecord({
+      cbcScore: r.cbcScore,
+      cbcBaseScore: r.cbcBaseScore,
+      cbcDeductionSummary: r.cbcDeductionSummary,
+      overallScore: r.overallScore || activeRecord.value?.overallScore || '',
+      descriptor: r.descriptor || activeRecord.value?.descriptor || '',
+      status: r.overallScore ? 'Computed' : activeRecord.value?.status
+    })
     showToast(`CBC Score: ${r.cbcScore}`)
   } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
   finally { computingCBC.value = false }
+}
+
+async function saveCbcDeduction() {
+  if (!activeRecord.value?.id) return
+  savingCbcDeduction.value = true
+  try {
+    const updated = await ipatApi.setCbcDeduction(activeRecord.value.id, cbcDeductionForm.value)
+    _syncRecord(updated)
+    showCbcDeductionModal.value = false
+    showToast('Offenses deduction saved')
+  } catch (e) {
+    console.error(e)
+    showToast('Could not save the offenses deduction. Please try again.', 'error')
+  } finally {
+    savingCbcDeduction.value = false
+  }
 }
 
 // ── FPO ──
@@ -1577,7 +1931,14 @@ async function syncFPOScore() {
   syncingFPO.value = true
   try {
     const r = await ipatApi.syncFPO(activeRecord.value.id)
-    _syncRecord({ fpoScore: r.fpoScore })
+    _syncRecord({
+      fpoScore: r.fpoScore,
+      cbcScore: r.cbcScore,
+      jfScore: r.jfScore,
+      overallScore: r.overallScore,
+      descriptor: r.descriptor,
+      status: 'Computed'
+    })
     fpoSource.value = r.source
     showToast(`FPO score pulled from ${r.source.type}: ${r.fpoScore}`)
   } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
@@ -1591,7 +1952,7 @@ async function saveJFRatings() {
     indicatorIdx: idx,
     rating: getJFRating(idx) || 1,
     evidence: jfEvidence.value[idx] || '',
-    raterType: activeAssignment.value?.raterType === 'JFPeer' ? 'Peer' : (activeAssignment.value?.raterType?.startsWith('Peer') ? 'Peer' : (activeAssignment.value?.raterType || jfRaterType.value))
+    raterType: ['Self', 'Supervisor'].includes(activeAssignment.value?.raterType) ? activeAssignment.value.raterType : jfRaterType.value
   })).filter((_, idx) => getJFRating(idx) !== null)
   if (!ratings.length) { showToast('Please rate at least one indicator', 'error'); return }
   savingJF.value = true
@@ -1608,7 +1969,12 @@ async function computeJF() {
   computingJF.value = true
   try {
     const r = await ipatApi.computeJF(activeRecord.value.id)
-    _syncRecord({ jfScore: r.jfScore })
+    _syncRecord({
+      jfScore: r.jfScore,
+      overallScore: r.overallScore || activeRecord.value?.overallScore || '',
+      descriptor: r.descriptor || activeRecord.value?.descriptor || '',
+      status: r.overallScore ? 'Computed' : activeRecord.value?.status
+    })
     showToast(`Job Fitness Score: ${r.jfScore}`)
   } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
   finally { computingJF.value = false }
@@ -1623,6 +1989,21 @@ async function computeOverall() {
     showToast(`Overall: ${r.overallScore} — ${r.descriptor}`)
   } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
   finally { computingOverall.value = false }
+}
+
+async function recomputeOverallAfterComponentChange() {
+  if (!activeRecord.value?.id) return
+  try {
+    const r = await ipatApi.computeOverall(activeRecord.value.id)
+    _syncRecord({ overallScore: r.overallScore, descriptor: r.descriptor, cbcScore: r.cbcScore, fpoScore: r.fpoScore, jfScore: r.jfScore, status: 'Computed' })
+  } catch (e) {
+    const fallbackScore = displayOverallScore(activeRecord.value)
+    _syncRecord({
+      overallScore: fallbackScore || '',
+      descriptor: fallbackScore ? descriptorForScore(fallbackScore) : '',
+      status: fallbackScore ? 'Computed' : activeRecord.value.status
+    })
+  }
 }
 
 async function finalizeRecord() {
@@ -1688,6 +2069,7 @@ function _resetEdap() {
 .eli-chips{display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
 .eli-period-pill{font-size:10px;font-weight:700;background:#F1F5F9;color:#475569;border-radius:20px;padding:2px 8px;}
 .eli-score-big{font-size:18px;font-weight:800;color:#1E293B;}
+.eli-score-percent{font-size:10px;font-weight:800;color:#0F766E;background:#ECFDF5;border:1px solid #BBF7D0;border-radius:20px;padding:2px 8px;}
 .eli-desc-chip{font-size:10px;font-weight:700;border-radius:20px;padding:2px 9px;}
 .eli-final{display:flex;align-items:center;gap:4px;font-size:10px;color:#15803D;font-weight:600;}
 
@@ -1730,6 +2112,7 @@ function _resetEdap() {
 /* ── Score hero ── */
 .rp-score-hero{text-align:center;padding:24px 20px;border-radius:12px;background:#F8FAFC;border:1px solid #E8EDF3;}
 .rp-score-big{font-size:48px;font-weight:800;color:#1E293B;line-height:1;}
+.rp-score-equivalent{display:inline-flex;align-items:center;justify-content:center;margin-top:8px;padding:4px 12px;border-radius:999px;background:rgba(255,255,255,.72);border:1px solid rgba(148,163,184,.25);font-size:12px;font-weight:700;color:#0F766E;}
 .rp-score-desc{font-size:13px;font-weight:600;margin-top:8px;}
 .rp-score-grid{display:flex;gap:12px;}
 .rp-score-grid-4{flex-wrap:wrap;}
@@ -1738,6 +2121,10 @@ function _resetEdap() {
 .rp-score-val{font-size:22px;font-weight:800;color:#94A3B8;}
 .rp-sv-has{color:#1E293B;}
 .rp-score-pct{font-size:10.5px;color:#94A3B8;margin-top:3px;}
+.rp-score-equivalent-sm{font-size:11px;font-weight:700;color:#0F766E;margin-top:5px;}
+.private-deduction-note{margin-top:14px;border:1px solid #FED7AA;background:#FFFBEB;color:#92400E;border-radius:10px;padding:12px 14px;font-size:12px;line-height:1.5;}
+.private-deduction-title{font-size:13px;font-weight:900;color:#7C2D12;margin-bottom:4px;}
+.private-deduction-note small{display:block;margin-top:4px;color:#B45309;}
 .rp-score-overall{background:#EFF6FF;border-color:#BFDBFE;}
 .rp-desc-badge{display:inline-flex;align-items:center;font-size:12.5px;font-weight:600;border-radius:20px;padding:5px 16px;}
 .rp-desc-badge.desc-excellent{background:#DCFCE7;color:#15803D;}
@@ -1853,6 +2240,20 @@ function _resetEdap() {
 .sscore-val.has-val{color:#0F172A;}
 .sscore-desc{font-size:10px;font-weight:600;margin-top:4px;padding:2px 6px;border-radius:8px;}
 .sscore-op{font-size:18px;font-weight:700;color:#CBD5E1;flex-shrink:0;}
+.conduct-deduction-btn{margin-left:auto;border:1px solid #FCD34D;background:#FFFBEB;color:#92400E;border-radius:10px;padding:9px 12px;font-size:12px;font-weight:900;display:flex;align-items:center;gap:7px;cursor:pointer;white-space:nowrap;}
+.conduct-deduction-btn:hover{border-color:#F59E0B;background:#FEF3C7;}
+.conduct-dot{width:8px;height:8px;border-radius:999px;background:#F59E0B;box-shadow:0 0 0 3px rgba(245,158,11,.16);}
+.conduct-modal{max-width:620px;}
+.warning-icon{background:#FFFBEB!important;color:#D97706!important;border:1px solid #FCD34D;font-weight:900;}
+.conduct-modal-body{display:flex;flex-direction:column;gap:14px;}
+.conduct-ratee-card{display:flex;flex-direction:column;gap:2px;border:1px solid #E1E9F3;border-radius:10px;background:#F8FAFC;padding:12px 14px;color:#0B1F36;}
+.conduct-ratee-card span{font-size:12px;color:#64748B;}
+.conduct-preview{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;border:1px solid #E1E9F3;border-radius:12px;background:#F8FAFC;padding:12px;}
+.conduct-preview div{background:#fff;border:1px solid #E8EDF3;border-radius:10px;padding:10px;text-align:center;}
+.conduct-preview span{display:block;font-size:10px;color:#64748B;font-weight:800;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;}
+.conduct-preview strong{font-size:18px;color:#0B1F36;}
+.conduct-preview-final{border-color:#BFDBFE!important;background:#EFF6FF!important;}
+.conduct-preview-final strong{color:#0046B8;}
 
 /* Tabs */
 .dtabs{display:flex;padding:0 24px;border-bottom:1px solid #E8EDF3;flex-shrink:0;overflow-x:auto;scrollbar-width:none;background:#FFFFFF;}
@@ -2158,9 +2559,9 @@ function _resetEdap() {
 
 /* ════════════ LEFT PANEL — card polish ════════════ */
 .eval-tp-left{width:560px;background:#FBFDFF;}
-.eli-list{padding:12px;display:flex;flex-direction:column;gap:10px;}
-.eli{position:relative;overflow:visible;border:1px solid #E6EDF6;border-radius:12px;background:#fff;padding:13px 14px 13px 16px;
-  min-height:0;box-shadow:0 1px 3px rgba(15,23,42,.04);transition:box-shadow .16s,border-color .16s,transform .09s;}
+.eli-list{padding:12px;display:flex;flex-direction:column;gap:10px;align-items:stretch;}
+.eli{position:relative;overflow:visible;border:1px solid #E6EDF6;border-radius:12px;background:#fff;padding:11px 14px 11px 16px;
+  min-height:56px;flex:0 0 auto;box-shadow:0 1px 3px rgba(15,23,42,.04);transition:box-shadow .16s,border-color .16s,transform .09s;}
 .eli:hover{border-color:#BFD6F5;box-shadow:0 4px 12px rgba(15,23,42,.08);transform:translateY(-1px);}
 .eli:active{transform:translateY(0);}
 .eli-active{background:#F4F9FF !important;border-color:#93C5FD !important;box-shadow:0 4px 14px rgba(59,130,246,.14);}
@@ -2178,14 +2579,78 @@ function _resetEdap() {
 .eli-status-label{font-size:10px;font-weight:600;}
 .eli-sl-done{color:#15803D;}
 .eli-sl-pend{color:#94A3B8;}
-.all-records-list{gap:10px;}
-.all-record-card{display:flex;flex-direction:column;gap:9px;padding-bottom:14px;overflow:hidden;}
-.all-record-card .eli-row{align-items:flex-start;}
-.all-record-card .eli-av{margin-top:1px;}
+.all-records-list{gap:8px;}
+.all-record-card{display:flex;flex-direction:column;justify-content:center;gap:6px;min-height:58px;padding-top:10px;padding-bottom:10px;overflow:hidden;}
+.all-record-card .eli-row{align-items:center;min-height:34px;}
+.all-record-card .eli-av{width:32px;height:32px;margin-top:0;flex:0 0 32px;font-size:10px;}
 .all-record-card .status-badge{flex-shrink:0;margin-top:2px;}
 .all-record-card .eli-chips{margin-left:46px;min-height:22px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
 .all-record-card .eli-period-pill{line-height:1.2;}
 .all-record-card .eli-score-big{line-height:1;}
+
+@media (min-width: 2200px) {
+  .eval-page{font-size:14px;}
+  .page-title{font-size:22px;}
+  .page-sub{font-size:12.5px;}
+  .content-card{padding:18px 20px;border-radius:18px;}
+  .eval-tp-shell{height:calc(100vh - 170px);min-height:780px;border-radius:16px;}
+  .eval-tp-left{width:640px;}
+  .eval-tp-left .tasks-period-bar,
+  .eval-tp-left .filter-bar{padding:18px 22px;}
+  .view-tabs{padding:0 16px;gap:10px;}
+  .view-tab{height:42px;font-size:14px;border-radius:22px;}
+  .eli-list{padding:16px;gap:12px;}
+  .eli{min-height:72px;padding:15px 18px 15px 20px;border-radius:14px;}
+  .eli-av{width:40px;height:40px;border-radius:11px;font-size:12px;}
+  .eli-name{font-size:14.5px;}
+  .eli-meta{font-size:12px;}
+  .all-record-card .eli-row{min-height:40px;}
+  .all-record-card .eli-av{width:36px;height:36px;flex-basis:36px;}
+  .all-record-card .eli-chips{margin-left:50px;}
+  .assessment-layout{grid-template-columns:440px minmax(0,1fr);}
+  .assessment-sidebar{padding:22px 18px;}
+  .sidebar-avatar,
+  .eval-form-av{width:48px;height:48px;border-radius:14px;font-size:13px;}
+  .sidebar-employee-name{font-size:15.5px;}
+  .sidebar-employee-desc{font-size:12.5px;}
+  .sidebar-domain{padding:15px;border-radius:14px;}
+  .sidebar-domain.active{padding-left:12px;}
+  .sidebar-domain-title{font-size:12.5px;}
+  .sidebar-domain-progress{font-size:11.5px;}
+  .sidebar-card{padding:15px;border-radius:14px;}
+  .sidebar-card-title{font-size:11px;}
+  .sidebar-scale-item strong{font-size:12.5px;}
+  .sidebar-scale-item small{font-size:11.5px;}
+  .assessment-content-header{padding:20px 26px;}
+  .assessment-content-title h3{font-size:18px;}
+  .assessment-content-title p{font-size:12.5px;}
+  .assessment-content .modal-body-scroll{padding:22px 26px 26px;}
+  .theme-hd{padding:14px 18px;border-radius:14px;}
+  .theme-badge{font-size:14px;}
+  .theme-desc{font-size:12.5px;}
+  .indicator-list{gap:10px;}
+  .indicator-row{grid-template-columns:28px minmax(0,1fr) auto;gap:16px;padding:15px 18px;border-radius:12px;}
+  .ind-num{width:26px;height:26px;font-size:11px;}
+  .ind-text{font-size:13.5px;}
+  .ind-rating{grid-template-columns:repeat(4,42px);gap:8px;}
+  .rating-btn{width:42px;height:42px;border-radius:11px;font-size:14px;}
+  .eval-form-footer{padding:14px 26px;}
+}
+
+@media (min-width: 2800px) {
+  .eval-page{font-size:15px;}
+  .eval-tp-shell{height:calc(100vh - 190px);min-height:900px;}
+  .eval-tp-left{width:720px;}
+  .assessment-layout{grid-template-columns:500px minmax(0,1fr);}
+  .eli{min-height:78px;}
+  .eli-name{font-size:15.5px;}
+  .eli-meta{font-size:13px;}
+  .assessment-content-title h3{font-size:20px;}
+  .assessment-content-title p{font-size:13px;}
+  .ind-text{font-size:14.5px;}
+  .ind-rating{grid-template-columns:repeat(4,46px);}
+  .rating-btn{width:46px;height:46px;font-size:15px;}
+}
 
 @media (max-width: 1440px) {
   .eval-tp-left{width:430px;}
@@ -2216,9 +2681,16 @@ function _resetEdap() {
 }
 
 @media (max-width: 980px) {
-  .eval-tp-shell{flex-direction:column;}
-  .eval-tp-left{width:100%;max-height:none;border-right:0;border-bottom:1px solid #E2E8F0;}
-  .eval-tp-right{max-height:none;}
+  .eval-page{min-height:auto;}
+  .content-card{overflow:visible;}
+  .eval-tp-shell{flex-direction:column;height:auto;min-height:0;overflow:visible;}
+  .eval-tp-left{width:100%;max-height:none;border-right:0;border-bottom:1px solid #E2E8F0;overflow:visible;}
+  .eval-tp-right{max-height:none;overflow:visible;}
+  .eli-list{flex:none;overflow:visible;}
+  .assessment-layout{height:auto;min-height:0;overflow:visible;}
+  .assessment-content{overflow:visible;}
+  .assessment-content .modal-body-scroll{overflow:visible;}
+  .conduct-preview{grid-template-columns:repeat(2,minmax(0,1fr));}
   .indicator-row,.jf-row{align-items:stretch;flex-direction:column;}
   .ind-rating{align-self:flex-end;}
 }

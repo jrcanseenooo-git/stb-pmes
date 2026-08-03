@@ -41,6 +41,8 @@ const IPATRaterAssignmentService = (() => {
   const isABD           = (r) => r === 'Assistant Bureau Director'
   const isDirector      = (r) => r === 'Bureau Director'
   const isEvaluatable   = (r) => r !== 'System Administrator' && !!r
+  const isObsoleteAssignment = (r) => ['JFPeer', 'JobFitnessPeer'].includes(String(r && r.raterType || ''))
+  const activeProtocolAssignments = (rows) => rows.filter(r => !isObsoleteAssignment(r))
 
   // ── Random selection with anti-repeat ────────────────────────────────────
   function _selectRandom(pool, excludeIds, prevId) {
@@ -53,8 +55,76 @@ const IPATRaterAssignmentService = (() => {
 
   // ── Lookup previous cycle's rater id for a given ratee + raterType ────────
   function _prevRaterId(prevAssignments, rateeId, raterType) {
-    const hit = prevAssignments.find(a => a.rateeId === rateeId && a.raterType === raterType)
+    const hit = prevAssignments.find(a => String(a.rateeId) === String(rateeId) && a.raterType === raterType)
     return hit ? hit.raterId : null
+  }
+
+  function _samePeriod(row, semester, year) {
+    return String(row.semester) === String(semester) && String(row.year) === String(year)
+  }
+
+  function _recordScore(record, assignments) {
+    const linked = assignments.filter(a => String(a.ipatRecordId) === String(record.id))
+    const completed = linked.filter(a => a.status === 'Completed').length
+    const hasScore = record.overallScore || record.cbcScore || record.jfScore || record.fpoScore ? 1 : 0
+    const created = record.createdAt ? new Date(record.createdAt).getTime() : 0
+    return (linked.length * 1000) + (completed * 100) + (hasScore * 10) - (created || 0) / 10000000000000
+  }
+
+  function writeAssignmentCompleted(assignSheet, assignmentId, allRows) {
+    const values = assignSheet.getDataRange().getValues()
+    const headers = values[0] || []
+    const idIdx = headers.indexOf('id')
+    const statusIdx = headers.indexOf('status')
+    const updatedAtIdx = headers.indexOf('updatedAt')
+    const now = new Date().toISOString()
+
+    for (let i = 1; i < values.length; i++) {
+      if (String(values[i][idIdx]) === String(assignmentId)) {
+        if (statusIdx >= 0) values[i][statusIdx] = 'Completed'
+        if (updatedAtIdx >= 0) values[i][updatedAtIdx] = now
+        assignSheet.getRange(i + 1, 1, 1, headers.length).setValues([values[i]])
+        const row = allRows.find(r => String(r.id) === String(assignmentId))
+        if (row) {
+          row.status = 'Completed'
+          row.updatedAt = now
+        }
+        return row
+      }
+    }
+
+    throw HttpError('Assignment not found', 404)
+  }
+
+  function completeAssignmentFromRows(assignSheet, assignmentId, row, allRows, user) {
+    writeAssignmentCompleted(assignSheet, assignmentId, allRows)
+
+    const ipatRecordId = row.ipatRecordId
+    if (ipatRecordId) {
+      const allForRecord = activeProtocolAssignments(allRows.filter(r => String(r.ipatRecordId) === String(ipatRecordId)))
+      const allDone = allForRecord.every(r => r.status === 'Completed' || r.id === assignmentId)
+      if (allDone) {
+        try {
+          IPATService.computeCBC(ipatRecordId, user)
+          try { IPATService.computeJF(ipatRecordId, user) } catch (je) {
+            Logger.log('[PMES] computeJF skipped (no JF ratings yet): ' + je.message)
+          }
+          IPATService.computeOverall(ipatRecordId, user)
+        } catch (e) {
+          Logger.log('[PMES] Auto-compute failed for ' + ipatRecordId + ': ' + e.message)
+        }
+      }
+    }
+
+    return { updated: true }
+  }
+
+  function _findCanonicalIpatRecord(records, assignments, rateeId, semester, year) {
+    const matches = records.filter(r =>
+      String(r.rateeId) === String(rateeId) && _samePeriod(r, semester, year)
+    )
+    if (!matches.length) return null
+    return matches.sort((a, b) => _recordScore(b, assignments) - _recordScore(a, assignments))[0]
   }
 
   // ── Position-specific assignment builders ────────────────────────────────
@@ -89,31 +159,18 @@ const IPATRaterAssignmentService = (() => {
       peer2 = _selectRandom(peer2DivPool, excludePeer2, _prevRaterId(prevAssign, ratee.id, 'Peer2'))
     }
 
-    // Supervisor: Section Head in same section + division; fallback to any SH in division
-    let supervisor = sec
+    // Supervisor: Section Head in the same section + division. When section data
+    // is missing, use any Section Head in the division as the safest fallback.
+    const supervisor = sec
       ? allUsers.find(u => isSectionHead(u.role) && (u.divisionId || '') === div && (u.section || '').trim() === sec)
-      : null
-    if (!supervisor) supervisor = allUsers.find(u => isSectionHead(u.role) && (u.divisionId || '') === div)
+      : allUsers.find(u => isSectionHead(u.role) && (u.divisionId || '') === div)
 
     // Skip Supervisor: Division Chief of same division
     const skipSupervisor = allUsers.find(u => isDivisionChief(u.role) && (u.divisionId || '') === div)
 
-    // JF Peer: must differ from Peer1 and Peer2; 30% division / 70% section
-    const excludeJFPeer = [ratee.id, peer1?.id, peer2?.id].filter(Boolean)
-    const jfPeerSectionPool = sectionPeers.filter(u => !excludeJFPeer.includes(u.id))
-    const jfPeerDivPool     = divStaff.filter(u => !excludeJFPeer.includes(u.id))
-    let jfPeer = null
-    if (Math.random() < 0.70 && jfPeerSectionPool.length) {
-      jfPeer = _selectRandom(jfPeerSectionPool, excludeJFPeer, _prevRaterId(prevAssign, ratee.id, 'JFPeer'))
-    }
-    if (!jfPeer && jfPeerDivPool.length) {
-      jfPeer = _selectRandom(jfPeerDivPool, excludeJFPeer, _prevRaterId(prevAssign, ratee.id, 'JFPeer'))
-    }
-
     const result = [{ raterId: ratee.id, raterName: ratee.fullName, raterType: 'Self' }]
     if (peer1)          result.push({ raterId: peer1.id,          raterName: peer1.fullName,          raterType: 'Peer1' })
     if (peer2)          result.push({ raterId: peer2.id,          raterName: peer2.fullName,          raterType: 'Peer2' })
-    if (jfPeer)         result.push({ raterId: jfPeer.id,         raterName: jfPeer.fullName,         raterType: 'JFPeer' })
     if (supervisor)     result.push({ raterId: supervisor.id,     raterName: supervisor.fullName,     raterType: 'Supervisor' })
     if (skipSupervisor) result.push({ raterId: skipSupervisor.id, raterName: skipSupervisor.fullName, raterType: 'SkipSupervisor' })
     return result
@@ -139,14 +196,9 @@ const IPATRaterAssignmentService = (() => {
     // Skip Supervisor — any ABD
     const skipSupervisor = allUsers.find(u => isABD(u.role))
 
-    // JF Peer — co-Section Head in same division, must differ from CBC Peer
-    const excludeJFPeer = [ratee.id, peer?.id].filter(Boolean)
-    const jfPeer = _selectRandom(shPeers.filter(u => !excludeJFPeer.includes(u.id)), excludeJFPeer, _prevRaterId(prevAssign, ratee.id, 'JFPeer'))
-
     const result = [{ raterId: ratee.id, raterName: ratee.fullName, raterType: 'Self' }]
     if (peer)          result.push({ raterId: peer.id,          raterName: peer.fullName,          raterType: 'Peer' })
     if (subordinate)   result.push({ raterId: subordinate.id,   raterName: subordinate.fullName,   raterType: 'Subordinate' })
-    if (jfPeer)        result.push({ raterId: jfPeer.id,        raterName: jfPeer.fullName,        raterType: 'JFPeer' })
     if (supervisor)    result.push({ raterId: supervisor.id,    raterName: supervisor.fullName,    raterType: 'Supervisor' })
     if (skipSupervisor) result.push({ raterId: skipSupervisor.id, raterName: skipSupervisor.fullName, raterType: 'SkipSupervisor' })
     return result
@@ -163,10 +215,6 @@ const IPATRaterAssignmentService = (() => {
     const subordinates = allUsers.filter(u => isSectionHead(u.role) && u.divisionId === div)
     const subordinate = _selectRandom(subordinates, [], _prevRaterId(prevAssign, ratee.id, 'Subordinate'))
 
-    // JF Peer — other Division Chief, must differ from CBC Peer
-    const excludeJFPeer = [ratee.id, peer?.id].filter(Boolean)
-    const jfPeer = _selectRandom(dcPeers.filter(u => !excludeJFPeer.includes(u.id)), excludeJFPeer, _prevRaterId(prevAssign, ratee.id, 'JFPeer'))
-
     // Supervisor — any ABD
     const supervisor = allUsers.find(u => isABD(u.role))
 
@@ -176,7 +224,6 @@ const IPATRaterAssignmentService = (() => {
     const result = [{ raterId: ratee.id, raterName: ratee.fullName, raterType: 'Self' }]
     if (peer)          result.push({ raterId: peer.id,          raterName: peer.fullName,          raterType: 'Peer' })
     if (subordinate)   result.push({ raterId: subordinate.id,   raterName: subordinate.fullName,   raterType: 'Subordinate' })
-    if (jfPeer)        result.push({ raterId: jfPeer.id,        raterName: jfPeer.fullName,        raterType: 'JFPeer' })
     if (supervisor)    result.push({ raterId: supervisor.id,    raterName: supervisor.fullName,    raterType: 'Supervisor' })
     if (skipSupervisor) result.push({ raterId: skipSupervisor.id, raterName: skipSupervisor.fullName, raterType: 'SkipSupervisor' })
     return result
@@ -225,7 +272,7 @@ const IPATRaterAssignmentService = (() => {
 
     const assignSheet = SpreadsheetService.getSheet(SHEET.IPAT_ASSIGNMENTS)
     const existingAssign = SpreadsheetService.getAllRows(assignSheet).filter(r =>
-      String(r.semester) === semester && String(r.year) === year
+      _samePeriod(r, semester, year)
     )
 
     // All active users
@@ -239,28 +286,20 @@ const IPATRaterAssignmentService = (() => {
     const prevSem  = semester === '1' ? '2' : '1'
     const prevYear = semester === '1' ? String(Number(year) - 1) : year
     const prevAssign = SpreadsheetService.getAllRows(assignSheet).filter(r =>
-      r.semester === prevSem && String(r.year) === prevYear
+      _samePeriod(r, prevSem, prevYear)
     )
 
+    IPATService.ensureRecordSchema()
     const ipatSheet   = SpreadsheetService.getSheet(SHEET.IPAT_RECORDS)
     const existingRec = SpreadsheetService.getAllRows(ipatSheet)
     const now = new Date().toISOString()
 
-    // Skip ratees who already have assignments for this period
-    const rateeIdsWithAssignments = new Set(existingAssign.map(a => a.rateeId))
-
     const assignments = []
     const evaluatable = allUsers.filter(u => isEvaluatable(u.role))
-    const newRatees = evaluatable.filter(u => !rateeIdsWithAssignments.has(u.id))
+    const touchedRateeIds = new Set()
+    const createdRecordIds = new Set()
 
-    if (!newRatees.length && existingAssign.length) {
-      throw HttpError(
-        `All active users already have assignments for Semester ${semester}, ${year}. No new users to add.`,
-        409
-      )
-    }
-
-    newRatees.forEach(ratee => {
+    evaluatable.forEach(ratee => {
       const role = ratee.role || ''
       let raterList = []
 
@@ -273,9 +312,7 @@ const IPATRaterAssignmentService = (() => {
       if (!raterList.length) return
 
       // Auto-create IPAT record if not yet existing for this period
-      let ipatRecord = existingRec.find(r =>
-        r.rateeId === ratee.id && r.semester === semester && String(r.year) === year
-      )
+      let ipatRecord = _findCanonicalIpatRecord(existingRec, existingAssign, ratee.id, semester, year)
 
       if (!ipatRecord) {
         const hasSubordinate = isSectionHead(role) || isDivisionChief(role) || isABD(role) || isDirector(role)
@@ -292,7 +329,20 @@ const IPATRaterAssignmentService = (() => {
           year,
           hasSubordinate,
           status:        'Draft',
-          cbcScore: '', fpoScore: '', jfScore: '', overallScore: '', descriptor: '',
+          cbcBaseScore: '',
+          cbcScore: '',
+          cbcNteLevel: 'none',
+          cbcNteDeductionPct: '',
+          cbcOffenseLevel: 'none',
+          cbcOffenseDeduction: '',
+          cbcDeductionNote: '',
+          cbcDeductionBy: '',
+          cbcDeductionByName: '',
+          cbcDeductionAt: '',
+          fpoScore: '',
+          jfScore: '',
+          overallScore: '',
+          descriptor: '',
           ipcrfFormId: '',
           createdAt: now,
           updatedAt: now
@@ -300,10 +350,16 @@ const IPATRaterAssignmentService = (() => {
         SpreadsheetService.appendRow(ipatSheet, newRec)
         existingRec.push(newRec)
         ipatRecord = newRec
+        createdRecordIds.add(newRec.id)
       }
 
-      // Store each rater assignment
+      const existingForRatee = existingAssign.filter(a => String(a.rateeId) === String(ratee.id))
+      const existingByRole = new Set(existingForRatee.map(a => a.raterType))
+
+      // Store only missing rater roles. Existing assignments and submitted
+      // ratings are preserved, so admins can safely backfill late accounts.
       raterList.forEach(a => {
+        if (existingByRole.has(a.raterType)) return
         assignments.push({
           id:             SpreadsheetService.generateId('RASN-'),
           semester,
@@ -321,21 +377,24 @@ const IPATRaterAssignmentService = (() => {
           createdAt:      now,
           updatedAt:      now
         })
+        existingByRole.add(a.raterType)
+        touchedRateeIds.add(ratee.id)
       })
     })
 
     assignments.forEach(a => SpreadsheetService.appendRow(assignSheet, a))
 
     AuditService.log('GENERATE_ASSIGNMENTS', 'IPAT',
-      `Generated ${assignments.length} rater assignments for Semester ${semester} ${year}`, user)
+      `Generated/backfilled ${assignments.length} rater assignments for Semester ${semester} ${year}`, user)
 
     const breakdown = {}
     assignments.forEach(a => { breakdown[a.raterType] = (breakdown[a.raterType] || 0) + 1 })
 
     return {
       generated:  assignments.length,
-      ratees:     newRatees.length,
-      existing:   rateeIdsWithAssignments.size,
+      ratees:     touchedRateeIds.size,
+      recordsCreated: createdRecordIds.size,
+      existing:   new Set(existingAssign.map(a => a.rateeId)).size,
       breakdown,
       semester,
       year
@@ -348,21 +407,31 @@ const IPATRaterAssignmentService = (() => {
     const profile = AuthService.getProfile(user)
     const assignSheet = SpreadsheetService.getSheet(SHEET.IPAT_ASSIGNMENTS)
 
-    let rows = SpreadsheetService.getAllRows(assignSheet).filter(r => r.raterId === profile.id)
+    let rows = activeProtocolAssignments(SpreadsheetService.getAllRows(assignSheet)).filter(r => String(r.raterId) === String(profile.id))
     if (params.semester) rows = rows.filter(r => String(r.semester) === String(params.semester))
     if (params.year)     rows = rows.filter(r => String(r.year) === String(params.year))
     if (params.status)   rows = rows.filter(r => r.status === params.status)
 
-    // Attach IPAT record scores for context
+    // Attach IPAT record scores for context without re-reading the sheet per task.
     const ipatSheet = SpreadsheetService.getSheet(SHEET.IPAT_RECORDS)
+    const recordsById = {}
+    SpreadsheetService.getAllRows(ipatSheet).forEach(r => {
+      recordsById[String(r.id)] = r
+    })
+
     return rows.map(a => {
       const rec = a.ipatRecordId
-        ? SpreadsheetService.getAllRows(ipatSheet).find(r => r.id === a.ipatRecordId)
+        ? recordsById[String(a.ipatRecordId)]
         : null
+      const ntePct = Number(rec?.cbcNteDeductionPct || 0)
+      const offenseDeduction = Number(rec?.cbcOffenseDeduction || 0)
+      const hasCbcDeduction = Boolean(ntePct || offenseDeduction)
+
       return {
         ...a,
         ipatStatus:   rec?.status || 'Draft',
-        overallScore: rec?.overallScore || null
+        overallScore: rec?.overallScore || null,
+        cbcDeductionHasDeduction: hasCbcDeduction
       }
     })
   }
@@ -377,7 +446,7 @@ const IPATRaterAssignmentService = (() => {
     if (!isAdmin && profile.id !== rateeId) throw HttpError('Unauthorized', 403)
 
     const assignSheet = SpreadsheetService.getSheet(SHEET.IPAT_ASSIGNMENTS)
-    let rows = SpreadsheetService.getAllRows(assignSheet).filter(r => r.rateeId === rateeId)
+    let rows = activeProtocolAssignments(SpreadsheetService.getAllRows(assignSheet)).filter(r => String(r.rateeId) === String(rateeId))
     if (params.semester) rows = rows.filter(r => String(r.semester) === String(params.semester))
     if (params.year)     rows = rows.filter(r => String(r.year) === String(params.year))
     if (!AuthService.hasPermission(profile, 'view_bureau_monitoring') && AuthService.hasPermission(profile, 'view_division_monitoring')) {
@@ -396,10 +465,10 @@ const IPATRaterAssignmentService = (() => {
     if (!isAdmin) throw HttpError('Unauthorized', 403)
 
     const assignSheet = SpreadsheetService.getSheet(SHEET.IPAT_ASSIGNMENTS)
-    let rows = SpreadsheetService.getAllRows(assignSheet)
+    let rows = activeProtocolAssignments(SpreadsheetService.getAllRows(assignSheet))
     if (params.semester) rows = rows.filter(r => String(r.semester) === String(params.semester))
     if (params.year)     rows = rows.filter(r => String(r.year) === String(params.year))
-    if (params.rateeId)  rows = rows.filter(r => r.rateeId === params.rateeId)
+    if (params.rateeId)  rows = rows.filter(r => String(r.rateeId) === String(params.rateeId))
     if (!AuthService.hasPermission(profile, 'view_bureau_monitoring') && AuthService.hasPermission(profile, 'view_division_monitoring')) {
       rows = rows.filter(r => r.rateeDivisionId === profile.divisionId)
     }
@@ -411,34 +480,49 @@ const IPATRaterAssignmentService = (() => {
   function markCompleted(assignmentId, user) {
     const profile = AuthService.getProfile(user)
     const assignSheet = SpreadsheetService.getSheet(SHEET.IPAT_ASSIGNMENTS)
-    const row = SpreadsheetService.getAllRows(assignSheet).find(r => r.id === assignmentId)
+    const rows = SpreadsheetService.getAllRows(assignSheet)
+    const row = rows.find(r => r.id === assignmentId)
     if (!row) throw HttpError('Assignment not found', 404)
+    if (isObsoleteAssignment(row)) throw HttpError('This assignment is no longer active under the current protocol', 400)
     if (row.raterId !== profile.id) {
       const isAdmin = AuthService.hasPermission(profile, 'generate_ipat_assignments') ||
                       AuthService.hasPermission(profile, 'view_bureau_monitoring')
       if (!isAdmin) throw HttpError('Unauthorized', 403)
     }
-    SpreadsheetService.updateRow(assignSheet, assignmentId, { status: 'Completed', updatedAt: new Date().toISOString() })
+    return completeAssignmentFromRows(assignSheet, assignmentId, row, rows, user)
+  }
 
-    // Auto-compute scores when every rater for this IPAT record has submitted
-    const ipatRecordId = row.ipatRecordId
-    if (ipatRecordId) {
-      const allForRecord = SpreadsheetService.getAllRows(assignSheet).filter(r => r.ipatRecordId === ipatRecordId)
-      const allDone = allForRecord.every(r => r.status === 'Completed' || r.id === assignmentId)
-      if (allDone) {
-        try {
-          IPATService.computeCBC(ipatRecordId, user)
-          try { IPATService.computeJF(ipatRecordId, user) } catch (je) {
-            Logger.log('[PMES] computeJF skipped (no JF ratings yet): ' + je.message)
-          }
-          IPATService.computeOverall(ipatRecordId, user)
-        } catch (e) {
-          Logger.log('[PMES] Auto-compute failed for ' + ipatRecordId + ': ' + e.message)
-        }
-      }
+  function submitAssignmentRatings(assignmentId, body, user) {
+    const profile = AuthService.getProfile(user)
+    const assignSheet = SpreadsheetService.getSheet(SHEET.IPAT_ASSIGNMENTS)
+    const rows = SpreadsheetService.getAllRows(assignSheet)
+    const row = rows.find(r => r.id === assignmentId)
+    if (!row) throw HttpError('Assignment not found', 404)
+    if (isObsoleteAssignment(row)) throw HttpError('This assignment is no longer active under the current protocol', 400)
+    if (row.raterId !== profile.id) {
+      const isAdmin = AuthService.hasPermission(profile, 'generate_ipat_assignments') ||
+                      AuthService.hasPermission(profile, 'view_bureau_monitoring')
+      if (!isAdmin) throw HttpError('Unauthorized', 403)
     }
+    if (!row.ipatRecordId) throw HttpError('Assignment has no linked assessment record', 400)
 
-    return { updated: true }
+    let cbcRatings = body.cbcRatings || []
+    let jfRatings  = body.jfRatings  || []
+    if (typeof cbcRatings === 'string') { try { cbcRatings = JSON.parse(cbcRatings) } catch(e) { cbcRatings = [] } }
+    if (typeof jfRatings  === 'string') { try { jfRatings  = JSON.parse(jfRatings)  } catch(e) { jfRatings  = [] } }
+    if (!Array.isArray(cbcRatings)) cbcRatings = []
+    if (!Array.isArray(jfRatings))  jfRatings  = []
+
+    if (cbcRatings.length) IPATService.saveCBCRatings(row.ipatRecordId, { ratings: cbcRatings }, user)
+    if (jfRatings.length)  IPATService.saveJFRatings(row.ipatRecordId, { ratings: jfRatings }, user)
+
+    const completed = completeAssignmentFromRows(assignSheet, assignmentId, row, rows, user)
+    return {
+      ...completed,
+      savedCBC: cbcRatings.length,
+      savedJF: jfRatings.length,
+      ipatRecordId: row.ipatRecordId
+    }
   }
 
   // ── GET MY OWN RESULTS (ratee views their final score) ───────────────────
@@ -446,14 +530,24 @@ const IPATRaterAssignmentService = (() => {
 
   function getMyResults(params, user) {
     const profile     = AuthService.getProfile(user)
+    IPATService.ensureRecordSchema()
     const recSheet    = SpreadsheetService.getSheet(SHEET.IPAT_RECORDS)
     const assignSheet = SpreadsheetService.getSheet(SHEET.IPAT_ASSIGNMENTS)
 
-    let rows = SpreadsheetService.getAllRows(recSheet).filter(r => r.rateeId === profile.id)
+    let rows = SpreadsheetService.getAllRows(recSheet).filter(r => String(r.rateeId) === String(profile.id))
     if (params.semester) rows = rows.filter(r => String(r.semester) === String(params.semester))
     if (params.year)     rows = rows.filter(r => String(r.year)     === String(params.year))
 
-    const allAssignments = SpreadsheetService.getAllRows(assignSheet)
+    const allAssignments = activeProtocolAssignments(SpreadsheetService.getAllRows(assignSheet))
+    const grouped = {}
+    rows.forEach(r => {
+      const key = [r.rateeId, r.semester, r.year].map(String).join('|')
+      if (!grouped[key]) grouped[key] = []
+      grouped[key].push(r)
+    })
+    rows = Object.keys(grouped).map(key =>
+      _findCanonicalIpatRecord(grouped[key], allAssignments, grouped[key][0].rateeId, grouped[key][0].semester, grouped[key][0].year)
+    ).filter(Boolean)
 
     return rows.map(r => {
       const assignments     = allAssignments.filter(a => a.ipatRecordId === r.id)
@@ -478,6 +572,14 @@ const IPATRaterAssignmentService = (() => {
         }
       }
 
+      const ntePct = Number(r.cbcNteDeductionPct || 0)
+      const offenseDeduction = Number(r.cbcOffenseDeduction || 0)
+      const hasCbcDeduction = Boolean(ntePct || offenseDeduction)
+      const cbcRaw = Number(r.cbcScore || 0)
+      const cbcWeightedScore = cbcRaw > 0
+        ? cbcRaw * 0.30
+        : null
+
       return {
         id:             r.id,
         semester:       r.semester,
@@ -486,6 +588,24 @@ const IPATRaterAssignmentService = (() => {
         divisionName:   r.divisionName,
         positionLevel:  r.positionLevel,
         cbcScore:       r.cbcScore     || null,
+        cbcBaseScore:   r.cbcBaseScore || null,
+        cbcNteLevel:    r.cbcNteLevel || 'none',
+        cbcNteDeductionPct: ntePct || null,
+        cbcOffenseLevel: r.cbcOffenseLevel || 'none',
+        cbcOffenseDeduction: offenseDeduction || null,
+        cbcDeductionHasDeduction: hasCbcDeduction,
+        cbcDeductionVisible: hasCbcDeduction,
+        cbcDeductionSummary: {
+          hasDeduction: hasCbcDeduction,
+          nteLevel: r.cbcNteLevel || 'none',
+          ntePct,
+          offenseLevel: r.cbcOffenseLevel || 'none',
+          offenseDeduction,
+          finalOverallDeduction: offenseDeduction,
+          baseScore: r.cbcBaseScore || r.cbcScore || null,
+          adjustedScore: r.cbcScore || null,
+          cbcWeightedScore: cbcWeightedScore !== null ? Math.round(cbcWeightedScore * 100) / 100 : null
+        },
         fpoScore:       r.fpoScore     || null,
         jfScore:        r.jfScore      || null,
         overallScore:   r.overallScore || null,
@@ -556,6 +676,7 @@ const IPATRaterAssignmentService = (() => {
     getRateeAssignments,
     list,
     markCompleted,
+    submitAssignmentRatings,
     deleteForPeriod
   }
 })()

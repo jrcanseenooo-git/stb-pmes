@@ -218,7 +218,7 @@ const AssessmentContentService = (() => {
         scaleType: '1-4 Likert',
         required: true,
         evidenceRequired: true,
-        applicableRaters: JSON.stringify(['Self', 'Peer', 'Supervisor', 'Skip Supervisor']),
+        applicableRaters: JSON.stringify(['Self', 'Supervisor']),
         applicableLevels: JSON.stringify([]),
         status: 'Active',
         period: '',
@@ -272,6 +272,9 @@ const AssessmentContentService = (() => {
   }
 
   function toRow(body) {
+    const applicableRaters = String(body.domain || '').toLowerCase() === 'jf'
+      ? ['Self', 'Supervisor']
+      : body.applicableRaters
     return {
       id: body.id || '',
       domain: body.domain || '',
@@ -282,7 +285,7 @@ const AssessmentContentService = (() => {
       scaleType: body.scaleType || '1-4 Likert',
       required: body.required === true || body.required === 'true' || body.required === 'TRUE',
       evidenceRequired: body.evidenceRequired === true || body.evidenceRequired === 'true' || body.evidenceRequired === 'TRUE',
-      applicableRaters: stringifyArray(body.applicableRaters),
+      applicableRaters: stringifyArray(applicableRaters),
       applicableLevels: stringifyArray(body.applicableLevels),
       status: body.status || 'Draft',
       period: body.period || '',
@@ -298,6 +301,9 @@ const AssessmentContentService = (() => {
   }
 
   function fromRow(row) {
+    const applicableRaters = String(row.domain || '').toLowerCase() === 'jf'
+      ? ['Self', 'Supervisor']
+      : parseJson(row.applicableRaters, [])
     return {
       ...row,
       sequence: Number(row.sequence) || 1,
@@ -305,7 +311,7 @@ const AssessmentContentService = (() => {
       required: row.required === true || row.required === 'TRUE',
       evidenceRequired: row.evidenceRequired === true || row.evidenceRequired === 'TRUE',
       hasBeenUsed: row.hasBeenUsed === true || row.hasBeenUsed === 'TRUE',
-      applicableRaters: parseJson(row.applicableRaters, []),
+      applicableRaters,
       applicableLevels: parseJson(row.applicableLevels, [])
     }
   }

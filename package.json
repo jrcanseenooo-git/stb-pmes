@@ -3,6 +3,6 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "deploy:check": "npm audit --prefix vue-frontend --audit-level=high && npm run build --prefix vue-frontend"
+    "deploy:check": "npm audit --prefix vue-frontend --audit-level=high && npm run lint:check --prefix vue-frontend && npm run smoke:check --prefix vue-frontend && npm run build --prefix vue-frontend"
   }
 }

@@ -1792,3 +1792,108 @@ things to watch on first real use:
 ### Pending Verification
 
 Live sign-in by a real user of each scope. Not performed.
+
+## 2026-08-10 - Rater Tagging Matrix (protocol gap G1)
+
+Branch: `feature/multi-office-assessment-scope`
+
+### Summary
+
+Closed the critical gap from the protocol alignment review: rater assignment
+branched on five hardcoded STB role strings, and any office using its own role
+names had its personnel skipped silently. Rater rules are now per-office data.
+
+### Files Added
+
+- `apps-script/RaterMatrixService.gs`
+- `vue-frontend/src/views/RaterMatrixView.vue`
+
+### Files Modified
+
+- `apps-script/IPATRaterAssignmentService.gs`
+- `apps-script/Router.gs`
+- `apps-script/OfficeScopeService.gs`
+- `vue-frontend/src/services/api.js`
+- `vue-frontend/src/composables/usePermissions.js`
+- `vue-frontend/src/router/index.js`
+- `vue-frontend/src/layouts/AppLayout.vue`
+
+### What Changed
+
+- New `RaterMatrix` tab per office: `rateeRole`, `raterType`, `sourceRoles`,
+  `scope`, `fallbackScope`. Scopes are `self`, `same-section`, `same-division`,
+  `office-wide`, and `same-section-preferred` (the 70/30 section-vs-division
+  draw that the original Peer2 rule used).
+- `generateAssignments` resolves raters from the matrix. An unmapped role is now
+  returned in the response as `unmapped` (with affected personnel counts) and
+  written to the audit log as `ASSIGNMENT_EXCEPTIONS`, replacing the silent
+  `return`. A mapped role whose configured rater is missing from the roster is
+  reported as `incomplete`.
+- `hasSubordinate` now derives from the resolved rater set rather than STB role
+  names, so the CBC weight split is correct for offices with their own hierarchy.
+- New routes: `GET/PUT rater-matrix`, `GET rater-matrix/coverage`,
+  `POST rater-matrix/seed-defaults`. Registered as office-scoped.
+- New `/rater-matrix` screen: per-role rater rules, plus a coverage panel that
+  surfaces unmapped roles and affected personnel counts before generation.
+
+### Design Decision — weights deliberately excluded
+
+The matrix does not store rating weights. The protocol assigns weight per rater
+TYPE (Self 15, Peer 15, Subordinate 15, Immediate Supervisor 30, Skip 25), not
+per role, and `AssessmentRules.cbcRaterWeight` already holds them and is what
+`IPATService.computeCBC` reads. A second weight table could silently disagree
+with the first and produce wrong scores. This is reversible if the protocol
+owners decide weights should vary per role.
+
+### Existing STB Functions Preserved
+
+The STB hierarchy is the seeded default and auto-seeds on first generation, so
+offices with no matrix behave exactly as before rather than reporting every role
+as unmapped.
+
+Proven, not assumed: a harness builds a synthetic STB roster and confirms all
+five roles resolve to the identical rater sets the old hardcoded functions
+produced:
+
+| Role | Resolved rater types |
+|---|---|
+| Technical Staff | Self, Peer1, Peer2, Supervisor, SkipSupervisor |
+| Section Head | Self, Peer, Subordinate, Supervisor, SkipSupervisor |
+| Division Chief | Self, Peer, Subordinate, Supervisor, SkipSupervisor |
+| Assistant Bureau Director | Self, Peer, Subordinate, Supervisor |
+| Bureau Director | Self, Subordinate |
+
+The same harness confirms Self always resolves to the ratee, no rater is
+assigned twice, nobody rates themselves outside the Self row, and an unmapped
+role is flagged rather than silently skipped.
+
+### Tests Performed
+
+- All 34 `.gs` files parse.
+- 6-case rater resolution harness (above): 6 passed, 0 failed.
+- `npm run deploy:check` — true exit code 0 (audit, lint, smoke, build).
+  Note: PowerShell reports 255 for this command because Vite writes a
+  pre-existing `INEFFECTIVE_DYNAMIC_IMPORT` warning to stderr and PowerShell
+  turns native stderr into an error record. Verified via bash that the real
+  exit code is 0.
+
+### Deployment
+
+- Apps Script: `@228`, `PMES_rater_matrix_dynamic_tagging`, existing deployment
+  ID reused.
+- Vercel: deployed, `READY`, live with no console errors.
+
+### Pending Verification
+
+Not exercised by a signed-in user. Specifically unverified:
+
+1. **First generation after deploy triggers the auto-seed.** The seed path is
+   logic-tested but has never run against a real spreadsheet. If the
+   `RaterMatrix` tab cannot be created, generation will fail rather than
+   silently skip — that is the intended direction, but it should be confirmed
+   on a non-production office first.
+2. Coverage counts against a real roster.
+3. That an office with genuinely custom role names now receives assignments.
+
+**Recommendation:** run Generate Assignments on one non-STB office before
+running it for STB, so the auto-seed is exercised somewhere recoverable.

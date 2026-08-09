@@ -478,16 +478,32 @@
 
               <!-- ── FPO TAB ── -->
               <div v-if="activeTab === 'fpo'" class="modal-body-scroll">
+                <!--
+                  The protocol defines a different Functional Performance Output
+                  instrument per office: STB uses the DSPMS IPCRF/DPCR, while
+                  Pag-abot, Walang Gutom and Tara-Basa each adopted their own.
+                  Only STB's instrument lives in this system, so only STB can
+                  auto-sync. Every other office records the figure its own
+                  instrument produced, and the IPCRF sync control is hidden
+                  rather than shown-and-failing.
+                -->
                 <div class="tab-intro">
-                  The <strong>Functional Performance Output</strong> domain uses the employee's <strong>IPCRF/DPCR Final Numerical Rating</strong> (1–5 scale) as the basis. It constitutes <strong>55%</strong> of the overall IPAT score.
+                  <template v-if="usesIpcrfForFpo">
+                    The <strong>Functional Performance Output</strong> domain uses the employee's <strong>IPCRF/DPCR Final Numerical Rating</strong> (1–5 scale) as the basis. It constitutes <strong>55%</strong> of the overall IPAT score.
+                  </template>
+                  <template v-else>
+                    The <strong>Functional Performance Output</strong> domain uses this office's own approved performance instrument, as provided for in the assessment protocol. Enter the resulting rating (1–5 scale) below. It constitutes <strong>55%</strong> of the overall assessment score.
+                  </template>
                 </div>
                 <div class="fpo-panel">
                   <div class="fpo-current">
                     <div class="fpo-label">FPO Weighted Score</div>
                     <div class="fpo-score">{{ fpoWeighted }}</div>
-                    <div v-if="activeRecord?.fpoScore" class="fpo-converted">Raw IPCRF score: <strong>{{ activeRecord.fpoScore }}</strong> × 0.55</div>
+                    <div v-if="activeRecord?.fpoScore" class="fpo-converted">
+                      Raw {{ usesIpcrfForFpo ? 'IPCRF' : 'FPO' }} score: <strong>{{ activeRecord.fpoScore }}</strong> × 0.55
+                    </div>
                   </div>
-                  <div class="fpo-update">
+                  <div v-if="usesIpcrfForFpo" class="fpo-update">
                     <label class="field-label">Auto-sync from IPCRF/CCEF</label>
                     <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
                       <button class="btn btn-primary" :disabled="syncingFPO" @click="syncFPOScore"><span v-if="syncingFPO" class="spinner-sm"></span>{{ syncingFPO ? 'Syncing…' : (activeRecord?.fpoScore ? 'Re-sync Score' : 'Sync Score') }}</button>
@@ -497,12 +513,16 @@
                   </div>
                 </div>
                 <div v-if="canAdmin" class="fpo-manual-panel">
-                  <div class="fpo-manual-title">Manual FPO Entry</div>
-                  <p class="fpo-manual-hint">For periods where IPCRF/CCEF is unavailable (e.g. 1st Semester), enter the FPO score manually.</p>
+                  <div class="fpo-manual-title">{{ usesIpcrfForFpo ? 'Manual FPO Entry' : 'FPO Entry' }}</div>
+                  <p class="fpo-manual-hint">
+                    {{ usesIpcrfForFpo
+                      ? 'For periods where IPCRF/CCEF is unavailable (e.g. 1st Semester), enter the FPO score manually.'
+                      : 'Enter the rating produced by this office\'s approved performance instrument for this period.' }}
+                  </p>
                   <div class="fpo-manual-row">
                     <div class="fpo-manual-input-group">
                       <label class="fpo-manual-label" for="fpoManualInput">
-                        IPCRF Final Rating
+                        {{ usesIpcrfForFpo ? 'IPCRF Final Rating' : 'FPO Rating' }}
                         <span class="fpo-manual-range">1.00 – 5.00</span>
                       </label>
                       <div class="fpo-input-shell">
@@ -905,11 +925,19 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { dashboardApi, ipatApi, ipatAssignmentsApi, usersApi, assessmentContentApi, assessmentCategoryApi } from '@/services/api'
 import { usePermissions } from '@/composables/usePermissions'
+import { useBranding } from '@/composables/useBranding'
 
 const route = useRoute()
 const { hasPermission, isAdmin } = usePermissions()
+const { isClusterPortal } = useBranding()
 const canViewBureauMonitoring = hasPermission('view_bureau_monitoring')
 const canViewDivisionMonitoring = hasPermission('view_division_monitoring')
+
+// Only STB's Functional Performance Output instrument (the DSPMS IPCRF/DPCR)
+// exists in this system. Participating offices adopted their own instruments
+// under the protocol, so for them the FPO figure is recorded manually and the
+// IPCRF auto-sync control is hidden rather than offered and then failing.
+const usesIpcrfForFpo = computed(() => !isClusterPortal.value)
 
 // ── Assessment content fetched from backend ──
 const assessmentQuestions  = ref([])

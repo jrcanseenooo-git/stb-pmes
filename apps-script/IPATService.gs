@@ -928,11 +928,36 @@ const IPATService = (() => {
 
   // ─────────────────────────────────────────────
   // SYNC FPO FROM IPCRF/CCEF
-  // FPO is never entered manually — it is always re-pulled from the
-  // ratee's own IPCRF/CCEF Final Numerical Rating for this same period.
+  // For STB, FPO is re-pulled from the ratee's own IPCRF/CCEF Final Numerical
+  // Rating for this same period. Participating offices use their own approved
+  // instrument and record the figure through setFPO.
   // ─────────────────────────────────────────────
 
+  // True only for the STB full scope, which is the one office whose FPO
+  // instrument (IPCRF/DPCR) is implemented in this system.
+  function requireIpcrfFpoOffice_(user) {
+    const profile = AuthService.getProfile(user)
+    const scope = String(profile.systemScope || 'STB_FULL')
+    const officeKey = String(profile.officeId || profile.officeCode || 'STB').trim().toUpperCase()
+    const isStb = scope === 'STB_FULL' && (!officeKey || officeKey === 'STB' || officeKey === 'OFF-STB')
+    if (!isStb) {
+      throw HttpError(
+        'This office records its Functional Performance Output through its own approved ' +
+        'instrument. Enter the rating directly instead of syncing from IPCRF/CCEF.',
+        400
+      )
+    }
+  }
+
   function syncFPO(ipatId, user) {
+    // Only STB's Functional Performance Output instrument (the DSPMS
+    // IPCRF/DPCR) lives in this system. Participating offices adopted their own
+    // instruments under the protocol and record the resulting figure through
+    // setFPO instead. The UI hides this control for them; this rejects the call
+    // outright so a stale client or a crafted request cannot pull an STB
+    // IPCRF rating into another office's assessment record.
+    requireIpcrfFpoOffice_(user)
+
     const record = _getRecord(ipatId)
     const sourceForm = IpcrfService.getFinalRatingForUser(record.rateeId, record.semester, record.year)
 

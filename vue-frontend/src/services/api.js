@@ -371,6 +371,14 @@ export const assessmentRulesApi = {
   seedDefaults: ()            => gasWrite('POST', 'assessment-rules/seed-defaults')
 }
 
+// ── Rater Matrix — who rates whom, per office, per role ──
+export const raterMatrixApi = {
+  list:         (p = {})      => gasGet('rater-matrix', p),
+  coverage:     (p = {})      => gasGet('rater-matrix/coverage', p),
+  save:         (items = [])  => gasWrite('PUT', 'rater-matrix', { items }),
+  seedDefaults: ()            => gasWrite('POST', 'rater-matrix/seed-defaults')
+}
+
 // ── Accomplishments ────────────────────────────
 
 export const accomplishmentsApi = {
@@ -571,6 +579,7 @@ export default {
   assessmentCategoryApi,
   assessmentContentApi,
   assessmentRulesApi,
+  raterMatrixApi,
   accomplishmentsApi,
   evaluationApi,
   reportsApi,

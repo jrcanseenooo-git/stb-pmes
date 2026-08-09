@@ -305,6 +305,21 @@ const IPATRaterAssignmentService = (() => {
     return result
   }
 
+  // Loads the office's rater matrix, seeding the STB hierarchy on first use.
+  //
+  // Auto-seeding matters for backwards compatibility: STB and the already
+  // provisioned offices have no RaterMatrix rows yet, and without this the very
+  // first generation after deploy would report every role as unmapped. The seed
+  // is a transcription of the five functions this replaced, so a freshly seeded
+  // office behaves exactly as it did before.
+  function _loadMatrixRows(body, user) {
+    let result = RaterMatrixService.list({ officeId: body.officeId || '' }, user)
+    if (!result.items.length) {
+      result = RaterMatrixService.seedDefaults({ officeId: body.officeId || '' }, user)
+    }
+    return result.items
+  }
+
   // ── GENERATE ASSIGNMENTS ─────────────────────────────────────────────────
 
   function generateAssignments(body, user) {
@@ -347,23 +362,49 @@ const IPATRaterAssignmentService = (() => {
     const touchedRateeIds = new Set()
     const createdRecordIds = new Set()
 
+    // Rater rules now come from the per-office RaterMatrix rather than the five
+    // hardcoded STB role branches this replaced. An office using its own role
+    // names no longer falls through to an empty list and a silent skip.
+    const matrixRows = _loadMatrixRows(body, user)
+    const matrixHelpers = { selectRandom: _selectRandom, prevRaterId: _prevRaterId }
+
+    // Exceptions are collected and returned rather than swallowed. A role with
+    // no matrix entry, or a configured rater who does not exist on the roster,
+    // used to vanish without trace; both are now reported to the administrator.
+    const unmappedRoles = {}
+    const incompleteRatees = []
+
     evaluatable.forEach(ratee => {
       const role = ratee.role || ''
-      let raterList = []
+      const resolution = RaterMatrixService.resolveRatersFor(
+        ratee, allUsers, prevAssign, matrixRows, matrixHelpers
+      )
 
-      if (isStaff(role))         raterList = _assignForStaff(ratee, allUsers, prevAssign)
-      else if (isSectionHead(role))   raterList = _assignForSectionHead(ratee, allUsers, prevAssign)
-      else if (isDivisionChief(role)) raterList = _assignForDivisionChief(ratee, allUsers, prevAssign)
-      else if (isABD(role))           raterList = _assignForABD(ratee, allUsers, prevAssign)
-      else if (isDirector(role))      raterList = _assignForDirector(ratee, allUsers, prevAssign)
+      if (resolution.unmappedRole) {
+        const role = String(ratee.role || '(no role)')
+        unmappedRoles[role] = (unmappedRoles[role] || 0) + 1
+        return
+      }
 
-      if (!raterList.length) return
+      const raterList = resolution.raters
+      if (!raterList.length) {
+        incompleteRatees.push({ rateeName: ratee.fullName, role: ratee.role, missing: resolution.missing })
+        return
+      }
+      if (resolution.missing.length) {
+        incompleteRatees.push({ rateeName: ratee.fullName, role: ratee.role, missing: resolution.missing })
+      }
 
       // Auto-create IPAT record if not yet existing for this period
       let ipatRecord = _findCanonicalIpatRecord(existingRec, existingAssign, ratee.id, semester, year)
 
       if (!ipatRecord) {
-        const hasSubordinate = isSectionHead(role) || isDivisionChief(role) || isABD(role) || isDirector(role)
+        // Derived from the matrix, not from the STB role names. This flag drives
+        // the CBC weight split — with a subordinate the weights are Self/Peer/
+        // Subordinate 15 each; without one the subordinate's 15% moves to a
+        // second peer. Reading it from the resolved rater set means an office
+        // with its own hierarchy gets the correct split automatically.
+        const hasSubordinate = raterList.some(r => r.raterType === 'Subordinate')
         const newId = SpreadsheetService.generateId('IPAT-')
         const newRec = {
           id:            newId,
@@ -458,6 +499,17 @@ const IPATRaterAssignmentService = (() => {
     assignments.forEach(a => { breakdown[a.raterType] = (breakdown[a.raterType] || 0) + 1 })
     replacedAssignments.forEach(a => { breakdown[a.raterType] = (breakdown[a.raterType] || 0) + 1 })
 
+    const unmappedList = Object.keys(unmappedRoles).map(role => ({
+      role: role,
+      personnel: unmappedRoles[role]
+    }))
+
+    if (unmappedList.length) {
+      AuditService.log('ASSIGNMENT_EXCEPTIONS', 'IPAT',
+        `${unmappedList.length} role(s) had no rater matrix entry and were skipped: ` +
+        unmappedList.map(u => `${u.role} (${u.personnel})`).join(', '), user)
+    }
+
     return {
       generated:  assignments.length,
       replaced:   replacedAssignments.length,
@@ -466,7 +518,15 @@ const IPATRaterAssignmentService = (() => {
       existing:   new Set(existingAssign.map(a => a.rateeId)).size,
       breakdown,
       semester,
-      year
+      year,
+      // Exceptions the previous implementation discarded silently. `unmapped`
+      // means the role has no matrix entry at all — nobody in it will be rated.
+      // `incomplete` means the role is mapped but a configured rater could not
+      // be found on the roster, so that person is rated by fewer raters than
+      // intended.
+      unmapped: unmappedList,
+      unmappedPersonnel: unmappedList.reduce((s, u) => s + u.personnel, 0),
+      incomplete: incompleteRatees
     }
   }
 

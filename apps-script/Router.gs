@@ -147,6 +147,14 @@ const Router = (() => {
       // ─────────────────────────────────────────
       // Accomplishments
       // ─────────────────────────────────────────
+      // Per-office rater matrix — who rates whom. Office-scoped.
+      case 'rater-matrix':
+        if (!id && method === 'GET') return RaterMatrixService.list(params, user)
+        if (!id && method === 'PUT') return RaterMatrixService.save(body, user)
+        if (id === 'coverage' && method === 'GET') return RaterMatrixService.coverage(params, user)
+        if (id === 'seed-defaults' && method === 'POST') return RaterMatrixService.seedDefaults(body, user)
+        break
+
       case 'assessment-rules':
         if (!id && method === 'GET') return AssessmentRulesService.list(params, user)
         if (!id && method === 'PUT') return AssessmentRulesService.update(body, user)

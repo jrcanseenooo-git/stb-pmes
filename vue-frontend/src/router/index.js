@@ -104,6 +104,11 @@ const routes = [
         meta: { officeAdminAllowed: true },
       },
       {
+        path: "rater-matrix",
+        component: () => import("@/views/RaterMatrixView.vue"),
+        meta: { anyPermission: ['generate_ipat_assignments', 'manage_office_registry'] },
+      },
+      {
         path: "cluster-overview",
         component: () => import("@/views/ClusterOverviewView.vue"),
         meta: { anyPermission: ['view_cluster_monitoring', 'manage_office_registry'] },
@@ -126,7 +131,7 @@ const EVALUATION_ROLLOUT_ALLOWED_PATHS = new Set([
   '/my-dashboard', '/my-tasks', '/my-results', '/library',
   '/my-notifications', '/my-profile', '/help',
   '/evaluation', '/profile', '/office-personnel', '/office-dashboard',
-  '/users', '/reports', '/unauthorized'
+  '/rater-matrix', '/users', '/reports', '/unauthorized'
 ])
 
 // Restricted-scope users land on the Simplified Dashboard rather than being

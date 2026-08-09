@@ -223,6 +223,20 @@
             </transition>
           </RouterLink>
 
+          <RouterLink v-if="canGenerateAssignments" to="/rater-matrix" class="nav-item" active-class="active" :title="collapsed ? 'Rater Tagging' : ''">
+            <div class="nav-icon">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <circle cx="8" cy="3.5" r="2" stroke="currentColor" stroke-width="1.3" />
+                <circle cx="3.5" cy="12" r="2" stroke="currentColor" stroke-width="1.3" />
+                <circle cx="12.5" cy="12" r="2" stroke="currentColor" stroke-width="1.3" />
+                <path d="M8 5.5v2.5M8 8L4.2 10.3M8 8l3.8 2.3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+              </svg>
+            </div>
+            <transition name="fade">
+              <span v-if="!collapsed" class="nav-label-text">Rater Tagging</span>
+            </transition>
+          </RouterLink>
+
           <RouterLink v-if="canViewClusterMonitoring || canManageOfficeRegistry" to="/cluster-overview" class="nav-item" active-class="active" :title="collapsed ? 'Cluster Overview' : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -433,7 +447,7 @@ import PasswordChangePrompt from '@/components/common/PasswordChangePrompt.vue'
 import LogoutConfirmModal from '@/components/common/LogoutConfirmModal.vue'
 
 const authStore = useAuthStore()
-const { canManageUsers, canManageOfficeUsers, canManageLibraries, canManageFocalAssignments, canManageDatabase, canManageOfficeRegistry, canViewClusterMonitoring, canManageOfficePersonnel, canViewAudit, canGenerateReports, canAccessFullSystem, isOfficeAdminScope, isClusterPortalScope } = usePermissions()
+const { canManageUsers, canManageOfficeUsers, canManageLibraries, canManageFocalAssignments, canManageDatabase, canManageOfficeRegistry, canViewClusterMonitoring, canGenerateAssignments, canManageOfficePersonnel, canViewAudit, canGenerateReports, canAccessFullSystem, isOfficeAdminScope, isClusterPortalScope } = usePermissions()
 const { isClusterPortal, portalTitle, portalSubtitle, wordmarkTop, wordmarkBottom, shortName, documentTitle } = useBranding()
 const notifStore = useNotificationsStore()
 const { confirm } = useConfirm()
@@ -498,6 +512,7 @@ const titleMap = {
   '/office-registry': { title: 'Office Registry', sub: 'Central Administration' },
   '/office-personnel': { title: 'Personnel Validation', sub: 'Office Assessment Roster' },
   '/office-dashboard': { title: 'Office Assessment Dashboard', sub: 'Office Monitoring' },
+  '/rater-matrix': { title: 'Rater Tagging', sub: 'Who Rates Whom' },
   '/cluster-overview': { title: 'Cluster Assessment Overview', sub: 'Central Monitoring' },
   '/profile': { title: 'Profile & Settings', sub: '' }
 }

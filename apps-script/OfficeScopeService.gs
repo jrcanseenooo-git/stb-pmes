@@ -5,6 +5,7 @@ const OfficeScopeService = (() => {
     'assessment-rules',
     'ipat',
     'ipat-assignments',
+    'rater-matrix',
     'notifications',
     'audit',
     'portal'

@@ -78,6 +78,12 @@ export function usePermissions() {
   const canViewClusterMonitoring = computed(() =>
     permissions.value.includes('view_cluster_monitoring')
   )
+  // Gates the Rater Tagging screen. Mirrors the backend check in
+  // RaterMatrixService.requireManage_ so the menu and the API agree.
+  const canGenerateAssignments = computed(() =>
+    permissions.value.includes('generate_ipat_assignments') ||
+    permissions.value.includes('manage_office_registry')
+  )
   const canManageOfficePersonnel = computed(() =>
     authStore.profile?.systemScope === 'OFFICE_ADMIN' ||
     authStore.profile?.officeRole === 'OFFICE_ADMIN' ||
@@ -118,7 +124,7 @@ export function usePermissions() {
     isAdmin, isDirector, isAsstDir, isDivChief, isSectionHead, isStaff,
     canViewAllDivisions, canApprove, canManageUsers, canManageLibraries,
     canManageFocalAssignments, canViewAudit, canGenerateReports,
-    canManageDatabase, canManageOfficeRegistry, canViewClusterMonitoring, canManageOfficePersonnel, canManageOfficeUsers,
+    canManageDatabase, canManageOfficeRegistry, canViewClusterMonitoring, canGenerateAssignments, canManageOfficePersonnel, canManageOfficeUsers,
     evaluationOnlyRollout, canAccessFullSystem, divisionScope
   }
 }

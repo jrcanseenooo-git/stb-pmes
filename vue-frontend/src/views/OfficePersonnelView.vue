@@ -1,18 +1,18 @@
 <template>
-  <div class="pmes-page p-4 grid gap-4 content-start">
+  <div class="pui-page">
     <PageHeader
       kicker="Office Administration"
       title="Personnel Validation"
       :subtitle="`Validate and maintain the ${officeName || 'office'} roster used for assessment assignments.`"
     >
       <template #actions>
-        <button v-if="canManageOfficePersonnel" class="btn-primary" type="button" @click="openCreate">
+        <button v-if="canManageOfficePersonnel" class="pui-btn pui-btn-primary" type="button" @click="openCreate">
           Add Personnel
         </button>
       </template>
     </PageHeader>
 
-    <div class="grid gap-3 grid-cols-2 lg:grid-cols-4">
+    <div class="pui-grid pui-grid-4">
       <StatTile label="Total Personnel" :value="counts.total" :loading="loading" />
       <StatTile label="Active" :value="counts.active" :loading="loading" tone="good" />
       <StatTile label="For Validation" :value="counts.pending" :loading="loading" :tone="counts.pending ? 'warn' : 'default'" />
@@ -39,17 +39,14 @@
       @refresh="loadRows"
     >
       <template #filters>
-        <div class="flex items-center gap-1 rounded-xl bg-slate-100 p-1" role="tablist" aria-label="Filter by status">
+        <div class="pui-tabs" role="tablist" aria-label="Filter by status">
           <button
             v-for="tab in STATUS_TABS"
             :key="tab.value"
             type="button"
             role="tab"
             :aria-selected="statusTab === tab.value"
-            :class="[
-              'px-3 py-1 rounded-lg text-xs font-extrabold transition-colors',
-              statusTab === tab.value ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-            ]"
+            :class="['pui-tab', statusTab === tab.value && 'pui-tab-active']"
             @click="statusTab = tab.value"
           >
             {{ tab.label }}
@@ -57,7 +54,7 @@
         </div>
       </template>
 
-      <table class="data-table">
+      <table class="pui-table">
         <thead>
           <tr>
             <th scope="col">Name</th>
@@ -66,28 +63,28 @@
             <th scope="col">Unit</th>
             <th scope="col">Section</th>
             <th scope="col">Status</th>
-            <th scope="col" class="text-right">Actions</th>
+            <th scope="col" style="text-align:right;">Actions</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="row in filteredRows" :key="row.id">
             <td>
-              <strong class="block text-[13px] text-slate-900">{{ row.fullName }}</strong>
-              <span class="block text-slate-500 mt-0.5">{{ row.employeeNo || 'No employee no.' }}</span>
+              <strong>{{ row.fullName }}</strong>
+              <small>{{ row.employeeNo || 'No employee no.' }}</small>
             </td>
-            <td class="whitespace-nowrap">{{ row.email }}</td>
+            <td style="white-space:nowrap;">{{ row.email }}</td>
             <td>{{ row.role || 'Technical Staff' }}</td>
             <td>{{ row.divisionName || row.organizationalUnitName || '—' }}</td>
             <td>{{ row.section || '—' }}</td>
             <td><StatusPill :status="row.status" /></td>
             <td>
-              <div class="flex items-center justify-end gap-1.5">
-                <button v-if="canManageOfficePersonnel" class="btn-secondary !py-1 !px-2.5 !text-xs" type="button" @click="openEdit(row)">
+              <div style="display:flex; justify-content:flex-end; gap:6px;">
+                <button v-if="canManageOfficePersonnel" class="pui-btn pui-btn-sm" type="button" @click="openEdit(row)">
                   Edit
                 </button>
                 <button
                   v-if="canManageOfficePersonnel && row.status === 'Active'"
-                  class="btn-danger !py-1 !px-2.5 !text-xs"
+                  class="pui-btn pui-btn-sm pui-btn-danger"
                   type="button"
                   :disabled="busyId === row.id"
                   @click="deactivate(row)"
@@ -96,7 +93,7 @@
                 </button>
                 <button
                   v-else-if="canManageOfficePersonnel"
-                  class="btn-secondary !py-1 !px-2.5 !text-xs"
+                  class="pui-btn pui-btn-sm"
                   type="button"
                   :disabled="busyId === row.id"
                   @click="activate(row)"
@@ -119,49 +116,49 @@
       :busy="saving"
       @close="closeModal"
     >
-      <form id="personnel-form" class="grid grid-cols-1 sm:grid-cols-2 gap-3" @submit.prevent="save">
-        <label class="sm:col-span-2">
-          <span class="form-label">Full Name</span>
-          <input v-model="form.fullName" class="form-input" type="text" required />
+      <form id="personnel-form" class="pui-grid pui-grid-2" @submit.prevent="save">
+        <label class="pui-span-2">
+          <span class="pui-label">Full Name</span>
+          <input v-model="form.fullName" class="pui-input" type="text" required />
         </label>
-        <label class="sm:col-span-2">
-          <span class="form-label">Email</span>
-          <input v-model="form.email" class="form-input" type="email" :disabled="!!editingId" required />
-          <small v-if="editingId" class="block mt-1 text-[11px] text-slate-500">
+        <label class="pui-span-2">
+          <span class="pui-label">Email</span>
+          <input v-model="form.email" class="pui-input" type="email" :disabled="!!editingId" required />
+          <small v-if="editingId" class="pui-hint">
             Email identifies the record and cannot be changed here.
           </small>
         </label>
         <label>
-          <span class="form-label">Role</span>
-          <select v-model="form.role" class="form-select">
+          <span class="pui-label">Role</span>
+          <select v-model="form.role" class="pui-select">
             <option v-for="option in roleOptions" :key="option" :value="option">{{ option }}</option>
           </select>
         </label>
         <label>
-          <span class="form-label">Employee No.</span>
-          <input v-model="form.employeeNo" class="form-input" type="text" />
+          <span class="pui-label">Employee No.</span>
+          <input v-model="form.employeeNo" class="pui-input" type="text" />
         </label>
         <label>
-          <span class="form-label">Unit / Division</span>
-          <input v-model="form.divisionName" class="form-input" type="text" />
+          <span class="pui-label">Unit / Division</span>
+          <input v-model="form.divisionName" class="pui-input" type="text" />
         </label>
         <label>
-          <span class="form-label">Section</span>
-          <input v-model="form.section" class="form-input" type="text" />
+          <span class="pui-label">Section</span>
+          <input v-model="form.section" class="pui-input" type="text" />
         </label>
-        <label class="sm:col-span-2">
-          <span class="form-label">Position / Title</span>
-          <input v-model="form.position" class="form-input" type="text" />
+        <label class="pui-span-2">
+          <span class="pui-label">Position / Title</span>
+          <input v-model="form.position" class="pui-input" type="text" />
         </label>
       </form>
 
-      <div v-if="modalError" class="rounded-xl border border-red-100 bg-red-50 px-3 py-2" role="alert">
-        <p class="text-xs text-red-700">{{ modalError }}</p>
+      <div v-if="modalError" class="pui-alert pui-alert-error" role="alert">
+        <p>{{ modalError }}</p>
       </div>
 
       <template #footer>
-        <button class="btn-secondary" type="button" :disabled="saving" @click="closeModal">Cancel</button>
-        <button class="btn-primary" type="submit" form="personnel-form" :disabled="saving">
+        <button class="pui-btn" type="button" :disabled="saving" @click="closeModal">Cancel</button>
+        <button class="pui-btn pui-btn-primary" type="submit" form="personnel-form" :disabled="saving">
           {{ saving ? 'Saving...' : 'Save Personnel' }}
         </button>
       </template>

@@ -1,11 +1,11 @@
 <template>
-  <header class="card px-5 py-4 flex items-start justify-between gap-4 flex-wrap">
-    <div class="min-w-0">
-      <p v-if="kicker" class="text-[11px] font-extrabold uppercase tracking-wider text-blue-700 mb-1">{{ kicker }}</p>
-      <h1 class="text-xl font-extrabold text-slate-900 leading-tight truncate">{{ title }}</h1>
-      <p v-if="subtitle" class="text-xs text-slate-500 mt-1">{{ subtitle }}</p>
+  <header class="pui-header">
+    <div>
+      <p v-if="kicker" class="pui-header-kicker">{{ kicker }}</p>
+      <h1 class="pui-header-title">{{ title }}</h1>
+      <p v-if="subtitle" class="pui-header-subtitle">{{ subtitle }}</p>
     </div>
-    <div v-if="$slots.actions" class="flex items-center gap-2 shrink-0">
+    <div v-if="$slots.actions" class="pui-header-actions">
       <slot name="actions" />
     </div>
   </header>

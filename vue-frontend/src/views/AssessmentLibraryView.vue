@@ -1,12 +1,12 @@
 <template>
-  <div class="pmes-page p-4 grid gap-4 content-start">
+  <div class="pui-page">
     <PageHeader
       kicker="Reference"
       title="Assessment Library"
       subtitle="The official assessment content used in this office. This is reference material and is read-only."
     >
       <template #actions>
-        <RouterLink to="/help" class="btn-secondary">Rating Guide</RouterLink>
+        <RouterLink to="/help" class="pui-btn">Rating Guide</RouterLink>
       </template>
     </PageHeader>
 
@@ -29,30 +29,30 @@
       @refresh="load"
     >
       <template #filters>
-        <label class="sr-only" for="library-category">Filter by category</label>
-        <select id="library-category" v-model="categoryFilter" class="form-select !py-1.5 !w-auto">
+        <label class="pui-sr-only" for="library-category">Filter by category</label>
+        <select id="library-category" v-model="categoryFilter" class="pui-select" style="width:auto; height:34px;">
           <option value="all">All categories</option>
           <option v-for="name in categoryNames" :key="name" :value="name">{{ name }}</option>
         </select>
       </template>
 
-      <div class="p-4 grid gap-3">
-        <article v-for="group in filteredGroups" :key="group.name" class="rounded-2xl border border-slate-200 overflow-hidden">
+      <div style="padding:16px; display:grid; gap:12px;">
+        <article v-for="group in filteredGroups" :key="group.name" style="border:1px solid #e2e8f0; border-radius:12px; overflow:hidden;">
           <button
             type="button"
-            class="w-full flex items-center justify-between gap-3 px-4 py-3 bg-slate-50 text-left hover:bg-slate-100 transition-colors"
+            style="width:100%; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:13px 16px; background:#f8fafc; text-align:left; border:0; cursor:pointer;"
             :aria-expanded="isOpen(group.name)"
             @click="toggle(group.name)"
           >
-            <div class="min-w-0">
-              <h3 class="text-sm font-extrabold text-slate-900">{{ group.name }}</h3>
-              <p v-if="group.description" class="text-xs text-slate-500 mt-0.5">{{ group.description }}</p>
+            <div style="min-width:0;">
+              <h3 style="margin:0; font-size:14px; font-weight:800; color:#0f172a;">{{ group.name }}</h3>
+              <p v-if="group.description" style="margin:3px 0 0; font-size:12px; color:#64748b;">{{ group.description }}</p>
             </div>
-            <div class="flex items-center gap-2 shrink-0">
-              <span class="badge-status bg-slate-200 text-slate-600">{{ group.items.length }}</span>
+            <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+              <span class="pui-badge">{{ group.items.length }}</span>
               <svg
                 width="14" height="14" viewBox="0 0 14 14" fill="none"
-                :class="['transition-transform', isOpen(group.name) && 'rotate-180']"
+                :style="{ transform: isOpen(group.name) ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }"
                 aria-hidden="true"
               >
                 <path d="M3 5l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
@@ -60,20 +60,22 @@
             </div>
           </button>
 
-          <ol v-if="isOpen(group.name)" class="divide-y divide-slate-100">
-            <li v-for="(item, index) in group.items" :key="item.id" class="px-4 py-3.5">
-              <div class="flex gap-3">
-                <span class="text-xs font-extrabold text-slate-400 pt-0.5 shrink-0">{{ index + 1 }}.</span>
-                <div class="min-w-0">
-                  <p class="text-sm font-bold text-slate-900 leading-snug">{{ item.questionText }}</p>
-                  <p v-if="item.guidanceText" class="mt-1.5 text-xs text-slate-600 leading-relaxed">{{ item.guidanceText }}</p>
-                  <div class="mt-2 flex flex-wrap gap-1.5">
-                    <span v-if="item.applicableRaters" class="badge-status bg-blue-50 text-blue-700">
-                      Rated by: {{ formatRaters(item.applicableRaters) }}
-                    </span>
-                    <span v-if="item.evidenceRequired" class="badge-status bg-amber-50 text-amber-700">Evidence required</span>
-                    <span v-if="item.required" class="badge-status bg-slate-100 text-slate-600">Required</span>
-                  </div>
+          <ol v-if="isOpen(group.name)" style="list-style:none; margin:0; padding:0;">
+            <li
+              v-for="(item, index) in group.items"
+              :key="item.id"
+              style="padding:14px 16px; border-top:1px solid #f1f5f9; display:flex; gap:10px;"
+            >
+              <span style="font-size:12px; font-weight:800; color:#94a3b8; flex-shrink:0;">{{ index + 1 }}.</span>
+              <div style="min-width:0;">
+                <p style="margin:0; font-size:13.5px; font-weight:700; color:#0f172a; line-height:1.4;">{{ item.questionText }}</p>
+                <p v-if="item.guidanceText" style="margin:6px 0 0; font-size:12px; color:#475569; line-height:1.5;">{{ item.guidanceText }}</p>
+                <div style="margin-top:8px; display:flex; flex-wrap:wrap; gap:6px;">
+                  <span v-if="item.applicableRaters" class="pui-badge pui-badge-brand">
+                    Rated by: {{ formatRaters(item.applicableRaters) }}
+                  </span>
+                  <span v-if="item.evidenceRequired" class="pui-badge pui-badge-warn">Evidence required</span>
+                  <span v-if="item.required" class="pui-badge">Required</span>
                 </div>
               </div>
             </li>

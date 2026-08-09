@@ -1,24 +1,24 @@
 <template>
-  <div class="pmes-page p-4 grid gap-4 content-start">
+  <div class="pui-page">
     <PageHeader
       kicker="Office Administration"
       title="Office Assessment Dashboard"
       :subtitle="`${officeName || 'Your office'} — ${period.label || 'current assessment period'}`"
     >
       <template #actions>
-        <button class="btn-secondary" type="button" :disabled="loading" @click="load">
+        <button class="pui-btn" type="button" :disabled="loading" @click="load">
           {{ loading ? 'Refreshing...' : 'Refresh' }}
         </button>
       </template>
     </PageHeader>
 
-    <div v-if="error" class="card border-red-100 bg-red-50 px-4 py-3" role="alert">
-      <p class="text-sm font-bold text-red-800">Office monitoring could not be loaded</p>
-      <p class="mt-0.5 text-xs text-red-700">{{ error }}</p>
-      <button class="btn-secondary mt-3 !py-1.5" type="button" @click="load">Try again</button>
+    <div v-if="error" class="pui-card pui-alert pui-alert-error" style="padding:16px;" role="alert">
+      <p class="pui-alert-title">Office monitoring could not be loaded</p>
+      <p>{{ error }}</p>
+      <button class="pui-btn pui-btn-sm" style="margin-top:10px;" type="button" @click="load">Try again</button>
     </div>
 
-    <div class="grid gap-3 grid-cols-2 lg:grid-cols-4">
+    <div class="pui-grid pui-grid-4">
       <StatTile label="Active Personnel" :value="kpis.activePersonnel" :total="kpis.totalPersonnel" :loading="loading" />
       <StatTile
         label="For Validation"
@@ -35,20 +35,20 @@
       />
     </div>
 
-    <div class="grid gap-3 grid-cols-2 lg:grid-cols-4">
+    <div class="pui-grid pui-grid-4">
       <StatTile label="Submitted" :value="kpis.submittedTasks" :loading="loading" tone="good" />
       <StatTile label="Outstanding" :value="kpis.outstandingTasks" :loading="loading" :tone="kpis.outstandingTasks ? 'warn' : 'default'" />
       <StatTile label="Assessment Records" :value="kpis.assessmentRecords" :loading="loading" />
       <StatTile label="Finalized" :value="kpis.finalizedRecords" :total="kpis.assessmentRecords" :loading="loading" />
     </div>
 
-    <section class="card p-5">
-      <div class="flex items-start justify-between gap-4 flex-wrap mb-4">
+    <section class="pui-card" style="padding:20px;">
+      <div class="pui-row-between" style="flex-wrap:wrap; margin-bottom:16px;">
         <div>
-          <h2 class="text-sm font-extrabold text-slate-900">Overall rating task completion</h2>
-          <p class="text-xs text-slate-500 mt-0.5">{{ period.label }}</p>
+          <h2 class="pui-card-title">Overall rating task completion</h2>
+          <p class="pui-card-subtitle">{{ period.label }}</p>
         </div>
-        <RouterLink to="/office-personnel" class="btn-secondary shrink-0">Personnel Validation</RouterLink>
+        <RouterLink to="/office-personnel" class="pui-btn" style="flex-shrink:0;">Personnel Validation</RouterLink>
       </div>
       <ProgressBar
         :value="kpis.submittedTasks"
@@ -57,22 +57,22 @@
       />
     </section>
 
-    <section class="card overflow-hidden">
-      <div class="card-header !px-4 !py-3">
-        <h2 class="card-title">Items needing attention</h2>
+    <section class="pui-card" style="overflow:hidden;">
+      <div class="pui-card-header">
+        <h2 class="pui-card-title">Items needing attention</h2>
       </div>
-      <ul class="divide-y divide-slate-100">
-        <li v-for="item in attention" :key="item.label" class="px-4 py-3 flex items-start gap-3">
+      <ul style="list-style:none; margin:0; padding:0;">
+        <li v-for="item in attention" :key="item.label" style="padding:12px 16px; border-top:1px solid #eef2f7; display:flex; align-items:flex-start; gap:10px;">
           <StatusPill :status="item.level" />
-          <div class="min-w-0">
-            <p class="text-sm font-bold text-slate-900">{{ item.label }}</p>
-            <p class="text-xs text-slate-500 mt-0.5 leading-relaxed">{{ item.detail }}</p>
+          <div style="min-width:0;">
+            <p style="margin:0; font-size:13px; font-weight:700; color:#0f172a;">{{ item.label }}</p>
+            <p style="margin:2px 0 0; font-size:12px; color:#64748b; line-height:1.5;">{{ item.detail }}</p>
           </div>
         </li>
       </ul>
     </section>
 
-    <div class="grid gap-4 grid-cols-1 lg:grid-cols-2">
+    <div class="pui-grid pui-grid-2">
       <BarList
         title="Completion by Organizational Unit"
         :subtitle="period.label"
@@ -89,7 +89,7 @@
       />
     </div>
 
-    <p v-if="lastUpdatedLabel" class="text-[11px] text-slate-400 px-1">
+    <p v-if="lastUpdatedLabel" style="font-size:11px; color:#94a3b8; padding:0 2px;">
       Last updated {{ lastUpdatedLabel }}
     </p>
   </div>

@@ -1,21 +1,22 @@
 <template>
-  <section class="card overflow-hidden">
-    <div class="card-header !px-4 !py-3 flex-wrap gap-3">
-      <div class="min-w-0">
-        <h2 class="text-sm font-extrabold text-slate-900">{{ title }}</h2>
-        <p v-if="subtitle" class="text-xs text-slate-500 mt-0.5">{{ subtitle }}</p>
+  <section class="pui-card" style="overflow:hidden;">
+    <div class="pui-card-header">
+      <div>
+        <h2 class="pui-card-title">{{ title }}</h2>
+        <p v-if="subtitle" class="pui-card-subtitle">{{ subtitle }}</p>
       </div>
 
-      <div class="flex items-center gap-2 flex-wrap">
+      <div class="pui-row pui-row-wrap">
         <slot name="filters" />
 
-        <div v-if="searchable" class="relative">
-          <label :for="searchId" class="sr-only">{{ searchLabel }}</label>
+        <div v-if="searchable">
+          <label :for="searchId" class="pui-sr-only">{{ searchLabel }}</label>
           <input
             :id="searchId"
             :value="search"
             type="search"
-            class="form-input !py-1.5 !w-full sm:!w-64"
+            class="pui-input"
+            style="width:240px;"
             :placeholder="searchPlaceholder"
             @input="onSearchInput"
           />
@@ -25,30 +26,30 @@
       </div>
     </div>
 
-    <div v-if="lastUpdated" class="px-4 py-1.5 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
-      <span class="text-[11px] font-bold text-slate-500">Last updated {{ lastUpdated }}</span>
-      <button v-if="refreshable" type="button" class="text-[11px] font-extrabold text-blue-700 hover:underline" :disabled="loading" @click="$emit('refresh')">
+    <div v-if="lastUpdated" style="padding:6px 16px; background:#f8fafc; border-bottom:1px solid #eef2f7; display:flex; align-items:center; gap:10px;">
+      <span style="font-size:11px; font-weight:700; color:#64748b;">Last updated {{ lastUpdated }}</span>
+      <button v-if="refreshable" type="button" style="font-size:11px; font-weight:800; color:#1d4ed8; background:none; border:0; cursor:pointer; padding:0;" :disabled="loading" @click="$emit('refresh')">
         Refresh
       </button>
     </div>
 
     <SkeletonRows v-if="loading" :rows="skeletonRows" :aria-label="`Loading ${title}`" />
 
-    <div v-else-if="error" class="m-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3" role="alert">
-      <p class="text-sm font-bold text-red-800">{{ errorTitle }}</p>
-      <p class="mt-0.5 text-xs text-red-700 leading-relaxed">{{ error }}</p>
-      <button v-if="refreshable" type="button" class="btn-secondary mt-3 !py-1.5" @click="$emit('refresh')">Try again</button>
+    <div v-else-if="error" class="pui-alert pui-alert-error" style="margin:16px;" role="alert">
+      <p class="pui-alert-title">{{ errorTitle }}</p>
+      <p>{{ error }}</p>
+      <button v-if="refreshable" type="button" class="pui-btn pui-btn-sm" style="margin-top:10px;" @click="$emit('refresh')">Try again</button>
     </div>
 
     <EmptyState v-else-if="empty" :title="emptyTitle" :description="emptyDescription">
       <template v-if="$slots.emptyAction" #action><slot name="emptyAction" /></template>
     </EmptyState>
 
-    <div v-else class="overflow-x-auto">
+    <div v-else class="pui-table-wrap">
       <slot />
     </div>
 
-    <div v-if="!loading && !error && !empty && $slots.footer" class="px-4 py-2.5 border-t border-slate-100 bg-slate-50/60">
+    <div v-if="!loading && !error && !empty && $slots.footer" style="padding:10px 16px; border-top:1px solid #eef2f7; background:#fafcff;">
       <slot name="footer" />
     </div>
   </section>

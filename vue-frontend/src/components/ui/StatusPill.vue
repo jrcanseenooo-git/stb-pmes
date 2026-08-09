@@ -1,5 +1,5 @@
 <template>
-  <span :class="['badge-status', toneClass]">{{ display }}</span>
+  <span :class="['pui-badge', toneClass]">{{ display }}</span>
 </template>
 
 <script setup>
@@ -44,9 +44,9 @@ const key = computed(() => String(props.status || '').trim().toUpperCase().repla
 const display = computed(() => props.label || LABELS[key.value] || props.status || '—')
 
 const toneClass = computed(() => {
-  if (GOOD.includes(key.value)) return 'bg-emerald-50 text-emerald-700'
-  if (WARN.includes(key.value)) return 'bg-amber-50 text-amber-700'
-  if (BAD.includes(key.value)) return 'bg-red-50 text-red-700'
-  return 'bg-slate-100 text-slate-600'
+  if (GOOD.includes(key.value)) return 'pui-badge-good'
+  if (WARN.includes(key.value)) return 'pui-badge-warn'
+  if (BAD.includes(key.value)) return 'pui-badge-bad'
+  return 'pui-badge-neutral'
 })
 </script>

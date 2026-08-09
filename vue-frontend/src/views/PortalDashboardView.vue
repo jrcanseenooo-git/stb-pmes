@@ -1,31 +1,31 @@
 <template>
-  <div class="pmes-page p-4 grid gap-4 content-start">
+  <div class="pui-page">
     <!--
       Simplified Dashboard for participating-office personnel.
       Deliberately excluded per the cluster specification: Account Settings,
       Quick Actions, Recent Activity, Performance Summary, and anything KRA.
       Everything here answers one question — what do I still have to rate?
     -->
-    <section class="card p-5">
-      <p class="text-[11px] font-extrabold uppercase tracking-wider text-blue-700">{{ portalSubtitle }}</p>
-      <h1 class="mt-1 text-2xl font-extrabold text-slate-900 leading-tight">
+    <section class="pui-card" style="padding:20px;">
+      <p class="pui-header-kicker">{{ portalSubtitle }}</p>
+      <h1 style="margin:4px 0 0; font-size:24px; font-weight:800; color:#0f172a; line-height:1.2;">
         {{ loading ? '—' : (person.fullName || 'Welcome') }}
       </h1>
-      <dl class="mt-3 flex flex-wrap gap-x-6 gap-y-2">
-        <div v-for="item in identityItems" :key="item.label" class="min-w-0">
-          <dt class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">{{ item.label }}</dt>
-          <dd class="text-sm font-bold text-slate-800 truncate">{{ item.value }}</dd>
+      <dl style="margin:14px 0 0; display:flex; flex-wrap:wrap; gap:8px 28px; padding:0;">
+        <div v-for="item in identityItems" :key="item.label" style="min-width:0;">
+          <dt style="font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; color:#94a3b8;">{{ item.label }}</dt>
+          <dd style="margin:2px 0 0; font-size:13px; font-weight:700; color:#334155;">{{ item.value }}</dd>
         </div>
       </dl>
     </section>
 
-    <div v-if="error" class="card border-red-100 bg-red-50 px-4 py-3" role="alert">
-      <p class="text-sm font-bold text-red-800">Your assessment summary could not be loaded</p>
-      <p class="mt-0.5 text-xs text-red-700">{{ error }}</p>
-      <button class="btn-secondary mt-3 !py-1.5" type="button" @click="load">Try again</button>
+    <div v-if="error" class="pui-card pui-alert pui-alert-error" style="padding:16px;" role="alert">
+      <p class="pui-alert-title">Your assessment summary could not be loaded</p>
+      <p>{{ error }}</p>
+      <button class="pui-btn pui-btn-sm" style="margin-top:10px;" type="button" @click="load">Try again</button>
     </div>
 
-    <div class="grid gap-3 grid-cols-1 sm:grid-cols-3">
+    <div class="pui-grid pui-grid-3">
       <StatTile
         label="Pending"
         :value="tasks.pending"
@@ -49,13 +49,13 @@
       />
     </div>
 
-    <section class="card p-5 grid gap-4">
-      <div class="flex items-start justify-between gap-4 flex-wrap">
+    <section class="pui-card" style="padding:20px; display:grid; gap:16px;">
+      <div class="pui-row-between" style="flex-wrap:wrap;">
         <div>
-          <h2 class="text-sm font-extrabold text-slate-900">Your rating task completion</h2>
-          <p class="text-xs text-slate-500 mt-0.5">{{ period.label || 'Current assessment period' }}</p>
+          <h2 class="pui-card-title">Your rating task completion</h2>
+          <p class="pui-card-subtitle">{{ period.label || 'Current assessment period' }}</p>
         </div>
-        <RouterLink to="/my-tasks" class="btn-primary shrink-0">
+        <RouterLink to="/my-tasks" class="pui-btn pui-btn-primary" style="flex-shrink:0;">
           {{ tasks.pending || tasks.draft ? 'Continue Rating' : 'Open My Rating Tasks' }}
         </RouterLink>
       </div>
@@ -66,18 +66,18 @@
         :label="`${tasks.completed} of ${tasks.total} rating tasks submitted`"
       />
 
-      <p v-if="!loading && !tasks.total" class="text-xs text-slate-500 leading-relaxed">
+      <p v-if="!loading && !tasks.total" class="pui-muted" style="font-size:12px; line-height:1.5;">
         You have no rating tasks for this assessment period yet. Your office administrator assigns
         them once the period opens — nothing is required from you until then.
       </p>
-      <p v-else-if="!loading && !tasks.pending && !tasks.draft" class="text-xs text-emerald-700 font-bold">
+      <p v-else-if="!loading && !tasks.pending && !tasks.draft" style="font-size:12px; font-weight:700; color:#047857;">
         All of your rating tasks for this period have been submitted.
       </p>
     </section>
 
-    <p v-if="lastUpdatedLabel" class="text-[11px] text-slate-400 px-1">
+    <p v-if="lastUpdatedLabel" style="font-size:11px; color:#94a3b8; padding:0 2px;">
       Last updated {{ lastUpdatedLabel }} ·
-      <button type="button" class="font-extrabold text-blue-700 hover:underline" :disabled="loading" @click="load">
+      <button type="button" style="font-weight:800; color:#1d4ed8; background:none; border:0; cursor:pointer; padding:0; font-size:11px;" :disabled="loading" @click="load">
         Refresh
       </button>
     </p>

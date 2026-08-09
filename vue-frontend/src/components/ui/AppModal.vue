@@ -1,12 +1,8 @@
 <template>
-  <div
-    v-if="show"
-    class="fixed inset-0 z-[80] grid place-items-center p-5 bg-slate-900/45"
-    @click.self="requestClose"
-  >
+  <div v-if="show" class="pui-modal-overlay" @click.self="requestClose">
     <div
       ref="panel"
-      class="card w-full max-h-full overflow-auto p-5 grid gap-4 shadow-2xl"
+      :class="['pui-modal', wide && 'pui-modal-wide']"
       :style="{ maxWidth: width }"
       role="dialog"
       aria-modal="true"
@@ -14,24 +10,19 @@
       @keydown.esc.stop.prevent="requestClose"
       @keydown.tab="trapFocus"
     >
-      <div class="flex items-start justify-between gap-3">
-        <div class="min-w-0">
-          <h2 :id="titleId" class="text-base font-extrabold text-slate-900">{{ title }}</h2>
-          <p v-if="description" class="text-xs text-slate-500 mt-1">{{ description }}</p>
+      <div class="pui-modal-hd">
+        <div>
+          <h2 :id="titleId" class="pui-modal-title">{{ title }}</h2>
+          <p v-if="description" class="pui-modal-desc">{{ description }}</p>
         </div>
-        <button
-          type="button"
-          class="shrink-0 w-8 h-8 rounded-xl bg-slate-100 text-slate-600 font-extrabold hover:bg-slate-200"
-          aria-label="Close dialog"
-          @click="requestClose"
-        >
+        <button type="button" class="pui-modal-close" aria-label="Close dialog" @click="requestClose">
           &times;
         </button>
       </div>
 
       <slot />
 
-      <div v-if="$slots.footer" class="flex justify-end gap-2 flex-wrap">
+      <div v-if="$slots.footer" class="pui-modal-actions">
         <slot name="footer" />
       </div>
     </div>
@@ -45,7 +36,8 @@ const props = defineProps({
   show: { type: Boolean, default: false },
   title: { type: String, required: true },
   description: { type: String, default: '' },
-  width: { type: String, default: '620px' },
+  width: { type: String, default: '' },
+  wide: { type: Boolean, default: false },
   // Blocks Esc and backdrop dismissal while a save is in flight, so a user
   // cannot lose typed values by tapping outside mid-request.
   busy: { type: Boolean, default: false }

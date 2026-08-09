@@ -1396,3 +1396,122 @@ validated:
   `vercel rollback`.
 - Backend: redeploy the previous version to the same deployment ID with
   `clasp deploy --deploymentId <id> --versionNumber 223`.
+
+## 2026-08-09 - Critical CSS Fix: Portal/Office/Cluster Screens Were Unstyled in Production
+
+Branch: `feature/multi-office-assessment-scope`
+
+### Summary
+
+Every screen built in this session's portal/office/cluster/report work was
+rendering unstyled in production. Root cause: `src/assets/main.css` — the app's
+Tailwind base/components/utilities stylesheet, containing `.card`, `.btn-*`,
+`.badge-status`, `.data-table`, `.form-*`, and every Tailwind utility class —
+has never been imported by `main.js` since the initial commit. This was a
+deliberate prior decision (see `c88a7d6`, 2026-07-03): Tailwind's preflight
+reset would visually alter every existing hand-styled STB screen, so it was
+kept out. Existing views work because each has its own scoped, hand-written
+`<style>` block. Every new component and view this session was built assuming
+Tailwind utilities were live — they were not. Fixed by building a real,
+additive, hand-written stylesheet instead of importing the dead one.
+
+### Files Added
+
+- `vue-frontend/src/assets/ui-kit.css`
+
+### Files Modified
+
+All previously-added shared components and new/rewritten views, converted from
+Tailwind utility classes to `ui-kit.css`:
+
+- `vue-frontend/src/main.js`
+- `vue-frontend/src/components/ui/PageHeader.vue`
+- `vue-frontend/src/components/ui/StatusPill.vue`
+- `vue-frontend/src/components/ui/StatTile.vue`
+- `vue-frontend/src/components/ui/EmptyState.vue`
+- `vue-frontend/src/components/ui/SkeletonRows.vue`
+- `vue-frontend/src/components/ui/ProgressBar.vue`
+- `vue-frontend/src/components/ui/AppModal.vue`
+- `vue-frontend/src/components/ui/DataPanel.vue`
+- `vue-frontend/src/components/ui/BarList.vue`
+- `vue-frontend/src/views/PortalDashboardView.vue`
+- `vue-frontend/src/views/MyTasksView.vue`
+- `vue-frontend/src/views/MyResultsView.vue`
+- `vue-frontend/src/views/AssessmentLibraryView.vue`
+- `vue-frontend/src/views/MyNotificationsView.vue`
+- `vue-frontend/src/views/MyProfileView.vue`
+- `vue-frontend/src/views/HelpGuideView.vue`
+- `vue-frontend/src/views/OfficeDashboardView.vue`
+- `vue-frontend/src/views/ClusterOverviewView.vue`
+- `vue-frontend/src/views/OfficeRegistryView.vue`
+- `vue-frontend/src/views/OfficePersonnelView.vue`
+- `vue-frontend/src/views/ReportsView.vue`
+- `vue-frontend/src/layouts/AppLayout.vue`
+
+### What Changed
+
+- `ui-kit.css` is hand-written, plain CSS. No `@tailwind` directives, no
+  Preflight, no `*` selector, no `html`/`body` rules. Every rule is scoped to a
+  `pui-` prefix (Portal UI) chosen specifically so it cannot collide with any
+  existing view's class names. It is additive-only: importing it changes
+  nothing about any screen that does not use a `pui-` class.
+  Values (colors, radii, spacing) were matched to this app's actual established
+  visual language — `DashboardView.vue`'s stat cards and the original
+  `OfficeRegistryView`/`OfficePersonnelView` — not to Tailwind defaults.
+- All 9 shared components and 12 views converted from Tailwind utility class
+  strings to `ui-kit.css` classes (or targeted inline styles for one-off
+  layout). No template logic, API calls, or business logic changed.
+- Fixed a second, independent bug found during this pass: `usePermissions`'s
+  `canManageOfficePersonnel` includes central-only permissions
+  (`manage_office_registry`, `manage_cluster_office_admins`) alongside genuine
+  office-admin scope, so a central/STB System Administrator saw "Office
+  Dashboard" and "Personnel Validation" in the sidebar. Both call
+  `OfficePersonnelService.withOffice_`, which correctly rejects `officeId=STB`
+  with a 400 ("Office personnel management is only available for participating
+  office portals") — by design, but with no office selector ever offered to a
+  central user, the link was guaranteed to fail. Narrowed nav visibility for
+  these two links to `isOfficeAdminScope` only. Central admins keep Cluster
+  Overview and Office Registry. The backend behavior is unchanged; this is a
+  navigation-visibility fix, not an authorization change.
+
+### Existing STB Functions Preserved
+
+- `assets/main.css` remains unimported — the prior decision stands.
+- Zero risk to existing STB screens: `ui-kit.css` defines only new, uniquely
+  prefixed class names; nothing existing references `pui-*`.
+- No route, API call, permission check, or business logic changed except the
+  two nav `v-if` conditions described above.
+
+### Tests Performed
+
+- `npm run lint:check`, `npm run smoke:check`, `npm run build`
+- `npm run deploy:check` from the repository root (audit, lint, smoke, build)
+- Built CSS output inspected directly: confirmed `.pui-card{...}` present in
+  the shipped bundle (it was absent before this fix, along with every other
+  class the new screens depended on).
+- Live computed-style check in the browser (both local dev and production
+  after deploy): created a detached `.pui-card` element and read
+  `getComputedStyle` — confirmed real background/border/radius are applied,
+  not browser defaults. Same check for `.pui-badge` (`inline-flex`, real
+  padding — this is what fixes the "PDFEXCELCSV" run-together text) and for
+  `<strong>` inside `.pui-table` (`display: block` — this is what fixes the
+  "BANGUNBangsamoro..." run-together text).
+- Console error check on the login page, local and production: none.
+
+### Deployment
+
+- No backend change in this fix; Apps Script remains at `@224`.
+- Vercel: `deploy:check` passed, deployed from repository root to the
+  `stb-pmes` project, confirmed `READY`.
+- `https://stb-pmes.vercel.app` confirmed serving the fix: live computed-style
+  check passed, no console errors.
+
+### What This Does Not Fix
+
+This corrects the CSS delivery mechanism and layout only. It does not
+constitute functional verification. In particular, `office-personnel`'s 400
+for central admins is fixed at the navigation-visibility layer, not tested
+end-to-end as a genuine office admin — that still requires a real office-admin
+account signing in. The pending-verification list from the two prior entries
+(real personnel/office-admin/central-admin sign-in, data reconciliation,
+performance measurement against a full office dataset) is unchanged by this fix.

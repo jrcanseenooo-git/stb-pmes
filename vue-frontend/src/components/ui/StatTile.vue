@@ -1,14 +1,14 @@
 <template>
-  <div class="card px-4 py-3">
-    <div class="flex items-center justify-between gap-3">
-      <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">{{ label }}</span>
-      <span v-if="hint" class="text-[10px] font-bold text-slate-400">{{ hint }}</span>
+  <div class="pui-stat">
+    <div class="pui-stat-top">
+      <span class="pui-stat-label">{{ label }}</span>
+      <span v-if="hint" class="pui-stat-hint">{{ hint }}</span>
     </div>
-    <div class="mt-1.5 flex items-baseline gap-1.5">
-      <strong :class="['text-2xl font-extrabold leading-none', toneClass]">{{ displayValue }}</strong>
-      <span v-if="total !== null" class="text-xs font-bold text-slate-400">/ {{ total }}</span>
+    <div class="pui-stat-value-row">
+      <strong :class="['pui-stat-value', toneClass]">{{ displayValue }}</strong>
+      <span v-if="total !== null" class="pui-stat-total">/ {{ total }}</span>
     </div>
-    <p v-if="caption" class="mt-1 text-[11px] text-slate-500 leading-snug">{{ caption }}</p>
+    <p v-if="caption" class="pui-stat-caption">{{ caption }}</p>
   </div>
 </template>
 
@@ -26,12 +26,12 @@ const props = defineProps({
 })
 
 const TONES = {
-  default: 'text-slate-900',
-  good: 'text-emerald-700',
-  warn: 'text-amber-600',
-  bad: 'text-red-700'
+  default: '',
+  good: 'pui-stat-value-good',
+  warn: 'pui-stat-value-warn',
+  bad: 'pui-stat-value-bad'
 }
 
 const displayValue = computed(() => (props.loading ? '—' : props.value))
-const toneClass = computed(() => (props.loading ? 'text-slate-300' : TONES[props.tone] || TONES.default))
+const toneClass = computed(() => (props.loading ? 'pui-stat-value-loading' : TONES[props.tone] || ''))
 </script>

@@ -1,5 +1,5 @@
 <template>
-  <div class="pmes-page p-4 grid gap-4 content-start">
+  <div class="pui-page">
     <PageHeader
       kicker="Assessment"
       title="Assessment Status"
@@ -8,7 +8,7 @@
       <template #actions>
         <button
           v-if="unreadCount"
-          class="btn-secondary"
+          class="pui-btn"
           type="button"
           :disabled="marking"
           @click="markAll"
@@ -30,26 +30,26 @@
       refreshable
       @refresh="load"
     >
-      <ul class="divide-y divide-slate-100">
+      <ul style="list-style:none; margin:0; padding:0;">
         <li
           v-for="item in visible"
           :key="item.id"
-          :class="['px-4 py-3.5 flex gap-3', !item.read && 'bg-blue-50/40']"
+          :style="{ padding: '14px 16px', display: 'flex', gap: '10px', borderBottom: '1px solid #eef2f7', background: item.read ? 'transparent' : 'rgba(239,246,255,.5)' }"
         >
           <span
-            :class="['mt-1.5 w-2 h-2 rounded-full shrink-0', item.read ? 'bg-slate-300' : 'bg-blue-600']"
+            :style="{ marginTop: '5px', width: '8px', height: '8px', borderRadius: '999px', flexShrink: 0, background: item.read ? '#cbd5e1' : '#1d4ed8' }"
             :aria-label="item.read ? 'Read' : 'Unread'"
           ></span>
-          <div class="min-w-0 flex-1">
-            <p class="text-sm text-slate-800 leading-snug">
+          <div style="min-width:0; flex:1;">
+            <p style="margin:0; font-size:13px; color:#334155; line-height:1.5;">
               <b>{{ typeLabel(item.type) }}:</b> {{ item.message }}
             </p>
-            <p class="mt-1 text-[11px] text-slate-400">{{ formatDateTime(item.createdAt) }}</p>
+            <p style="margin:4px 0 0; font-size:11px; color:#94a3b8;">{{ formatDateTime(item.createdAt) }}</p>
           </div>
           <button
             v-if="!item.read"
             type="button"
-            class="text-[11px] font-extrabold text-blue-700 hover:underline shrink-0 self-start mt-0.5"
+            style="font-size:11px; font-weight:800; color:#1d4ed8; background:none; border:0; cursor:pointer; flex-shrink:0; align-self:flex-start; margin-top:2px;"
             @click="markOne(item)"
           >
             Mark read

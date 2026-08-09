@@ -1,20 +1,20 @@
 <template>
-  <div class="pmes-page p-4 grid gap-4 content-start">
+  <div class="pui-page">
     <PageHeader
       kicker="Assessment"
       title="My Results"
       subtitle="Your own consolidated assessment results. Individual rater identities and individual rater scores are not shown."
     />
 
-    <div v-if="loading" class="card"><SkeletonRows :rows="4" aria-label="Loading your results" /></div>
+    <div v-if="loading" class="pui-card"><SkeletonRows :rows="4" aria-label="Loading your results" /></div>
 
-    <div v-else-if="error" class="card border-red-100 bg-red-50 px-4 py-3" role="alert">
-      <p class="text-sm font-bold text-red-800">Your results could not be loaded</p>
-      <p class="mt-0.5 text-xs text-red-700">{{ error }}</p>
-      <button class="btn-secondary mt-3 !py-1.5" type="button" @click="load">Try again</button>
+    <div v-else-if="error" class="pui-card pui-alert pui-alert-error" style="padding:16px;" role="alert">
+      <p class="pui-alert-title">Your results could not be loaded</p>
+      <p>{{ error }}</p>
+      <button class="pui-btn pui-btn-sm" style="margin-top:10px;" type="button" @click="load">Try again</button>
     </div>
 
-    <div v-else-if="!items.length" class="card">
+    <div v-else-if="!items.length" class="pui-card">
       <EmptyState
         title="No results available yet"
         description="Your results appear here once all assigned raters have submitted their ratings for an assessment period and the result has been finalized."
@@ -24,53 +24,51 @@
     <template v-else>
       <!-- Period selector doubles as the assessment history. Selecting an
            earlier period shows that period's consolidated result. -->
-      <div v-if="items.length > 1" class="card p-2 flex gap-1.5 overflow-x-auto" role="tablist" aria-label="Assessment period">
+      <div v-if="items.length > 1" class="pui-card" style="padding:8px; display:flex; gap:6px; overflow-x:auto;" role="tablist" aria-label="Assessment period">
         <button
           v-for="item in items"
           :key="item.id"
           type="button"
           role="tab"
           :aria-selected="selectedId === item.id"
-          :class="[
-            'px-3.5 py-2 rounded-xl text-xs font-extrabold whitespace-nowrap transition-colors',
-            selectedId === item.id ? 'bg-blue-700 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-          ]"
+          :class="['pui-tab', selectedId === item.id && 'pui-tab-active']"
+          style="padding:8px 14px;"
           @click="selectedId = item.id"
         >
           {{ item.periodLabel }}
         </button>
       </div>
 
-      <section v-if="selected" class="card p-5 grid gap-5">
-        <div class="flex items-start justify-between gap-4 flex-wrap">
+      <section v-if="selected" class="pui-card" style="padding:20px; display:grid; gap:18px;">
+        <div class="pui-row-between" style="flex-wrap:wrap;">
           <div>
-            <p class="text-[11px] font-extrabold uppercase tracking-wider text-blue-700">{{ selected.periodLabel }}</p>
-            <h2 class="mt-1 text-sm font-extrabold text-slate-900">Overall Assessment Result</h2>
+            <p class="pui-header-kicker">{{ selected.periodLabel }}</p>
+            <h2 class="pui-card-title" style="margin-top:2px;">Overall Assessment Result</h2>
           </div>
           <StatusPill :status="selected.status" />
         </div>
 
-        <div class="flex items-end gap-4 flex-wrap">
+        <div style="display:flex; align-items:flex-end; gap:16px; flex-wrap:wrap;">
           <div>
-            <p class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Overall Score</p>
-            <strong class="text-4xl font-extrabold text-slate-900 leading-none">
+            <p style="font-size:10px; font-weight:800; text-transform:uppercase; color:#94a3b8; margin:0;">Overall Score</p>
+            <strong style="font-size:36px; font-weight:800; color:#0f172a; line-height:1;">
               {{ formatScore(selected.overallScore) }}
             </strong>
           </div>
-          <p v-if="selected.descriptor" class="text-sm font-bold text-slate-600 pb-1">{{ selected.descriptor }}</p>
+          <p v-if="selected.descriptor" style="font-size:14px; font-weight:700; color:#475569; margin:0 0 4px;">{{ selected.descriptor }}</p>
         </div>
 
-        <div v-if="!selected.raterProgress.allComplete" class="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3">
-          <p class="text-xs font-bold text-amber-800">This result is not yet final</p>
-          <p class="mt-0.5 text-xs text-amber-700 leading-relaxed">
+        <div v-if="!selected.raterProgress.allComplete" class="pui-alert pui-alert-warn">
+          <p class="pui-alert-title" style="color:#92400e;">This result is not yet final</p>
+          <p>
             {{ selected.raterProgress.completed }} of {{ selected.raterProgress.total }} assigned raters have submitted.
             The consolidated score is computed once all ratings are in.
           </p>
         </div>
 
         <div>
-          <h3 class="text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-3">Domain Scores</h3>
-          <div class="grid gap-3 grid-cols-1 sm:grid-cols-3">
+          <h3 style="font-size:11px; font-weight:800; text-transform:uppercase; color:#64748b; margin:0 0 10px;">Domain Scores</h3>
+          <div class="pui-grid pui-grid-3">
             <StatTile
               v-for="domain in domainScores"
               :key="domain.label"
@@ -81,7 +79,7 @@
           </div>
         </div>
 
-        <p v-if="selected.hasDeduction" class="text-xs text-slate-500 leading-relaxed border-t border-slate-100 pt-4">
+        <p v-if="selected.hasDeduction" style="font-size:12px; color:#64748b; line-height:1.5; border-top:1px solid #eef2f7; padding-top:14px; margin:0;">
           A deduction has been applied to this result under the approved assessment protocol.
           Contact your office administrator if you need an explanation of the adjustment.
         </p>

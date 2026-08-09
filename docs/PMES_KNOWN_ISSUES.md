@@ -166,3 +166,40 @@ Three of the five criticals (E-01, D-01, D-04) concern data that already exists 
   onto the shared component set.
 - **No automated test coverage for the new routes.** All verification to date is
   lint, build, smoke check, and Apps Script syntax parse.
+
+## H. Critical CSS regression — found and fixed 2026-08-09
+
+- **Every screen from the portal/office/cluster/report slices rendered
+  unstyled in production.** `assets/main.css` (Tailwind + `.card`/`.btn-*`/
+  `.badge-status`/`.data-table`/`.form-*`) has never been imported by
+  `main.js` since the initial commit — a deliberate prior choice to avoid
+  Tailwind's Preflight altering existing hand-styled STB screens. Every
+  component and view built in this session assumed that stylesheet was live.
+  It was not. Visible as: cards rendering as bare text with no borders,
+  badges/pills losing their padding and running together
+  ("PDFEXCELCSV"), and block-level labels collapsing onto one line
+  ("BANGUNBangsamoro Umpungan sa Nutrisyon"). Severity: Critical (every new
+  module was effectively unusable). **Fixed**: added
+  `vue-frontend/src/assets/ui-kit.css`, a hand-written, additive stylesheet
+  scoped to `pui-`-prefixed classes, imported globally; converted all 9 shared
+  components and 12 views to it. `assets/main.css` remains unimported —
+  the original decision stands, zero risk to existing STB screens.
+- **Central/STB admins saw "Office Dashboard" and "Personnel Validation" in
+  the sidebar and hit a guaranteed 400.** `canManageOfficePersonnel` includes
+  central-only permissions, but the backend (`OfficePersonnelService.withOffice_`)
+  correctly rejects a central admin's own `officeId=STB`, and no office
+  selector was ever offered. Severity: Medium (broken navigation entry, not a
+  security issue — the backend rejection was correct). **Fixed**: narrowed nav
+  visibility for these two links to `isOfficeAdminScope` only.
+
+### Open — carried forward
+
+- Direct URL navigation to `/office-personnel` or `/office-dashboard` by a
+  central admin still hits the same 400 (now unreachable via nav, but not
+  blocked at the route-guard level). Low priority: the backend fails safely
+  with a clear message, not a security gap.
+- No screen behind login has been visually verified by a real signed-in
+  session of any scope. Verification for this fix was: computed-style checks
+  in the browser (confirming the CSS rules genuinely apply) and the built CSS
+  bundle contents — not a rendered screenshot of an authenticated page, since
+  authenticating as a user was not performed.

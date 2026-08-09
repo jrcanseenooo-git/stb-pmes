@@ -1,5 +1,5 @@
 <template>
-  <div class="pmes-page p-4 grid gap-4 content-start">
+  <div class="pui-page">
     <!--
       Read-only personal information for participating-office personnel.
       Deliberately excluded per the cluster specification: the Account Settings
@@ -12,36 +12,40 @@
       subtitle="Your assessment record for this office. These details are maintained by your office administrator."
     />
 
-    <section class="card p-5">
-      <div class="flex items-center gap-4">
-        <div class="w-14 h-14 rounded-2xl bg-blue-700 text-white grid place-items-center text-lg font-extrabold shrink-0">
+    <section class="pui-card" style="padding:20px;">
+      <div style="display:flex; align-items:center; gap:14px;">
+        <div style="width:52px; height:52px; border-radius:14px; background:#0b3b75; color:#fff; display:grid; place-items:center; font-size:17px; font-weight:800; flex-shrink:0;">
           {{ authStore.initials || 'U' }}
         </div>
-        <div class="min-w-0">
-          <h2 class="text-lg font-extrabold text-slate-900 truncate">{{ authStore.fullName || '—' }}</h2>
-          <p class="text-xs text-slate-500 mt-0.5 truncate">{{ authStore.position }}</p>
+        <div style="min-width:0;">
+          <h2 style="margin:0; font-size:17px; font-weight:800; color:#0f172a;">{{ authStore.fullName || '—' }}</h2>
+          <p style="margin:2px 0 0; font-size:12px; color:#64748b;">{{ authStore.position }}</p>
         </div>
-        <div class="ml-auto shrink-0">
+        <div style="margin-left:auto; flex-shrink:0;">
           <StatusPill :status="authStore.isActive ? 'ACTIVE' : 'INACTIVE'" />
         </div>
       </div>
     </section>
 
-    <section class="card overflow-hidden">
-      <div class="card-header !px-4 !py-3">
-        <h2 class="card-title">Assessment Record</h2>
+    <section class="pui-card" style="overflow:hidden;">
+      <div class="pui-card-header">
+        <h2 class="pui-card-title">Assessment Record</h2>
       </div>
-      <dl class="divide-y divide-slate-100">
-        <div v-for="field in fields" :key="field.label" class="px-4 py-3 grid grid-cols-1 sm:grid-cols-3 gap-1 sm:gap-4">
-          <dt class="text-xs font-extrabold text-slate-500">{{ field.label }}</dt>
-          <dd class="sm:col-span-2 text-sm text-slate-800 break-words">{{ field.value || '—' }}</dd>
+      <dl style="margin:0; padding:0;">
+        <div
+          v-for="field in fields"
+          :key="field.label"
+          style="padding:11px 16px; border-top:1px solid #eef2f7; display:grid; grid-template-columns:1fr 2fr; gap:6px 16px;"
+        >
+          <dt style="font-size:11.5px; font-weight:800; color:#64748b; margin:0;">{{ field.label }}</dt>
+          <dd style="font-size:13px; color:#334155; margin:0; word-break:break-word;">{{ field.value || '—' }}</dd>
         </div>
       </dl>
     </section>
 
-    <section class="card p-4 bg-slate-50">
-      <p class="text-xs text-slate-600 leading-relaxed">
-        <b class="text-slate-800">Need a correction?</b>
+    <section class="pui-alert pui-alert-info">
+      <p style="line-height:1.55; margin:0;">
+        <b style="color:#1e3a8a;">Need a correction?</b>
         Personnel details, organizational assignment and supervisor information are validated by your
         office administrator. Contact them to request a change — these fields cannot be edited here.
       </p>

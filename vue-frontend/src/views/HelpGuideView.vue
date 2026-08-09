@@ -1,90 +1,87 @@
 <template>
-  <div class="pmes-page p-4 grid gap-4 content-start">
+  <div class="pui-page">
     <PageHeader
       kicker="Help"
       title="Rating Guide"
       subtitle="How to complete an assessment, what each rater relationship means, and how the rating scale is applied."
     >
       <template #actions>
-        <RouterLink to="/library" class="btn-secondary">Assessment Library</RouterLink>
+        <RouterLink to="/library" class="pui-btn">Assessment Library</RouterLink>
       </template>
     </PageHeader>
 
-    <section class="card p-5">
-      <h2 class="text-sm font-extrabold text-slate-900">Completing an assessment</h2>
-      <ol class="mt-3 grid gap-3">
-        <li v-for="(step, index) in STEPS" :key="step.title" class="flex gap-3">
-          <span class="w-6 h-6 rounded-full bg-blue-700 text-white grid place-items-center text-xs font-extrabold shrink-0">
+    <section class="pui-card" style="padding:20px;">
+      <h2 class="pui-card-title">Completing an assessment</h2>
+      <ol style="margin:14px 0 0; padding:0; list-style:none; display:grid; gap:12px;">
+        <li v-for="(step, index) in STEPS" :key="step.title" style="display:flex; gap:12px;">
+          <span style="width:24px; height:24px; border-radius:999px; background:#0b3b75; color:#fff; display:grid; place-items:center; font-size:11px; font-weight:800; flex-shrink:0;">
             {{ index + 1 }}
           </span>
-          <div class="min-w-0">
-            <p class="text-sm font-bold text-slate-900">{{ step.title }}</p>
-            <p class="mt-0.5 text-xs text-slate-600 leading-relaxed">{{ step.detail }}</p>
+          <div style="min-width:0;">
+            <p style="margin:0; font-size:13.5px; font-weight:700; color:#0f172a;">{{ step.title }}</p>
+            <p style="margin:3px 0 0; font-size:12px; color:#64748b; line-height:1.5;">{{ step.detail }}</p>
           </div>
         </li>
       </ol>
     </section>
 
-    <section class="card overflow-hidden">
-      <div class="card-header !px-4 !py-3">
-        <h2 class="card-title">Rating Scale</h2>
-        <span v-if="scaleSource" class="text-[11px] font-bold text-slate-400">{{ scaleSource }}</span>
+    <section class="pui-card" style="overflow:hidden;">
+      <div class="pui-card-header">
+        <h2 class="pui-card-title">Rating Scale</h2>
+        <span v-if="scaleSource" style="font-size:11px; font-weight:700; color:#94a3b8;">{{ scaleSource }}</span>
       </div>
-      <div class="overflow-x-auto">
-        <table class="data-table">
+      <div class="pui-table-wrap">
+        <table class="pui-table">
           <thead>
             <tr>
-              <th scope="col" class="w-20">Rating</th>
+              <th scope="col" style="width:80px;">Rating</th>
               <th scope="col">Descriptor</th>
               <th scope="col">What it means</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="level in SCALE" :key="level.value">
-              <td><strong class="text-sm text-slate-900">{{ level.value }}</strong></td>
-              <td class="font-bold text-slate-800">{{ level.descriptor }}</td>
-              <td class="text-slate-600">{{ level.meaning }}</td>
+              <td><strong>{{ level.value }}</strong></td>
+              <td style="font-weight:700; color:#334155;">{{ level.descriptor }}</td>
+              <td>{{ level.meaning }}</td>
             </tr>
           </tbody>
         </table>
       </div>
-      <p class="px-4 py-3 text-xs text-slate-500 border-t border-slate-100 leading-relaxed">
+      <p style="padding:12px 16px; font-size:12px; color:#64748b; border-top:1px solid #eef2f7; line-height:1.5; margin:0;">
         Ratings accept one decimal place. Any value outside 1 to 5 is rejected by the form.
       </p>
     </section>
 
-    <section class="card overflow-hidden">
-      <div class="card-header !px-4 !py-3">
-        <h2 class="card-title">Rater Relationships</h2>
+    <section class="pui-card" style="overflow:hidden;">
+      <div class="pui-card-header">
+        <h2 class="pui-card-title">Rater Relationships</h2>
       </div>
-      <dl class="divide-y divide-slate-100">
-        <div v-for="type in RATER_TYPES" :key="type.label" class="px-4 py-3">
-          <dt class="text-sm font-bold text-slate-900">{{ type.label }}</dt>
-          <dd class="mt-0.5 text-xs text-slate-600 leading-relaxed">{{ type.detail }}</dd>
+      <dl style="margin:0;">
+        <div v-for="type in RATER_TYPES" :key="type.label" style="padding:12px 16px; border-top:1px solid #eef2f7;">
+          <dt style="font-size:13px; font-weight:700; color:#0f172a; margin:0;">{{ type.label }}</dt>
+          <dd style="margin:3px 0 0; font-size:12px; color:#64748b; line-height:1.5;">{{ type.detail }}</dd>
         </div>
       </dl>
     </section>
 
-    <section class="card overflow-hidden">
-      <div class="card-header !px-4 !py-3">
-        <h2 class="card-title">Common Questions</h2>
+    <section class="pui-card" style="overflow:hidden;">
+      <div class="pui-card-header">
+        <h2 class="pui-card-title">Common Questions</h2>
       </div>
-      <div class="divide-y divide-slate-100">
-        <details v-for="faq in FAQS" :key="faq.question" class="group">
-          <summary class="px-4 py-3 cursor-pointer text-sm font-bold text-slate-900 hover:bg-slate-50 list-none flex items-center justify-between gap-3">
+      <div>
+        <details v-for="faq in FAQS" :key="faq.question" style="border-top:1px solid #eef2f7;">
+          <summary style="padding:12px 16px; cursor:pointer; font-size:13px; font-weight:700; color:#0f172a; list-style:none; display:flex; align-items:center; justify-content:space-between; gap:12px;">
             {{ faq.question }}
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="shrink-0 transition-transform group-open:rotate-180" aria-hidden="true">
-              <path d="M3 5l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
           </summary>
-          <p class="px-4 pb-3.5 text-xs text-slate-600 leading-relaxed">{{ faq.answer }}</p>
+          <p style="padding:0 16px 14px; font-size:12px; color:#64748b; line-height:1.5; margin:0;">{{ faq.answer }}</p>
         </details>
       </div>
     </section>
 
-    <section class="card p-4 bg-slate-50">
-      <p class="text-xs text-slate-600 leading-relaxed">
-        <b class="text-slate-800">Still need help?</b>
+    <section class="pui-card" style="padding:16px; background:#f8fafc;">
+      <p style="font-size:12px; color:#475569; line-height:1.55; margin:0;">
+        <b style="color:#334155;">Still need help?</b>
         Contact your office administrator for questions about your assignments, your personnel
         details, or the assessment period. They can also request a rating task be reopened if a
         correction is needed after submission.

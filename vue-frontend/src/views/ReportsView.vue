@@ -1,12 +1,12 @@
 <template>
-  <div class="pmes-page p-4 grid gap-4 content-start">
+  <div class="pui-page">
     <PageHeader
       kicker="Reporting"
       title="Report Center"
       :subtitle="`Generate and export official reports for ${portalSubtitle}.`"
     >
       <template #actions>
-        <button v-if="selectedType" class="btn-secondary" type="button" @click="clearSelection">
+        <button v-if="selectedType" class="pui-btn" type="button" @click="clearSelection">
           Back to catalog
         </button>
       </template>
@@ -14,23 +14,24 @@
 
     <!-- CATALOG -->
     <template v-if="!selectedType">
-      <section v-for="group in catalog" :key="group.category" class="grid gap-3">
-        <div class="px-1">
-          <h2 class="text-sm font-extrabold text-slate-900">{{ group.category }}</h2>
-          <p class="text-xs text-slate-500 mt-0.5">{{ group.blurb }}</p>
+      <section v-for="group in catalog" :key="group.category" style="display:grid; gap:12px;">
+        <div style="padding:0 2px;">
+          <h2 style="margin:0; font-size:14px; font-weight:800; color:#0f172a;">{{ group.category }}</h2>
+          <p style="margin:3px 0 0; font-size:12px; color:#64748b;">{{ group.blurb }}</p>
         </div>
-        <div class="grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+        <div class="pui-grid" style="grid-template-columns:repeat(auto-fill, minmax(260px, 1fr));">
           <button
             v-for="report in group.reports"
             :key="report.value"
             type="button"
-            class="card p-4 text-left hover:border-blue-300 hover:shadow-md transition-all focus:outline-none focus:ring-4 focus:ring-blue-100"
+            class="pui-card"
+            style="padding:16px; text-align:left; cursor:pointer; transition:box-shadow .12s, border-color .12s;"
             @click="selectReport(report.value)"
           >
-            <h3 class="text-sm font-extrabold text-slate-900 leading-snug">{{ report.label }}</h3>
-            <p class="mt-1.5 text-xs text-slate-600 leading-relaxed">{{ report.description }}</p>
-            <div class="mt-3 flex flex-wrap gap-1.5">
-              <span v-for="format in formatsFor(report.value)" :key="format" class="badge-status bg-slate-100 text-slate-600">
+            <h3 style="margin:0; font-size:13.5px; font-weight:800; color:#0f172a; line-height:1.4;">{{ report.label }}</h3>
+            <p style="margin:6px 0 0; font-size:12px; color:#475569; line-height:1.5;">{{ report.description }}</p>
+            <div style="margin-top:12px; display:flex; flex-wrap:wrap; gap:6px;">
+              <span v-for="format in formatsFor(report.value)" :key="format" class="pui-badge">
                 {{ format.toUpperCase() }}
               </span>
             </div>
@@ -38,7 +39,7 @@
         </div>
       </section>
 
-      <div v-if="!reportTypes.length" class="card">
+      <div v-if="!reportTypes.length" class="pui-card">
         <EmptyState
           title="No reports available for your access level"
           description="Report availability follows your role and office. Contact a central administrator if you expect to see reports here."
@@ -48,51 +49,47 @@
 
     <!-- RUN PANEL -->
     <template v-else>
-      <div class="grid gap-4 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)] items-start">
-        <section class="card overflow-hidden">
-          <div class="card-header !px-4 !py-3">
-            <h2 class="card-title">{{ selectedMeta.label }}</h2>
+      <div class="pui-run-grid">
+        <section class="pui-card" style="overflow:hidden;">
+          <div class="pui-card-header">
+            <h2 class="pui-card-title">{{ selectedMeta.label }}</h2>
           </div>
-          <div class="p-4 grid gap-3.5">
-            <p class="text-xs text-slate-600 leading-relaxed">{{ selectedMeta.description }}</p>
+          <div style="padding:16px; display:grid; gap:14px;">
+            <p style="font-size:12px; color:#475569; line-height:1.5; margin:0;">{{ selectedMeta.description }}</p>
 
-            <div v-if="!isUndersecretaryReport" class="grid gap-1">
-              <label class="form-label" for="report-division">Division</label>
-              <select id="report-division" v-model="form.divisionId" class="form-select">
+            <div v-if="!isUndersecretaryReport">
+              <label class="pui-label" for="report-division">Division</label>
+              <select id="report-division" v-model="form.divisionId" class="pui-select">
                 <option v-if="canSelectAllDivisions" value="">All Divisions</option>
                 <option v-for="d in divisions" :key="d.id" :value="d.id">{{ d.name }}</option>
               </select>
             </div>
 
-            <div class="grid grid-cols-2 gap-3">
-              <div class="grid gap-1">
-                <label class="form-label" for="report-semester">Semester</label>
-                <select id="report-semester" v-model="form.semester" class="form-select">
+            <div class="pui-grid pui-grid-2">
+              <div>
+                <label class="pui-label" for="report-semester">Semester</label>
+                <select id="report-semester" v-model="form.semester" class="pui-select">
                   <option value="1">Semester 1</option>
                   <option value="2">Semester 2</option>
                 </select>
               </div>
-              <div class="grid gap-1">
-                <label class="form-label" for="report-year">Year</label>
-                <input id="report-year" v-model.number="form.year" type="number" class="form-input" />
+              <div>
+                <label class="pui-label" for="report-year">Year</label>
+                <input id="report-year" v-model.number="form.year" type="number" class="pui-input" />
               </div>
             </div>
 
-            <div class="grid gap-1">
-              <span class="form-label">Format</span>
-              <div class="flex gap-2" role="radiogroup" aria-label="Export format">
+            <div>
+              <span class="pui-label">Format</span>
+              <div style="display:flex; gap:8px;" role="radiogroup" aria-label="Export format">
                 <button
                   v-for="f in availableFormats"
                   :key="f.value"
                   type="button"
                   role="radio"
                   :aria-checked="form.format === f.value"
-                  :class="[
-                    'flex-1 rounded-xl border px-3 py-2 text-xs font-extrabold transition-colors',
-                    form.format === f.value
-                      ? 'border-blue-700 bg-blue-50 text-blue-700'
-                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                  ]"
+                  :class="['pui-tab', form.format === f.value && 'pui-tab-active']"
+                  :style="{ flex: 1, textAlign: 'center', border: '1px solid ' + (form.format === f.value ? '#1d4ed8' : '#e2e8f0'), padding: '8px' }"
                   @click="form.format = f.value"
                 >
                   {{ f.label }}
@@ -100,72 +97,72 @@
               </div>
             </div>
 
-            <button class="btn-primary w-full" type="button" :disabled="previewing" @click="loadPreview">
+            <button class="pui-btn pui-btn-primary pui-btn-block" type="button" :disabled="previewing" @click="loadPreview">
               {{ previewing ? 'Loading preview...' : 'Preview' }}
             </button>
-            <button class="btn-secondary w-full" type="button" :disabled="generating || !preview" @click="generate">
+            <button class="pui-btn pui-btn-block" type="button" :disabled="generating || !preview" @click="generate">
               {{ generating ? 'Exporting...' : 'Export Report' }}
             </button>
-            <p v-if="!preview && !previewing" class="text-[11px] text-slate-500 leading-relaxed">
+            <p v-if="!preview && !previewing" style="font-size:11px; color:#64748b; line-height:1.5; margin:0;">
               Preview first so you can confirm the report covers the records you expect before exporting.
             </p>
           </div>
         </section>
 
-        <div class="grid gap-4">
+        <div style="display:grid; gap:16px;">
           <!-- Analytics preview -->
-          <section v-if="preview" class="card overflow-hidden">
-            <div class="card-header !px-4 !py-3 flex-wrap gap-2">
-              <div class="min-w-0">
-                <p class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+          <section v-if="preview" class="pui-card" style="overflow:hidden;">
+            <div class="pui-card-header">
+              <div>
+                <p style="font-size:10px; font-weight:800; text-transform:uppercase; color:#64748b; margin:0;">
                   {{ preview.scopeLabel }} · S{{ preview.semester }} {{ preview.year }}
                 </p>
-                <h2 class="card-title mt-0.5">Report Preview</h2>
+                <h2 class="pui-card-title" style="margin-top:3px;">Report Preview</h2>
               </div>
-              <span class="text-[11px] text-slate-500">Generated {{ fmtDateTime(preview.generatedAt) }}</span>
+              <span style="font-size:11px; color:#64748b;">Generated {{ fmtDateTime(preview.generatedAt) }}</span>
             </div>
 
-            <div class="grid gap-3 grid-cols-2 lg:grid-cols-4 p-4 bg-slate-50 border-b border-slate-100">
+            <div class="pui-grid pui-grid-4" style="padding:16px; background:#f8fafc; border-bottom:1px solid #eef2f7;">
               <StatTile label="Personnel Covered" :value="preview.kpis.personnel" />
               <StatTile label="Assessment Records" :value="preview.kpis.records" />
               <StatTile label="Scored" :value="preview.kpis.scoredPercent" />
               <StatTile label="Overall Average" :value="fmtScore(preview.kpis.overallAverage)" />
             </div>
 
-            <div class="grid gap-4 p-4 lg:grid-cols-2">
-              <div class="rounded-2xl border border-slate-200 p-4">
-                <h3 class="text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-3">Interpretation Distribution</h3>
-                <div class="h-64"><Bar :data="interpretationChartData" :options="barOptions" /></div>
+            <div class="pui-grid pui-grid-2" style="padding:16px;">
+              <div style="border:1px solid #e2e8f0; border-radius:12px; padding:16px;">
+                <h3 style="font-size:11px; font-weight:800; text-transform:uppercase; color:#64748b; margin:0 0 12px;">Interpretation Distribution</h3>
+                <div style="height:250px;"><Bar :data="interpretationChartData" :options="barOptions" /></div>
               </div>
-              <div class="rounded-2xl border border-slate-200 p-4">
-                <h3 class="text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-3">Domain Average Scores</h3>
-                <div class="h-40"><Doughnut :data="domainChartData" :options="doughnutOptions" /></div>
-                <ul class="mt-3 grid gap-1.5">
+              <div style="border:1px solid #e2e8f0; border-radius:12px; padding:16px;">
+                <h3 style="font-size:11px; font-weight:800; text-transform:uppercase; color:#64748b; margin:0 0 12px;">Domain Average Scores</h3>
+                <div style="height:160px;"><Doughnut :data="domainChartData" :options="doughnutOptions" /></div>
+                <ul style="margin:12px 0 0; padding:0; list-style:none; display:grid; gap:6px;">
                   <li
                     v-for="(domain, index) in preview.domainAverages"
                     :key="domain.label"
-                    class="flex items-center gap-2 text-xs"
+                    style="display:flex; align-items:center; gap:8px; font-size:12px;"
                   >
-                    <i class="w-2.5 h-2.5 rounded-sm shrink-0" :style="{ backgroundColor: domainColors[index % domainColors.length] }"></i>
-                    <span class="text-slate-600 truncate">{{ domain.label }}</span>
-                    <strong class="ml-auto text-slate-900">{{ fmtScore(domain.average) }}</strong>
+                    <i :style="{ width: '10px', height: '10px', borderRadius: '3px', flexShrink: 0, background: domainColors[index % domainColors.length] }"></i>
+                    <span style="color:#475569; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ domain.label }}</span>
+                    <strong style="margin-left:auto; color:#0f172a;">{{ fmtScore(domain.average) }}</strong>
                   </li>
                 </ul>
               </div>
             </div>
 
-            <div v-if="preview.officeSummaries?.length" class="p-4 pt-0">
-              <h3 class="text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-3">Office / Program Summary</h3>
-              <ul class="grid gap-3">
+            <div v-if="preview.officeSummaries?.length" style="padding:0 16px 16px;">
+              <h3 style="font-size:11px; font-weight:800; text-transform:uppercase; color:#64748b; margin:0 0 12px;">Office / Program Summary</h3>
+              <ul style="margin:0; padding:0; list-style:none; display:grid; gap:12px;">
                 <li v-for="office in preview.officeSummaries" :key="office.office">
-                  <div class="flex items-baseline justify-between gap-3 mb-1.5">
-                    <div class="min-w-0">
-                      <strong class="text-xs text-slate-900">{{ office.office }}</strong>
-                      <span class="block text-[11px] text-slate-500">
+                  <div class="pui-row-between" style="margin-bottom:6px;">
+                    <div style="min-width:0;">
+                      <strong style="font-size:12px; color:#0f172a;">{{ office.office }}</strong>
+                      <span style="display:block; font-size:11px; color:#64748b;">
                         {{ office.scored }}/{{ office.records }} scored · {{ office.pendingAssignments }} pending ratings
                       </span>
                     </div>
-                    <strong class="text-sm text-slate-900 shrink-0">{{ fmtScore(office.overallAverage) }}</strong>
+                    <strong style="font-size:14px; color:#0f172a; flex-shrink:0;">{{ fmtScore(office.overallAverage) }}</strong>
                   </div>
                   <ProgressBar :value="Number(office.overallAverage || 0)" :total="4" :show-value="false" />
                 </li>
@@ -181,14 +178,14 @@
             empty-title="No reports generated yet"
             empty-description="Generated reports are listed here with a download link."
           >
-            <ul class="divide-y divide-slate-100">
-              <li v-for="r in recentReports" :key="r.id" class="px-4 py-3 flex items-center gap-3">
-                <span class="badge-status bg-slate-100 text-slate-600 shrink-0">{{ r.format?.toUpperCase() }}</span>
-                <div class="min-w-0 flex-1">
-                  <p class="text-sm font-bold text-slate-900 truncate">{{ r.name }}</p>
-                  <p class="text-[11px] text-slate-500">{{ fmtDate(r.createdAt) }}</p>
+            <ul style="list-style:none; margin:0; padding:0;">
+              <li v-for="r in recentReports" :key="r.id" style="padding:12px 16px; border-top:1px solid #eef2f7; display:flex; align-items:center; gap:10px;">
+                <span class="pui-badge" style="flex-shrink:0;">{{ r.format?.toUpperCase() }}</span>
+                <div style="min-width:0; flex:1;">
+                  <p style="margin:0; font-size:13px; font-weight:700; color:#0f172a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ r.name }}</p>
+                  <p style="margin:2px 0 0; font-size:11px; color:#94a3b8;">{{ fmtDate(r.createdAt) }}</p>
                 </div>
-                <button class="btn-secondary !py-1 !px-2.5 !text-xs shrink-0" type="button" @click="downloadReport(r)">
+                <button class="pui-btn pui-btn-sm" style="flex-shrink:0;" type="button" @click="downloadReport(r)">
                   Download
                 </button>
               </li>
@@ -474,6 +471,20 @@ function downloadReport(r) {
 </script>
 
 <style scoped>
+/* Catalog cards are native <button> elements for keyboard/click affordance;
+   reset the button-specific defaults main.css would otherwise have handled. */
+.pui-card {
+  font: inherit;
+}
+button.pui-card:hover {
+  border-color: #93c5fd;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, .08);
+}
+button.pui-card:focus-visible {
+  outline: 3px solid rgba(29, 78, 216, .3);
+  outline-offset: 1px;
+}
+
 .toast {
   position: fixed;
   bottom: 24px;

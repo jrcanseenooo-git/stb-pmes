@@ -1,13 +1,13 @@
 <template>
-  <div class="pmes-page p-4 grid gap-4 content-start">
+  <div class="pui-page">
     <PageHeader
       kicker="Central Administration"
       title="Office Registry"
       subtitle="Provision, validate and activate evaluation-only spreadsheets for participating offices."
     >
       <template #actions>
-        <RouterLink v-if="canViewClusterMonitoring" to="/cluster-overview" class="btn-secondary">Cluster Overview</RouterLink>
-        <button v-if="canManageOfficeRegistry" class="btn-primary" type="button" @click="openProvisionModal">Add Office</button>
+        <RouterLink v-if="canViewClusterMonitoring" to="/cluster-overview" class="pui-btn">Cluster Overview</RouterLink>
+        <button v-if="canManageOfficeRegistry" class="pui-btn pui-btn-primary" type="button" @click="openProvisionModal">Add Office</button>
       </template>
     </PageHeader>
 
@@ -31,10 +31,10 @@
       @refresh="loadOffices"
     >
       <template v-if="canManageOfficeRegistry" #emptyAction>
-        <button class="btn-primary" type="button" @click="openProvisionModal">Add Office</button>
+        <button class="pui-btn pui-btn-primary" type="button" @click="openProvisionModal">Add Office</button>
       </template>
 
-      <table class="data-table">
+      <table class="pui-table">
         <thead>
           <tr>
             <th scope="col">Office</th>
@@ -42,32 +42,32 @@
             <th scope="col">Office Status</th>
             <th scope="col">Portal Status</th>
             <th scope="col">Last Validated</th>
-            <th scope="col" class="text-right">Actions</th>
+            <th scope="col" style="text-align:right;">Actions</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="office in filteredOffices" :key="office.officeId">
             <td>
-              <strong class="block text-[13px] text-slate-900">{{ office.officeCode }}</strong>
-              <span class="block text-slate-500 mt-0.5">{{ office.officeName }}</span>
+              <strong>{{ office.officeCode }}</strong>
+              <small>{{ office.officeName }}</small>
             </td>
-            <td class="whitespace-nowrap">{{ office.primaryAdminEmail || '—' }}</td>
+            <td style="white-space:nowrap;">{{ office.primaryAdminEmail || '—' }}</td>
             <td><StatusPill :status="office.officeStatus || 'DRAFT'" /></td>
             <td>
               <StatusPill :status="office.spreadsheetStatus || 'NOT_PROVISIONED'" />
               <!-- A registry row left mid-provisioning is recoverable, not broken.
                    Provisioning has timed out in production before, so the resume
                    path is stated rather than left for the operator to infer. -->
-              <small v-if="needsResume(office)" class="block text-amber-700 font-bold text-[10.5px] mt-1 leading-snug">
+              <small v-if="needsResume(office)" style="display:block; color:#b45309; font-weight:700; margin-top:3px;">
                 Setup incomplete — run Validate, then Activate.
               </small>
             </td>
-            <td class="whitespace-nowrap">{{ formatDate(office.lastValidatedAt) }}</td>
+            <td style="white-space:nowrap;">{{ formatDate(office.lastValidatedAt) }}</td>
             <td>
-              <div class="flex items-center justify-end gap-1.5">
+              <div style="display:flex; align-items:center; justify-content:flex-end; gap:6px; flex-wrap:wrap;">
                 <template v-if="canManageOfficeRegistry && !isStbOffice(office)">
                   <button
-                    class="btn-secondary !py-1 !px-2.5 !text-xs"
+                    class="pui-btn pui-btn-sm"
                     type="button"
                     :disabled="busyId === office.officeId"
                     title="Check the office spreadsheet against the required schema"
@@ -76,7 +76,7 @@
                     {{ busyId === office.officeId && busyAction === 'validate' ? 'Validating...' : 'Validate' }}
                   </button>
                   <button
-                    class="btn-secondary !py-1 !px-2.5 !text-xs"
+                    class="pui-btn pui-btn-sm"
                     type="button"
                     :disabled="busyId === office.officeId || !canActivate(office)"
                     :title="activateHint(office)"
@@ -85,7 +85,7 @@
                     {{ busyId === office.officeId && busyAction === 'activate' ? 'Activating...' : 'Activate' }}
                   </button>
                   <button
-                    class="btn-secondary !py-1 !px-2.5 !text-xs"
+                    class="pui-btn pui-btn-sm"
                     type="button"
                     :disabled="busyId === office.officeId"
                     title="Configure the divisions, sections and roles offered at registration"
@@ -94,8 +94,8 @@
                     Configure
                   </button>
                 </template>
-                <span v-else-if="canManageOfficeRegistry" class="text-[11px] font-bold text-slate-500">Central PMES</span>
-                <span v-else class="text-[11px] font-bold text-slate-500">Monitoring only</span>
+                <span v-else-if="canManageOfficeRegistry" style="font-size:11px; font-weight:700; color:#64748b;">Central PMES</span>
+                <span v-else style="font-size:11px; font-weight:700; color:#64748b;">Monitoring only</span>
               </div>
             </td>
           </tr>
@@ -111,74 +111,78 @@
       :busy="saving"
       @close="closeProvisionModal"
     >
-      <form id="provision-form" class="grid grid-cols-1 sm:grid-cols-2 gap-3" @submit.prevent="provisionOffice">
+      <form id="provision-form" class="pui-grid pui-grid-2" @submit.prevent="provisionOffice">
         <label>
-          <span class="form-label">Office Code</span>
-          <input v-model="form.officeCode" class="form-input" type="text" placeholder="EPAHP" required :disabled="saving" />
+          <span class="pui-label">Office Code</span>
+          <input v-model="form.officeCode" class="pui-input" type="text" placeholder="EPAHP" required :disabled="saving" />
         </label>
         <label>
-          <span class="form-label">Office Short Name</span>
-          <input v-model="form.officeShortName" class="form-input" type="text" placeholder="EPAHP" :disabled="saving" />
+          <span class="pui-label">Office Short Name</span>
+          <input v-model="form.officeShortName" class="pui-input" type="text" placeholder="EPAHP" :disabled="saving" />
         </label>
-        <label class="sm:col-span-2">
-          <span class="form-label">Office Name</span>
+        <label class="pui-span-2">
+          <span class="pui-label">Office Name</span>
           <input
             v-model="form.officeName"
-            class="form-input"
+            class="pui-input"
             type="text"
             placeholder="Enhanced Partnership Against Hunger and Poverty"
             required
             :disabled="saving"
           />
         </label>
-        <label class="sm:col-span-2">
-          <span class="form-label">Primary Office Admin Email</span>
-          <input v-model="form.primaryAdminEmail" class="form-input" type="email" placeholder="admin@dswd.gov.ph" required :disabled="saving" />
+        <label class="pui-span-2">
+          <span class="pui-label">Primary Office Admin Email</span>
+          <input v-model="form.primaryAdminEmail" class="pui-input" type="email" placeholder="admin@dswd.gov.ph" required :disabled="saving" />
         </label>
       </form>
 
       <!-- Provisioning is a multi-step backend operation that can exceed the
            Apps Script execution window. Showing the steps means an operator who
            hits a timeout knows which stage was reached. -->
-      <ol class="rounded-2xl border border-slate-200 divide-y divide-slate-100 overflow-hidden">
-        <li v-for="(step, index) in PROVISION_STEPS" :key="step" class="px-4 py-2.5 flex items-center gap-3">
+      <ol style="list-style:none; margin:0; padding:0; border:1px solid #e2e8f0; border-radius:10px; overflow:hidden;">
+        <li
+          v-for="(step, index) in PROVISION_STEPS"
+          :key="step"
+          :style="{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '10px', borderTop: index ? '1px solid #eef2f7' : 'none' }"
+        >
           <span
-            :class="[
-              'w-5 h-5 rounded-full grid place-items-center text-[10px] font-extrabold shrink-0',
-              stepState(index) === 'done' ? 'bg-emerald-100 text-emerald-700'
-                : stepState(index) === 'active' ? 'bg-blue-700 text-white'
-                : 'bg-slate-100 text-slate-400'
-            ]"
+            :style="{
+              width: '20px', height: '20px', borderRadius: '999px', flexShrink: 0,
+              display: 'grid', placeItems: 'center', fontSize: '10px', fontWeight: 800,
+              background: stepState(index) === 'done' ? '#d1fae5' : stepState(index) === 'active' ? '#0b3b75' : '#f1f5f9',
+              color: stepState(index) === 'done' ? '#047857' : stepState(index) === 'active' ? '#fff' : '#94a3b8'
+            }"
           >
             {{ stepState(index) === 'done' ? '✓' : index + 1 }}
           </span>
-          <span :class="['text-xs', stepState(index) === 'idle' ? 'text-slate-400' : 'font-bold text-slate-700']">
+          <span :style="{ fontSize: '12px', fontWeight: stepState(index) === 'idle' ? 500 : 700, color: stepState(index) === 'idle' ? '#94a3b8' : '#334155' }">
             {{ step }}
           </span>
         </li>
       </ol>
 
-      <div v-if="modalError" class="rounded-xl border border-red-100 bg-red-50 px-3 py-2.5" role="alert">
-        <p class="text-xs font-bold text-red-800">Provisioning did not complete</p>
-        <p class="mt-0.5 text-xs text-red-700 leading-relaxed">{{ modalError }}</p>
-        <p class="mt-1.5 text-xs text-red-700 leading-relaxed">
+      <div v-if="modalError" class="pui-alert pui-alert-error" role="alert">
+        <p class="pui-alert-title">Provisioning did not complete</p>
+        <p>{{ modalError }}</p>
+        <p style="margin-top:6px;">
           If a partial office row now appears in the registry, do not add the office again —
           use Validate and then Activate on the existing row.
         </p>
       </div>
 
-      <div v-if="lastValidation" class="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2.5">
-        <p class="text-xs font-bold text-blue-900">
+      <div v-if="lastValidation" class="pui-alert pui-alert-info">
+        <p class="pui-alert-title" style="color:#1e3a8a;">
           {{ lastValidation.valid ? 'Schema validation passed' : 'Schema validation needs attention' }}
         </p>
-        <ul v-if="lastValidation.errors?.length" class="mt-1.5 pl-4 list-disc text-xs text-blue-900 leading-relaxed">
+        <ul v-if="lastValidation.errors?.length" style="margin:6px 0 0; padding-left:18px;">
           <li v-for="item in lastValidation.errors" :key="item">{{ item }}</li>
         </ul>
       </div>
 
       <template #footer>
-        <button class="btn-secondary" type="button" :disabled="saving" @click="closeProvisionModal">Cancel</button>
-        <button class="btn-primary" type="submit" form="provision-form" :disabled="saving">
+        <button class="pui-btn" type="button" :disabled="saving" @click="closeProvisionModal">Cancel</button>
+        <button class="pui-btn pui-btn-primary" type="submit" form="provision-form" :disabled="saving">
           {{ saving ? 'Provisioning...' : 'Create Evaluation Spreadsheet' }}
         </button>
       </template>
@@ -189,64 +193,67 @@
       :show="showOrgModal"
       title="Configure Registration Options"
       :description="`${orgOffice?.officeName || 'Office'} divisions, sections and requested roles.`"
-      width="880px"
+      wide
       :busy="orgSaving"
       @close="closeOrgOptionsModal"
     >
-      <form id="org-form" class="grid grid-cols-1 lg:grid-cols-2 gap-3" @submit.prevent="saveOrgOptions">
+      <form id="org-form" class="pui-grid pui-grid-2" @submit.prevent="saveOrgOptions">
         <label>
-          <span class="form-label">Divisions / Units</span>
+          <span class="pui-label">Divisions / Units</span>
           <textarea
             v-model="orgForm.divisionsText"
-            class="form-input font-mono !text-xs"
+            class="pui-textarea"
+            style="font-family:monospace; font-size:12px;"
             rows="8"
             placeholder="One per line&#10;Operations Division&#10;ADMIN | Administrative Unit"
           ></textarea>
-          <small class="block mt-1 text-[11px] text-slate-500">One line per unit. Optional format: <code>CODE | Name</code>.</small>
+          <small class="pui-hint">One line per unit. Optional format: <code>CODE | Name</code>.</small>
         </label>
         <label>
-          <span class="form-label">Sections</span>
+          <span class="pui-label">Sections</span>
           <textarea
             v-model="orgForm.sectionsText"
-            class="form-input font-mono !text-xs"
+            class="pui-textarea"
+            style="font-family:monospace; font-size:12px;"
             rows="8"
             placeholder="One per line&#10;Operations Division | Field Operations Section"
           ></textarea>
-          <small class="block mt-1 text-[11px] text-slate-500">Use <code>Division | Section</code> so registration can filter correctly.</small>
+          <small class="pui-hint">Use <code>Division | Section</code> so registration can filter correctly.</small>
         </label>
-        <label class="lg:col-span-2">
-          <span class="form-label">Requested Roles</span>
+        <label class="pui-span-2">
+          <span class="pui-label">Requested Roles</span>
           <textarea
             v-model="orgForm.rolesText"
-            class="form-input font-mono !text-xs"
+            class="pui-textarea"
+            style="font-family:monospace; font-size:12px;"
             rows="4"
             placeholder="Technical Staff&#10;Section Head&#10;Division Chief"
           ></textarea>
-          <small class="block mt-1 text-[11px] text-slate-500">Request choices only. An administrator still validates the approved role.</small>
+          <small class="pui-hint">Request choices only. An administrator still validates the approved role.</small>
         </label>
       </form>
 
       <!-- Parsing is shown back before saving, because the delimiter format is
            easy to get wrong and the failure is otherwise silent. -->
-      <div class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
-        <p class="text-xs font-extrabold text-slate-700">This will be saved as</p>
-        <p class="mt-1 text-xs text-slate-600">
+      <div class="pui-alert" style="background:#f8fafc; border:1px solid #e2e8f0; color:#334155;">
+        <p class="pui-alert-title" style="color:#334155;">This will be saved as</p>
+        <p>
           {{ parsedPreview.divisions }} division(s) ·
           {{ parsedPreview.sections }} section(s) ·
           {{ parsedPreview.roles }} requested role(s)
         </p>
-        <p v-if="parsedPreview.orphanSections" class="mt-1 text-xs font-bold text-amber-700">
+        <p v-if="parsedPreview.orphanSections" style="font-weight:700; color:#b45309; margin-top:4px;">
           {{ parsedPreview.orphanSections }} section(s) have no matching division and will not be filterable at registration.
         </p>
       </div>
 
-      <div v-if="orgError" class="rounded-xl border border-red-100 bg-red-50 px-3 py-2" role="alert">
-        <p class="text-xs text-red-700">{{ orgError }}</p>
+      <div v-if="orgError" class="pui-alert pui-alert-error" role="alert">
+        <p>{{ orgError }}</p>
       </div>
 
       <template #footer>
-        <button class="btn-secondary" type="button" :disabled="orgSaving" @click="closeOrgOptionsModal">Cancel</button>
-        <button class="btn-primary" type="submit" form="org-form" :disabled="orgSaving">
+        <button class="pui-btn" type="button" :disabled="orgSaving" @click="closeOrgOptionsModal">Cancel</button>
+        <button class="pui-btn pui-btn-primary" type="submit" form="org-form" :disabled="orgSaving">
           {{ orgSaving ? 'Saving...' : 'Save Registration Options' }}
         </button>
       </template>

@@ -4,6 +4,11 @@ import App from './App.vue'
 import router from './router'
 import Toast from 'vue-toastification'
 import './assets/fonts.css'
+// Additive-only, hand-written CSS scoped to `pui-` prefixed classes for the
+// multi-office portal modules. Deliberately NOT importing assets/main.css —
+// its Tailwind preflight/base layer has never been active and would alter
+// every existing hand-styled screen; see git history on this file.
+import './assets/ui-kit.css'
 import 'vue-toastification/dist/index.css'
 
 if (import.meta.env.PROD) {

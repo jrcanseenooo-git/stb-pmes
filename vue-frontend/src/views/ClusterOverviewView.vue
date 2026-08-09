@@ -1,19 +1,19 @@
 <template>
-  <div class="pmes-page p-4 grid gap-4 content-start">
+  <div class="pui-page">
     <PageHeader
       kicker="Central Administration"
       title="Cluster Assessment Overview"
       subtitle="Assessment progress across participating Innovation Cluster offices."
     >
       <template #actions>
-        <RouterLink v-if="canManageOfficeRegistry" to="/office-registry" class="btn-secondary">Office Registry</RouterLink>
-        <button class="btn-primary" type="button" :disabled="loading" @click="load">
+        <RouterLink v-if="canManageOfficeRegistry" to="/office-registry" class="pui-btn">Office Registry</RouterLink>
+        <button class="pui-btn pui-btn-primary" type="button" :disabled="loading" @click="load">
           {{ loading ? 'Refreshing...' : 'Refresh' }}
         </button>
       </template>
     </PageHeader>
 
-    <div class="grid gap-3 grid-cols-2 lg:grid-cols-4">
+    <div class="pui-grid pui-grid-4">
       <StatTile label="Participating Offices" :value="totals.activeOffices" :total="totals.offices" :loading="loading" />
       <StatTile label="Total Personnel" :value="totals.personnel" :loading="loading" />
       <StatTile label="Assessment Records" :value="totals.assessmentRecords" :loading="loading" />
@@ -25,7 +25,7 @@
       />
     </div>
 
-    <div class="grid gap-3 grid-cols-2 lg:grid-cols-4">
+    <div class="pui-grid pui-grid-4">
       <StatTile label="Submitted Ratings" :value="totals.completedAssignments" :loading="loading" tone="good" />
       <StatTile
         label="Pending Ratings"
@@ -63,7 +63,7 @@
       @update:search="value => (search = value)"
       @refresh="load"
     >
-      <table class="data-table">
+      <table class="pui-table">
         <thead>
           <tr>
             <th scope="col">Office</th>
@@ -77,38 +77,36 @@
         <tbody>
           <tr v-for="office in filteredItems" :key="office.officeId">
             <td>
-              <strong class="block text-[13px] text-slate-900">{{ office.officeCode }}</strong>
-              <span class="block text-slate-500 mt-0.5">{{ office.officeName }}</span>
+              <strong>{{ office.officeCode }}</strong>
+              <small>{{ office.officeName }}</small>
             </td>
             <td>
               <StatusPill :status="healthStatus(office.health)" />
-              <small v-if="office.healthNote" class="block text-slate-400 text-[10.5px] mt-1 leading-snug max-w-[220px]">
-                {{ office.healthNote }}
-              </small>
+              <small v-if="office.healthNote" style="max-width:220px;">{{ office.healthNote }}</small>
             </td>
-            <td class="whitespace-nowrap">
+            <td style="white-space:nowrap;">
               {{ office.personnel.active }} active
-              <span v-if="office.personnel.pending" class="block text-amber-600 font-bold text-[11px]">
+              <span v-if="office.personnel.pending" style="display:block; color:#b45309; font-weight:700; font-size:11px;">
                 {{ office.personnel.pending }} for validation
               </span>
             </td>
-            <td class="whitespace-nowrap">
+            <td style="white-space:nowrap;">
               {{ office.assignments.completed }} / {{ office.assignments.total }}
             </td>
-            <td class="min-w-[140px]">
+            <td style="min-width:140px;">
               <ProgressBar
                 :value="office.assignments.completed"
                 :total="office.assignments.total"
-                :label="''"
+                :show-value="false"
               />
             </td>
-            <td class="whitespace-nowrap">{{ formatDate(office.lastActivityAt) }}</td>
+            <td style="white-space:nowrap;">{{ formatDate(office.lastActivityAt) }}</td>
           </tr>
         </tbody>
       </table>
     </DataPanel>
 
-    <p class="text-[11px] text-slate-400 px-1 leading-relaxed">
+    <p style="font-size:11px; color:#94a3b8; padding:0 2px; line-height:1.5;">
       Aggregate monitoring only. Individual rating content and individual rater identities are not
       included in cluster analytics.
     </p>

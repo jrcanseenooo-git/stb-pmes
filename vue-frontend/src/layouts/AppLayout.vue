@@ -209,7 +209,7 @@
             </transition>
           </RouterLink>
 
-          <RouterLink v-if="canManageOfficePersonnel" to="/office-dashboard" class="nav-item" active-class="active" :title="collapsed ? 'Office Dashboard' : ''">
+          <RouterLink v-if="isOfficeAdminScope" to="/office-dashboard" class="nav-item" active-class="active" :title="collapsed ? 'Office Dashboard' : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <path d="M2 13.5V9M6 13.5V4M10 13.5V6.5M14 13.5V2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
@@ -243,7 +243,7 @@
             </transition>
           </RouterLink>
 
-          <RouterLink v-if="canManageOfficePersonnel" to="/office-personnel" class="nav-item" active-class="active" :title="collapsed ? 'Office Personnel' : ''">
+          <RouterLink v-if="isOfficeAdminScope" to="/office-personnel" class="nav-item" active-class="active" :title="collapsed ? 'Office Personnel' : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <circle cx="5.5" cy="5" r="2.5" stroke="currentColor" stroke-width="1.4"/>

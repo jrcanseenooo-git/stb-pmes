@@ -1,12 +1,12 @@
 <template>
-  <div class="pmes-page p-4 grid gap-4 content-start">
+  <div class="pui-page">
     <PageHeader
       kicker="Assessment"
       title="My Rating Tasks"
       subtitle="People you have been assigned to rate for the current assessment period."
     />
 
-    <div class="grid gap-3 grid-cols-3">
+    <div class="pui-grid pui-grid-3">
       <StatTile label="Pending" :value="counts.pending" :loading="loading" :tone="counts.pending ? 'warn' : 'default'" />
       <StatTile label="Draft" :value="counts.draft" :loading="loading" />
       <StatTile label="Submitted" :value="counts.submitted" :total="items.length" :loading="loading" tone="good" />
@@ -32,17 +32,14 @@
       @refresh="load"
     >
       <template #filters>
-        <div class="flex items-center gap-1 rounded-xl bg-slate-100 p-1" role="tablist" aria-label="Filter by status">
+        <div class="pui-tabs" role="tablist" aria-label="Filter by status">
           <button
             v-for="tab in STATUS_TABS"
             :key="tab.value"
             type="button"
             role="tab"
             :aria-selected="statusTab === tab.value"
-            :class="[
-              'px-3 py-1 rounded-lg text-xs font-extrabold transition-colors',
-              statusTab === tab.value ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-            ]"
+            :class="['pui-tab', statusTab === tab.value && 'pui-tab-active']"
             @click="statusTab = tab.value"
           >
             {{ tab.label }}
@@ -50,9 +47,9 @@
         </div>
       </template>
 
-      <!-- Desktop: table. Below sm the same rows render as stacked cards, because
-           a seven-column table is unreadable on a phone. -->
-      <table class="data-table hidden sm:table">
+      <!-- Desktop: table. Below 720px the same rows render as stacked cards,
+           since a six-column table is unreadable on a phone. -->
+      <table v-if="!isNarrow" class="pui-table">
         <thead>
           <tr>
             <th scope="col">Person to Rate</th>
@@ -60,55 +57,54 @@
             <th scope="col">Your Role as Rater</th>
             <th scope="col">Status</th>
             <th scope="col">Last Saved</th>
-            <th scope="col" class="text-right">Action</th>
+            <th scope="col" style="text-align:right;">Action</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="task in filteredItems" :key="task.id">
             <td>
-              <strong class="block text-[13px] text-slate-900">{{ task.rateeName }}</strong>
-              <span class="block text-slate-500 mt-0.5">{{ task.rateePosition || '—' }}</span>
+              <strong>{{ task.rateeName }}</strong>
+              <small>{{ task.rateePosition || '—' }}</small>
             </td>
             <td>{{ task.organizationalUnit || '—' }}</td>
             <td>{{ raterTypeLabel(task.raterType) }}</td>
             <td><StatusPill :status="task.status" /></td>
-            <td class="whitespace-nowrap">{{ formatDateTime(task.submittedAt || task.lastSavedAt) }}</td>
-            <td>
-              <div class="flex justify-end">
-                <RouterLink
-                  :to="{ path: '/evaluation', query: { assignment: task.id } }"
-                  :class="task.status === 'SUBMITTED' ? 'btn-secondary !py-1 !px-2.5 !text-xs' : 'btn-primary !py-1 !px-2.5 !text-xs'"
-                >
-                  {{ actionLabel(task.status) }}
-                </RouterLink>
-              </div>
+            <td style="white-space:nowrap;">{{ formatDateTime(task.submittedAt || task.lastSavedAt) }}</td>
+            <td style="text-align:right;">
+              <RouterLink
+                :to="{ path: '/evaluation', query: { assignment: task.id } }"
+                :class="['pui-btn', 'pui-btn-sm', task.status !== 'SUBMITTED' && 'pui-btn-primary']"
+              >
+                {{ actionLabel(task.status) }}
+              </RouterLink>
             </td>
           </tr>
         </tbody>
       </table>
 
-      <ul class="sm:hidden divide-y divide-slate-100">
-        <li v-for="task in filteredItems" :key="task.id" class="p-4">
-          <div class="flex items-start justify-between gap-3">
-            <div class="min-w-0">
-              <strong class="block text-sm text-slate-900">{{ task.rateeName }}</strong>
-              <span class="block text-xs text-slate-500 mt-0.5">{{ task.rateePosition || '—' }}</span>
+      <ul v-if="isNarrow" style="list-style:none; margin:0; padding:0;">
+        <li v-for="task in filteredItems" :key="task.id" style="padding:14px 16px; border-bottom:1px solid #eef2f7;">
+          <div class="pui-row-between">
+            <div style="min-width:0;">
+              <strong style="display:block; font-size:14px; color:#0f172a;">{{ task.rateeName }}</strong>
+              <span style="display:block; font-size:12px; color:#64748b; margin-top:2px;">{{ task.rateePosition || '—' }}</span>
             </div>
             <StatusPill :status="task.status" />
           </div>
-          <dl class="mt-3 grid grid-cols-2 gap-2">
+          <dl style="margin:10px 0 0; display:grid; grid-template-columns:1fr 1fr; gap:8px;">
             <div>
-              <dt class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Unit</dt>
-              <dd class="text-xs font-bold text-slate-700 truncate">{{ task.organizationalUnit || '—' }}</dd>
+              <dt style="font-size:10px; font-weight:800; text-transform:uppercase; color:#94a3b8;">Unit</dt>
+              <dd style="margin:2px 0 0; font-size:12px; font-weight:700; color:#334155;">{{ task.organizationalUnit || '—' }}</dd>
             </div>
             <div>
-              <dt class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Your Role</dt>
-              <dd class="text-xs font-bold text-slate-700">{{ raterTypeLabel(task.raterType) }}</dd>
+              <dt style="font-size:10px; font-weight:800; text-transform:uppercase; color:#94a3b8;">Your Role</dt>
+              <dd style="margin:2px 0 0; font-size:12px; font-weight:700; color:#334155;">{{ raterTypeLabel(task.raterType) }}</dd>
             </div>
           </dl>
           <RouterLink
             :to="{ path: '/evaluation', query: { assignment: task.id } }"
-            :class="['mt-3 w-full', task.status === 'SUBMITTED' ? 'btn-secondary' : 'btn-primary']"
+            :class="['pui-btn', 'pui-btn-block', task.status !== 'SUBMITTED' && 'pui-btn-primary']"
+            style="margin-top:12px;"
           >
             {{ actionLabel(task.status) }}
           </RouterLink>
@@ -119,7 +115,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { portalApi } from '@/services/api'
 import PageHeader from '@/components/ui/PageHeader.vue'
@@ -152,8 +148,18 @@ const error = ref('')
 const search = ref('')
 const statusTab = ref('all')
 const lastUpdatedAt = ref(null)
+const isNarrow = ref(false)
 
-onMounted(load)
+onMounted(() => {
+  load()
+  checkWidth()
+  window.addEventListener('resize', checkWidth)
+})
+onUnmounted(() => window.removeEventListener('resize', checkWidth))
+
+function checkWidth() {
+  isNarrow.value = window.innerWidth < 720
+}
 
 const counts = computed(() => ({
   pending: items.value.filter(t => t.status === 'PENDING').length,

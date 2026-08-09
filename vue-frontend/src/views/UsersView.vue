@@ -249,7 +249,7 @@
       <div class="card-hd user-card-hd">
         <div>
           <span class="card-title">Accounts</span>
-          <p class="card-subtitle">Showing {{ loading ? '...' : filteredUsers.length }} of {{ users.length }} users</p>
+          <p class="card-subtitle">{{ loading ? 'Showing ...' : paginationSummary }}</p>
         </div>
         <span class="badge badge-blue">{{ loading ? 'Loading...' : filteredUsers.length + ' shown' }}</span>
       </div>
@@ -265,7 +265,7 @@
               <th v-if="canManageUsers">Temp Password</th>
               <th>Status</th>
               <!-- <th>Last Login</th> -->
-              <th v-if="canManageUsers">Actions</th>
+              <th v-if="canAdministerUsers">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -289,14 +289,14 @@
                 <td v-if="canManageUsers"><div class="sk-line" style="width:80px"></div></td>
                 <td><div class="sk-pill" style="width:55px"></div></td>
                 <!-- <td><div class="sk-line" style="width:60px"></div></td> -->
-                <td v-if="canManageUsers"><div class="sk-actions"></div></td>
+                <td v-if="canAdministerUsers"><div class="sk-actions"></div></td>
               </tr>
             </template>
 
             <!-- ── Real data rows ── -->
             <template v-else>
-              <tr v-for="(u, i) in filteredUsers" :key="u.email" :class="i % 2 === 1 ? 'stripe' : ''">
-                <td v-if="canManageUsers">
+              <tr v-for="(u, i) in pagedUsers" :key="u.id || u.email" :class="i % 2 === 1 ? 'stripe' : ''">
+                <td>
                   <div class="user-cell">
                     <div class="av" :style="{ background: u.avatarColor }">{{ u.initials }}</div>
                     <div>
@@ -328,7 +328,7 @@
                   </div>
                   <span v-else class="text-xs muted">—</span>
                 </td>
-                <td>
+                <td v-if="canAdministerUsers">
                   <span :class="['status-badge', u.status === 'Active' ? 's-green' : u.status === 'Pending' ? 's-amber' : 's-red']">
                     {{ u.status === 'Pending' ? 'Pending' : u.status }}
                   </span>
@@ -344,12 +344,18 @@
                       </svg>
                     </button>
                     <template v-if="u.status === 'Pending'">
-                      <button class="btn btn-xs approve" @click="activateUser(u)">Approve</button>
-                      <button class="btn btn-xs deactivate" @click="declineUser(u)">Decline</button>
+                      <button class="btn btn-xs approve" :disabled="busyUserId === u.id" @click="activateUser(u)">
+                        <span v-if="busyUserId === u.id" class="spinner-xs"></span>{{ busyUserId === u.id ? 'Approving…' : 'Approve' }}
+                      </button>
+                      <button class="btn btn-xs deactivate" :disabled="busyUserId === u.id" @click="declineUser(u)">Decline</button>
                     </template>
-                    <button v-else-if="u.status === 'Inactive'" class="btn btn-xs activate" @click="activateUser(u)">Activate</button>
-                    <button v-else-if="u.status === 'Active'" class="btn btn-xs deactivate" @click="deactivateUser(u)">Deactivate</button>
-                    <button class="icon-btn-sm danger" @click="resetPassword(u)" title="Reset password">
+                    <button v-else-if="u.status === 'Inactive'" class="btn btn-xs activate" :disabled="busyUserId === u.id" @click="activateUser(u)">
+                      <span v-if="busyUserId === u.id" class="spinner-xs"></span>{{ busyUserId === u.id ? 'Activating…' : 'Activate' }}
+                    </button>
+                    <button v-else-if="u.status === 'Active'" class="btn btn-xs deactivate" :disabled="busyUserId === u.id" @click="deactivateUser(u)">
+                      <span v-if="busyUserId === u.id" class="spinner-xs"></span>{{ busyUserId === u.id ? 'Saving…' : 'Deactivate' }}
+                    </button>
+                    <button v-if="canManageUsers" class="icon-btn-sm danger" @click="resetPassword(u)" title="Reset password">
                       <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                         <path d="M2 6a4 4 0 017-2M10 6a4 4 0 01-7 2M10 4v3H7" stroke="#EF4444" stroke-width="1.2" stroke-linecap="round"/>
                       </svg>
@@ -358,7 +364,7 @@
                 </td>
               </tr>
               <tr v-if="!loading && !filteredUsers.length">
-                <td :colspan="canManageUsers ? 8 : 6" class="empty-row">
+                <td :colspan="usersTableColspan" class="empty-row">
                   <svg width="32" height="32" viewBox="0 0 32 32" fill="none" style="margin:0 auto 8px;display:block">
                     <circle cx="16" cy="16" r="14" stroke="#E2E8F0" stroke-width="2"/>
                     <path d="M11 16h10M16 11v10" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round"/>
@@ -370,6 +376,42 @@
 
           </tbody>
         </table>
+      </div>
+      <div v-if="!loading && filteredUsers.length" class="pagination-bar">
+        <div class="pagination-meta">
+          <span>{{ pageRangeLabel }}</span>
+          <label class="page-size-control">
+            <span>Rows</span>
+            <select v-model.number="pageSize" class="page-size-select">
+              <option v-for="size in pageSizeOptions" :key="size" :value="size">{{ size }}</option>
+            </select>
+          </label>
+        </div>
+        <div class="pagination-controls">
+          <button class="page-btn" :disabled="currentPage === 1" @click="goToPage(1)" title="First page">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+              <path d="M7.5 3L4 6.5L7.5 10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M10 3L6.5 6.5L10 10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <button class="page-btn" :disabled="currentPage === 1" @click="goToPage(currentPage - 1)" title="Previous page">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+              <path d="M8 3L4.5 6.5L8 10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <span class="page-indicator">Page {{ currentPage }} of {{ totalPages }}</span>
+          <button class="page-btn" :disabled="currentPage === totalPages" @click="goToPage(currentPage + 1)" title="Next page">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+              <path d="M5 3L8.5 6.5L5 10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <button class="page-btn" :disabled="currentPage === totalPages" @click="goToPage(totalPages)" title="Last page">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+              <path d="M5.5 3L9 6.5L5.5 10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M3 3L6.5 6.5L3 10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -434,12 +476,7 @@
                   <label class="field-label">Role <span class="req">*</span></label>
                   <select v-model="form.role" class="field-select">
                     <option value="">Select role…</option>
-                    <option>System Administrator</option>
-                    <option>Bureau Director</option>
-                    <option>Assistant Bureau Director</option>
-                    <option>Division Chief</option>
-                    <option>Section Head</option>
-                    <option>Staff</option>
+                    <option v-for="role in userFormRoleOptions" :key="role">{{ role }}</option>
                   </select>
                 </div>
                 <div class="field">
@@ -454,14 +491,32 @@
                 </div>
                 <div class="field full">
                   <label class="field-label">Section</label>
-                  <select v-model="form.section" class="field-select">
-                    <option value="">Select section…</option>
-                    <option>Children and Youth Section</option>
-                    <option>Women, Older Persons and Persons with Disability Section</option>
-                    <option>Other Marginalized Groups Section</option>
+                  <select v-model="form.section" class="field-select" :disabled="!form.division">
+                    <option value="">{{ form.division ? sectionSelectPlaceholder : 'Select division first…' }}</option>
+                    <option v-for="section in sectionsForSelectedDivision" :key="section.id" :value="section.name">
+                      {{ section.name }}
+                    </option>
                   </select>
                 </div>
-                <div class="field full">
+                <div v-if="canManageUsers" class="field">
+                  <label class="field-label">System Scope</label>
+                  <select v-model="form.systemScope" class="field-select">
+                    <option value="STB_FULL">STB Full PMES</option>
+                    <option value="CLUSTER_PORTAL">Innovation Cluster Portal</option>
+                    <option value="OFFICE_ADMIN">Office Admin Portal</option>
+                    <option value="CLUSTER_ADMIN">Central Cluster Admin</option>
+                  </select>
+                </div>
+                <div v-if="canManageUsers" class="field">
+                  <label class="field-label">Office</label>
+                  <select v-model="form.officeId" class="field-select" :disabled="form.systemScope === 'STB_FULL' || !officeOptions.length">
+                    <option value="STB">Social Technology Bureau</option>
+                    <option v-for="office in officeOptions" :key="office.officeId" :value="office.officeId">
+                      {{ office.officeName }}
+                    </option>
+                  </select>
+                </div>
+                <div v-if="canManageUsers" class="field full">
                   <label class="field-label">Access Groups</label>
                   <div class="access-group-grid">
                     <label v-for="group in accessGroupOptions" :key="group.value" class="access-group-option">
@@ -601,7 +656,7 @@
 
 <script setup>
 import { ref, computed, h, onMounted, watch } from 'vue'
-import { usersApi, focalAssignmentsApi, maintenanceApi, systemSettingsApi } from '@/services/api'
+import { usersApi, focalAssignmentsApi, maintenanceApi, systemSettingsApi, officeRegistryApi } from '@/services/api'
 import { useConfirm, CONFIRMS } from '@/composables/useConfirm'
 import { usePermissions } from '@/composables/usePermissions'
 import { useAuthStore } from '@/stores/auth'
@@ -617,6 +672,18 @@ const DIVISION_IDS = {
   'Pilot Implementation Division': 'pid',
   'Social Technology Analysis and Evaluation Division': 'staed'
 }
+const CANONICAL_SECTIONS = [
+  { id: 'SEC-admin-office', divisionId: 'admin-pool', name: 'Office Admin Personnel' },
+  { id: 'SEC-dfd-cy', divisionId: 'dfd', name: 'Children and Youth Section' },
+  { id: 'SEC-dfd-omg', divisionId: 'dfd', name: 'Other Marginalized Groups Section' },
+  { id: 'SEC-dfd-wpo', divisionId: 'dfd', name: 'Women, Persons with Disability and Older Persons Section' },
+  { id: 'SEC-pid-cy', divisionId: 'pid', name: 'Children and Youth Section' },
+  { id: 'SEC-pid-omg', divisionId: 'pid', name: 'Other Marginalized Groups Section' },
+  { id: 'SEC-pid-wpo', divisionId: 'pid', name: 'Women, Persons with Disability and Older Persons Section' },
+  { id: 'SEC-staed-ev', divisionId: 'staed', name: 'Social Technology Evaluation Section' },
+  { id: 'SEC-staed-pm', divisionId: 'staed', name: 'Social Technology Portfolio Management Section' },
+  { id: 'SEC-staed-pr', divisionId: 'staed', name: 'Social Technology Promotion Section' }
+]
 
 const accessGroupOptions = [
   {
@@ -648,12 +715,35 @@ const accessGroupOptions = [
     value: 'evaluation-manager',
     label: 'Evaluation Manager',
     description: 'Can generate and monitor IPAT evaluation assignments.'
+  },
+  {
+    value: 'cluster-system-admin',
+    label: 'Cluster System Admin',
+    description: 'Can manage office registry, provisioning, validation, and cluster monitoring.'
+  },
+  {
+    value: 'cluster-technical-admin',
+    label: 'Cluster Technical Admin',
+    description: 'Can provision and validate office assessment spreadsheets.'
+  },
+  {
+    value: 'cluster-assessment-admin',
+    label: 'Cluster Assessment Admin',
+    description: 'Can manage assessment content and monitor participating offices.'
+  },
+  {
+    value: 'cluster-monitoring-admin',
+    label: 'Cluster Monitoring Admin',
+    description: 'Can monitor participating offices without provisioning access.'
   }
 ]
 
 const search        = ref('')
 const roleFilter    = ref('')
 const statusFilter  = ref('')
+const currentPage   = ref(1)
+const pageSize      = ref(10)
+const pageSizeOptions = [10, 25, 50]
 const showModal     = ref(false)
 const showResetModal = ref(false)
 const showFocalPanel = ref(false)
@@ -669,6 +759,15 @@ const copied        = ref(false)
 const showPw        = ref({})
 const toast         = ref({ show: false, msg: '', type: 'success' })
 const users         = ref([])
+const officeOptions = ref([])
+// Backend paginate() defaults to 50; this view shows the whole directory at once,
+// so ask for a ceiling well above any realistic office headcount. If the cluster
+// ever exceeds this, loadUsers() warns instead of truncating silently.
+const USERS_PAGE_SIZE = 2000
+// Which row is mid-write. Approving hits Apps Script AND the Firebase Admin API,
+// so it is measured in seconds — without this the admin clicked Approve and saw
+// nothing change, with no way to tell whether it had registered.
+const busyUserId = ref('')
 const focalUsers    = ref([])
 const divisionFocalRows = ref([])
 const bureauFocals = ref({ primaryUserId: '', alternateUserId: '' })
@@ -690,12 +789,18 @@ const systemAccessModes = ref([
     description: 'Users can access the modules allowed by their role and permissions.'
   }
 ])
-const { canManageUsers, canManageFocalAssignments, canManageDatabase } = usePermissions()
+const { canManageUsers, canManageOfficeUsers, canManageFocalAssignments, canManageDatabase } = usePermissions()
 const { confirm, confirmState } = useConfirm()
 const authStore = useAuthStore()
 const activeUsersCount = computed(() => users.value.filter(u => u.status === 'Active').length)
 const inactiveUsersCount = computed(() => users.value.filter(u => u.status === 'Inactive').length)
 const pendingUsersCount = computed(() => users.value.filter(u => u.status === 'Pending').length)
+const canAdministerUsers = computed(() => canManageUsers.value || canManageOfficeUsers.value)
+const usersTableColspan = computed(() => 6 + (canManageUsers.value ? 1 : 0) + (canAdministerUsers.value ? 1 : 0))
+const userFormRoleOptions = computed(() => {
+  const officeRoles = ['Bureau Director', 'Assistant Bureau Director', 'Division Chief', 'Section Head', 'Technical Staff']
+  return canManageUsers.value ? ['System Administrator', ...officeRoles] : officeRoles
+})
 const reviewerUsersCount = computed(() => users.value.filter(u =>
   ['System Administrator', 'Bureau Director', 'Assistant Bureau Director', 'Division Chief', 'Section Head'].includes(u.role)
 ).length)
@@ -834,14 +939,43 @@ const SearchSelect = {
 // ── Load users on mount ──
 onMounted(async () => {
   await loadUsers()
-  if (canManageUsers.value) await loadSystemSettings()
+  if (canManageUsers.value) await Promise.all([loadOfficeOptions(), loadSystemSettings()])
 })
+
+async function loadOfficeOptions() {
+  try {
+    const data = await officeRegistryApi.list({ pageSize: 200 })
+    officeOptions.value = (data.items || data || [])
+      .filter(office => office.officeStatus === 'ACTIVE' || office.spreadsheetStatus === 'ACTIVE')
+      .map(office => ({
+        officeId: office.officeId,
+        officeCode: office.officeCode,
+        officeName: office.officeName
+      }))
+  } catch (e) {
+    console.warn('[PMES] Office registry unavailable for user form:', e?.message || e)
+    officeOptions.value = []
+  }
+}
 
 async function loadUsers() {
   loading.value = true
   try {
-    const result = await usersApi.list()
+    // SpreadsheetService.paginate() defaults to pageSize 50. Calling list() with
+    // no params silently returned only the first 50 rows — and because new
+    // accounts are appended to the bottom of the sheet, the rows that went
+    // missing were always the newest ones. That is why self-registered users
+    // never appeared under "Pending activation".
+    const result = await usersApi.list({ pageSize: USERS_PAGE_SIZE })
     users.value  = (result.items ?? result ?? []).map(mapUser)
+
+    // If the account count ever exceeds the page size, say so loudly rather than
+    // truncating in silence again.
+    const total = Number(result?.total)
+    if (Number.isFinite(total) && total > users.value.length) {
+      console.warn(`[Users] Truncated: showing ${users.value.length} of ${total}.`)
+      showToast(`Showing ${users.value.length} of ${total} accounts. Narrow the search to see the rest.`, 'error')
+    }
   } catch (e) {
     console.warn('[Users]', e.message)
     showToast('Could not load users from database.', 'error')
@@ -1091,7 +1225,7 @@ function mapUser(row) {
     initials:     name.split(/\s+/).filter(Boolean).map(n => n[0]).join('').toUpperCase(),
     name,
     email:        row.email        || '',
-    role:         row.role         || 'Staff',
+    role:         row.role         || 'Technical Staff',
     division:     row.divisionName || row.divisionId || '',
     divisionId:   row.divisionId   || '',
     section:      row.section      || '',
@@ -1104,6 +1238,12 @@ function mapUser(row) {
     pendingActivation: row.pendingActivation === true || String(row.pendingActivation).toLowerCase() === 'true',
     requestedRole: row.requestedRole || '',
     selfRegistered: row.selfRegistered === true || String(row.selfRegistered).toLowerCase() === 'true',
+    officeId: row.officeId || 'STB',
+    officeCode: row.officeCode || row.officeId || 'STB',
+    officeName: row.officeName || 'Social Technology Bureau',
+    systemScope: row.systemScope || 'STB_FULL',
+    officeRole: row.officeRole || 'STB_PERSONNEL',
+    centralRoles: parseList(row.centralRoles),
     permissionGroups: parseList(row.permissionGroups),
     permissions: parseList(row.permissions),
     lastLogin:    row.lastLoginAt ? formatDate(row.lastLoginAt) : 'Never',
@@ -1144,6 +1284,12 @@ const defaultForm = () => ({
   fullName:'', email:'',
   role:'', division:'', section:'', position:'',
   employeeNo:'', type:'Regular',
+  officeId: 'STB',
+  officeCode: 'STB',
+  officeName: 'Social Technology Bureau',
+  systemScope: 'STB_FULL',
+  officeRole: 'STB_PERSONNEL',
+  centralRoles: [],
   permissionGroups: [],
   tempPassword: generatePassword()
 })
@@ -1151,21 +1297,94 @@ const defaultForm = () => ({
 const form = ref(defaultForm())
 function regeneratePassword() { form.value.tempPassword = generatePassword() }
 
+const sectionsForSelectedDivision = computed(() => {
+  const divisionId = DIVISION_IDS[form.value.division] || ''
+  return CANONICAL_SECTIONS.filter(section => section.divisionId === divisionId)
+})
+const sectionSelectPlaceholder = computed(() =>
+  sectionsForSelectedDivision.value.length ? 'Select section…' : 'No sections available'
+)
+
+watch(() => form.value.division, () => {
+  if (!form.value.section) return
+  const valid = sectionsForSelectedDivision.value.some(section => section.name === form.value.section)
+  if (!valid) form.value.section = ''
+})
+
+watch(() => form.value.systemScope, scope => {
+  if (scope === 'STB_FULL') {
+    form.value.officeId = 'STB'
+    form.value.officeCode = 'STB'
+    form.value.officeName = 'Social Technology Bureau'
+    form.value.officeRole = 'STB_PERSONNEL'
+  } else if (scope === 'OFFICE_ADMIN') {
+    form.value.officeRole = 'OFFICE_ADMIN'
+  } else if (scope === 'CLUSTER_ADMIN') {
+    form.value.officeRole = 'CENTRAL_ADMIN'
+  } else {
+    form.value.officeRole = 'OFFICE_PERSONNEL'
+  }
+})
+
+watch(() => form.value.officeId, officeId => {
+  if (officeId === 'STB') {
+    form.value.officeCode = 'STB'
+    form.value.officeName = 'Social Technology Bureau'
+    return
+  }
+  const office = officeOptions.value.find(item => item.officeId === officeId)
+  if (office) {
+    form.value.officeCode = office.officeCode
+    form.value.officeName = office.officeName
+  }
+})
+
 // ── Filter ──
+function searchable(value) {
+  return String(value ?? '').toLowerCase()
+}
+
 const filteredUsers = computed(() => {
-  const q = search.value.toLowerCase().trim()
+  const q = searchable(search.value).trim()
   return users.value.filter(u => {
+    const fields = [u.name, u.email, u.role, u.division, u.section, u.employeeNo]
     const matchesSearch = !q ||
-      u.name.toLowerCase().includes(q) ||
-      u.email.toLowerCase().includes(q) ||
-      u.role.toLowerCase().includes(q) ||
-      (u.division || '').toLowerCase().includes(q) ||
-      (u.section || '').toLowerCase().includes(q) ||
-      (u.employeeNo || '').toLowerCase().includes(q)
+      fields.some(field => searchable(field).includes(q))
     const matchesRole = !roleFilter.value || u.role === roleFilter.value
     const matchesStatus = !statusFilter.value || u.status === statusFilter.value
     return matchesSearch && matchesRole && matchesStatus
   })
+})
+
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredUsers.value.length / pageSize.value)))
+const pageStartIndex = computed(() => (currentPage.value - 1) * pageSize.value)
+const pagedUsers = computed(() =>
+  filteredUsers.value.slice(pageStartIndex.value, pageStartIndex.value + pageSize.value)
+)
+const pageRangeLabel = computed(() => {
+  if (!filteredUsers.value.length) return 'No users shown'
+  const start = pageStartIndex.value + 1
+  const end = Math.min(pageStartIndex.value + pageSize.value, filteredUsers.value.length)
+  return `Showing ${start}-${end} of ${filteredUsers.value.length}`
+})
+const paginationSummary = computed(() => {
+  const filteredCount = filteredUsers.value.length
+  const totalCount = users.value.length
+  return filteredCount === totalCount
+    ? `${pageRangeLabel.value} users`
+    : `${pageRangeLabel.value} matching users (${totalCount} total)`
+})
+
+function goToPage(page) {
+  currentPage.value = Math.min(Math.max(Number(page) || 1, 1), totalPages.value)
+}
+
+watch([search, roleFilter, statusFilter, pageSize], () => {
+  currentPage.value = 1
+})
+
+watch(totalPages, pages => {
+  if (currentPage.value > pages) currentPage.value = pages
 })
 
 // ── Modal ──
@@ -1183,6 +1402,12 @@ function openEditModal(user) {
     position:     user.position    || '',
     employeeNo:   user.employeeNo  || '',
     type:         user.type        || 'Regular',
+    officeId:     user.officeId    || 'STB',
+    officeCode:   user.officeCode  || user.officeId || 'STB',
+    officeName:   user.officeName  || 'Social Technology Bureau',
+    systemScope:  user.systemScope || 'STB_FULL',
+    officeRole:   user.officeRole  || 'STB_PERSONNEL',
+    centralRoles: [...(user.centralRoles || [])],
     permissionGroups: [...(user.permissionGroups || [])],
     tempPassword: ''
   }
@@ -1193,6 +1418,12 @@ function openEditModal(user) {
 async function saveUser() {
   if (!form.value.fullName || !form.value.email || !form.value.role) {
     showToast('Please fill in all required fields.', 'error'); return
+  }
+  if (sectionsForSelectedDivision.value.length && !form.value.section) {
+    showToast('Please select a section for the chosen division.', 'error'); return
+  }
+  if (form.value.systemScope !== 'STB_FULL' && !form.value.officeId) {
+    showToast('Please select the assigned office for this portal user.', 'error'); return
   }
   const ok = await confirm(editingUser.value
     ? {
@@ -1217,6 +1448,12 @@ async function saveUser() {
       position:    form.value.position,
       employeeNo:  form.value.employeeNo,
       type:        form.value.type,
+      officeId:    form.value.officeId || 'STB',
+      officeCode:  form.value.officeCode || form.value.officeId || 'STB',
+      officeName:  form.value.officeName || 'Social Technology Bureau',
+      systemScope: form.value.systemScope || 'STB_FULL',
+      officeRole:  form.value.officeRole || 'STB_PERSONNEL',
+      centralRoles: [...(form.value.centralRoles || [])],
       permissionGroups: [...(form.value.permissionGroups || [])]
     }
     if (editingUser.value) {
@@ -1247,15 +1484,27 @@ async function activateUser(user) {
     details: [
       { label: 'Email', value: user.email },
       { label: 'Requested role', value: user.requestedRole || '—' },
-      { label: 'Assigned role', value: user.role }
+      { label: 'Assigned role', value: user.role },
+      { label: 'System scope', value: user.systemScope || 'STB_FULL' },
+      { label: 'Office', value: user.officeName || 'Social Technology Bureau' }
     ],
     note: 'The user will be able to sign in immediately after approval.',
     confirmLabel: 'Approve & Activate',
     cancelLabel: 'Not yet'
   } : CONFIRMS.activateUser(user.name))
   if (!ok) return
-  try   { await usersApi.activate(user.id); user.status = 'Active'; user.pendingActivation = false; showToast(`${user.name} ${isApproval ? 'approved' : 'activated'}.`) }
-  catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
+  busyUserId.value = user.id
+  try {
+    await usersApi.activate(user.id)
+    user.status = 'Active'
+    user.pendingActivation = false
+    showToast(`${user.name} ${isApproval ? 'approved' : 'activated'}.`)
+  } catch (e) {
+    console.error(e)
+    showToast(e?.message || 'Something went wrong. Please try again.', 'error')
+  } finally {
+    busyUserId.value = ''
+  }
 }
 
 async function declineUser(user) {
@@ -1268,11 +1517,17 @@ async function declineUser(user) {
     cancelLabel: 'Cancel'
   })
   if (!ok) return
+  busyUserId.value = user.id
   try {
     await usersApi.decline(user.id)
     users.value = users.value.filter(u => u.id !== user.id)
     showToast(`${user.name}'s registration declined.`, 'warning')
-  } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
+  } catch (e) {
+    console.error(e)
+    showToast(e?.message || 'Something went wrong. Please try again.', 'error')
+  } finally {
+    busyUserId.value = ''
+  }
 }
 async function deactivateUser(user) {
   const ok = await confirm(CONFIRMS.deactivateUser(user.name))
@@ -1307,6 +1562,7 @@ function roleBadgeClass(role) {
     'Assistant Bureau Director': 'role-director',
     'Division Chief': 'role-chief',
     'Staff': 'role-staff',
+    'Technical Staff': 'role-staff',
     'Contractor of Service': 'role-contractor'
   }
   return map[role] || 'role-staff'
@@ -1360,6 +1616,11 @@ function showToast(msg, type='success') {
 .btn:disabled{opacity:.55;cursor:not-allowed;}
 .btn-sm{padding:4px 9px;font-size:11px;}
 .btn-xs{padding:3px 8px;font-size:10px;border-radius:5px;}
+.btn-xs:disabled{opacity:.65;cursor:not-allowed;}
+/* Inline busy indicator for row actions — approving reaches both Apps Script and
+   the Firebase Admin API, so the wait is seconds, not milliseconds. */
+.spinner-xs{display:inline-block;width:9px;height:9px;margin-right:5px;vertical-align:-1px;
+  border:1.5px solid currentColor;border-top-color:transparent;border-radius:50%;animation:spin .6s linear infinite;}
 .activate{background:#F0FDF4;color:#15803D;border-color:#BBF7D0;}
 .activate:hover{background:#DCFCE7;}
 .deactivate{background:#FEF2F2;color:#B91C1C;border-color:#FECACA;}
@@ -1466,6 +1727,10 @@ function showToast(msg, type='success') {
   .summary-grid{grid-template-columns:1fr;}
   .page-heading h1{font-size:20px;}
   .top-actions .btn{width:100%;justify-content:center;}
+  .pagination-bar{align-items:stretch;flex-direction:column;}
+  .pagination-meta{justify-content:space-between;}
+  .pagination-controls{justify-content:space-between;}
+  .page-indicator{flex:1;}
   .form-grid,.access-group-grid{grid-template-columns:1fr;}
   .full{grid-column:span 1;}
 }
@@ -1482,6 +1747,16 @@ function showToast(msg, type='success') {
 .tbl tbody tr:hover td{background:#F8FBFF;}
 .stripe td{background:#FCFDFF;}
 .empty-row{text-align:center;color:#94A3B8;padding:40px !important;font-size:13px;}
+.pagination-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-top:1px solid #EFF3F8;background:#FBFCFE;}
+.pagination-meta,.pagination-controls,.page-size-control{display:flex;align-items:center;gap:8px;min-width:0;}
+.pagination-meta{color:#7183A3;font-size:12px;font-weight:600;}
+.page-size-control span{font-size:11px;color:#8BA0C0;text-transform:uppercase;letter-spacing:.05em;}
+.page-size-select{height:30px;border:1px solid #DDE7F3;background:#fff;border-radius:7px;padding:0 8px;color:#1A2332;font-size:12px;outline:none;}
+.page-size-select:focus{border-color:#2F80ED;box-shadow:0 0 0 3px rgba(47,128,237,.08);}
+.page-btn{width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;border:1px solid #DDE7F3;background:#fff;color:#64748B;border-radius:7px;cursor:pointer;transition:all .15s;}
+.page-btn:hover:not(:disabled){border-color:#BFDBFE;background:#EFF6FF;color:#1A56B0;}
+.page-btn:disabled{opacity:.45;cursor:not-allowed;}
+.page-indicator{min-width:86px;text-align:center;color:#475569;font-size:12px;font-weight:700;}
 .flex-row{display:flex;align-items:center;}
 .gap-4{gap:4px;} .gap-6{gap:6px;} .gap-8{gap:8px;}
 .fw-500{font-weight:500;font-size:13px;}

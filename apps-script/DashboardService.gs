@@ -18,7 +18,7 @@ const DashboardService = (() => {
     users = applyUserScope(users, profile)
 
     // Filter by period if given
-    if (params.semester) accs = accs.filter(r => r.semester === params.semester)
+    if (params.semester) accs = accs.filter(r => String(r.semester) === String(params.semester))
     if (params.year)     accs = accs.filter(r => r.year == params.year)
 
     const completed = accs.filter(r => ['Completed','Approved'].includes(r.status)).length
@@ -74,7 +74,7 @@ const DashboardService = (() => {
     let accs       = SpreadsheetService.getAllRows(accSheet).filter(r => !r.deleted)
     accs           = applyScope(accs, profile)
 
-    if (params.semester) accs = accs.filter(r => r.semester === params.semester)
+    if (params.semester) accs = accs.filter(r => String(r.semester) === String(params.semester))
     if (params.year)     accs = accs.filter(r => r.year == params.year)
 
     const STATUS_LIST = ['Not Started','Ongoing','Submitted','For Revision','Approved','Delayed','Completed']

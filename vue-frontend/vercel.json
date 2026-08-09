@@ -1,21 +1,18 @@
 {
   "headers": [
     {
-      "source": "/(.*)",
+      "source": "/((?!api/).*)",
       "headers": [
-        {
-          "key": "Access-Control-Allow-Origin",
-          "value": "https://stb-pmes.vercel.app"
-        },
-        {
-          "key": "Vary",
-          "value": "Origin"
-        }
+        { "key": "Access-Control-Allow-Origin", "value": "https://stb-pmes.vercel.app" },
+        { "key": "Cross-Origin-Opener-Policy", "value": "same-origin-allow-popups" },
+        { "key": "Vary", "value": "Origin" }
       ]
     }
   ],
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/$1" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
   ]
 }

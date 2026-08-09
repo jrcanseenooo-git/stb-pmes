@@ -128,8 +128,16 @@ function exportCSV() {
 onMounted(async () => {
   loading.value = true
   try {
-    const r = await auditApi.list()
+    // paginate() defaults to 50; the live audit log already holds 248 entries,
+    // so the trail was showing only its most recent page with no indication that
+    // anything was missing. An audit view that silently hides records is worse
+    // than one that is slow.
+    const r = await auditApi.list({ pageSize: 1000 })
     rows.value = r?.items || (Array.isArray(r) ? r : [])
+    const total = Number(r?.total)
+    if (Number.isFinite(total) && total > rows.value.length) {
+      showToast(`Showing the latest ${rows.value.length} of ${total} entries. Use the filters to narrow the range.`, 'error')
+    }
   } catch (e) { console.error(e); showToast('Could not load audit log. Please try again.', 'error') }
   finally { loading.value = false }
 })

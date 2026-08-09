@@ -162,15 +162,6 @@ const DatabaseMaintenanceService = (() => {
       ]
     },
     {
-      name: SHEET.IPAT_EDAP,
-      headers: [
-        'id','ipatId','rateeId','rateeName',
-        'rows',
-        'sem1Status','sem1Notes','sem2Status','sem2Notes',
-        'createdAt','updatedAt'
-      ]
-    },
-    {
       name: SHEET.IPAT_ASSIGNMENTS,
       headers: [
         'id','semester','year',

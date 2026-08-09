@@ -2,6 +2,7 @@
 const SHEET = {
   USERS:              'Users',
   DIVISIONS:          'Divisions',
+  SECTIONS:           'Sections',
   KRAS:               'KRAs',
   INDICATORS:         'SuccessIndicators',
   ACCOMPLISHMENTS:    'Accomplishments',
@@ -25,11 +26,12 @@ const SHEET = {
   IPAT_RECORDS:      'IPATRecords',
   IPAT_CBC_RATINGS:  'IPATCBCRatings',
   IPAT_JF_RATINGS:   'IPATJFRatings',
-  IPAT_EDAP:         'IPATEdap',
   IPAT_ASSIGNMENTS:  'IPATRaterAssignments',
 
   ASSESSMENT_CONTENT:    'AssessmentContent',
-  ASSESSMENT_CATEGORIES: 'AssessmentCategories'
+  ASSESSMENT_CATEGORIES: 'AssessmentCategories',
+  OFFICE_REGISTRY:       'OfficeRegistry',
+  OFFICE_ORG_OPTIONS:    'OfficeOrgOptions'
 }
 
 // ── Entry point: HTTP GET ──
@@ -128,7 +130,17 @@ function parseBody(e) {
 }
 
 function respond(status, success, data, message) {
-  const payload = JSON.stringify({ success: success, data: data !== undefined ? data : null, message: message || null })
+  // `status` used to be accepted and then thrown away. Every response leaves here
+  // as HTTP 200 (an Apps Script constraint), so with no status in the body the
+  // client had no way to tell a 401 from a 400 — it fell back to a generic
+  // "check your input" message even when the real answer was "sign in again".
+  // Carrying the code in the envelope lets the frontend react correctly.
+  const payload = JSON.stringify({
+    success: success,
+    status: status || (success ? 200 : 400),
+    data: data !== undefined ? data : null,
+    message: message || null
+  })
   return ContentService
     .createTextOutput(payload)
     .setMimeType(ContentService.MimeType.JSON)

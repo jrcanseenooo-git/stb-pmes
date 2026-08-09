@@ -11,16 +11,93 @@ const BASE_URL = import.meta.env.DEV
   ? normalizeApiBaseUrl(import.meta.env.VITE_API_PROXY_URL, '/gas')
   : normalizeApiBaseUrl(import.meta.env.VITE_API_PROXY_URL, '/api/gas')
 
+const MAX_IN_FLIGHT = Number(import.meta.env.VITE_API_MAX_IN_FLIGHT || 4)
+const API_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS || 45000)
+const requestQueue = []
+const inFlightReads = new Map()
+let activeRequests = 0
+
+function stableStringify(value) {
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value).sort().map(k => `${JSON.stringify(k)}:${stableStringify(value[k])}`).join(',')}}`
+  }
+  return JSON.stringify(value)
+}
+
+function readKey(route, data) {
+  return `${route}:${stableStringify(data || {})}`
+}
+
+function drainQueue() {
+  while (activeRequests < MAX_IN_FLIGHT && requestQueue.length) {
+    const item = requestQueue.shift()
+    activeRequests += 1
+    item.run()
+      .then(item.resolve, item.reject)
+      .finally(() => {
+        activeRequests -= 1
+        drainQueue()
+      })
+  }
+}
+
+function enqueueRequest(run) {
+  return new Promise((resolve, reject) => {
+    requestQueue.push({ run, resolve, reject })
+    drainQueue()
+  })
+}
+
 // ── Core transport ─────────────────────────────
 
-async function getToken() {
+// Marker for "this session is no longer valid" — distinct from a transient
+// transport hiccup. Callers surface it as a sign-in prompt rather than a generic
+// failure, and it is never retried.
+const AUTH_EXPIRED = Symbol('authExpired')
+const AUTH_REJECTED = Symbol('authRejected')
+
+function authExpiredError() {
+  const e = new Error('Your session has expired. Please sign in again.')
+  e[AUTH_EXPIRED] = true
+  // Announce it once so the app can route to sign-in. A window event rather than
+  // a store import keeps this module free of a circular dependency on the auth
+  // store, which imports this file.
+  try { window.dispatchEvent(new CustomEvent('pmes:auth-expired')) } catch (_) { /* SSR / no DOM */ }
+  return e
+}
+
+function authRejectedError() {
+  const e = new Error('The current session token was rejected.')
+  e[AUTH_REJECTED] = true
+  return e
+}
+
+async function getToken({ forceRefresh = false } = {}) {
+  const user = auth.currentUser
+  if (!user) throw authExpiredError()
   try {
-    const user = auth.currentUser
-    return user ? await user.getIdToken(false) : null
+    return await user.getIdToken(forceRefresh)
   } catch (e) {
-    console.warn('[PMES] Token error:', e.message)
-    return null
+    // A 400 from identitytoolkit here means the refresh token was rejected —
+    // the session is genuinely dead. Previously this was swallowed and null was
+    // returned, so every subsequent call went out with an empty token and came
+    // back 401. One expired session became a wall of "Unauthorized" errors with
+    // nothing telling the user to sign in again.
+    console.warn('[PMES] Token refresh failed:', e?.code || e?.message)
+    throw authExpiredError()
   }
+}
+
+// Marker for "the response was not JSON at all" — an Apps Script HTML error page
+// or a 404 from the googleusercontent echo URL. These are transient and safe to
+// retry for reads, unlike a well-formed {success:false} rejection.
+const TRANSIENT = Symbol('transient')
+
+function transientError(message) {
+  const e = new Error(message)
+  e[TRANSIENT] = true
+  return e
 }
 
 async function parseApiResponse(res) {
@@ -29,25 +106,33 @@ async function parseApiResponse(res) {
   try {
     data = JSON.parse(text)
   } catch {
-    // Google returned an HTML error page (transient outage, etc.)
-    throw new Error('The server returned an unexpected response. Please try again.')
+    // Google returned an HTML error page (transient outage, echo-URL 404, etc.)
+    throw transientError('The server returned an unexpected response. Please try again.')
   }
   if (!data.success) {
-    if (import.meta.env.DEV && data.message) {
-      console.warn('[PMES] API request was rejected:', data.message)
-    }
-    throw new Error(userSafeApiMessage(res))
+    // Every response is HTTP 200 by Apps Script necessity, so the real code
+    // travels in the body. The backend already scrubs >=500 messages to a
+    // generic string and writes <500 messages for end users, so data.message is
+    // both safe and more specific than anything we can infer here.
+    const status = Number(data.status) || res.status || 0
+    const message = data.message || userSafeApiMessage(status)
+    if (import.meta.env.DEV && status !== 401) console.warn('[PMES] API rejected:', status, message)
+
+    if (status === 401) throw authRejectedError()
+    const err = new Error(message)
+    err.status = status
+    throw err
   }
   return data.data
 }
 
-function userSafeApiMessage(res) {
-  if (res.status === 401) return 'Your session expired. Please sign in again.'
-  if (res.status === 403) return 'You do not have permission to perform this action.'
-  if (res.status === 404) return 'The requested record could not be found.'
-  if (res.status === 409) return 'This record was already updated. Please refresh and try again.'
-  if (res.status === 429) return 'Too many requests. Please wait a moment and try again.'
-  if (res.status >= 500) return 'Something went wrong on the server. Please try again.'
+function userSafeApiMessage(status) {
+  if (status === 401) return 'Your session expired. Please sign in again.'
+  if (status === 403) return 'You do not have permission to perform this action.'
+  if (status === 404) return 'The requested record could not be found.'
+  if (status === 409) return 'This record was already updated. Please refresh and try again.'
+  if (status === 429) return 'Too many requests. Please wait a moment and try again.'
+  if (status >= 500) return 'Something went wrong on the server. Please try again.'
   return 'Could not complete the request. Please check your input and try again.'
 }
 
@@ -55,19 +140,91 @@ function userSafeApiMessage(res) {
 // method, token and payload. The browser talks to a same-origin proxy so Apps
 // Script CORS never blocks local or production usage.
 async function gasSend(method, route, data = {}) {
-  const token = await getToken()
-  const res = await fetch(BASE_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    cache: 'no-store',
-    body: JSON.stringify({ route, _method: method, token: token || '', ...(data || {}) })
-  })
-  return parseApiResponse(res)
+  const send = async ({ forceRefresh = false } = {}) => {
+    const token = await getToken({ forceRefresh })
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), API_TIMEOUT_MS)
+    const res = await enqueueRequest(() => fetch(BASE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      cache: 'no-store',
+      signal: controller.signal,
+      body: JSON.stringify({ route, _method: method, token, ...(data || {}) })
+    }).finally(() => {
+      clearTimeout(timer)
+    }))
+    return parseApiResponse(res)
+  }
+
+  if (method === 'GET') {
+    const key = readKey(route, data)
+    if (inFlightReads.has(key)) return inFlightReads.get(key)
+    // NOTE THE TRAILING () — this must be invoked immediately.
+    // Without it, `promise` held the async function itself rather than the
+    // promise it returns. The function was then cached and returned, and
+    // `await`ing a plain function yields the function, so EVERY GET resolved to
+    // a function instead of data: r.items was undefined and every list in the
+    // app rendered empty with no error.
+    const promise = (async () => {
+      try {
+        return await send()
+      } catch (first) {
+        if (first?.[AUTH_REJECTED] && auth.currentUser) {
+          try {
+            return await send({ forceRefresh: true })
+          } catch (second) {
+            if (second?.[AUTH_REJECTED]) throw authExpiredError()
+            throw second
+          }
+        }
+        if (first?.[AUTH_REJECTED]) throw authExpiredError()
+        throw first
+      } finally {
+        inFlightReads.delete(key)
+      }
+    })()
+    inFlightReads.set(key, promise)
+    return promise
+  }
+
+  try {
+    return await send()
+  } catch (first) {
+    // A cached ID token can expire between page load and request. Force one
+    // refresh and try again before declaring the session dead — this is safe for
+    // any verb because the first attempt was rejected at the auth gate, before
+    // the router ran, so nothing was applied.
+    if (first?.[AUTH_REJECTED] && auth.currentUser) {
+      try {
+        return await send({ forceRefresh: true })
+      } catch (second) {
+        if (second?.[AUTH_REJECTED]) throw authExpiredError()
+        throw second
+      }
+    }
+    if (first?.[AUTH_REJECTED]) throw authExpiredError()
+    throw first
+  }
 }
 
-const gasGet       = (route, params = {}) => gasSend('GET', route, params)
-const gasWrite     = (method, route, body = {}) => gasSend(method, route, body)
-const gasWriteBody = (method, route, body = {}) => gasSend(method, route, body)
+async function gasSendWithRetry(method, route, data = {}) {
+  try {
+    return await gasSend(method, route, data)
+  } catch (err) {
+    // Retry ONLY a transport-level hiccup, and ONLY for reads. A GET is
+    // idempotent so a second attempt cannot double-write; POST/PUT/PATCH/DELETE
+    // are never retried because the first attempt may already have applied.
+    // An API rejection and an expired session are real answers, not hiccups,
+    // and are rethrown untouched.
+    if (!err?.[TRANSIENT] || method !== 'GET') throw err
+    await new Promise(r => setTimeout(r, 400))
+    return gasSend(method, route, data)
+  }
+}
+
+const gasGet       = (route, params = {}) => gasSendWithRetry('GET', route, params)
+const gasWrite     = (method, route, body = {}) => gasSendWithRetry(method, route, body)
+const gasWriteBody = (method, route, body = {}) => gasSendWithRetry(method, route, body)
 
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
@@ -83,6 +240,7 @@ function fileToBase64(file) {
 export const authApi = {
   me:        ()                        => gasGet('auth/me'),
   whoami:    ()                        => gasGet('auth/whoami'),
+  backendInfo: ()                      => gasGet('auth/backend-info'),
   registerOptions: ()                  => gasGet('auth/register-options'),
   register:  (data)                    => gasWriteBody('POST', 'auth/register', data),
   logAction: (action, module, details) => gasGet('auth/log', { action, module, details })
@@ -122,6 +280,25 @@ export const focalAssignmentsApi = {
 export const maintenanceApi = {
   previewFreshSchema: () => gasGet('maintenance/fresh-schema'),
   rebuildFreshSchema: (confirmation) => gasWrite('POST', 'maintenance/fresh-schema', { confirmation })
+}
+
+export const officeRegistryApi = {
+  list:     (p = {})   => gasGet('office-registry', p),
+  get:      (id)       => gasGet(`office-registry/${id}`),
+  spec:     ()         => gasGet('office-registry/spec'),
+  monitoring:(p = {})  => gasGet('office-registry/monitoring', p),
+  provision:(data)     => gasWrite('POST', 'office-registry', data),
+  orgOptions:(id)      => gasGet(`office-registry/${id}/org-options`),
+  saveOrgOptions:(id, data) => gasWrite('PUT', `office-registry/${id}/org-options`, data),
+  validate: (id)       => gasWrite('POST', `office-registry/${id}/validate`),
+  activate: (id)       => gasWrite('POST', `office-registry/${id}/activate`)
+}
+
+export const officePersonnelApi = {
+  list:       (p = {})   => gasGet('office-personnel', p),
+  create:     (data)     => gasWrite('POST', 'office-personnel', data),
+  update:     (id, data) => gasWrite('PUT', `office-personnel/${id}`, data),
+  deactivate: (id)       => gasWrite('PATCH', `office-personnel/${id}/deactivate`)
 }
 
 // ── KRAs & Success Indicators ──────────────────
@@ -175,6 +352,12 @@ export const assessmentContentApi = {
     rows: JSON.stringify(payload)
   }),
   seed:             (data = {})     => gasWrite('POST',  'assessment-content/seed', data)
+}
+
+export const assessmentRulesApi = {
+  list:         (p = {})      => gasGet('assessment-rules', p),
+  update:       (rules = [])  => gasWrite('PUT', 'assessment-rules', { rules }),
+  seedDefaults: ()            => gasWrite('POST', 'assessment-rules/seed-defaults')
 }
 
 // ── Accomplishments ────────────────────────────
@@ -242,10 +425,6 @@ export const ipatApi = {
   // Overall
   computeOverall: (id)          => gasWrite('POST',  `ipat/${id}/compute`),
 
-  // EDAP
-  saveEdap:       (id, data)    => gasWrite('POST',  `ipat/${id}/edap`, data),
-  getEdap:        (id)          => gasGet(`ipat/${id}/edap`),
-
   // Meta
   getThemes:        ()          => gasGet('ipat/themes'),
   getJFIndicators:  ()          => gasGet('ipat/jf-indicators')
@@ -270,6 +449,8 @@ export const ipatAssignmentsApi = {
 
 export const reportsApi = {
   list:     ()     => gasGet('reports'),
+  options:  ()     => gasGet('reports/options'),
+  preview:  (data) => gasWrite('POST', 'reports/preview', data),
   generate: (data) => gasWrite('POST', 'reports/generate', data),
   download: (id)   => gasGet(`reports/${id}/download`)
 }
@@ -378,6 +559,7 @@ export { ipcrfApi as ipcrf }
 export { kraLibraryApi as kraLibrary }
 export { assessmentContentApi as assessmentContent }
 export { assessmentCategoryApi as assessmentCategory }
+export { assessmentRulesApi as assessmentRules }
 
 // ── Default export ─────────────────────────────
 
@@ -387,10 +569,12 @@ export default {
   usersApi,
   focalAssignmentsApi,
   maintenanceApi,
+  officeRegistryApi,
   kraApi,
   kraLibraryApi,
   assessmentCategoryApi,
   assessmentContentApi,
+  assessmentRulesApi,
   accomplishmentsApi,
   movApi,
   evaluationApi,

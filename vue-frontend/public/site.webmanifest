@@ -1,7 +1,7 @@
 {
   "name": "Performance Monitoring and Evaluation System",
   "short_name": "PMES",
-  "description": "Social Technology Bureau performance monitoring and evaluation system.",
+  "description": "Innovation Cluster performance monitoring and evaluation system.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

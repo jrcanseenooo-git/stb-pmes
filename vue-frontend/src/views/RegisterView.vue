@@ -3,7 +3,7 @@
     <div class="ob-bg" aria-hidden="true"></div>
     <div class="ob-shell">
       <div class="ob-hero">
-        <div class="ob-kicker">SOCIAL TECHNOLOGY BUREAU</div>
+        <div class="ob-kicker">DSWD INNOVATION CLUSTER</div>
         <h1 class="ob-title">Performance Monitoring &amp; Evaluation System</h1>
       </div>
 
@@ -27,6 +27,14 @@
         <transition name="ob-fade">
           <div v-if="error" class="ob-error" role="alert">{{ error }}</div>
         </transition>
+
+        <div v-if="checkingAccount" class="ob-note">
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+            <circle cx="7.5" cy="7.5" r="6.3" stroke="#1D4ED8" stroke-width="1.3"/>
+            <path d="M7.5 4.4v3.6M7.5 10v.1" stroke="#1D4ED8" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+          Checking your approved PMES account...
+        </div>
 
         <form class="ob-form" @submit.prevent="submit" novalidate>
           <div class="ob-section-label">Profile details</div>
@@ -77,27 +85,49 @@
 
           <div class="ob-grid">
             <div class="ob-field ob-full">
+              <label>Office / Program</label>
+              <select v-model="form.officeId" :disabled="submitting">
+                <option value="">Select office / program...</option>
+                <option v-for="o in options.offices" :key="o.officeId" :value="o.officeId">
+                  {{ o.officeName }}
+                </option>
+              </select>
+              <span v-if="!isStbRegistration" class="ob-name-tip">
+                This registration will be reviewed as a limited office portal account.
+              </span>
+            </div>
+            <div class="ob-field ob-full">
               <label>
-                Division <span v-if="options.divisions.length" class="req">*</span>
+                Division <span class="ob-hint">{{ divisionOptionsForOffice.length ? 'optional' : 'admin confirms' }}</span>
                 <button v-if="optionsError" type="button" class="ob-name-reset" @click="loadOptions" :disabled="loadingOptions">
                   {{ loadingOptions ? 'Retrying…' : 'Retry' }}
                 </button>
               </label>
-              <select v-model="form.divisionId" :disabled="submitting || loadingOptions">
-                <option value="">{{ loadingOptions ? 'Loading divisions…' : (options.divisions.length ? 'Select division…' : 'Division unavailable — admin will assign') }}</option>
-                <option v-for="d in options.divisions" :key="d.id" :value="d.id">{{ d.name }}</option>
+              <select v-model="form.divisionId" :disabled="submitting || !divisionOptionsForOffice.length">
+                <option value="">{{ divisionSelectPlaceholder }}</option>
+                <option v-for="d in divisionOptionsForOffice" :key="d.id" :value="d.id">{{ d.name }}</option>
               </select>
               <span v-if="optionsError" class="ob-name-tip" style="color:#B45309">{{ optionsError }}</span>
             </div>
             <div class="ob-field">
               <label>Section</label>
-              <input v-model.trim="form.section" type="text" placeholder="e.g. Children and Youth Section" :disabled="submitting"/>
+              <select v-model="form.section"
+                      :disabled="submitting || !form.divisionId || !sectionsForDivision.length">
+                <option value="">
+                  {{ sectionPlaceholder }}
+                </option>
+                <option v-for="s in sectionsForDivision" :key="s.id" :value="s.name">{{ s.name }}</option>
+              </select>
+              <span v-if="!sectionsForDivision.length && form.divisionId && !loadingOptions"
+                    class="ob-name-tip" style="color:#B45309">
+                No section list is available for the selected division. Please ask an administrator to confirm the reference table.
+              </span>
             </div>
             <div class="ob-field">
               <label>Requested Role <span class="ob-hint">admin confirms</span></label>
               <select v-model="form.role" :disabled="submitting">
                 <option value="">Select role…</option>
-                <option v-for="r in options.requestedRoles" :key="r" :value="r">{{ r }}</option>
+                <option v-for="r in requestedRolesForOffice" :key="r" :value="r">{{ r }}</option>
               </select>
             </div>
           </div>
@@ -112,6 +142,52 @@
         <button class="ob-signout" @click="signOut" :disabled="submitting">Not you? Sign out</button>
       </div>
     </div>
+
+    <transition name="ob-fade">
+      <div v-if="showConfirmModal" class="ob-modal-overlay" @click.self="showConfirmModal = false">
+        <div class="ob-modal">
+          <div class="ob-modal-hd">
+            <h3>Confirm registration details</h3>
+            <p>System Admin will validate this information before approving your account.</p>
+          </div>
+
+          <div class="ob-confirm-list">
+            <div class="ob-confirm-row">
+              <span>Office / Program</span>
+              <strong>{{ selectedOfficeName || 'No data' }}</strong>
+            </div>
+            <div class="ob-confirm-row">
+              <span>Full Name</span>
+              <strong>{{ fullName || 'No data' }}</strong>
+            </div>
+            <div class="ob-confirm-row">
+              <span>Division</span>
+              <strong :class="{ muted: !selectedDivisionName }">{{ selectedDivisionName || 'No data' }}</strong>
+            </div>
+            <div class="ob-confirm-row">
+              <span>Section</span>
+              <strong :class="{ muted: !form.section }">{{ form.section || 'No data' }}</strong>
+            </div>
+            <div class="ob-confirm-row">
+              <span>Requested Role</span>
+              <strong :class="{ muted: !form.role }">{{ form.role || 'No data' }}</strong>
+            </div>
+          </div>
+
+          <div class="ob-modal-note">
+            If access and assignment details are blank or uncertain, you can still submit. The System Admin will correct them in User Management before approval.
+          </div>
+
+          <div class="ob-modal-actions">
+            <button type="button" class="ob-modal-cancel" :disabled="submitting" @click="showConfirmModal = false">Review Again</button>
+            <button type="button" class="ob-modal-submit" :disabled="submitting" @click="submitConfirmed">
+              <span v-if="submitting" class="ob-spin"></span>
+              {{ submitting ? 'Submitting…' : 'Confirm & Submit' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
   </div>
 </template>
 
@@ -132,18 +208,101 @@ const initials = computed(() =>
 // Static option lists live in the frontend so they always render even if the
 // reference endpoint is unreachable. Only divisions must come from the server.
 const EMPLOYMENT_TYPES = ['Regular', 'Contract of Service (COS)', 'Casual', 'Job Order', 'Co-Terminus']
-const REQUESTED_ROLES  = ['Staff', 'Section Head', 'Division Chief', 'Assistant Bureau Director', 'Bureau Director']
+const REQUESTED_ROLES  = ['Technical Staff', 'Section Head', 'Division Chief', 'Assistant Bureau Director', 'Bureau Director']
+const FALLBACK_OFFICES = [
+  {
+    officeId: 'STB',
+    officeCode: 'STB',
+    officeName: 'Social Technology Bureau',
+    officeShortName: 'STB',
+    systemScope: 'STB_FULL'
+  }
+]
+const FALLBACK_DIVISIONS = [
+  { id: 'admin-pool', name: 'Admin Pool' },
+  { id: 'dfd', name: 'Design Formulation Division' },
+  { id: 'pid', name: 'Pilot Implementation Division' },
+  { id: 'staed', name: 'Social Technology Analysis and Evaluation Division' }
+]
+const FALLBACK_SECTIONS = [
+  { id: 'SEC-admin-office', divisionId: 'admin-pool', name: 'Office Admin Personnel' },
+  { id: 'SEC-dfd-cy', divisionId: 'dfd', name: 'Children and Youth Section' },
+  { id: 'SEC-dfd-omg', divisionId: 'dfd', name: 'Other Marginalized Groups Section' },
+  { id: 'SEC-dfd-wpo', divisionId: 'dfd', name: 'Women, Persons with Disability and Older Persons Section' },
+  { id: 'SEC-pid-cy', divisionId: 'pid', name: 'Children and Youth Section' },
+  { id: 'SEC-pid-omg', divisionId: 'pid', name: 'Other Marginalized Groups Section' },
+  { id: 'SEC-pid-wpo', divisionId: 'pid', name: 'Women, Persons with Disability and Older Persons Section' },
+  { id: 'SEC-staed-ev', divisionId: 'staed', name: 'Social Technology Evaluation Section' },
+  { id: 'SEC-staed-pm', divisionId: 'staed', name: 'Social Technology Portfolio Management Section' },
+  { id: 'SEC-staed-pr', divisionId: 'staed', name: 'Social Technology Promotion Section' }
+]
 
-const options = ref({ divisions: [], employmentTypes: EMPLOYMENT_TYPES, requestedRoles: REQUESTED_ROLES })
-const loadingOptions = ref(true)
+const options = ref({
+  offices: FALLBACK_OFFICES,
+  divisions: FALLBACK_DIVISIONS,
+  sections: FALLBACK_SECTIONS,
+  officeOptions: {},
+  employmentTypes: EMPLOYMENT_TYPES,
+  requestedRoles: REQUESTED_ROLES
+})
+
+// Sections belong to a division, so only offer the ones that fit the division
+// the registrant chose. Before a division is picked the list is empty and the
+// control shows "Choose a division first".
+const sectionsForDivision = computed(() =>
+  sectionOptionsForOffice.value.filter(s => String(s.divisionId) === String(form.value.divisionId))
+)
+const sectionPlaceholder = computed(() => {
+  if (!form.value.divisionId) return 'Choose a division first'
+  if (!sectionsForDivision.value.length) return 'No sections available'
+  return 'Select section...'
+})
+const selectedOfficeOrgOptions = computed(() =>
+  form.value.officeId ? (options.value.officeOptions?.[form.value.officeId] || null) : null
+)
+const divisionOptionsForOffice = computed(() =>
+  isStbRegistration.value
+    ? options.value.divisions
+    : (selectedOfficeOrgOptions.value?.divisions || [])
+)
+const sectionOptionsForOffice = computed(() =>
+  isStbRegistration.value
+    ? options.value.sections
+    : (selectedOfficeOrgOptions.value?.sections || [])
+)
+const requestedRolesForOffice = computed(() =>
+  selectedOfficeOrgOptions.value?.requestedRoles?.length
+    ? selectedOfficeOrgOptions.value.requestedRoles
+    : options.value.requestedRoles
+)
+const divisionSelectPlaceholder = computed(() => {
+  if (!form.value.officeId) return 'Select office / program first'
+  return divisionOptionsForOffice.value.length ? 'Select division...' : 'No divisions configured - admin will confirm'
+})
+const loadingOptions = ref(false)
 const optionsError = ref('')
 const submitting = ref(false)
 const error = ref('')
+const checkingAccount = ref(false)
+const showConfirmModal = ref(false)
 
 const form = ref({
   firstName: '', middleName: '', lastName: '', suffix: '',
-  position: '', employeeNo: '', type: 'Regular', divisionId: '', section: '', role: ''
+  position: '', employeeNo: '', type: 'Regular', officeId: '', divisionId: '', section: '', role: ''
 })
+
+const selectedOffice = computed(() =>
+  options.value.offices.find(o => String(o.officeId) === String(form.value.officeId)) || null
+)
+const selectedOfficeName = computed(() =>
+  selectedOffice.value?.officeName || ''
+)
+const isStbRegistration = computed(() =>
+  String(selectedOffice.value?.officeId || form.value.officeId || '').toUpperCase() === 'STB'
+)
+const selectedDivisionName = computed(() =>
+  divisionOptionsForOffice.value.find(d => d.id === form.value.divisionId)?.name || ''
+)
 
 // Full name on record: "First M.I. Last Suffix" — the middle name is shortened
 // to an initial with a dot (PH government standard). Editable, so the user can
@@ -160,17 +319,29 @@ function composeName() {
   const sfx = form.value.suffix.trim()
   return sfx ? `${core}${core ? ' ' : ''}${sfx}` : core
 }
+// Changing division invalidates any section already chosen — a DFD section is
+// not a valid PID section. Clear it rather than submit a mismatched pair, but
+// keep a value that still exists under the new division.
+watch(() => form.value.divisionId, () => {
+  if (!form.value.section) return
+  const stillValid = sectionsForDivision.value.some(s => s.name === form.value.section)
+  if (!stillValid) form.value.section = ''
+})
+
+watch(() => form.value.officeId, () => {
+  if (isStbRegistration.value) return
+  form.value.divisionId = ''
+  form.value.section = ''
+})
+
 watch(() => [form.value.firstName, form.value.middleName, form.value.lastName, form.value.suffix], () => {
   if (!fullNameTouched.value) fullName.value = composeName()
 })
 function onFullNameInput() { fullNameTouched.value = true }
 function resetFullName() { fullNameTouched.value = false; fullName.value = composeName() }
 
-// Division is required only when the list actually loaded; if it couldn't load,
-// the user can still submit and an admin assigns the division on approval.
 const canSubmit = computed(() =>
-  form.value.firstName.trim() && form.value.lastName.trim() && fullName.value.trim() &&
-  (options.value.divisions.length === 0 || !!form.value.divisionId)
+  form.value.firstName.trim() && form.value.lastName.trim() && fullName.value.trim() && form.value.officeId
 )
 
 // Prefill from the Google display name conservatively: last token is the
@@ -190,9 +361,12 @@ async function loadOptions() {
   try {
     const opts = await authApi.registerOptions()
     options.value = {
-      divisions:       opts?.divisions || [],
+      offices:         mergeOfficeOptions(opts?.offices),
+      divisions:       mergeDivisionOptions(opts?.divisions),
+      sections:        mergeSectionOptions(opts?.sections),
+      officeOptions:    normalizeOfficeOrgOptions(opts?.officeOptions),
       employmentTypes: opts?.employmentTypes?.length ? opts.employmentTypes : EMPLOYMENT_TYPES,
-      requestedRoles:  opts?.requestedRoles?.length  ? opts.requestedRoles  : REQUESTED_ROLES
+      requestedRoles:  normalizeRoleOptions(opts?.requestedRoles)
     }
     if (!options.value.divisions.length) {
       optionsError.value = 'No divisions were returned. You can still submit — an admin will assign your division on approval.'
@@ -205,6 +379,94 @@ async function loadOptions() {
   }
 }
 
+function mergeSectionOptions(sections = []) {
+  const merged = [...FALLBACK_SECTIONS, ...(Array.isArray(sections) ? sections : [])]
+  const seen = new Set()
+  return merged.filter(section => {
+    const key = `${section.divisionId || ''}:${section.name || ''}`.toLowerCase()
+    if (!section.divisionId || !section.name || seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
+function mergeOfficeOptions(offices = []) {
+  const merged = [...FALLBACK_OFFICES, ...(Array.isArray(offices) ? offices : [])]
+  const seen = new Set()
+  return merged.filter(office => {
+    const key = String(office.officeId || office.officeCode || '').toUpperCase()
+    if (!key || seen.has(key)) return false
+    seen.add(key)
+    return true
+  }).sort((a, b) => String(a.officeName || '').localeCompare(String(b.officeName || '')))
+}
+
+function mergeDivisionOptions(divisions = []) {
+  const merged = [...FALLBACK_DIVISIONS, ...(Array.isArray(divisions) ? divisions : [])]
+  const seen = new Set()
+  return merged.filter(division => {
+    const key = String(division.id || division.name || '').toLowerCase()
+    if (!key || seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
+function normalizeOfficeOrgOptions(officeOptions = {}) {
+  const normalized = {}
+  Object.entries(officeOptions || {}).forEach(([officeId, config]) => {
+    normalized[officeId] = {
+      divisions: normalizeOfficeDivisions(config?.divisions || []),
+      sections: normalizeOfficeSections(config?.sections || []),
+      requestedRoles: normalizeRoleOptions(config?.requestedRoles || [])
+    }
+  })
+  return normalized
+}
+
+function normalizeOfficeDivisions(divisions = []) {
+  const seen = new Set()
+  return (Array.isArray(divisions) ? divisions : []).filter(division => {
+    const key = String(division.id || division.name || '').toLowerCase()
+    if (!key || seen.has(key)) return false
+    seen.add(key)
+    return true
+  }).sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')))
+}
+
+function normalizeOfficeSections(sections = []) {
+  const seen = new Set()
+  return (Array.isArray(sections) ? sections : []).filter(section => {
+    const key = `${section.divisionId || ''}:${section.name || ''}`.toLowerCase()
+    if (!section.name || seen.has(key)) return false
+    seen.add(key)
+    return true
+  }).sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')))
+}
+
+function normalizeRoleOptions(roles = []) {
+  const source = Array.isArray(roles) && roles.length ? roles : REQUESTED_ROLES
+  return source.map(role => role === 'Staff' ? 'Technical Staff' : role)
+}
+
+async function recoverExistingAccount() {
+  checkingAccount.value = true
+  try {
+    await authStore.fetchProfile()
+    if (authStore.hasAccess) {
+      router.replace('/evaluation')
+      return true
+    }
+    if (authStore.needsActivation) {
+      router.replace('/auth/pending')
+      return true
+    }
+  } finally {
+    checkingAccount.value = false
+  }
+  return false
+}
+
 onMounted(async () => {
   const g = splitName(identity.value.name)
   form.value.firstName  = g.firstName
@@ -212,14 +474,26 @@ onMounted(async () => {
   form.value.lastName   = g.lastName
   fullName.value        = composeName()
   loadOptions()
+  if (!authStore.needsRegistration) recoverExistingAccount()
 })
 
 async function submit() {
-  if (!canSubmit.value) { error.value = 'Please provide your first name, last name, and division.'; return }
+  if (!form.value.firstName.trim() || !form.value.lastName.trim() || !fullName.value.trim()) {
+    error.value = 'Please provide your first name and last name.'
+    return
+  }
+  if (!form.value.officeId) {
+    error.value = 'Please select your office or program.'
+    return
+  }
+  error.value = ''
+  showConfirmModal.value = true
+}
+
+async function submitConfirmed() {
   error.value = ''
   submitting.value = true
   try {
-    const division = options.value.divisions.find(d => d.id === form.value.divisionId)
     await authStore.register({
       fullName:   fullName.value.trim(),
       firstName:  form.value.firstName,
@@ -229,13 +503,26 @@ async function submit() {
       position:   form.value.position,
       employeeNo: form.value.employeeNo,
       type:       form.value.type,
+      officeId:   selectedOffice.value.officeId,
       divisionId: form.value.divisionId,
-      division:   division?.name || '',
+      division:   selectedDivisionName.value,
       section:    form.value.section,
       role:       form.value.role
     })
+    showConfirmModal.value = false
     router.push('/auth/pending')
   } catch (e) {
+    if (e?.status === 409 || String(e?.message || '').toLowerCase().includes('account for this email already exists')) {
+      await authStore.fetchProfile()
+      if (authStore.hasAccess) {
+        router.replace('/evaluation')
+        return
+      }
+      if (authStore.needsActivation) {
+        router.replace('/auth/pending')
+        return
+      }
+    }
     error.value = 'Could not submit registration. Please check your details and try again.'
   } finally {
     submitting.value = false
@@ -256,7 +543,7 @@ async function signOut() {
 .ob-shell{position:relative;z-index:1;width:100%;max-width:600px;}
 
 .ob-hero{text-align:center;margin-bottom:18px;}
-.ob-kicker{font-size:10px;font-weight:800;letter-spacing:.24em;color:#8FB2E8;margin-bottom:7px;}
+.ob-kicker{max-width:min(92vw,720px);margin:0 auto 7px;font-size:10px;font-weight:800;line-height:1.35;letter-spacing:.08em;color:#8FB2E8;}
 .ob-title{font-size:16px;font-weight:800;color:#EAF1FB;letter-spacing:-.2px;margin:0;}
 
 .ob-card{background:#fff;border-radius:18px;padding:24px;box-shadow:0 30px 80px rgba(2,8,24,.55);}
@@ -284,6 +571,25 @@ async function signOut() {
 .ob-name-reset{margin-left:auto;background:none;border:none;color:#3B82F6;font-size:11px;font-weight:600;cursor:pointer;padding:0;}
 .ob-name-reset:hover{text-decoration:underline;}
 .ob-name-tip{font-size:10.5px;color:#94A3B8;line-height:1.4;}
+
+.ob-modal-overlay{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(3,10,24,.58);backdrop-filter:blur(4px);}
+.ob-modal{width:100%;max-width:440px;background:#fff;border-radius:16px;box-shadow:0 24px 80px rgba(2,8,24,.42);overflow:hidden;border:1px solid #E2E8F0;}
+.ob-modal-hd{padding:20px 22px 14px;border-bottom:1px solid #EEF2F7;background:#FAFCFF;}
+.ob-modal-hd h3{margin:0 0 4px;color:#0F172A;font-size:17px;font-weight:800;letter-spacing:-.2px;}
+.ob-modal-hd p{margin:0;color:#64748B;font-size:12.5px;line-height:1.45;}
+.ob-confirm-list{padding:14px 22px 2px;}
+.ob-confirm-row{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding:10px 0;border-bottom:1px solid #F1F5F9;}
+.ob-confirm-row span{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#94A3B8;}
+.ob-confirm-row strong{font-size:13px;color:#0F172A;text-align:right;line-height:1.35;}
+.ob-confirm-row strong.muted{color:#B45309;}
+.ob-modal-note{margin:14px 22px 0;border:1px solid #FDE68A;background:#FFFBEB;color:#92400E;border-radius:10px;padding:10px 12px;font-size:12px;line-height:1.45;}
+.ob-modal-actions{display:flex;justify-content:flex-end;gap:8px;padding:16px 22px 20px;}
+.ob-modal-cancel,.ob-modal-submit{border-radius:10px;padding:10px 14px;font-size:12.5px;font-weight:800;cursor:pointer;border:1px solid #DDE7F3;}
+.ob-modal-cancel{background:#fff;color:#475569;}
+.ob-modal-cancel:hover:not(:disabled){background:#F8FAFC;}
+.ob-modal-submit{display:inline-flex;align-items:center;justify-content:center;gap:7px;background:#1D4ED8;border-color:#1D4ED8;color:#fff;min-width:138px;}
+.ob-modal-submit:hover:not(:disabled){background:#1E40AF;border-color:#1E40AF;}
+.ob-modal-cancel:disabled,.ob-modal-submit:disabled{opacity:.6;cursor:not-allowed;}
 
 .ob-submit{width:100%;margin-top:20px;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px;border:none;border-radius:11px;background:linear-gradient(135deg,#2F6BE4,#1A56B0);color:#fff;font-size:14px;font-weight:700;cursor:pointer;transition:filter .15s,box-shadow .15s;box-shadow:0 8px 20px rgba(26,86,176,.32);}
 .ob-submit:hover:not(:disabled){filter:brightness(1.06);box-shadow:0 10px 26px rgba(26,86,176,.42);}

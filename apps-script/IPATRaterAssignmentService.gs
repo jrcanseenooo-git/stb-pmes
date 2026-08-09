@@ -44,6 +44,18 @@ const IPATRaterAssignmentService = (() => {
   const isObsoleteAssignment = (r) => ['JFPeer', 'JobFitnessPeer'].includes(String(r && r.raterType || ''))
   const activeProtocolAssignments = (rows) => rows.filter(r => !isObsoleteAssignment(r))
 
+  function withRatingWriteLock(work) {
+    const lock = LockService.getScriptLock()
+    if (!lock.tryLock(20000)) {
+      throw HttpError('The rating system is busy saving other submissions. Please try again in a moment.', 429)
+    }
+    try {
+      return work()
+    } finally {
+      lock.releaseLock()
+    }
+  }
+
   // ── Random selection with anti-repeat ────────────────────────────────────
   function _selectRandom(pool, excludeIds, prevId) {
     const eligible = pool.filter(u => !excludeIds.includes(u.id))
@@ -505,7 +517,7 @@ const IPATRaterAssignmentService = (() => {
 
   // ── MARK ASSIGNMENT COMPLETED ─────────────────────────────────────────────
 
-  function markCompleted(assignmentId, user) {
+  function markCompletedUnlocked(assignmentId, user) {
     const profile = AuthService.getProfile(user)
     const assignSheet = SpreadsheetService.getSheet(SHEET.IPAT_ASSIGNMENTS)
     const rows = SpreadsheetService.getAllRows(assignSheet)
@@ -520,7 +532,11 @@ const IPATRaterAssignmentService = (() => {
     return completeAssignmentFromRows(assignSheet, assignmentId, row, rows, user)
   }
 
-  function submitAssignmentRatings(assignmentId, body, user) {
+  function markCompleted(assignmentId, user) {
+    return withRatingWriteLock(() => markCompletedUnlocked(assignmentId, user))
+  }
+
+  function submitAssignmentRatingsUnlocked(assignmentId, body, user) {
     const profile = AuthService.getProfile(user)
     const assignSheet = SpreadsheetService.getSheet(SHEET.IPAT_ASSIGNMENTS)
     const rows = SpreadsheetService.getAllRows(assignSheet)
@@ -533,6 +549,9 @@ const IPATRaterAssignmentService = (() => {
       if (!isAdmin) throw HttpError('Unauthorized', 403)
     }
     if (!row.ipatRecordId) throw HttpError('Assignment has no linked assessment record', 400)
+    if (String(row.status || 'Pending') === 'Completed') {
+      throw HttpError('This rating assignment has already been submitted.', 409)
+    }
 
     let cbcRatings = body.cbcRatings || []
     let jfRatings  = body.jfRatings  || []
@@ -551,6 +570,10 @@ const IPATRaterAssignmentService = (() => {
       savedJF: jfRatings.length,
       ipatRecordId: row.ipatRecordId
     }
+  }
+
+  function submitAssignmentRatings(assignmentId, body, user) {
+    return withRatingWriteLock(() => submitAssignmentRatingsUnlocked(assignmentId, body, user))
   }
 
   // ── GET MY OWN RESULTS (ratee views their final score) ───────────────────
@@ -584,21 +607,9 @@ const IPATRaterAssignmentService = (() => {
       const pendingRaters   = assignments.filter(a => a.status !== 'Completed').map(a => a.raterType)
       const allComplete     = totalRaters > 0 && completedRaters === totalRaters
 
-      // Auto-compute on first view if all raters are done but scores are missing or incomplete
-      const needsCompute = allComplete && (!r.cbcScore || !r.overallScore || (r.cbcScore && !r.jfScore))
-      if (needsCompute) {
-        try {
-          IPATService.computeCBC(r.id, user)
-          try { IPATService.computeJF(r.id, user) } catch (je) {
-            Logger.log('[PMES] getMyResults computeJF skipped: ' + je.message)
-          }
-          IPATService.computeOverall(r.id, user)
-          const freshRec = SpreadsheetService.getRow(recSheet, r.id)
-          if (freshRec) r = freshRec
-        } catch (e) {
-          Logger.log('[PMES] getMyResults auto-compute failed for ' + r.id + ': ' + e.message)
-        }
-      }
+      // Reads must stay read-only under load. Final scores are computed by the
+      // locked submit/complete path when the last assignment is completed, not by
+      // every ratee opening the Results tab at the same time.
 
       const ntePct = Number(r.cbcNteDeductionPct || 0)
       const offenseDeduction = Number(r.cbcOffenseDeduction || 0)
@@ -649,6 +660,49 @@ const IPATRaterAssignmentService = (() => {
 
   // ── DELETE ALL ASSIGNMENTS FOR A PERIOD (admin, to regenerate) ────────────
 
+  // Dry run for deleteForPeriod. Destructive maintenance routes follow a
+  // GET-preview-then-POST-confirm pattern (see DatabaseMaintenanceService), so an
+  // administrator can see exactly what a reset would remove before running it.
+  function previewDeleteForPeriod(params, user) {
+    const profile = AuthService.getProfile(user)
+    if (profile.role !== 'System Administrator') {
+      throw HttpError('Unauthorized — System Administrator required', 403)
+    }
+
+    const sem = String(params.semester || '')
+    const yr  = String(params.year || '')
+    if (!sem || !yr) throw HttpError('semester and year are required', 400)
+
+    const counts = {}
+    const countIn = (sheetName, filter) => {
+      try {
+        counts[sheetName] = SpreadsheetService
+          .getAllRows(SpreadsheetService.getSheet(sheetName))
+          .filter(filter).length
+      } catch (e) { counts[sheetName] = 0 }
+    }
+
+    const inPeriod = r => String(r.semester) === sem && String(r.year) === yr
+    countIn(SHEET.IPAT_ASSIGNMENTS, inPeriod)
+    countIn(SHEET.IPAT_RECORDS,     inPeriod)
+    countIn(SHEET.IPAT_CBC_RATINGS, inPeriod)
+    countIn(SHEET.IPAT_JF_RATINGS,  inPeriod)
+
+
+    const total = Object.keys(counts).reduce((s, k) => s + counts[k], 0)
+    return {
+      semester: sem,
+      year: yr,
+      counts,
+      total,
+      destructive: true,
+      confirmationRequired: 'RESET ' + sem + ' ' + yr,
+      warning: 'This permanently removes every IPAT assignment, record, rating and ' +
+               'development plan for the period. Submitted ratings are NOT recoverable ' +
+               'from the application. Take a spreadsheet backup first.'
+    }
+  }
+
   function deleteForPeriod(semester, year, user) {
     const profile = AuthService.getProfile(user)
     if (!['System Administrator'].includes(profile.role)) throw HttpError('Unauthorized — System Administrator required', 403)
@@ -668,28 +722,10 @@ const IPATRaterAssignmentService = (() => {
       } catch(e) { counts[sheetName] = 0 }
     }
 
-    // Collect IPAT record IDs first (needed for EDAP which links via ipatId)
-    var recSheet = null
-    var periodRecordIds = new Set()
-    try {
-      recSheet = SpreadsheetService.getSheet(SHEET.IPAT_RECORDS)
-      SpreadsheetService.getAllRows(recSheet).forEach(function(r) {
-        if (String(r.semester) === sem && String(r.year) === yr) periodRecordIds.add(r.id)
-      })
-    } catch(e) {}
-
     purgeSheet(SHEET.IPAT_ASSIGNMENTS,  'semester', 'year')
     purgeSheet(SHEET.IPAT_RECORDS,      'semester', 'year')
     purgeSheet(SHEET.IPAT_CBC_RATINGS,  'semester', 'year')
     purgeSheet(SHEET.IPAT_JF_RATINGS,   'semester', 'year')
-
-    // EDAP links via ipatId, not semester/year
-    try {
-      var edapSheet = SpreadsheetService.getSheet(SHEET.IPAT_EDAP)
-      var edapRows  = SpreadsheetService.getAllRows(edapSheet).filter(function(r) { return periodRecordIds.has(r.ipatId) })
-      edapRows.forEach(function(r) { try { SpreadsheetService.hardDeleteRow(edapSheet, r.id) } catch(e) {} })
-      counts[SHEET.IPAT_EDAP] = edapRows.length
-    } catch(e) { counts[SHEET.IPAT_EDAP] = 0 }
 
     const total = Object.values(counts).reduce((s, n) => s + n, 0)
     AuditService.log('RESET_PERIOD', 'IPAT',
@@ -705,6 +741,7 @@ const IPATRaterAssignmentService = (() => {
     list,
     markCompleted,
     submitAssignmentRatings,
+    previewDeleteForPeriod,
     deleteForPeriod
   }
 })()

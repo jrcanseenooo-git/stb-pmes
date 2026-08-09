@@ -63,10 +63,23 @@ const FirebaseAuthService = (() => {
   }
 
   // ── Build a signed JWT and exchange it for an access token ──
+  // Service-account access tokens are valid for an hour, but this signed a fresh
+  // RSA-SHA256 JWT and did a full OAuth exchange on EVERY call — two extra
+  // network round trips plus a signing operation before the real request could
+  // start. That is the bulk of the wait when approving a user. Cache it in
+  // CacheService (shared across executions) and re-use it until it nearly
+  // expires. A cache failure just falls through to minting a new one.
+  const ADMIN_TOKEN_CACHE_KEY = 'fb_admin_token'
+
   function getAdminToken() {
     if (!CLIENT_EMAIL || !PRIVATE_KEY) {
       throw new Error('Missing FIREBASE_CLIENT_EMAIL or FIREBASE_PRIVATE_KEY in Script Properties')
     }
+
+    try {
+      const cached = CacheService.getScriptCache().get(ADMIN_TOKEN_CACHE_KEY)
+      if (cached) return cached
+    } catch (e) { /* cache unavailable — mint a fresh token below */ }
 
     const now     = Math.floor(Date.now() / 1000)
     const header  = Utilities.base64EncodeWebSafe(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))
@@ -96,6 +109,14 @@ const FirebaseAuthService = (() => {
     if (!tokenResult.access_token) {
       throw new Error('Failed to get access token: ' + JSON.stringify(tokenResult))
     }
+
+    // Cache for slightly less than the token's own lifetime so it is never
+    // served past expiry. Google returns expires_in (typically 3600s); hold it
+    // for that minus a 5-minute safety margin, capped at CacheService's 6h max.
+    try {
+      const ttl = Math.max(60, Math.min(21600, (Number(tokenResult.expires_in) || 3600) - 300))
+      CacheService.getScriptCache().put(ADMIN_TOKEN_CACHE_KEY, tokenResult.access_token, ttl)
+    } catch (e) { /* non-fatal: the token still works, it just won't be re-used */ }
 
     return tokenResult.access_token
   }
@@ -268,6 +289,7 @@ const FirebaseAuthService = (() => {
   function testSetup() {
     Logger.log('Testing Firebase Service Account access...')
     Logger.log('Project ID:    ' + PROJECT_ID)
+    const testEmail = PROPS.getProperty('FIREBASE_TEST_EMAIL')
     Logger.log('Client Email:  ' + (CLIENT_EMAIL || '❌ NOT SET'))
     Logger.log('Private Key:   ' + (PRIVATE_KEY ? '✅ set (' + PRIVATE_KEY.length + ' chars)' : '❌ NOT SET'))
 
@@ -275,7 +297,12 @@ const FirebaseAuthService = (() => {
       const token = getAdminToken()
       Logger.log('✅ Access token obtained (length: ' + token.length + ')')
 
-      const admin = getUserByEmail('jrbcancino@dswd.gov.ph')
+      if (!testEmail) {
+        Logger.log('Set FIREBASE_TEST_EMAIL to test account lookup.')
+        return
+      }
+
+      const admin = getUserByEmail(testEmail)
       if (admin) {
         Logger.log('✅ Firebase Admin API working! Found user: ' + admin.email)
         Logger.log('   UID: ' + admin.localId)

@@ -3,7 +3,7 @@
     <div class="pd-bg" aria-hidden="true"></div>
     <div class="pd-shell">
       <div class="pd-hero">
-        <div class="pd-kicker">SOCIAL TECHNOLOGY BUREAU</div>
+        <div class="pd-kicker">DSWD INNOVATION CLUSTER</div>
         <h1 class="pd-hero-title">Performance Monitoring &amp; Evaluation System</h1>
       </div>
 
@@ -91,7 +91,7 @@ async function signOut() {
 .pd-shell{position:relative;z-index:1;width:100%;max-width:460px;}
 
 .pd-hero{text-align:center;margin-bottom:18px;}
-.pd-kicker{font-size:10px;font-weight:800;letter-spacing:.24em;color:#8FB2E8;margin-bottom:7px;}
+.pd-kicker{max-width:min(92vw,720px);margin:0 auto 7px;font-size:10px;font-weight:800;line-height:1.35;letter-spacing:.08em;color:#8FB2E8;}
 .pd-hero-title{font-size:16px;font-weight:800;color:#EAF1FB;letter-spacing:-.2px;margin:0;}
 
 .pd-card{background:#fff;border-radius:18px;padding:30px 26px;text-align:center;box-shadow:0 30px 80px rgba(2,8,24,.55);}

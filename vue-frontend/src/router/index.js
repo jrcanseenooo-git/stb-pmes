@@ -51,8 +51,23 @@ const routes = [
         path: "evaluation",
         component: () => import("@/views/EvaluationView.vue"),
       },
+      { path: "unauthorized", component: () => import("@/views/UnauthorizedView.vue") },
       { path: "audit", component: () => import("@/views/AuditView.vue") },
-      { path: "users", component: () => import("@/views/UsersView.vue") },
+      {
+        path: "users",
+        component: () => import("@/views/UsersView.vue"),
+        meta: { anyPermission: ['manage_users', 'manage_office_users'] },
+      },
+      {
+        path: "office-registry",
+        component: () => import("@/views/OfficeRegistryView.vue"),
+        meta: { anyPermission: ['manage_office_registry', 'provision_office_spreadsheets', 'validate_office_spreadsheets', 'view_cluster_monitoring'] },
+      },
+      {
+        path: "office-personnel",
+        component: () => import("@/views/OfficePersonnelView.vue"),
+        meta: { officeAdminAllowed: true },
+      },
       { path: "profile", component: () => import("@/views/ProfileView.vue") },
     ],
   },
@@ -67,7 +82,7 @@ const router = createRouter({
   routes,
 });
 
-const EVALUATION_ROLLOUT_ALLOWED_PATHS = new Set(['/evaluation', '/profile'])
+const EVALUATION_ROLLOUT_ALLOWED_PATHS = new Set(['/evaluation', '/profile', '/office-personnel', '/users', '/reports', '/unauthorized'])
 
 function isEvaluationOnlyRollout(profile) {
   if (profile?.systemAccessMode) return profile.systemAccessMode !== 'full_access'
@@ -84,6 +99,11 @@ function hasFullSystemAccess(profile) {
     permissions.includes('manage_database') ||
     permissions.includes('manage_libraries') ||
     permissions.includes('manage_assessment_content') ||
+    permissions.includes('manage_office_registry') ||
+    permissions.includes('provision_office_spreadsheets') ||
+    permissions.includes('validate_office_spreadsheets') ||
+    permissions.includes('view_cluster_monitoring') ||
+    permissions.includes('view_bureau_monitoring') ||
     permissions.includes('view_audit') ||
     groups.includes('system-admin') ||
     groups.includes('user-manager') ||
@@ -108,6 +128,7 @@ router.beforeEach(async (to) => {
   if (to.meta.requiresFirebaseUser) {
     if (!auth.initialised) await auth.init();
     if (!auth.isAuthenticated) return { path: "/auth/login" };
+    if (to.name === "Register") await auth.fetchProfile();
     if (to.name === "Register" && !auth.needsRegistration) {
       return auth.needsActivation ? { path: "/auth/pending" } : { path: "/dashboard" };
     }
@@ -123,6 +144,20 @@ router.beforeEach(async (to) => {
   // Signed in but not yet provisioned / approved in PMES
   if (auth.needsRegistration) return { path: "/auth/register" };
   if (auth.needsActivation)   return { path: "/auth/pending" };
+  if (Array.isArray(to.meta.anyPermission) && to.meta.anyPermission.length) {
+    const permissions = auth.profile?.permissions || []
+    if (!to.meta.anyPermission.some(permission => permissions.includes(permission))) {
+      return { path: "/unauthorized" };
+    }
+  }
+  if (to.meta.officeAdminAllowed) {
+    const permissions = auth.profile?.permissions || []
+    const isOfficeAdmin = auth.profile?.systemScope === 'OFFICE_ADMIN' ||
+      auth.profile?.officeRole === 'OFFICE_ADMIN' ||
+      permissions.includes('manage_cluster_office_admins') ||
+      permissions.includes('manage_office_registry')
+    if (!isOfficeAdmin) return { path: "/unauthorized" };
+  }
   if (
     isEvaluationOnlyRollout(auth.profile) &&
     !hasFullSystemAccess(auth.profile) &&

@@ -3,6 +3,8 @@ import { ref, computed } from 'vue'
 import {
   signInWithEmailAndPassword,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signOut,
   onAuthStateChanged
 } from 'firebase/auth'
@@ -10,6 +12,66 @@ import { auth, googleProvider } from '@/firebase'
 import { authApi } from '@/services/api'
 
 const ALLOWED_DOMAIN = import.meta.env.VITE_ALLOWED_EMAIL_DOMAIN || 'dswd.gov.ph'
+const BOOTSTRAP_ADMIN_EMAILS = (import.meta.env.VITE_BOOTSTRAP_ADMIN_EMAILS || 'systemadmin@dswd.gov.ph')
+  .split(/[,\n|]+/)
+  .map(email => email.trim().toLowerCase())
+  .filter(Boolean)
+
+const SYSTEM_ADMIN_PERMISSIONS = [
+  'manage_users',
+  'manage_focal_assignments',
+  'manage_libraries',
+  'manage_assessment_content',
+  'generate_ipat_assignments',
+  'manage_ipat_scores',
+  'view_bureau_monitoring',
+  'view_division_monitoring',
+  'view_audit',
+  'manage_database'
+]
+
+function canonicalRole(value) {
+  const raw = String(value || '').trim()
+  const key = raw.toLowerCase().replace(/[\s_-]+/g, ' ')
+  const aliases = {
+    'system admin': 'System Administrator',
+    'system administrator': 'System Administrator',
+    'admin': 'System Administrator',
+    'administrator': 'System Administrator',
+    'bureau director': 'Bureau Director',
+    'assistant bureau director': 'Assistant Bureau Director',
+    'asst bureau director': 'Assistant Bureau Director',
+    'division chief': 'Division Chief',
+    'section head': 'Section Head',
+    'staff': 'Technical Staff',
+    'technical staff': 'Technical Staff'
+  }
+  return aliases[key] || raw
+}
+
+function normalizeList(value) {
+  if (Array.isArray(value)) return value
+  return String(value || '')
+    .split(/[,\n|]+/)
+    .map(v => v.trim())
+    .filter(Boolean)
+}
+
+function normalizeProfile(rawProfile) {
+  if (!rawProfile) return null
+  return {
+    ...rawProfile,
+    role: canonicalRole(rawProfile.role),
+    officeId: rawProfile.officeId || 'STB',
+    officeCode: rawProfile.officeCode || rawProfile.officeId || 'STB',
+    officeName: rawProfile.officeName || 'Social Technology Bureau',
+    systemScope: rawProfile.systemScope || 'STB_FULL',
+    officeRole: rawProfile.officeRole || 'STB_PERSONNEL',
+    centralRoles: normalizeList(rawProfile.centralRoles),
+    permissionGroups: normalizeList(rawProfile.permissionGroups),
+    permissions: normalizeList(rawProfile.permissions)
+  }
+}
 
 export const useAuthStore = defineStore('auth', () => {
   const user        = ref(null)    // Firebase user
@@ -24,7 +86,12 @@ export const useAuthStore = defineStore('auth', () => {
   // ── Computed ──
   const isAuthenticated = computed(() => !!user.value)
   const hasAccess       = computed(() => !!profile.value && !needsRegistration.value && !needsActivation.value)
-  const role            = computed(() => profile.value?.role ?? null)
+  const role            = computed(() => canonicalRole(profile.value?.role) || null)
+  const officeId        = computed(() => profile.value?.officeId || 'STB')
+  const officeName      = computed(() => profile.value?.officeName || 'Social Technology Bureau')
+  const systemScope     = computed(() => profile.value?.systemScope || 'STB_FULL')
+  const isStbFullScope  = computed(() => systemScope.value === 'STB_FULL')
+  const isClusterPortal = computed(() => ['CLUSTER_PORTAL', 'OFFICE_ADMIN', 'CLUSTER_ADMIN'].includes(systemScope.value))
 
   const fullName = computed(() =>
     profile.value?.fullName ||
@@ -55,6 +122,58 @@ export const useAuthStore = defineStore('auth', () => {
   const createdAt       = computed(() => profile.value?.createdAt      || '')
   const profileId       = computed(() => profile.value?.id             || '')
 
+  function isBootstrapAdminEmail(email) {
+    return BOOTSTRAP_ADMIN_EMAILS.includes(String(email || '').trim().toLowerCase())
+  }
+
+  function bootstrapAdminProfile() {
+    const email = user.value?.email || ''
+    if (!isBootstrapAdminEmail(email)) return null
+    return normalizeProfile({
+      id: 'USR-842232ae8d20',
+      uid: user.value?.uid || '',
+      email,
+      fullName: user.value?.displayName || 'System Admin',
+      role: 'System Administrator',
+      active: true,
+      pendingActivation: false,
+      permissionGroups: ['system-admin'],
+      permissions: SYSTEM_ADMIN_PERMISSIONS,
+      officeId: 'STB',
+      officeCode: 'STB',
+      officeName: 'Social Technology Bureau',
+      systemScope: 'CLUSTER_ADMIN',
+      officeRole: 'STB_PERSONNEL',
+      centralRoles: ['CLUSTER_SYSTEM_ADMIN'],
+      systemAccessMode: 'full_access'
+    })
+  }
+
+  function useBootstrapAdminProfile(reason) {
+    const fallback = bootstrapAdminProfile()
+    if (!fallback) return false
+    console.warn(`[PMES] Using bootstrap admin profile: ${reason}`)
+    profile.value = fallback
+    needsRegistration.value = false
+    needsActivation.value = false
+    return true
+  }
+
+  async function adoptFirebaseUser(firebaseUser) {
+    if (!firebaseUser) return false
+    if (!isAllowedEmail(firebaseUser.email)) {
+      await signOut(auth)
+      user.value = null
+      profile.value = null
+      needsRegistration.value = false
+      needsActivation.value = false
+      return false
+    }
+    user.value = firebaseUser
+    await fetchProfile()
+    return true
+  }
+
   // ── Domain check ──
   function isAllowedEmail(email) {
     if (!email) return false
@@ -70,27 +189,48 @@ export const useAuthStore = defineStore('auth', () => {
     needsActivation.value   = false
     try {
       const res = await authApi.whoami()
-      if (!res || !res.registered) {
+
+      // A missing or malformed response is a TRANSPORT failure, not an answer.
+      // Treating it as "not registered" showed an existing, active employee the
+      // self-registration form — which is both alarming and wrong (the backend
+      // would reject the submission with 409 anyway). Only an explicit
+      // registered === false means the account genuinely does not exist.
+      if (!res || typeof res !== 'object' || typeof res.registered === 'undefined') {
+        console.warn('[PMES] whoami returned no usable payload — leaving account state unresolved.')
+        if (useBootstrapAdminProfile('whoami returned no usable payload')) return
+        if (!profile.value) profile.value = null
+        needsRegistration.value = false
+        needsActivation.value = false
+        return
+      }
+
+      if (!res.registered) {
+        if (useBootstrapAdminProfile('whoami did not find a PMES row')) return
         profile.value = null
         needsRegistration.value = true
+        needsActivation.value = false
       } else if (res.pending || res.active === false) {
-        profile.value = res.profile || null
+        profile.value = normalizeProfile(res.profile)
         needsActivation.value = true
       } else {
-        profile.value = res.profile
+        profile.value = normalizeProfile(res.profile)
+        needsRegistration.value = false
+        needsActivation.value = false
       }
     } catch (e) {
       // Transient error (network/server). Don't misroute to registration —
-      // leave the user unresolved so the guard keeps them on login.
+      // leave a new user unresolved, but preserve an already-loaded profile so
+      // a background refresh cannot collapse the sidebar to low-access modules.
       console.warn('[PMES] Could not resolve account status:', e.message)
-      profile.value = null
+      if (useBootstrapAdminProfile(e.message || 'profile request failed')) return
+      if (!profile.value) profile.value = null
     }
   }
 
   // ── Update local profile (after user edits profile page) ──
   function patchProfile(updates) {
     if (profile.value) {
-      profile.value = { ...profile.value, ...updates }
+      profile.value = normalizeProfile({ ...profile.value, ...updates })
     }
   }
 
@@ -110,17 +250,32 @@ export const useAuthStore = defineStore('auth', () => {
   // ── Init: called once by router guard ──
   function init() {
     return new Promise((resolve) => {
-      const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
-        unsub()
-        if (firebaseUser) {
-          user.value = firebaseUser
-          const profileEmail = String(profile.value?.email || '').toLowerCase()
-          const loginEmail = String(firebaseUser.email || '').toLowerCase()
-          if (!profile.value || profileEmail !== loginEmail) await fetchProfile()
-        }
+      let settled = false
+      const finish = () => {
+        if (settled) return
+        settled = true
         initialised.value = true
         resolve()
-      })
+      }
+
+      ;(async () => {
+        try {
+          const redirectResult = await getRedirectResult(auth)
+          if (redirectResult?.user) {
+            await adoptFirebaseUser(redirectResult.user)
+            finish()
+            return
+          }
+        } catch (e) {
+          console.warn('[PMES] Google redirect result failed:', e?.code || e?.message)
+        }
+
+        const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+          unsub()
+          if (firebaseUser) await adoptFirebaseUser(firebaseUser)
+          finish()
+        })
+      })()
     })
   }
 
@@ -148,18 +303,15 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = true
     error.value   = null
     try {
-      const cred  = await signInWithPopup(auth, googleProvider)
-      const email = cred.user.email
-      if (!isAllowedEmail(email)) {
-        await signOut(auth)
-        throw new Error(`Only @${ALLOWED_DOMAIN} accounts are permitted.`)
-      }
-      user.value = cred.user
-      await fetchProfile()
+      const cred = await signInWithPopup(auth, googleProvider)
+      await adoptFirebaseUser(cred.user)
+      return { redirected: false }
     } catch (e) {
-      if (e.code === 'auth/popup-closed-by-user') {
-        error.value = 'Sign-in popup was closed. Please try again.'
-      } else if (e.code === 'auth/network-request-failed') {
+      if (e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user') {
+        await signInWithRedirect(auth, googleProvider)
+        return { redirected: true }
+      }
+      if (e.code === 'auth/network-request-failed') {
         error.value = 'Network error. Check your connection and try again.'
       } else {
         error.value = 'Google sign-in failed. Please try again.'
@@ -177,6 +329,24 @@ export const useAuthStore = defineStore('auth', () => {
     profile.value = null
     needsRegistration.value = false
     needsActivation.value   = false
+  }
+
+  // ── Dead session cleanup ──
+  // Firebase restores a persisted user on load even when its refresh token has
+  // been revoked. isAuthenticated is just !!user, so the guard would admit that
+  // user, every API call would come back 401, and nothing ever cleared it —
+  // leaving the app in a state where signing in again was the only escape and
+  // even that started from a poisoned baseline. Clear it properly instead.
+  // Returns false (and does nothing) if a sign-in is currently in flight, so it
+  // can never abort the login the user is actively performing.
+  async function sessionExpired() {
+    if (loading.value) return false
+    try { await signOut(auth) } catch (e) { /* already signed out */ }
+    user.value    = null
+    profile.value = null
+    needsRegistration.value = false
+    needsActivation.value   = false
+    return true
   }
 
   // ── Human-readable Firebase errors ──
@@ -198,13 +368,14 @@ export const useAuthStore = defineStore('auth', () => {
     needsRegistration, needsActivation,
     // Computed – auth
     isAuthenticated, hasAccess, role, fullName, initials, identity,
+    officeId, officeName, systemScope, isStbFullScope, isClusterPortal,
     // Computed – profile fields (FIX: previously missing)
     profileId, employeeNo,
     position, divisionName, divisionId,
     positionLevel, sgLevel, employmentType,
     isActive, createdAt,
     // Methods
-    init, loginWithEmail, loginWithGoogle, logout,
+    init, loginWithEmail, loginWithGoogle, logout, sessionExpired,
     fetchProfile, patchProfile, register
   }
 })

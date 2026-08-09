@@ -10,7 +10,10 @@ export const useUsersStore = defineStore('users', () => {
   async function fetchAll() {
     loading.value = true
     try {
-      const result = await usersApi.list()
+      // Backend paginate() defaults to pageSize 50, so an unparameterised call
+      // silently drops every account past the 50th — always the newest ones,
+      // since rows are appended. See UsersView.loadUsers for the same fix.
+      const result = await usersApi.list({ pageSize: 2000 })
       users.value  = result.items ?? result ?? []
     } catch (e) {
       console.warn('[Users] fetchAll failed:', e.message)

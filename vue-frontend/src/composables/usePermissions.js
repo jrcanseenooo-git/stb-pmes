@@ -4,8 +4,29 @@ import { useAuthStore } from '@/stores/auth'
 export function usePermissions() {
   const authStore = useAuthStore()
   const role      = computed(() => authStore.role)
-  const permissions = computed(() => authStore.profile?.permissions || [])
-  const permissionGroups = computed(() => authStore.profile?.permissionGroups || [])
+  const systemScope = computed(() => authStore.profile?.systemScope || 'STB_FULL')
+  const isOfficeAdminScope = computed(() =>
+    systemScope.value === 'OFFICE_ADMIN' ||
+    authStore.profile?.officeRole === 'OFFICE_ADMIN'
+  )
+  const permissions = computed(() => {
+    const base = authStore.profile?.permissions || []
+    if (!isOfficeAdminScope.value) return base
+    return Array.from(new Set(base.concat([
+      'manage_office_users',
+      'generate_ipat_assignments',
+      'manage_ipat_scores',
+      'view_bureau_monitoring',
+      'view_division_monitoring'
+    ])))
+  })
+  const permissionGroups = computed(() => {
+    const base = authStore.profile?.permissionGroups || []
+    if (!isOfficeAdminScope.value) return base
+    return Array.from(new Set(base.concat(['office-assessment-admin'])))
+  })
+  const isStbFullScope = computed(() => systemScope.value === 'STB_FULL')
+  const isClusterPortalScope = computed(() => ['CLUSTER_PORTAL', 'OFFICE_ADMIN', 'CLUSTER_ADMIN'].includes(systemScope.value))
 
   const hasPermission = (permission) => computed(() =>
     permissions.value.includes(permission)
@@ -16,7 +37,7 @@ export function usePermissions() {
   const isAsstDir     = computed(() => role.value === 'Assistant Bureau Director')
   const isDivChief    = computed(() => role.value === 'Division Chief')
   const isSectionHead = computed(() => role.value === 'Section Head')
-  const isStaff       = computed(() => role.value === 'Staff')
+  const isStaff       = computed(() => ['Staff', 'Technical Staff'].includes(role.value))
 
   const canViewAllDivisions = computed(() =>
     permissions.value.includes('view_bureau_monitoring') ||
@@ -26,6 +47,11 @@ export function usePermissions() {
   )
   const canApprove = computed(() => isAdmin.value || isDirector.value || isAsstDir.value || isDivChief.value || isSectionHead.value)
   const canManageUsers = computed(() => permissions.value.includes('manage_users') || isAdmin.value)
+  const canManageOfficeUsers = computed(() =>
+    permissions.value.includes('manage_office_users') ||
+    authStore.profile?.systemScope === 'OFFICE_ADMIN' ||
+    authStore.profile?.officeRole === 'OFFICE_ADMIN'
+  )
   const canManageLibraries = computed(() =>
     permissions.value.includes('manage_libraries') ||
     permissions.value.includes('manage_assessment_content') ||
@@ -33,8 +59,31 @@ export function usePermissions() {
   )
   const canManageFocalAssignments = computed(() => permissions.value.includes('manage_focal_assignments') || isAdmin.value)
   const canViewAudit = computed(() => permissions.value.includes('view_audit') || isAdmin.value || isDirector.value)
-  const canGenerateReports = computed(() => isAdmin.value || isDirector.value || isAsstDir.value || isDivChief.value || isSectionHead.value)
+  const canGenerateReports = computed(() =>
+    isAdmin.value ||
+    isDirector.value ||
+    isAsstDir.value ||
+    isDivChief.value ||
+    isSectionHead.value ||
+    permissions.value.includes('view_bureau_monitoring') ||
+    permissions.value.includes('view_cluster_monitoring') ||
+    permissions.value.includes('manage_office_users')
+  )
   const canManageDatabase = computed(() => permissions.value.includes('manage_database') || isAdmin.value)
+  const canManageOfficeRegistry = computed(() =>
+    permissions.value.includes('manage_office_registry') ||
+    permissions.value.includes('provision_office_spreadsheets') ||
+    permissions.value.includes('validate_office_spreadsheets')
+  )
+  const canViewClusterMonitoring = computed(() =>
+    permissions.value.includes('view_cluster_monitoring')
+  )
+  const canManageOfficePersonnel = computed(() =>
+    authStore.profile?.systemScope === 'OFFICE_ADMIN' ||
+    authStore.profile?.officeRole === 'OFFICE_ADMIN' ||
+    permissions.value.includes('manage_cluster_office_admins') ||
+    permissions.value.includes('manage_office_registry')
+  )
   const evaluationOnlyRollout = computed(() => {
     const mode = authStore.profile?.systemAccessMode
     if (mode) return mode !== 'full_access'
@@ -48,6 +97,9 @@ export function usePermissions() {
     permissions.value.includes('manage_database') ||
     permissions.value.includes('manage_libraries') ||
     permissions.value.includes('manage_assessment_content') ||
+    permissions.value.includes('manage_office_registry') ||
+    permissions.value.includes('provision_office_spreadsheets') ||
+    permissions.value.includes('view_cluster_monitoring') ||
     permissions.value.includes('view_audit') ||
     permissionGroups.value.includes('system-admin') ||
     permissionGroups.value.includes('user-manager') ||
@@ -62,9 +114,11 @@ export function usePermissions() {
 
   return {
     role, permissions, permissionGroups, hasPermission,
+    systemScope, isStbFullScope, isClusterPortalScope,
     isAdmin, isDirector, isAsstDir, isDivChief, isSectionHead, isStaff,
     canViewAllDivisions, canApprove, canManageUsers, canManageLibraries,
     canManageFocalAssignments, canViewAudit, canGenerateReports,
-    canManageDatabase, evaluationOnlyRollout, canAccessFullSystem, divisionScope
+    canManageDatabase, canManageOfficeRegistry, canViewClusterMonitoring, canManageOfficePersonnel, canManageOfficeUsers,
+    evaluationOnlyRollout, canAccessFullSystem, divisionScope
   }
 }

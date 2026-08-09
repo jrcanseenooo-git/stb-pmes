@@ -56,8 +56,14 @@ const AuditService = (() => {
     const { items } = list({ ...params, pageSize: 9999 }, user)
     const headers = ['timestamp','userEmail','userName','role','action','module','details']
     const lines   = [headers.join(',')]
+    const csvCell = value => {
+      const text = value instanceof Date
+        ? value.toISOString()
+        : String(value === undefined || value === null ? '' : value)
+      return `"${text.replace(/"/g, '""')}"`
+    }
     items.forEach(r => {
-      lines.push(headers.map(h => `"${(r[h] || '').replace(/"/g, '""')}"`).join(','))
+      lines.push(headers.map(h => csvCell(r[h])).join(','))
     })
     return { csv: lines.join('\n') }
   }

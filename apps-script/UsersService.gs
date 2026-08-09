@@ -6,11 +6,17 @@
  */
 
 const UsersService = (() => {
-  const USER_EXTRA_COLUMNS = ['tempPassword', 'tempPasswordHash', 'mustChangePassword', 'permissionGroups', 'permissions', 'pendingActivation', 'requestedRole', 'selfRegistered', 'firstName', 'middleName', 'lastName', 'suffix']
+  const USER_EXTRA_COLUMNS = [
+    'tempPassword', 'tempPasswordHash', 'mustChangePassword',
+    'permissionGroups', 'permissions',
+    'pendingActivation', 'requestedRole', 'selfRegistered',
+    'firstName', 'middleName', 'lastName', 'suffix',
+    'officeId', 'officeCode', 'officeName', 'systemScope', 'officeRole', 'centralRoles'
+  ]
 
   // ── SELF-REGISTER (Google-authenticated user with no PMES account yet) ──
   // Identity (uid/email) is taken from the verified token, never the form.
-  // Role is forced to Staff and the account is created inactive + pending, so
+  // Role is forced to Technical Staff and the account is created inactive + pending, so
   // a self-registering user can never grant themselves elevated access — an
   // admin reviews and sets the real role on approval.
   function selfRegister(body, user) {
@@ -26,6 +32,15 @@ const UsersService = (() => {
     })
     if (existing) throw HttpError('An account for this email already exists. Contact your administrator.', 409)
 
+    const office = typeof OfficeRegistryService !== 'undefined'
+      ? OfficeRegistryService.resolveRegistrationOffice(body)
+      : {
+        officeId: 'STB',
+        officeCode: 'STB',
+        officeName: 'Social Technology Bureau',
+        systemScope: 'STB_FULL',
+        officeRole: 'STB_PERSONNEL'
+      }
     const now = new Date().toISOString()
     const id  = SpreadsheetService.generateId('USR-')
     const newUser = {
@@ -37,7 +52,7 @@ const UsersService = (() => {
       middleName:         body.middleName || '',
       lastName:           body.lastName   || '',
       suffix:             body.suffix     || '',
-      role:               'Staff',                                   // forced — admin sets real role on approval
+      role:               'Technical Staff',                         // forced — admin sets real role on approval
       requestedRole:      body.role || '',                          // what the user asked for (hint only)
       positionLevel:      resolvePositionLevel(body.position || ''),
       divisionId:         body.divisionId   || '',
@@ -46,6 +61,12 @@ const UsersService = (() => {
       position:           body.position     || '',
       employeeNo:         body.employeeNo   || '',
       type:               body.type         || 'Regular',
+      officeId:           office.officeId,
+      officeCode:         office.officeCode,
+      officeName:         office.officeName,
+      systemScope:        office.systemScope,
+      officeRole:         office.officeRole,
+      centralRoles:       '',
       tempPassword:       '',
       tempPasswordHash:   '',
       mustChangePassword: false,                                    // Google-authenticated — no temp password
@@ -63,10 +84,11 @@ const UsersService = (() => {
 
   // ── DECLINE a pending registration (admin) ──
   function decline(id, user) {
-    AuthService.requirePermission(user, 'manage_users')
+    const profile = AuthService.getProfile(user)
     const sheet = _usersSheet()
     const row   = SpreadsheetService.getRow(sheet, id)
     if (!row) throw HttpError('User not found', 404)
+    requireUserAdministration_(profile, row)
     SpreadsheetService.updateRow(sheet, id, {
       deleted:           true,
       active:            false,
@@ -85,8 +107,13 @@ const UsersService = (() => {
 
     // Scope by role — staff only see their division
     const canManageUsers = AuthService.hasPermission(profile, 'manage_users')
+    const canManageOfficeUsers = hasOfficeUserAdministration_(profile)
     const canViewBureau = AuthService.hasPermission(profile, 'view_bureau_monitoring')
-    if (!canManageUsers && !canViewBureau) {
+    if (canManageUsers) {
+      // central user managers keep full scope
+    } else if (canManageOfficeUsers) {
+      rows = rows.filter(r => sameOffice_(r, profile))
+    } else if (!canViewBureau) {
       rows = rows.filter(r => r.divisionId === profile.divisionId)
     }
 
@@ -117,8 +144,13 @@ const UsersService = (() => {
     // anyone; everyone else is limited to their own division. This closes the
     // IDOR where any authenticated user could enumerate every user record by id.
     const canManageUsers = AuthService.hasPermission(profile, 'manage_users')
+    const canManageOfficeUsers = hasOfficeUserAdministration_(profile)
     const canViewBureau = AuthService.hasPermission(profile, 'view_bureau_monitoring')
-    if (!canManageUsers && !canViewBureau && row.id !== profile.id && row.divisionId !== profile.divisionId) {
+    if (!canManageUsers &&
+        !(canManageOfficeUsers && sameOffice_(row, profile)) &&
+        !canViewBureau &&
+        row.id !== profile.id &&
+        row.divisionId !== profile.divisionId) {
       throw HttpError('Access denied to this user record', 403)
     }
     return _safeUser(row)
@@ -138,7 +170,7 @@ const UsersService = (() => {
       uid:                '',   // will be set after Firebase creation
       email:              body.email        || '',
       fullName:           body.fullName     || '',
-      role:               body.role         || 'Staff',
+      role:               body.role         || 'Technical Staff',
       permissionGroups:   _normaliseList(body.permissionGroups),
       permissions:        _normaliseList(body.permissions),
       positionLevel:      body.positionLevel || resolvePositionLevel(body.position || ''),
@@ -148,6 +180,12 @@ const UsersService = (() => {
       position:           body.position     || '',
       employeeNo:         body.employeeNo   || '',
       type:               body.type         || 'Regular',
+      officeId:           body.officeId     || 'STB',
+      officeCode:         body.officeCode   || body.officeId || 'STB',
+      officeName:         body.officeName   || 'Social Technology Bureau',
+      systemScope:        body.systemScope  || 'STB_FULL',
+      officeRole:         body.officeRole   || 'STB_PERSONNEL',
+      centralRoles:       _normaliseList(body.centralRoles),
       tempPassword:       '',
       tempPasswordHash:   body.tempPassword ? _hashTempPassword(id, body.email, body.tempPassword) : '',
       mustChangePassword: true,
@@ -204,19 +242,31 @@ const UsersService = (() => {
   function update(id, body, user) {
     const profile = AuthService.getProfile(user)
     const canManageUsers = AuthService.hasPermission(profile, 'manage_users')
-    if (!canManageUsers && id !== profile.id) {
-      throw HttpError('Insufficient permissions', 403)
-    }
+    const canManageOfficeUsers = hasOfficeUserAdministration_(profile)
 
     const sheet    = _usersSheet()
     const existing = SpreadsheetService.getRow(sheet, id)
     if (!existing) throw HttpError('User not found', 404)
     const updateBody = { ...body }
+    const canEditOwn = id === profile.id
+    const canEditOfficeUser = canManageOfficeUsers && sameOffice_(existing, profile)
+    if (!canManageUsers && !canEditOfficeUser && !canEditOwn) {
+      throw HttpError('Insufficient permissions', 403)
+    }
+    if (canEditOfficeUser && !canManageUsers) {
+      stripOfficeAdminForbiddenFields_(updateBody)
+    }
+    if (canEditOwn && !canManageUsers && !canEditOfficeUser) {
+      stripSelfForbiddenFields_(updateBody)
+    }
     if (Object.prototype.hasOwnProperty.call(updateBody, 'permissionGroups')) {
       updateBody.permissionGroups = _normaliseList(updateBody.permissionGroups)
     }
     if (Object.prototype.hasOwnProperty.call(updateBody, 'permissions')) {
       updateBody.permissions = _normaliseList(updateBody.permissions)
+    }
+    if (Object.prototype.hasOwnProperty.call(updateBody, 'centralRoles')) {
+      updateBody.centralRoles = _normaliseList(updateBody.centralRoles)
     }
 
     // A tempPassword in the update body means this is a password reset.
@@ -263,15 +313,27 @@ const UsersService = (() => {
 
   // ── ACTIVATE user ──
   function activate(id, user) {
-    AuthService.requirePermission(user, 'manage_users')
+    const profile = AuthService.getProfile(user)
     const sheet   = _usersSheet()
     const row     = SpreadsheetService.getRow(sheet, id)
     if (!row) throw HttpError('User not found', 404)
+    requireUserAdministration_(profile, row)
 
-    SpreadsheetService.updateRow(sheet, id, {
+    const approvedRow = {
+      ...row,
       active:            true,
       pendingActivation: false,   // approving a self-registered account clears the pending flag
       updatedAt:         new Date().toISOString()
+    }
+    let officePersonnelSync = { synced: false, skipped: true }
+    if (shouldSyncOfficePersonnel_(approvedRow) && typeof OfficePersonnelService !== 'undefined') {
+      officePersonnelSync = OfficePersonnelService.syncFromCentralUser(approvedRow, user)
+    }
+
+    SpreadsheetService.updateRow(sheet, id, {
+      active:            approvedRow.active,
+      pendingActivation: approvedRow.pendingActivation,
+      updatedAt:         approvedRow.updatedAt
     })
 
     // Enable in Firebase
@@ -284,15 +346,16 @@ const UsersService = (() => {
     }
 
     AuditService.log('ACTIVATE_USER', 'Users', `Activated user: ${row.email}`, user)
-    return { success: true }
+    return { success: true, officePersonnelSync }
   }
 
   // ── DEACTIVATE user ──
   function deactivate(id, user) {
-    AuthService.requirePermission(user, 'manage_users')
+    const profile = AuthService.getProfile(user)
     const sheet = _usersSheet()
     const row   = SpreadsheetService.getRow(sheet, id)
     if (!row) throw HttpError('User not found', 404)
+    requireUserAdministration_(profile, row)
 
     SpreadsheetService.updateRow(sheet, id, {
       active:    false,
@@ -484,6 +547,50 @@ const UsersService = (() => {
       .map(s => s.trim())
       .filter(Boolean)
       .join(',')
+  }
+
+  function shouldSyncOfficePersonnel_(row) {
+    const officeId = String(row.officeId || row.officeCode || '').trim().toUpperCase()
+    const scope = String(row.systemScope || '').trim().toUpperCase()
+    return officeId && officeId !== 'STB' && ['CLUSTER_PORTAL', 'OFFICE_ADMIN'].indexOf(scope) >= 0
+  }
+
+  function hasOfficeUserAdministration_(profile) {
+    return AuthService.hasPermission(profile, 'manage_office_users') ||
+      String(profile.systemScope || '') === 'OFFICE_ADMIN' ||
+      String(profile.officeRole || '') === 'OFFICE_ADMIN'
+  }
+
+  function sameOffice_(row, profile) {
+    const rowOffice = String(row.officeId || row.officeCode || '').trim().toUpperCase()
+    const profileOffice = String(profile.officeId || profile.officeCode || '').trim().toUpperCase()
+    return !!rowOffice && !!profileOffice && rowOffice === profileOffice && rowOffice !== 'STB'
+  }
+
+  function requireUserAdministration_(profile, targetRow) {
+    if (AuthService.hasPermission(profile, 'manage_users')) return profile
+    if (hasOfficeUserAdministration_(profile) && sameOffice_(targetRow, profile)) return profile
+    throw HttpError('Access denied. User approval permission required for this office.', 403)
+  }
+
+  function stripOfficeAdminForbiddenFields_(body) {
+    if (String(body.role || '').trim() === 'System Administrator') {
+      throw HttpError('Office administrators cannot assign System Administrator role.', 403)
+    }
+    [
+      'id', 'uid', 'email', 'officeId', 'officeCode', 'officeName',
+      'systemScope', 'officeRole', 'centralRoles',
+      'permissionGroups', 'permissions',
+      'tempPassword', 'tempPasswordHash', 'mustChangePassword',
+      'active', 'pendingActivation', 'selfRegistered',
+      'createdAt', 'lastLoginAt', 'deleted'
+    ].forEach(key => delete body[key])
+  }
+
+  function stripSelfForbiddenFields_(body) {
+    Object.keys(body).forEach(key => {
+      if (['fullName', 'position', 'employeeNo'].indexOf(key) < 0) delete body[key]
+    })
   }
 
   return { list, get, create, update, updateOwnProfile, activate, deactivate, resetPassword, selfRegister, decline }

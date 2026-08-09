@@ -269,7 +269,7 @@ const activity      = ref([])
 
 // ── Computed from store ──
 const fullName    = computed(() => authStore.fullName)
-const role        = computed(() => authStore.role || 'Staff')
+const role        = computed(() => authStore.role || 'Profile not loaded')
 const userEmail   = computed(() => authStore.user?.email || '—')
 const initials    = computed(() => authStore.initials)
 const divisionName = computed(() => authStore.divisionName)

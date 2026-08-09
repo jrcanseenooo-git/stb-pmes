@@ -8,8 +8,8 @@
 
         <transition name="fade">
           <div v-if="!collapsed" class="brand-text">
-            <div class="brand-name">PERFORMANCE MONITORING</div>
-            <div class="brand-sub">EVALUATION SYSTEM</div>
+            <div class="brand-name">{{ brandTitleTop }}</div>
+            <div class="brand-sub">{{ brandTitleBottom }}</div>
           </div>
         </transition>
       </div>
@@ -123,8 +123,7 @@
           <div v-if="!collapsed" class="nav-label">{{ canAccessFullSystem ? 'Administration' : 'Account' }}</div>
           <div v-else class="nav-divider"></div>
 
-          <!-- Reports hidden until ReportsService backend is implemented -->
-          <!--<RouterLink to="/reports" class="nav-item" active-class="active" :title="collapsed ? 'Reports' : ''">
+          <RouterLink v-if="canGenerateReports" to="/reports" class="nav-item" active-class="active" :title="collapsed ? 'Reports' : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.4" />
@@ -134,7 +133,7 @@
             <transition name="fade">
               <span v-if="!collapsed" class="nav-label-text">Reports</span>
             </transition>
-          </RouterLink>-->
+          </RouterLink>
 
           <RouterLink v-if="canViewAudit" to="/audit" class="nav-item" active-class="active" :title="collapsed ? 'Audit Trail' : ''">
             <div class="nav-icon">
@@ -161,6 +160,30 @@
             </transition>
           </RouterLink>
 
+          <RouterLink v-if="canManageOfficeRegistry || canViewClusterMonitoring" to="/office-registry" class="nav-item" active-class="active" :title="collapsed ? 'Office Registry' : ''">
+            <div class="nav-icon">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M2.5 13.5h11M3.5 13.5V3.5h5v10M8.5 6.5h4v7M5.2 6h1.6M5.2 8.5h1.6M10.2 9h1.2M10.2 11h1.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <transition name="fade">
+              <span v-if="!collapsed" class="nav-label-text">Office Registry</span>
+            </transition>
+          </RouterLink>
+
+          <RouterLink v-if="canManageOfficePersonnel" to="/office-personnel" class="nav-item" active-class="active" :title="collapsed ? 'Office Personnel' : ''">
+            <div class="nav-icon">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <circle cx="5.5" cy="5" r="2.5" stroke="currentColor" stroke-width="1.4"/>
+                <circle cx="11.5" cy="6" r="1.8" stroke="currentColor" stroke-width="1.3"/>
+                <path d="M1.8 14c.4-2.8 2.2-4.4 3.7-4.4s3.3 1.6 3.7 4.4M9.5 13.8c.25-1.7 1.25-2.7 2-2.7s1.75 1 2 2.7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <transition name="fade">
+              <span v-if="!collapsed" class="nav-label-text">Office Personnel</span>
+            </transition>
+          </RouterLink>
+
           <RouterLink to="/profile" class="nav-item" active-class="active" :title="collapsed ? 'Settings' : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -183,7 +206,7 @@
           <transition name="fade">
             <div v-if="!collapsed" class="user-meta">
               <div class="user-name">{{ authStore.fullName || 'User' }}</div>
-              <div class="user-role">{{ authStore.role || 'Staff' }}</div>
+              <div class="user-role">{{ authStore.role || 'Profile not loaded' }}</div>
             </div>
           </transition>
 
@@ -305,7 +328,7 @@ import PasswordChangePrompt from '@/components/common/PasswordChangePrompt.vue'
 import LogoutConfirmModal from '@/components/common/LogoutConfirmModal.vue'
 
 const authStore = useAuthStore()
-const { canManageUsers, canManageLibraries, canManageFocalAssignments, canManageDatabase, canViewAudit, canAccessFullSystem } = usePermissions()
+const { canManageUsers, canManageOfficeUsers, canManageLibraries, canManageFocalAssignments, canManageDatabase, canManageOfficeRegistry, canViewClusterMonitoring, canManageOfficePersonnel, canViewAudit, canGenerateReports, canAccessFullSystem } = usePermissions()
 const notifStore = useNotificationsStore()
 const { confirm } = useConfirm()
 
@@ -315,6 +338,7 @@ const accomplishmentsUnread = computed(() =>
 )
 const canAccessUserManagement = computed(() =>
   canManageUsers.value ||
+  canManageOfficeUsers.value ||
   canManageFocalAssignments.value ||
   canManageDatabase.value
 )
@@ -333,6 +357,7 @@ const isMobile = ref(false)
 const showPwPrompt = ref(false)
 const showLogoutConfirm = ref(false)
 let notificationTimer = null
+let lastProfileRefreshAt = 0
 
 const titleMap = {
   '/dashboard': { title: 'Dashboard', sub: 'Bureau Overview' },
@@ -342,14 +367,19 @@ const titleMap = {
   '/accomplishments': { title: 'Accomplishments', sub: 'Q1 2025' },
   '/mov': { title: 'MOV Files', sub: 'Google Drive' },
   '/reports': { title: 'Reports', sub: 'Generate & Export' },
-  '/evaluation': { title: 'Evaluation', sub: 'Rating Computation' },
+  '/evaluation': { title: 'Evaluation Ratings', sub: 'Innovations Performance Assessment Tool' },
   '/audit': { title: 'Audit Trail', sub: 'Activity Log' },
   '/users': { title: 'User Management', sub: 'Access Control' },
+  '/office-registry': { title: 'Office Registry', sub: 'Central Administration' },
+  '/office-personnel': { title: 'Office Personnel', sub: 'Office Assessment Roster' },
   '/profile': { title: 'Profile & Settings', sub: '' }
 }
 
 const pageTitle = computed(() => titleMap[route.path]?.title ?? 'PMES')
 const pageSub = computed(() => titleMap[route.path]?.sub ?? '')
+const isClusterPortal = computed(() => authStore.profile?.systemScope && authStore.profile.systemScope !== 'STB_FULL')
+const brandTitleTop = computed(() => isClusterPortal.value ? 'INNOVATION CLUSTER' : 'PERFORMANCE MONITORING')
+const brandTitleBottom = computed(() => isClusterPortal.value ? 'ASSESSMENT PORTAL' : 'EVALUATION SYSTEM')
 
 const currentSemester = computed(() => {
   const now = new Date()
@@ -486,9 +516,15 @@ function checkMobile() {
   if (isMobile.value) collapsed.value = true
 }
 
-async function refreshRealtimeShell() {
+async function refreshRealtimeShell(options = {}) {
   if (!authStore.hasAccess) return
+  const forceProfile = options.forceProfile === true
+  const now = Date.now()
   try {
+    if (forceProfile || now - lastProfileRefreshAt > 60000) {
+      await authStore.fetchProfile()
+      lastProfileRefreshAt = now
+    }
     await notifStore.fetchAll({ silent: true })
   } catch {
     // Background refresh should never interrupt the user.
@@ -496,7 +532,11 @@ async function refreshRealtimeShell() {
 }
 
 function handleVisibilityChange() {
-  if (!document.hidden) refreshRealtimeShell()
+  if (!document.hidden) refreshRealtimeShell({ forceProfile: true })
+}
+
+function handleWindowFocus() {
+  refreshRealtimeShell({ forceProfile: true })
 }
 
 const vClickOutside = {
@@ -514,15 +554,15 @@ const vClickOutside = {
 onMounted(() => {
   checkMobile()
   window.addEventListener('resize', checkMobile)
-  window.addEventListener('focus', refreshRealtimeShell)
+  window.addEventListener('focus', handleWindowFocus)
   document.addEventListener('visibilitychange', handleVisibilityChange)
-  refreshRealtimeShell()
+  refreshRealtimeShell({ forceProfile: true })
   notificationTimer = window.setInterval(refreshRealtimeShell, 30000)
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', checkMobile)
-  window.removeEventListener('focus', refreshRealtimeShell)
+  window.removeEventListener('focus', handleWindowFocus)
   document.removeEventListener('visibilitychange', handleVisibilityChange)
   if (notificationTimer) window.clearInterval(notificationTimer)
 })

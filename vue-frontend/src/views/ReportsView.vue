@@ -1,156 +1,206 @@
-﻿<template>
-  <div class="reports-page">
+<template>
+  <div class="pmes-page p-4 grid gap-4 content-start">
+    <PageHeader
+      kicker="Reporting"
+      title="Report Center"
+      :subtitle="`Generate and export official reports for ${portalSubtitle}.`"
+    >
+      <template #actions>
+        <button v-if="selectedType" class="btn-secondary" type="button" @click="clearSelection">
+          Back to catalog
+        </button>
+      </template>
+    </PageHeader>
 
-    <div class="content-card">
-
-    <div class="page-hd">
-      <div>
-        <h2 class="page-title">Reports</h2>
-        <p class="page-sub">Generate and export performance reports</p>
-      </div>
-    </div>
-
-    <div class="reports-grid">
-      <!-- Generate panel -->
-      <div class="panel">
-        <div class="panel-hd">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M5 8h6M5 5h6M5 11h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-          Generate Report
+    <!-- CATALOG -->
+    <template v-if="!selectedType">
+      <section v-for="group in catalog" :key="group.category" class="grid gap-3">
+        <div class="px-1">
+          <h2 class="text-sm font-extrabold text-slate-900">{{ group.category }}</h2>
+          <p class="text-xs text-slate-500 mt-0.5">{{ group.blurb }}</p>
         </div>
-        <div class="panel-body">
-          <div class="field">
-            <label class="field-label">Report Type <span class="req">*</span></label>
-            <select v-model="form.type" class="field-input">
-              <option v-for="t in reportTypes" :key="t.value" :value="t.value">{{ t.label }}</option>
-            </select>
-            <p v-if="isUndersecretaryReport" class="field-note">Generates an annex-ready analytics table with interpretation distribution and domain averages. Office admins are limited to their assigned office/program.</p>
+        <div class="grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+          <button
+            v-for="report in group.reports"
+            :key="report.value"
+            type="button"
+            class="card p-4 text-left hover:border-blue-300 hover:shadow-md transition-all focus:outline-none focus:ring-4 focus:ring-blue-100"
+            @click="selectReport(report.value)"
+          >
+            <h3 class="text-sm font-extrabold text-slate-900 leading-snug">{{ report.label }}</h3>
+            <p class="mt-1.5 text-xs text-slate-600 leading-relaxed">{{ report.description }}</p>
+            <div class="mt-3 flex flex-wrap gap-1.5">
+              <span v-for="format in formatsFor(report.value)" :key="format" class="badge-status bg-slate-100 text-slate-600">
+                {{ format.toUpperCase() }}
+              </span>
+            </div>
+          </button>
+        </div>
+      </section>
+
+      <div v-if="!reportTypes.length" class="card">
+        <EmptyState
+          title="No reports available for your access level"
+          description="Report availability follows your role and office. Contact a central administrator if you expect to see reports here."
+        />
+      </div>
+    </template>
+
+    <!-- RUN PANEL -->
+    <template v-else>
+      <div class="grid gap-4 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)] items-start">
+        <section class="card overflow-hidden">
+          <div class="card-header !px-4 !py-3">
+            <h2 class="card-title">{{ selectedMeta.label }}</h2>
           </div>
-          <div class="form-row">
-            <div v-if="!isUndersecretaryReport" class="field">
-              <label class="field-label">Division</label>
-              <select v-model="form.divisionId" class="field-input">
+          <div class="p-4 grid gap-3.5">
+            <p class="text-xs text-slate-600 leading-relaxed">{{ selectedMeta.description }}</p>
+
+            <div v-if="!isUndersecretaryReport" class="grid gap-1">
+              <label class="form-label" for="report-division">Division</label>
+              <select id="report-division" v-model="form.divisionId" class="form-select">
                 <option v-if="canSelectAllDivisions" value="">All Divisions</option>
                 <option v-for="d in divisions" :key="d.id" :value="d.id">{{ d.name }}</option>
               </select>
             </div>
-            <div class="field">
-              <label class="field-label">Semester</label>
-              <select v-model="form.semester" class="field-input">
-                <option value="1">Semester 1</option>
-                <option value="2">Semester 2</option>
-              </select>
-            </div>
-            <div class="field">
-              <label class="field-label">Year</label>
-              <input v-model.number="form.year" type="number" class="field-input"/>
-            </div>
-          </div>
-          <div class="field">
-            <label class="field-label">Format</label>
-            <div class="format-row">
-              <label v-for="f in availableFormats" :key="f.value" :class="['format-opt', form.format === f.value && 'active']" @click="form.format = f.value">
-                <svg v-if="f.value === 'pdf'" width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="3" y="2" width="12" height="14" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M6 6h6M6 9h4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
-                <svg v-else-if="f.value === 'excel'" width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="3" y="2" width="12" height="14" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M6 7l2 4M8 7l-2 4M10 7v4M10 9h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
-                <svg v-else width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="3" y="2" width="12" height="14" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M6 6h6M6 9h6M6 12h6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
-                {{ f.label }}
-              </label>
-            </div>
-          </div>
-          <button class="btn btn-primary btn-full" @click="loadPreview" :disabled="previewing">
-            <span v-if="previewing" class="spinner-sm"></span>
-            <svg v-else width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 10.5h9M3 8l2-2 2 1.5L10 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            {{ previewing ? 'Loading analytics...' : 'Preview Analytics' }}
-          </button>
-          <button class="btn btn-full" @click="generate" :disabled="generating || !preview">
-            <span v-if="generating" class="spinner-sm dark"></span>
-            {{ generating ? 'Exporting...' : 'Export Current Report' }}
-          </button>
-        </div>
-      </div>
 
-      <!-- Recent reports -->
-      <div class="panel">
-        <div class="panel-hd">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.4"/><path d="M8 5v3.5l2.5 1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-          Recent Reports
-        </div>
-        <div v-if="!recentReports.length" class="panel-empty">No reports generated yet.</div>
-        <div v-else class="report-list">
-          <div v-for="r in recentReports" :key="r.id" class="report-item">
-            <div class="report-icon" :class="r.format">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2" y="1" width="10" height="12" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M4 5h6M4 7h4" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>
-            </div>
-            <div class="report-info">
-              <div class="report-name">{{ r.name }}</div>
-              <div class="report-meta">{{ fmtDate(r.createdAt) }} · {{ r.format?.toUpperCase() }}</div>
-            </div>
-            <button class="btn btn-xs" @click="downloadReport(r)">
-              <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 1v6M3 5l2.5 2L8 5M2 9h7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div v-if="preview" class="analytics-board">
-      <div class="analytics-hd">
-        <div>
-          <p class="eyebrow">{{ preview.scopeLabel }} · S{{ preview.semester }} {{ preview.year }}</p>
-          <h3>Undersecretary Analytics Preview</h3>
-        </div>
-        <span class="updated">Updated {{ fmtDateTime(preview.generatedAt) }}</span>
-      </div>
-
-      <div class="kpi-grid">
-        <div class="kpi"><span>Personnel Covered</span><strong>{{ preview.kpis.personnel }}</strong></div>
-        <div class="kpi"><span>Assessment Records</span><strong>{{ preview.kpis.records }}</strong></div>
-        <div class="kpi"><span>Scored</span><strong>{{ preview.kpis.scoredPercent }}</strong></div>
-        <div class="kpi"><span>Overall Average</span><strong>{{ fmtScore(preview.kpis.overallAverage) }}</strong></div>
-      </div>
-
-      <div class="chart-grid">
-        <div class="chart-panel">
-          <h4>Interpretation Distribution</h4>
-          <Bar :data="interpretationChartData" :options="barOptions" />
-        </div>
-        <div class="chart-panel">
-          <h4>Domain Average Scores</h4>
-          <div class="domain-chart-layout">
-            <Doughnut :data="domainChartData" :options="doughnutOptions" />
-            <div class="domain-score-list">
-              <div v-for="(domain, index) in preview.domainAverages" :key="domain.label" class="domain-score-row">
-                <i :style="{ backgroundColor: domainColors[index % domainColors.length] }"></i>
-                <span>{{ domain.label }}</span>
-                <strong>{{ fmtScore(domain.average) }}</strong>
+            <div class="grid grid-cols-2 gap-3">
+              <div class="grid gap-1">
+                <label class="form-label" for="report-semester">Semester</label>
+                <select id="report-semester" v-model="form.semester" class="form-select">
+                  <option value="1">Semester 1</option>
+                  <option value="2">Semester 2</option>
+                </select>
+              </div>
+              <div class="grid gap-1">
+                <label class="form-label" for="report-year">Year</label>
+                <input id="report-year" v-model.number="form.year" type="number" class="form-input" />
               </div>
             </div>
+
+            <div class="grid gap-1">
+              <span class="form-label">Format</span>
+              <div class="flex gap-2" role="radiogroup" aria-label="Export format">
+                <button
+                  v-for="f in availableFormats"
+                  :key="f.value"
+                  type="button"
+                  role="radio"
+                  :aria-checked="form.format === f.value"
+                  :class="[
+                    'flex-1 rounded-xl border px-3 py-2 text-xs font-extrabold transition-colors',
+                    form.format === f.value
+                      ? 'border-blue-700 bg-blue-50 text-blue-700'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                  ]"
+                  @click="form.format = f.value"
+                >
+                  {{ f.label }}
+                </button>
+              </div>
+            </div>
+
+            <button class="btn-primary w-full" type="button" :disabled="previewing" @click="loadPreview">
+              {{ previewing ? 'Loading preview...' : 'Preview' }}
+            </button>
+            <button class="btn-secondary w-full" type="button" :disabled="generating || !preview" @click="generate">
+              {{ generating ? 'Exporting...' : 'Export Report' }}
+            </button>
+            <p v-if="!preview && !previewing" class="text-[11px] text-slate-500 leading-relaxed">
+              Preview first so you can confirm the report covers the records you expect before exporting.
+            </p>
           </div>
+        </section>
+
+        <div class="grid gap-4">
+          <!-- Analytics preview -->
+          <section v-if="preview" class="card overflow-hidden">
+            <div class="card-header !px-4 !py-3 flex-wrap gap-2">
+              <div class="min-w-0">
+                <p class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                  {{ preview.scopeLabel }} · S{{ preview.semester }} {{ preview.year }}
+                </p>
+                <h2 class="card-title mt-0.5">Report Preview</h2>
+              </div>
+              <span class="text-[11px] text-slate-500">Generated {{ fmtDateTime(preview.generatedAt) }}</span>
+            </div>
+
+            <div class="grid gap-3 grid-cols-2 lg:grid-cols-4 p-4 bg-slate-50 border-b border-slate-100">
+              <StatTile label="Personnel Covered" :value="preview.kpis.personnel" />
+              <StatTile label="Assessment Records" :value="preview.kpis.records" />
+              <StatTile label="Scored" :value="preview.kpis.scoredPercent" />
+              <StatTile label="Overall Average" :value="fmtScore(preview.kpis.overallAverage)" />
+            </div>
+
+            <div class="grid gap-4 p-4 lg:grid-cols-2">
+              <div class="rounded-2xl border border-slate-200 p-4">
+                <h3 class="text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-3">Interpretation Distribution</h3>
+                <div class="h-64"><Bar :data="interpretationChartData" :options="barOptions" /></div>
+              </div>
+              <div class="rounded-2xl border border-slate-200 p-4">
+                <h3 class="text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-3">Domain Average Scores</h3>
+                <div class="h-40"><Doughnut :data="domainChartData" :options="doughnutOptions" /></div>
+                <ul class="mt-3 grid gap-1.5">
+                  <li
+                    v-for="(domain, index) in preview.domainAverages"
+                    :key="domain.label"
+                    class="flex items-center gap-2 text-xs"
+                  >
+                    <i class="w-2.5 h-2.5 rounded-sm shrink-0" :style="{ backgroundColor: domainColors[index % domainColors.length] }"></i>
+                    <span class="text-slate-600 truncate">{{ domain.label }}</span>
+                    <strong class="ml-auto text-slate-900">{{ fmtScore(domain.average) }}</strong>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <div v-if="preview.officeSummaries?.length" class="p-4 pt-0">
+              <h3 class="text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-3">Office / Program Summary</h3>
+              <ul class="grid gap-3">
+                <li v-for="office in preview.officeSummaries" :key="office.office">
+                  <div class="flex items-baseline justify-between gap-3 mb-1.5">
+                    <div class="min-w-0">
+                      <strong class="text-xs text-slate-900">{{ office.office }}</strong>
+                      <span class="block text-[11px] text-slate-500">
+                        {{ office.scored }}/{{ office.records }} scored · {{ office.pendingAssignments }} pending ratings
+                      </span>
+                    </div>
+                    <strong class="text-sm text-slate-900 shrink-0">{{ fmtScore(office.overallAverage) }}</strong>
+                  </div>
+                  <ProgressBar :value="Number(office.overallAverage || 0)" :total="4" :show-value="false" />
+                </li>
+              </ul>
+            </div>
+          </section>
+
+          <!-- Recent reports -->
+          <DataPanel
+            title="Recent Reports"
+            :subtitle="`${recentReports.length} generated`"
+            :empty="!recentReports.length"
+            empty-title="No reports generated yet"
+            empty-description="Generated reports are listed here with a download link."
+          >
+            <ul class="divide-y divide-slate-100">
+              <li v-for="r in recentReports" :key="r.id" class="px-4 py-3 flex items-center gap-3">
+                <span class="badge-status bg-slate-100 text-slate-600 shrink-0">{{ r.format?.toUpperCase() }}</span>
+                <div class="min-w-0 flex-1">
+                  <p class="text-sm font-bold text-slate-900 truncate">{{ r.name }}</p>
+                  <p class="text-[11px] text-slate-500">{{ fmtDate(r.createdAt) }}</p>
+                </div>
+                <button class="btn-secondary !py-1 !px-2.5 !text-xs shrink-0" type="button" @click="downloadReport(r)">
+                  Download
+                </button>
+              </li>
+            </ul>
+          </DataPanel>
         </div>
       </div>
-
-      <div class="office-panel">
-        <h4>Office / Program Summary</h4>
-        <div class="office-list">
-          <div v-for="office in preview.officeSummaries" :key="office.office" class="office-row">
-            <div>
-              <strong>{{ office.office }}</strong>
-              <span>{{ office.scored }}/{{ office.records }} scored · {{ office.pendingAssignments }} pending ratings</span>
-            </div>
-            <div class="office-score">
-              <span>{{ fmtScore(office.overallAverage) }}</span>
-              <div class="bar"><i :style="{ width: scoreWidth(office.overallAverage) }"></i></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    </div>
-    <!-- /Content card -->
+    </template>
 
     <teleport to="body">
       <transition name="toast-slide">
-        <div v-if="toast.show" :class="['toast', `toast-${toast.type}`]">{{ toast.msg }}</div>
+        <div v-if="toast.show" :class="['toast', `toast-${toast.type}`]" role="status">{{ toast.msg }}</div>
       </transition>
     </teleport>
   </div>
@@ -159,6 +209,12 @@
 <script setup>
 import { computed, ref, onMounted, watch } from 'vue'
 import { reportsApi } from '@/services/api'
+import { useBranding } from '@/composables/useBranding'
+import PageHeader from '@/components/ui/PageHeader.vue'
+import DataPanel from '@/components/ui/DataPanel.vue'
+import StatTile from '@/components/ui/StatTile.vue'
+import ProgressBar from '@/components/ui/ProgressBar.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import { Bar, Doughnut } from 'vue-chartjs'
 import {
   ArcElement,
@@ -170,28 +226,66 @@ import {
   Tooltip
 } from 'chart.js'
 
+const { portalSubtitle } = useBranding()
+
 const generating    = ref(false)
 const previewing    = ref(false)
 const recentReports = ref([])
 const preview       = ref(null)
 const toast         = ref({ show: false, msg: '', type: 'success' })
+const selectedType  = ref('')
 
-// Divisions and report types come from the backend so the form reflects the
+// Divisions and report types come from the backend so the catalog reflects the
 // caller's actual scope. Division-level users only ever see their own division
 // and never the bureau-wide report.
 const divisions             = ref([])
 const canSelectAllDivisions = ref(false)
-const reportTypes           = ref([
-  { value: 'undersecretary-analytics', label: 'Undersecretary Analytics Annex' },
-  { value: 'ipcrf-summary',        label: 'IPCRF Accomplishment Summary' },
-  { value: 'ccef-summary',         label: 'CCEF Targets Summary' },
-  { value: 'division-performance', label: 'Division Performance Report' },
-  { value: 'semestral',            label: 'Semestral Performance Report' },
-  { value: 'delayed',              label: 'Delayed Submission Report' }
-])
+const reportTypes           = ref([])
+
+// Catalog metadata. The backend owns which report types a caller may run; this
+// only supplies the human description and grouping for the ones it returns, so
+// an unknown type still renders rather than disappearing.
+const REPORT_META = {
+  'undersecretary-analytics': {
+    category: 'Assessment Analytics',
+    description: 'Annex-ready analytics with interpretation distribution and domain averages. Office administrators are limited to their assigned office or program.'
+  },
+  'bureau-analytics': {
+    category: 'Assessment Analytics',
+    description: 'Bureau-wide assessment analytics across all divisions. Requires bureau-level monitoring access.'
+  },
+  'division-performance': {
+    category: 'Performance Monitoring',
+    description: 'Performance summary for a selected division over one assessment period.'
+  },
+  'semestral': {
+    category: 'Performance Monitoring',
+    description: 'Consolidated semestral performance report for the selected scope and period.'
+  },
+  'delayed': {
+    category: 'Performance Monitoring',
+    description: 'Submissions past their expected date, for follow-up. Uses neutral status labels only.'
+  },
+  'ipcrf-summary': {
+    category: 'STB Instruments',
+    description: 'Accomplishment summary drawn from IPCRF forms. Applies to the Social Technology Bureau scope.'
+  },
+  'ccef-summary': {
+    category: 'STB Instruments',
+    description: 'Targets summary drawn from CCEF forms. Applies to the Social Technology Bureau scope.'
+  }
+}
+
+const CATEGORY_ORDER = ['Assessment Analytics', 'Performance Monitoring', 'STB Instruments', 'Other Reports']
+const CATEGORY_BLURBS = {
+  'Assessment Analytics': 'Aggregate assessment progress and scoring. No individual rating content is included.',
+  'Performance Monitoring': 'Completion and status reporting for a division, office or period.',
+  'STB Instruments': 'Reports specific to the Social Technology Bureau instruments.',
+  'Other Reports': 'Additional reports available to your access level.'
+}
 
 const form = ref({
-  type:       'undersecretary-analytics',
+  type:       '',
   divisionId: '',
   semester:   '1',
   year:       new Date().getFullYear(),
@@ -205,15 +299,55 @@ const formats = [
 ]
 
 const isUndersecretaryReport = computed(() => form.value.type === 'undersecretary-analytics')
+
+// PDF is unavailable for the analytics annex; the backend rejects it.
 const availableFormats = computed(() =>
-  isUndersecretaryReport.value
-    ? formats.filter(format => format.value !== 'pdf')
-    : formats
+  isUndersecretaryReport.value ? formats.filter(format => format.value !== 'pdf') : formats
 )
+
+const selectedMeta = computed(() => {
+  const found = reportTypes.value.find(t => t.value === selectedType.value)
+  return {
+    label: found?.label || selectedType.value,
+    description: REPORT_META[selectedType.value]?.description || 'Generate this report for the selected scope and period.'
+  }
+})
+
+const catalog = computed(() => {
+  const groups = new Map()
+  reportTypes.value.forEach(type => {
+    const category = REPORT_META[type.value]?.category || 'Other Reports'
+    if (!groups.has(category)) {
+      groups.set(category, { category, blurb: CATEGORY_BLURBS[category] || '', reports: [] })
+    }
+    groups.get(category).reports.push({
+      ...type,
+      description: REPORT_META[type.value]?.description || 'Generate this report for the selected scope and period.'
+    })
+  })
+  return Array.from(groups.values())
+    .sort((a, b) => CATEGORY_ORDER.indexOf(a.category) - CATEGORY_ORDER.indexOf(b.category))
+})
+
+function formatsFor(type) {
+  return type === 'undersecretary-analytics' ? ['excel', 'csv'] : ['pdf', 'excel', 'csv']
+}
 
 watch(isUndersecretaryReport, (enabled) => {
   if (enabled && form.value.format === 'pdf') form.value.format = 'excel'
 }, { immediate: true })
+
+function selectReport(value) {
+  selectedType.value = value
+  form.value.type = value
+  preview.value = null
+  if (value === 'undersecretary-analytics') loadPreview()
+}
+
+function clearSelection() {
+  selectedType.value = ''
+  preview.value = null
+}
 
 const chartColors = ['#1D4ED8', '#059669', '#F59E0B', '#DC2626', '#7C3AED']
 const domainColors = ['#1D4ED8', '#059669', '#F59E0B', '#7C3AED']
@@ -231,23 +365,17 @@ const valueLabelPlugin = {
         const raw = dataset.data[index]
         const value = Number(raw || 0)
         if (!value) return
-        const label = chart.config.type === 'doughnut'
-          ? value.toFixed(2)
-          : String(value)
+        const label = chart.config.type === 'doughnut' ? value.toFixed(2) : String(value)
         const position = element.tooltipPosition()
-        if (chart.config.type === 'doughnut') {
-          ctx.fillStyle = '#0F172A'
-          ctx.fillText(label, position.x, position.y)
-        } else {
-          ctx.fillStyle = '#0F172A'
-          ctx.fillText(label, position.x, position.y - 12)
-        }
+        ctx.fillStyle = '#0F172A'
+        ctx.fillText(label, position.x, chart.config.type === 'doughnut' ? position.y : position.y - 12)
       })
     })
     ctx.restore()
   }
 }
 ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Legend, Tooltip, valueLabelPlugin)
+
 const interpretationChartData = computed(() => ({
   labels: (preview.value?.interpretationDistribution || []).map(item => item.label),
   datasets: [{
@@ -278,8 +406,7 @@ const doughnutOptions = {
 
 function fmtDate(iso) { return iso ? new Date(iso).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) : '' }
 function fmtDateTime(iso) { return iso ? new Date(iso).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '' }
-function fmtScore(value) { return Number(value || 0) ? Number(value).toFixed(2) : '-' }
-function scoreWidth(value) { return `${Math.max(0, Math.min(100, (Number(value || 0) / 4) * 100))}%` }
+function fmtScore(value) { return Number(value || 0) ? Number(value).toFixed(2) : '—' }
 function showToast(msg, type = 'success') { toast.value = { show: true, msg, type }; setTimeout(() => { toast.value.show = false }, 3500) }
 
 onMounted(async () => {
@@ -288,31 +415,26 @@ onMounted(async () => {
     divisions.value             = opts?.divisions || []
     canSelectAllDivisions.value = !!opts?.canSelectAllDivisions
     if (opts?.types?.length) reportTypes.value = opts.types
-    if (reportTypes.value.some(type => type.value === 'undersecretary-analytics')) {
-      form.value.type = 'undersecretary-analytics'
-    } else if (reportTypes.value.length && !reportTypes.value.some(type => type.value === form.value.type)) {
-      form.value.type = reportTypes.value[0].value
-    }
     if (!canSelectAllDivisions.value && divisions.value.length) {
       form.value.divisionId = divisions.value[0].id
     }
-  } catch (e) { /* keep the built-in defaults if options are unavailable */ }
+  } catch (e) {
+    showToast('Report options could not be loaded. Some reports may be unavailable.', 'error')
+  }
 
   try {
     const r = await reportsApi.list()
     recentReports.value = r?.items || (Array.isArray(r) ? r : [])
-  } catch (e) { /* silently fail — recent reports is non-critical */ }
-  if (form.value.type === 'undersecretary-analytics') loadPreview()
+  } catch (e) { /* recent reports is non-critical */ }
 })
 
 async function loadPreview() {
   previewing.value = true
   try {
     preview.value = await reportsApi.preview(form.value)
-    showToast('Analytics preview updated.')
   } catch (e) {
     console.error(e)
-    showToast(e?.message || 'Could not load analytics preview.', 'error')
+    showToast(e?.message || 'Could not load the report preview.', 'error')
   } finally {
     previewing.value = false
   }
@@ -323,7 +445,7 @@ async function generate() {
   try {
     const result = await reportsApi.generate(form.value)
     if (result?.rowCount === 0) {
-      showToast('No records matched that division and period.', 'error')
+      showToast('No records matched that scope and period.', 'error')
       return
     }
     if (result?.downloadUrl) {
@@ -352,86 +474,20 @@ function downloadReport(r) {
 </script>
 
 <style scoped>
-.reports-page { padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif; font-size: 13px; color: #1A2332; min-height: 100%; }
-.content-card { background: #fff; border: 1px solid #E2E8F0; border-radius: 14px; padding: 20px; }
-.page-hd { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 20px; }
-.page-title { font-size: 20px; font-weight: 700; color: #0F172A; margin: 0 0 3px; }
-.page-sub { font-size: 12px; color: #94A3B8; margin: 0; }
-.reports-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
-.analytics-board { margin-top: 18px; border: 1px solid #E2E8F0; border-radius: 12px; background: #fff; overflow: hidden; }
-.analytics-hd { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 16px 18px; border-bottom: 1px solid #E2E8F0; }
-.analytics-hd h3 { margin: 0; font-size: 17px; color: #0F172A; }
-.eyebrow { margin: 0 0 4px; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #64748B; }
-.updated { font-size: 11px; color: #64748B; white-space: nowrap; }
-.kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; padding: 14px 18px; background: #F8FAFC; border-bottom: 1px solid #E2E8F0; }
-.kpi { background: #fff; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px; }
-.kpi span { display: block; color: #64748B; font-size: 11px; font-weight: 700; text-transform: uppercase; }
-.kpi strong { display: block; margin-top: 6px; font-size: 24px; color: #0F172A; }
-.chart-grid { display: grid; grid-template-columns: 1.2fr .8fr; gap: 12px; padding: 14px 18px; }
-.chart-panel { height: 300px; border: 1px solid #E2E8F0; border-radius: 8px; padding: 14px; background: #fff; }
-.chart-panel h4, .office-panel h4 { margin: 0 0 12px; font-size: 13px; color: #0F172A; }
-.domain-chart-layout { display: grid; grid-template-columns: minmax(0, 1fr) 210px; align-items: center; gap: 12px; height: 248px; }
-.domain-score-list { display: grid; gap: 8px; }
-.domain-score-row { display: grid; grid-template-columns: 10px 1fr auto; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid #F1F5F9; }
-.domain-score-row:last-child { border-bottom: none; }
-.domain-score-row i { width: 10px; height: 10px; border-radius: 3px; }
-.domain-score-row span { font-size: 11px; color: #475569; line-height: 1.25; }
-.domain-score-row strong { font-size: 14px; color: #0F172A; }
-.office-panel { margin: 0 18px 18px; border: 1px solid #E2E8F0; border-radius: 8px; padding: 14px; }
-.office-list { display: grid; gap: 10px; }
-.office-row { display: grid; grid-template-columns: 1fr 190px; align-items: center; gap: 14px; padding: 10px 0; border-bottom: 1px solid #F1F5F9; }
-.office-row:last-child { border-bottom: none; }
-.office-row strong { display: block; color: #0F172A; font-size: 12px; }
-.office-row span { display: block; margin-top: 3px; color: #64748B; font-size: 11px; }
-.office-score { display: flex; align-items: center; gap: 10px; }
-.office-score > span { width: 42px; color: #0F172A; font-weight: 800; text-align: right; }
-.bar { flex: 1; height: 8px; border-radius: 999px; background: #E2E8F0; overflow: hidden; }
-.bar i { display: block; height: 100%; border-radius: inherit; background: #1D4ED8; }
-.panel { background: #F8FAFC; border: 1px solid #F1F5F9; border-radius: 12px; overflow: hidden; }
-.panel-hd { display: flex; align-items: center; gap: 8px; padding: 14px 18px; border-bottom: 1px solid #E2E8F0; font-size: 13px; font-weight: 600; color: #0F172A; }
-.panel-body { padding: 18px; display: flex; flex-direction: column; gap: 14px; }
-.panel-empty { padding: 36px 18px; text-align: center; color: #94A3B8; font-size: 12px; }
-.field { display: flex; flex-direction: column; gap: 5px; }
-.field-label { font-size: 11px; font-weight: 600; color: #374151; }
-.field-note { margin: 2px 0 0; font-size: 11px; line-height: 1.45; color: #64748B; }
-.field-input { padding: 9px 12px; border: 1.5px solid #E2E8F0; border-radius: 9px; font-size: 13px; color: #0F172A; background: #fff; outline: none; transition: border-color .15s; }
-.field-input:focus { border-color: #3B82F6; box-shadow: 0 0 0 3px rgba(59,130,246,.1); }
-.form-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
-.format-row { display: flex; gap: 8px; }
-.format-opt { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 12px; border: 1.5px solid #E2E8F0; border-radius: 9px; cursor: pointer; font-size: 12px; font-weight: 500; color: #374151; transition: all .15s; }
-.format-opt:hover { border-color: #CBD5E1; }
-.format-opt.active { border-color: #3B82F6; background: #EBF4FF; color: #1A56B0; }
-.req { color: #EF4444; font-size: 11px; }
-.report-list { padding: 8px 0; }
-.report-item { display: flex; align-items: center; gap: 12px; padding: 10px 18px; border-bottom: 1px solid #F1F5F9; }
-.report-item:last-child { border-bottom: none; }
-.report-item:hover { background: #F8FBFF; }
-.report-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.report-icon.pdf   { background: #FEF2F2; color: #B91C1C; }
-.report-icon.excel { background: #F0FDF4; color: #15803D; }
-.report-icon.csv   { background: #F8FAFC; color: #64748B; }
-.report-info { flex: 1; min-width: 0; }
-.report-name { font-size: 12px; font-weight: 600; color: #0F172A; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.report-meta { font-size: 10px; color: #94A3B8; }
-.btn { display: inline-flex; align-items: center; gap: 5px; padding: 7px 13px; border-radius: 8px; font-size: 12px; cursor: pointer; border: 1px solid #E2E8F0; background: #fff; color: #374151; transition: all .15s; font-weight: 500; }
-.btn:hover { border-color: #CBD5E1; background: #F8FAFC; }
-.btn:disabled { opacity: .55; cursor: not-allowed; }
-.btn-primary { background: #0D2137; color: #fff; border-color: #0D2137; }
-.btn-primary:hover:not(:disabled) { background: #1e3f61; }
-.btn-full { width: 100%; justify-content: center; }
-.btn-xs { padding: 4px 9px; font-size: 11px; }
-.spinner-sm { display: inline-block; width: 11px; height: 11px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .6s linear infinite; }
-.spinner-sm.dark { border-color: rgba(15,23,42,.2); border-top-color: #0F172A; }
-@keyframes spin { to { transform: rotate(360deg) } }
-.toast { position: fixed; bottom: 24px; right: 24px; background: #0F172A; color: #fff; padding: 10px 16px; border-radius: 10px; font-size: 13px; box-shadow: 0 8px 24px rgba(0,0,0,.2); z-index: 9999; pointer-events: none; }
-.toast-error { background: #EB5757; }
-.toast-slide-enter-active, .toast-slide-leave-active { transition: all .25s; }
-.toast-slide-enter-from, .toast-slide-leave-to { opacity: 0; transform: translateY(8px); }
-@media (max-width: 900px) {
-  .reports-grid, .chart-grid, .kpi-grid { grid-template-columns: 1fr; }
-  .domain-chart-layout { grid-template-columns: 1fr; height: auto; }
-  .domain-chart-layout canvas { max-height: 220px; }
-  .office-row { grid-template-columns: 1fr; }
-  .chart-panel { height: 260px; }
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 200;
+  padding: 12px 18px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, .22);
 }
+.toast-success { background: #047857; }
+.toast-error { background: #b91c1c; }
+.toast-slide-enter-active, .toast-slide-leave-active { transition: all .25s ease; }
+.toast-slide-enter-from, .toast-slide-leave-to { opacity: 0; transform: translateY(10px); }
 </style>

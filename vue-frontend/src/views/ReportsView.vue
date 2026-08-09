@@ -239,6 +239,7 @@
 import { computed, ref, onMounted, watch } from 'vue'
 import { reportsApi } from '@/services/api'
 import { useBranding } from '@/composables/useBranding'
+import { useConfirm } from '@/composables/useConfirm'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import DataPanel from '@/components/ui/DataPanel.vue'
 import StatTile from '@/components/ui/StatTile.vue'
@@ -256,6 +257,7 @@ import {
 } from 'chart.js'
 
 const { portalSubtitle } = useBranding()
+const { confirm } = useConfirm()
 
 const generating    = ref(false)
 const previewing    = ref(false)
@@ -504,6 +506,13 @@ async function loadPreview() {
 }
 
 async function generate() {
+  const ok = await confirm({
+    title: 'Export Report',
+    message: `Generate ${selectedMeta.value.label} as ${form.value.format.toUpperCase()} for Semester ${form.value.semester}, ${form.value.year}?`,
+    confirmLabel: 'Export'
+  })
+  if (!ok) return
+
   generating.value = true
   try {
     const result = await reportsApi.generate(form.value)

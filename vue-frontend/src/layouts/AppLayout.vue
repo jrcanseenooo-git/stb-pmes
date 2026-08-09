@@ -1,17 +1,20 @@
 ﻿<template>
   <div class="shell" :class="{ 'sidebar-collapsed': collapsed }">
     <aside class="sidebar">
+      <!--
+        Text-only wordmark — no seal/icon. The system runs cluster-wide now, not
+        just for STB, so a fixed STB seal image no longer represents every
+        participating office; a text mark scales to any office without needing
+        per-office artwork.
+      -->
       <div class="sb-brand">
-        <div class="brand-icon">
-          <img src="/android-chrome-512x512.png" alt="Social Technology Bureau seal" class="brand-seal" />
-        </div>
-
-        <transition name="fade">
-          <div v-if="!collapsed" class="brand-text">
+        <transition name="fade" mode="out-in">
+          <div v-if="!collapsed" key="full" class="brand-text">
             <div class="brand-name">{{ wordmarkTop }}</div>
             <div class="brand-sub">{{ wordmarkBottom }}</div>
             <div class="brand-office" :title="portalSubtitle">{{ portalSubtitle }}</div>
           </div>
+          <div v-else key="mark" class="brand-mark" :title="portalTitle">{{ shortName }}</div>
         </transition>
       </div>
 
@@ -431,7 +434,7 @@ import LogoutConfirmModal from '@/components/common/LogoutConfirmModal.vue'
 
 const authStore = useAuthStore()
 const { canManageUsers, canManageOfficeUsers, canManageLibraries, canManageFocalAssignments, canManageDatabase, canManageOfficeRegistry, canViewClusterMonitoring, canManageOfficePersonnel, canViewAudit, canGenerateReports, canAccessFullSystem, isOfficeAdminScope, isClusterPortalScope } = usePermissions()
-const { isClusterPortal, portalSubtitle, wordmarkTop, wordmarkBottom, shortName, documentTitle } = useBranding()
+const { isClusterPortal, portalTitle, portalSubtitle, wordmarkTop, wordmarkBottom, shortName, documentTitle } = useBranding()
 const notifStore = useNotificationsStore()
 const { confirm } = useConfirm()
 
@@ -756,30 +759,12 @@ onUnmounted(() => {
 }
 
 .sb-brand {
-  height: var(--topbar-h);
+  min-height: var(--topbar-h);
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: 11px;
-  padding: 0 14px;
+  padding: 12px 16px;
   border-bottom: 1px solid rgba(255,255,255,.08);
-}
-
-.brand-icon {
-  width: 34px;
-  height: 34px;
-  flex-shrink: 0;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  overflow: hidden;
-  background: #ffffff;
-}
-
-.brand-seal {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
 }
 
 .brand-text {
@@ -789,10 +774,24 @@ onUnmounted(() => {
 
 .brand-name {
   color: #ffffff;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 800;
-  line-height: 1;
-  margin-top: 10px;
+  line-height: 1.2;
+}
+
+/* Collapsed-sidebar fallback: a short text initialism (PMES, or the office
+   code) rather than an icon — still pure text, just compact enough for the
+   narrow collapsed rail. */
+.brand-mark {
+  width: 100%;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+  letter-spacing: .03em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .brand-sub {
@@ -1295,17 +1294,11 @@ onUnmounted(() => {
   }
 
   .sb-brand {
-    gap: 13px;
-    padding: 0 18px;
-  }
-
-  .brand-icon {
-    width: 39px;
-    height: 39px;
+    padding: 14px 18px;
   }
 
   .brand-name {
-    font-size: 15.5px;
+    font-size: 16.5px;
   }
 
   .brand-sub {

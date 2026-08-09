@@ -65,8 +65,9 @@
             <td style="white-space:nowrap;">{{ formatDate(office.lastValidatedAt) }}</td>
             <td>
               <div style="display:flex; align-items:center; justify-content:flex-end; gap:6px; flex-wrap:wrap;">
-                <template v-if="canManageOfficeRegistry && !isStbOffice(office)">
+                <template v-if="canManageOfficeRegistry">
                   <button
+                    v-if="!isStbOffice(office)"
                     class="pui-btn pui-btn-sm"
                     type="button"
                     :disabled="busyId === office.officeId"
@@ -76,6 +77,7 @@
                     {{ busyId === office.officeId && busyAction === 'validate' ? 'Validating...' : 'Validate' }}
                   </button>
                   <button
+                    v-if="!isStbOffice(office)"
                     class="pui-btn pui-btn-sm"
                     type="button"
                     :disabled="busyId === office.officeId || !canActivate(office)"
@@ -84,6 +86,7 @@
                   >
                     {{ busyId === office.officeId && busyAction === 'activate' ? 'Activating...' : 'Activate' }}
                   </button>
+                  <span v-if="isStbOffice(office)" style="font-size:11px; font-weight:700; color:#64748b;">Central PMES</span>
                   <button
                     class="pui-btn pui-btn-sm"
                     type="button"
@@ -94,7 +97,6 @@
                     Configure
                   </button>
                 </template>
-                <span v-else-if="canManageOfficeRegistry" style="font-size:11px; font-weight:700; color:#64748b;">Central PMES</span>
                 <span v-else style="font-size:11px; font-weight:700; color:#64748b;">Monitoring only</span>
               </div>
             </td>
@@ -197,30 +199,49 @@
       :busy="orgSaving"
       @close="closeOrgOptionsModal"
     >
-      <form id="org-form" class="pui-grid pui-grid-2" @submit.prevent="saveOrgOptions">
+      <form id="org-form" style="display:grid; gap:16px;" @submit.prevent="saveOrgOptions">
         <label>
           <span class="pui-label">Divisions / Units</span>
           <textarea
             v-model="orgForm.divisionsText"
             class="pui-textarea"
             style="font-family:monospace; font-size:12px;"
-            rows="8"
+            rows="5"
             placeholder="One per line&#10;Operations Division&#10;ADMIN | Administrative Unit"
           ></textarea>
           <small class="pui-hint">One line per unit. Optional format: <code>CODE | Name</code>.</small>
         </label>
-        <label>
+
+        <div>
           <span class="pui-label">Sections</span>
-          <textarea
-            v-model="orgForm.sectionsText"
-            class="pui-textarea"
-            style="font-family:monospace; font-size:12px;"
-            rows="8"
-            placeholder="One per line&#10;Operations Division | Field Operations Section"
-          ></textarea>
-          <small class="pui-hint">Use <code>Division | Section</code> so registration can filter correctly.</small>
-        </label>
-        <label class="pui-span-2">
+          <!--
+            Sections are entered under their division rather than as a second
+            free-text list that has to repeat the division name on every line.
+            With several divisions each carrying a few sections, retyping the
+            division name that many times is exactly where a typo silently
+            orphans a section — it stops matching its parent division and
+            never appears in the registration form's Section dropdown, with
+            no error shown anywhere. Grouping by division removes the free-text
+            name entirely, so that failure mode can't happen.
+          -->
+          <div v-if="!parsedDivisionNames.length" class="pui-hint" style="margin-top:4px;">
+            Enter divisions above first — a section box appears for each one.
+          </div>
+          <div v-else class="org-section-grid">
+            <div v-for="name in parsedDivisionNames" :key="name" class="org-section-card">
+              <p class="org-section-title">{{ name }}</p>
+              <textarea
+                v-model="sectionsByDivision[name]"
+                class="pui-textarea"
+                style="font-family:monospace; font-size:12px; resize:vertical;"
+                rows="3"
+                placeholder="One section per line"
+              ></textarea>
+            </div>
+          </div>
+        </div>
+
+        <label>
           <span class="pui-label">Requested Roles</span>
           <textarea
             v-model="orgForm.rolesText"
@@ -233,17 +254,12 @@
         </label>
       </form>
 
-      <!-- Parsing is shown back before saving, because the delimiter format is
-           easy to get wrong and the failure is otherwise silent. -->
       <div class="pui-alert" style="background:#f8fafc; border:1px solid #e2e8f0; color:#334155;">
         <p class="pui-alert-title" style="color:#334155;">This will be saved as</p>
         <p>
           {{ parsedPreview.divisions }} division(s) ·
           {{ parsedPreview.sections }} section(s) ·
           {{ parsedPreview.roles }} requested role(s)
-        </p>
-        <p v-if="parsedPreview.orphanSections" style="font-weight:700; color:#b45309; margin-top:4px;">
-          {{ parsedPreview.orphanSections }} section(s) have no matching division and will not be filterable at registration.
         </p>
       </div>
 
@@ -262,16 +278,18 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { officeRegistryApi } from '@/services/api'
 import { usePermissions } from '@/composables/usePermissions'
+import { useConfirm } from '@/composables/useConfirm'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import DataPanel from '@/components/ui/DataPanel.vue'
 import StatusPill from '@/components/ui/StatusPill.vue'
 import AppModal from '@/components/ui/AppModal.vue'
 
 const { canManageOfficeRegistry, canViewClusterMonitoring } = usePermissions()
+const { confirm } = useConfirm()
 
 const PROVISION_STEPS = [
   'Validate office code and details',
@@ -295,7 +313,8 @@ const lastUpdatedAt = ref(null)
 const orgOffice = ref(null)
 const orgError = ref('')
 const orgSaving = ref(false)
-const orgForm = ref({ divisionsText: '', sectionsText: '', rolesText: '' })
+const orgForm = ref({ divisionsText: '', rolesText: '' })
+const sectionsByDivision = ref({})
 const form = ref(defaultForm())
 
 onMounted(loadOffices)
@@ -317,17 +336,22 @@ const lastUpdatedLabel = computed(() =>
   lastUpdatedAt.value ? lastUpdatedAt.value.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''
 )
 
-const parsedPreview = computed(() => {
-  const divisions = parseDivisionLines(orgForm.value.divisionsText)
-  const sections = parseSectionLines(orgForm.value.sectionsText)
-  const divisionNames = new Set(divisions.map(d => String(d.name).toLowerCase()))
-  return {
-    divisions: divisions.length,
-    sections: sections.length,
-    roles: parseSimpleLines(orgForm.value.rolesText).length,
-    orphanSections: sections.filter(s => !s.divisionName || !divisionNames.has(String(s.divisionName).toLowerCase())).length
-  }
-})
+const parsedPreview = computed(() => ({
+  divisions: parsedDivisions.value.length,
+  sections: sectionsFromGroupedInputs().length,
+  roles: parseSimpleLines(orgForm.value.rolesText).length
+}))
+
+const parsedDivisions = computed(() => parseDivisionLines(orgForm.value.divisionsText))
+const parsedDivisionNames = computed(() => parsedDivisions.value.map(item => item.name).filter(Boolean))
+
+watch(parsedDivisionNames, names => {
+  const next = {}
+  names.forEach(name => {
+    next[name] = sectionsByDivision.value[name] || ''
+  })
+  sectionsByDivision.value = next
+}, { immediate: true })
 
 // Provisioning runs as one backend call, so step state is derived rather than
 // streamed: idle before submit, all active while in flight, all done on success.
@@ -384,6 +408,13 @@ function closeProvisionModal() {
 }
 
 async function provisionOffice() {
+  const ok = await confirm({
+    title: 'Provision Office',
+    message: `A new evaluation-only Google Spreadsheet will be created for ${form.value.officeName || 'this office'} and registered centrally. This creates real infrastructure — it is not something to undo casually.`,
+    confirmLabel: 'Create Spreadsheet'
+  })
+  if (!ok) return
+
   saving.value = true
   modalError.value = ''
   lastValidation.value = null
@@ -404,10 +435,22 @@ async function provisionOffice() {
 }
 
 async function validateOffice(office) {
+  const ok = await confirm({
+    title: 'Validate Office Spreadsheet',
+    message: `Check ${office.officeName || office.officeCode}'s spreadsheet against the required schema. This only reads the spreadsheet — nothing is changed.`,
+    confirmLabel: 'Validate'
+  })
+  if (!ok) return
   await runOfficeAction(office, 'validate', () => officeRegistryApi.validate(office.officeId), 'Could not validate this office.')
 }
 
 async function activateOffice(office) {
+  const ok = await confirm({
+    title: 'Activate Office',
+    message: `${office.officeName || office.officeCode} will become active in the Innovation Cluster Personnel Assessment Portal. Its personnel will be able to sign in and receive rating assignments.`,
+    confirmLabel: 'Activate'
+  })
+  if (!ok) return
   await runOfficeAction(office, 'activate', () => officeRegistryApi.activate(office.officeId), 'Could not activate this office.')
 }
 
@@ -431,22 +474,28 @@ async function openOrgOptionsModal(office) {
   orgError.value = ''
   orgForm.value = {
     divisionsText: '',
-    sectionsText: '',
     rolesText: 'Technical Staff\nSection Head\nDivision Chief\nAssistant Bureau Director\nBureau Director'
   }
+  sectionsByDivision.value = {}
   showOrgModal.value = true
   try {
     const data = await officeRegistryApi.orgOptions(office.officeId)
     const divisions = data.divisions || []
     const divisionNameById = Object.fromEntries(divisions.map(item => [item.id, item.name]))
+    const groupedSections = {}
+    ;(data.sections || []).forEach(item => {
+      const divisionName = divisionNameById[item.divisionId] || item.divisionId || ''
+      if (!divisionName) return
+      if (!groupedSections[divisionName]) groupedSections[divisionName] = []
+      groupedSections[divisionName].push(item.name)
+    })
     orgForm.value = {
       divisionsText: divisions.map(item => (item.code ? `${item.code} | ${item.name}` : item.name)).join('\n'),
-      sectionsText: (data.sections || []).map(item => {
-        const divisionName = divisionNameById[item.divisionId] || item.divisionId || ''
-        return divisionName ? `${divisionName} | ${item.name}` : item.name
-      }).join('\n'),
       rolesText: (data.requestedRoles || []).join('\n')
     }
+    sectionsByDivision.value = Object.fromEntries(
+      divisions.map(item => [item.name, (groupedSections[item.name] || []).join('\n')])
+    )
   } catch (e) {
     orgError.value = e?.message || 'Could not load registration options.'
   }
@@ -459,12 +508,19 @@ function closeOrgOptionsModal() {
 
 async function saveOrgOptions() {
   if (!orgOffice.value) return
+  const ok = await confirm({
+    title: 'Save Registration Options',
+    message: `This replaces the current divisions, sections and requested roles for ${orgOffice.value.officeName || 'this office'} with ${parsedPreview.value.divisions} division(s), ${parsedPreview.value.sections} section(s) and ${parsedPreview.value.roles} requested role(s).`,
+    confirmLabel: 'Save'
+  })
+  if (!ok) return
+
   orgSaving.value = true
   orgError.value = ''
   try {
     await officeRegistryApi.saveOrgOptions(orgOffice.value.officeId, {
       divisions: parseDivisionLines(orgForm.value.divisionsText),
-      sections: parseSectionLines(orgForm.value.sectionsText),
+      sections: sectionsFromGroupedInputs(),
       requestedRoles: parseSimpleLines(orgForm.value.rolesText).map(name => ({ name }))
     })
     showOrgModal.value = false
@@ -486,13 +542,13 @@ function parseDivisionLines(value) {
   })
 }
 
-function parseSectionLines(value) {
-  return parseSimpleLines(value).map(line => {
-    const parts = line.split('|').map(part => part.trim()).filter(Boolean)
-    return parts.length > 1
-      ? { divisionName: parts[0], name: parts.slice(1).join(' | ') }
-      : { name: parts[0] }
-  })
+function sectionsFromGroupedInputs() {
+  return parsedDivisionNames.value.flatMap(divisionName =>
+    parseSimpleLines(sectionsByDivision.value[divisionName]).map(name => ({
+      divisionName,
+      name
+    }))
+  )
 }
 
 function formatDate(value) {
@@ -502,3 +558,41 @@ function formatDate(value) {
   return date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })
 }
 </script>
+
+<style scoped>
+.org-section-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+  margin-top: 8px;
+  overflow: hidden;
+}
+
+.org-section-card {
+  min-width: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px;
+  background: #fafcff;
+}
+
+.org-section-card textarea {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.org-section-title {
+  margin: 0 0 6px;
+  color: #0f172a;
+  font-size: 11.5px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  .org-section-grid {
+    grid-template-columns: 1fr;
+  }
+}
+</style>

@@ -1587,3 +1587,115 @@ Still unverified: the actual rendered catalog with a real signed-in session.
 This entry's verification is the icon geometry and the CSS engine, not a
 screenshot of the live authenticated Report Center — that requires the user's
 own login, which was not performed.
+
+## 2026-08-09 - Overflow Fix, Confirmation Modals, Text-Only Wordmark
+
+Branch: `feature/multi-office-assessment-scope`
+
+### Summary
+
+Three fixes from direct user testing while entering real registration data for
+Walang Gutom (9 divisions, 2-3 sections each): a horizontal-scrollbar/overlap
+bug in ui-kit.css, missing confirmation on every submit-style action in the new
+modules, and removal of the STB seal image from the sidebar since the system is
+now cluster-wide, not STB-only.
+
+### Files Modified
+
+- `vue-frontend/src/assets/ui-kit.css`
+- `vue-frontend/src/views/OfficeRegistryView.vue`
+- `vue-frontend/src/views/OfficePersonnelView.vue`
+- `vue-frontend/src/views/ReportsView.vue`
+- `vue-frontend/src/layouts/AppLayout.vue`
+
+### What Changed
+
+**Overflow/box-sizing bug.** `ui-kit.css` had zero `box-sizing` declarations.
+Elements like `.pui-input`/`.pui-textarea` combine `width:100%` with padding;
+under the browser's default `content-box`, rendered width becomes
+`100% + padding + border`, overflowing the container — the horizontal
+scrollbar the user reported. Fixed with a single scoped rule,
+`[class^="pui-"], [class*=" pui-"] { box-sizing: border-box; }` — an attribute
+selector, not `*`, so it only touches elements that already carry a `pui-`
+class and cannot affect any existing screen. Also hardened `.pui-modal` to
+`overflow-x: hidden` (was `overflow: auto`, both axes) and `.pui-page` to
+`overflow-x: hidden; min-width: 0`, as defense in depth. Verified by injecting
+a `.pui-input` into a 300px test container and confirming `offsetWidth` is
+exactly 300, not 300+padding — before this fix it would have measured wider
+than its container.
+
+**Configure Registration Options redesign completed.** The per-division
+section grouping started in the previous session (in response to the
+duplicate-section-name question) is now fully wired: `parsedDivisionNames`
+derives live from the Divisions textarea, `sectionsByDivision` holds one
+section list per division, and `sectionsFromGroupedInputs()` builds the save
+payload by pairing each division with its own section list — there is no
+free-text division name to mistype anymore, so a section can no longer be
+silently orphaned by a typo. This directly addresses the reported difficulty
+entering 9 divisions with 2-3 sections each. Removed the now-dead
+`sectionsText` field and the `orphanSections` count, which is structurally
+impossible under the new input shape.
+
+**Confirmation modals added to every submit/action button in the new modules**,
+using the existing `useConfirm` composable (already used for Office Personnel
+deactivate/activate):
+- Office Registry: Provision Office (Create Evaluation Spreadsheet), Validate,
+  Activate, Save Registration Options.
+- Office Personnel: Save Personnel (Add and Edit).
+- Report Center: Export Report.
+
+Scope note: this covers the new multi-office modules only, not the pre-existing
+STB screens (IPCRF, Evaluation ratings, KRA, User Management), which already
+have their own confirmation patterns built and tested in earlier work and were
+not touched here to avoid an unreviewed change to live STB functionality.
+
+**Sidebar wordmark is now text-only.** Removed `<img src="/android-chrome-512x512.png">`
+and its circular frame from `AppLayout.vue`'s sidebar header — the system is
+cluster-wide now, not STB-only, and a fixed STB seal no longer represents every
+participating office. `.sb-brand` changed from a fixed `height` to `min-height`
+with vertical padding, since the three-line text stack (wordmark + subtitle +
+office name, the latter up to two lines) was already taller than the old fixed
+56px row before this change — a latent clipping risk now resolved alongside
+the icon removal. Collapsed-sidebar state, which previously showed only the
+icon, now shows a short text mark (`PMES` or the office code) instead — still
+pure text, not a graphic.
+
+### Existing STB Functions Preserved
+
+- The `box-sizing` and `.pui-modal`/`.pui-page` overflow rules are scoped to
+  `pui-` classes only; no existing view's CSS is touched.
+- `useConfirm` is the same composable already used elsewhere in the app
+  (Users, IPCRF); no new confirmation UI was introduced.
+- No STB-only screen was modified in this entry.
+- The browser-tab favicon and PWA manifest icons are untouched; only the
+  in-app sidebar image was removed.
+
+### Tests Performed
+
+- `npm run lint:check`, `npm run smoke:check`, `npm run build`
+- `npm run deploy:check` from the repository root
+- Live computed-style check: injected `.pui-input`/`.pui-textarea` into a
+  300px test container and confirmed `box-sizing: border-box` applies and
+  `offsetWidth` exactly matches the container (300px), not 300px+padding.
+  Confirmed `.pui-modal` computes `overflow-x: hidden`.
+- Console error check on `https://stb-pmes.vercel.app` after deploy.
+
+### Test Results
+
+- All checks passed.
+- Box-sizing/overflow fix confirmed at the CSS engine level.
+- No console errors on the live production deploy.
+
+### Deployment
+
+- No backend change. Apps Script remains at `@224`.
+- Vercel: deployed from repository root, confirmed live, no console errors.
+
+### Pending Verification
+
+The sidebar wordmark change (`AppLayout.vue`) uses Vue scoped styles that only
+apply within an authenticated, rendered instance of the component — this
+cannot be verified without a real login, which was not performed. The same
+applies to the Configure Registration Options modal's live layout with real
+multi-division data (Walang Gutom's actual 9 divisions). Both need the user's
+own screenshot to confirm.

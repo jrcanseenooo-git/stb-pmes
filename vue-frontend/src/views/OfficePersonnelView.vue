@@ -295,6 +295,15 @@ function closeModal() {
 }
 
 async function save() {
+  const ok = await confirm({
+    title: editingId.value ? 'Save Changes' : 'Add Personnel',
+    message: editingId.value
+      ? `Save changes to ${form.value.fullName || 'this personnel record'}?`
+      : `Add ${form.value.fullName || 'this person'} to the assessment roster?`,
+    confirmLabel: 'Save'
+  })
+  if (!ok) return
+
   saving.value = true
   modalError.value = ''
   try {

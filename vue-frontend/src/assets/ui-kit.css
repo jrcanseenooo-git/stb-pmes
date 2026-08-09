@@ -15,6 +15,15 @@
  * defaults.
  */
 
+/* Scoped to `pui-` classes only (attribute selector, not `*`) — every element
+   with padding + width:100% in this file needs border-box or its rendered
+   width exceeds its container under the browser's content-box default,
+   producing exactly the horizontal-scrollbar symptom this was written to fix. */
+[class^="pui-"],
+[class*=" pui-"] {
+  box-sizing: border-box;
+}
+
 .pui-card {
   background: #fff;
   border: 1px solid #e2e8f0;
@@ -50,6 +59,8 @@
   gap: 16px;
   color: #1a2332;
   font-size: 13px;
+  min-width: 0;
+  overflow-x: hidden;
 }
 
 /* ── Page header ─────────────────────────────────────────────────────── */
@@ -385,7 +396,8 @@
   width: 100%;
   max-width: 620px;
   max-height: 100%;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
   background: #fff;
   border-radius: 12px;
   border: 1px solid #dbe4f0;

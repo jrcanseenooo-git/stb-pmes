@@ -14,26 +14,58 @@
 
     <!-- CATALOG -->
     <template v-if="!selectedType">
-      <section v-for="group in catalog" :key="group.category" style="display:grid; gap:12px;">
-        <div style="padding:0 2px;">
-          <h2 style="margin:0; font-size:14px; font-weight:800; color:#0f172a;">{{ group.category }}</h2>
-          <p style="margin:3px 0 0; font-size:12px; color:#64748b;">{{ group.blurb }}</p>
+      <section v-for="group in catalog" :key="group.category" style="display:grid; gap:14px;">
+        <div style="display:flex; align-items:center; gap:10px; padding:0 2px;">
+          <span
+            class="pui-icon-chip pui-icon-chip-sm"
+            :style="{ background: group.meta.bg, color: group.meta.accent }"
+            aria-hidden="true"
+          >
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+              <path :d="group.meta.icon" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </span>
+          <div>
+            <h2 style="margin:0; font-size:14px; font-weight:800; color:#0f172a;">{{ group.category }}</h2>
+            <p style="margin:1px 0 0; font-size:12px; color:#64748b;">{{ group.blurb }}</p>
+          </div>
         </div>
-        <div class="pui-grid" style="grid-template-columns:repeat(auto-fill, minmax(260px, 1fr));">
+
+        <div class="pui-catalog-grid">
           <button
             v-for="report in group.reports"
             :key="report.value"
             type="button"
-            class="pui-card"
-            style="padding:16px; text-align:left; cursor:pointer; transition:box-shadow .12s, border-color .12s;"
+            class="pui-card pui-catalog-card"
             @click="selectReport(report.value)"
           >
-            <h3 style="margin:0; font-size:13.5px; font-weight:800; color:#0f172a; line-height:1.4;">{{ report.label }}</h3>
-            <p style="margin:6px 0 0; font-size:12px; color:#475569; line-height:1.5;">{{ report.description }}</p>
-            <div style="margin-top:12px; display:flex; flex-wrap:wrap; gap:6px;">
-              <span v-for="format in formatsFor(report.value)" :key="format" class="pui-badge">
-                {{ format.toUpperCase() }}
-              </span>
+            <span
+              class="pui-icon-chip"
+              :style="{ background: group.meta.bg, color: group.meta.accent }"
+              aria-hidden="true"
+            >
+              <svg width="18" height="18" viewBox="0 0 16 16" fill="none">
+                <path :d="group.meta.icon" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </span>
+
+            <div style="flex:1; min-width:0;">
+              <h3 style="margin:0; font-size:13.5px; font-weight:800; color:#0f172a; line-height:1.4;">{{ report.label }}</h3>
+              <p style="margin:5px 0 0; font-size:12px; color:#475569; line-height:1.5;">{{ report.description }}</p>
+
+              <div style="margin-top:12px; display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                  <span v-for="format in formatsFor(report.value)" :key="format" :class="['pui-badge', formatTone(format)]">
+                    {{ format.toUpperCase() }}
+                  </span>
+                </div>
+                <span class="pui-catalog-cta">
+                  Configure
+                  <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                    <path d="M2.5 6h7M6 2.5L9.5 6 6 9.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                </span>
+              </div>
             </div>
           </button>
         </div>
@@ -281,6 +313,35 @@ const CATEGORY_BLURBS = {
   'Other Reports': 'Additional reports available to your access level.'
 }
 
+// One accent color + icon per category so the catalog reads as distinct
+// groups at a glance instead of a repeated grey box. Icon paths use the same
+// thin-stroke style as the sidebar nav icons (viewBox 0 0 16 16, stroke 1.4).
+const CATEGORY_META = {
+  'Assessment Analytics': {
+    accent: '#1d4ed8', bg: '#eff6ff',
+    icon: 'M2 13.5V9M6 13.5V4M10 13.5V6.5M14 13.5V2.5'
+  },
+  'Performance Monitoring': {
+    accent: '#059669', bg: '#ecfdf5',
+    // Checkmark-in-box, straight-line segments only (no arcs) to avoid any
+    // ambiguity in hand-written arc flag/coordinate parsing.
+    icon: 'M2.5 2.5h11v11h-11z M5 8l2 2 4-4'
+  },
+  'STB Instruments': {
+    accent: '#7c3aed', bg: '#f5f3ff',
+    icon: 'M4 1.5h5.5L13 5v9.5a1 1 0 01-1 1H4a1 1 0 01-1-1v-12a1 1 0 011-1zM9.5 1.5V5H13M5 8h6M5 10.5h6'
+  },
+  'Other Reports': {
+    accent: '#64748b', bg: '#f1f5f9',
+    icon: 'M1.5 4a1 1 0 011-1h3.5l1.5 1.5H13a1 1 0 011 1V12a1 1 0 01-1 1H2.5a1 1 0 01-1-1V4z'
+  }
+}
+
+const FORMAT_TONES = { pdf: 'pui-badge-pdf', excel: 'pui-badge-excel', csv: 'pui-badge-csv' }
+function formatTone(format) {
+  return FORMAT_TONES[format] || 'pui-badge-neutral'
+}
+
 const form = ref({
   type:       '',
   divisionId: '',
@@ -315,7 +376,12 @@ const catalog = computed(() => {
   reportTypes.value.forEach(type => {
     const category = REPORT_META[type.value]?.category || 'Other Reports'
     if (!groups.has(category)) {
-      groups.set(category, { category, blurb: CATEGORY_BLURBS[category] || '', reports: [] })
+      groups.set(category, {
+        category,
+        blurb: CATEGORY_BLURBS[category] || '',
+        meta: CATEGORY_META[category] || CATEGORY_META['Other Reports'],
+        reports: []
+      })
     }
     groups.get(category).reports.push({
       ...type,
@@ -471,18 +537,64 @@ function downloadReport(r) {
 </script>
 
 <style scoped>
+/* Fixed column count rather than auto-fill: keeps card width identical across
+   every category section regardless of how many cards a given row has, so a
+   2-card row doesn't stretch its cards wider than the 3-card row below it. */
+.pui-catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 960px) {
+  .pui-catalog-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 620px) {
+  .pui-catalog-grid { grid-template-columns: 1fr; }
+}
+
 /* Catalog cards are native <button> elements for keyboard/click affordance;
    reset the button-specific defaults main.css would otherwise have handled. */
-.pui-card {
+.pui-catalog-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  text-align: left;
+  cursor: pointer;
   font: inherit;
+  transition: box-shadow .12s, border-color .12s, transform .12s;
 }
-button.pui-card:hover {
+
+.pui-catalog-card:hover {
   border-color: #93c5fd;
-  box-shadow: 0 4px 14px rgba(15, 23, 42, .08);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, .09);
+  transform: translateY(-1px);
 }
-button.pui-card:focus-visible {
+
+.pui-catalog-card:focus-visible {
   outline: 3px solid rgba(29, 78, 216, .3);
   outline-offset: 1px;
+}
+
+.pui-catalog-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #1d4ed8;
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: opacity .12s, transform .12s;
+  white-space: nowrap;
+}
+
+.pui-catalog-card:hover .pui-catalog-cta,
+.pui-catalog-card:focus-visible .pui-catalog-cta {
+  opacity: 1;
+  transform: translateX(0);
 }
 
 .toast {

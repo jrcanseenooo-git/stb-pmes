@@ -181,6 +181,12 @@
 .pui-badge-brand { background: #eff6ff; color: #1d4ed8; }
 .pui-badge-neutral { background: #f1f5f9; color: #475569; }
 
+/* Per-file-format tones, distinct from the status tones above so a PDF badge
+   doesn't read as an error and an Excel badge doesn't read as "on track". */
+.pui-badge-pdf   { background: #fdf2f8; color: #be185d; }
+.pui-badge-excel { background: #ecfdf5; color: #047857; }
+.pui-badge-csv   { background: #eff6ff; color: #1d4ed8; }
+
 /* ── Forms ───────────────────────────────────────────────────────────── */
 
 .pui-label {
@@ -613,6 +619,23 @@
 .pui-barlist-value .pui-muted {
   color: #94a3b8;
   font-weight: 700;
+}
+
+/* ── Icon chip (category / catalog card accents) ────────────────────── */
+
+.pui-icon-chip {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.pui-icon-chip-sm {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
 }
 
 /* ── Misc ────────────────────────────────────────────────────────────── */

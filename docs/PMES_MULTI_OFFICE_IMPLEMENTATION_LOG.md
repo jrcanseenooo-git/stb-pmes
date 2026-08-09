@@ -1515,3 +1515,75 @@ end-to-end as a genuine office admin — that still requires a real office-admin
 account signing in. The pending-verification list from the two prior entries
 (real personnel/office-admin/central-admin sign-in, data reconciliation,
 performance measurement against a full office dataset) is unchanged by this fix.
+
+## 2026-08-09 - Report Center Visual Redesign
+
+Branch: `feature/multi-office-assessment-scope`
+
+### Summary
+
+Addressed direct user feedback ("the report center looks awful") on the just-
+shipped catalog layout: flat repeated white boxes, uneven half-filled rows, and
+grey format badges with no differentiation. Added per-category color/icon
+accents, per-format badge coloring, a fixed-column grid, and a hover-revealed
+"Configure" affordance.
+
+### Files Modified
+
+- `vue-frontend/src/assets/ui-kit.css`
+- `vue-frontend/src/views/ReportsView.vue`
+
+### What Changed
+
+- Added `.pui-badge-pdf` / `.pui-badge-excel` / `.pui-badge-csv` tones,
+  distinct from the existing status tones (good/warn/bad) so a PDF badge does
+  not read as an error state.
+- Added `.pui-icon-chip` for a colored, rounded icon container reused at both
+  category-header size and card size.
+- Each category (Assessment Analytics / Performance Monitoring / STB
+  Instruments / Other Reports) now has a distinct accent color and icon,
+  applied to both its section header and every card in that section.
+- Replaced the `auto-fill` grid with a fixed 3-column `.pui-catalog-grid`
+  (2 columns under 960px, 1 under 620px) so card width is identical across
+  every category regardless of how many cards are in a given row — the
+  previous layout stretched 2-card rows wider than 3-card rows below them.
+- Added a "Configure →" cue that fades in on hover/focus, plus a subtle lift
+  and shadow, so the cards read as clickable before the cursor lands on them.
+- All four category icons are hand-written inline SVG paths using only
+  straight-line and clearly-disambiguated arc commands (verified by rendering
+  each one standalone before deploying — see Tests Performed).
+
+### Existing STB Functions Preserved
+
+- Presentation-only change inside the Report Center catalog. No API call,
+  permission check, or business logic touched.
+
+### Tests Performed
+
+- `npm run lint:check`, `npm run smoke:check`, `npm run build`
+- `npm run deploy:check` from the repository root
+- Rendered all four category icons standalone in the browser (via a temporary
+  file served through the dev server, removed before commit) to confirm the
+  hand-written SVG path data draws correctly with no parsing artifacts —
+  caught and fixed one icon (`Performance Monitoring`) whose arc-command
+  flags were ambiguous before this check.
+- Live console error check on `https://stb-pmes.vercel.app` after deploy.
+
+### Test Results
+
+- All checks passed.
+- Icon render check: all four icons (bar chart / checklist / document /
+  folder) drew correctly with correct per-category color.
+- Live deploy: no console errors.
+
+### Deployment
+
+- No backend change. Apps Script remains at `@224`.
+- Vercel: deployed from repository root, confirmed live.
+
+### Pending Verification
+
+Still unverified: the actual rendered catalog with a real signed-in session.
+This entry's verification is the icon geometry and the CSS engine, not a
+screenshot of the live authenticated Report Center — that requires the user's
+own login, which was not performed.

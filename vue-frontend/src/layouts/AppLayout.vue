@@ -491,7 +491,6 @@ const titleMap = {
   '/review': { title: 'Review', sub: 'Assigned IPCRF / CCEF Forms' },
   '/kra': { title: 'KRA Library', sub: 'Master KRA & SI List' },
   '/accomplishments': { title: 'Accomplishments', sub: 'Q1 2025' },
-  '/mov': { title: 'MOV Files', sub: 'Google Drive' },
   '/reports': { title: 'Reports', sub: 'Generate & Export' },
   '/evaluation': { title: 'Evaluation Ratings', sub: 'Innovations Performance Assessment Tool' },
   '/audit': { title: 'Audit Trail', sub: 'Activity Log' },
@@ -575,7 +574,6 @@ function notificationTarget(notification) {
   if (moduleName.includes('report')) return { path: '/reports', query: withRelated }
   if (moduleName.includes('audit')) return { path: '/audit', query: withRelated }
   if (moduleName.includes('user')) return { path: '/users', query: withRelated }
-  if (moduleName.includes('mov')) return { path: '/mov', query: withRelated }
 
   if (text.includes('returned') || text.includes('revision') || text.includes('target') || text.includes('ipcrf') || text.includes('ccef')) {
     return { path: '/ipcrf', query: withRelated }

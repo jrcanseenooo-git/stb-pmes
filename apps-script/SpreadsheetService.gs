@@ -45,7 +45,6 @@ const SpreadsheetService = (() => {
     'CompetencyBehaviorRatings':['IPATCBCRatings'],
     'JobFitnessRatings':        ['IPATJFRatings'],
     'RaterAssignments':         ['IPATRaterAssignments'],
-    'EvidenceFiles':            ['MOVFiles'],
     'AuditLogs':                ['AuditLog']
   }
 
@@ -99,8 +98,45 @@ const SpreadsheetService = (() => {
     try { return getSheet(name) } catch (e) { return null }
   }
 
+  // Identifies which spreadsheet a Sheet object belongs to, so cache entries for
+  // the same tab name in different office spreadsheets never collide.
+  function sheetOwnerId_(sheet) {
+    try {
+      const parent = sheet.getParent()
+      return parent ? parent.getId() : getSpreadsheetId()
+    } catch (e) {
+      return getSpreadsheetId()
+    }
+  }
+
+  function sheetNameOf_(sheet) {
+    try { return sheet.getName() } catch (e) { return '' }
+  }
+
+  // Drops cached reads for a tab. Every write path calls this, so a read issued
+  // after a write in the same request sees the new data rather than the copy
+  // taken before it.
+  function invalidateCache_(sheet) {
+    if (typeof DataCacheService === 'undefined') return
+    try {
+      DataCacheService.invalidate(sheetOwnerId_(sheet), sheetNameOf_(sheet))
+    } catch (e) {
+      Logger.log('[SpreadsheetService] cache invalidation failed: ' + e.message)
+    }
+  }
+
   // ── Read all rows as objects ──
+  // Routed through DataCacheService: repeated reads of the same tab within one
+  // request are served from memory instead of re-hitting the Sheets backend,
+  // and slow-moving reference tabs are additionally shared across executions.
+  // See DataCacheService.gs for why transactional tabs are memo-only.
   function getAllRows(sheet) {
+    const read = () => readAllRowsUncached_(sheet)
+    if (typeof DataCacheService === 'undefined') return read()
+    return DataCacheService.readThrough(sheetOwnerId_(sheet), sheetNameOf_(sheet), read)
+  }
+
+  function readAllRowsUncached_(sheet) {
     const data = sheet.getDataRange().getValues()
     if (data.length < 2) return []
     const headers = data[0]
@@ -131,6 +167,7 @@ const SpreadsheetService = (() => {
       return val
     })
     sheet.appendRow(row)
+    invalidateCache_(sheet)
     return data
   }
 
@@ -172,6 +209,7 @@ const SpreadsheetService = (() => {
 
         if (touched) {
           sheet.getRange(i + 1, 1, 1, headers.length).setValues([rowValues])
+          invalidateCache_(sheet)
         }
 
         // Return merged object
@@ -192,6 +230,7 @@ const SpreadsheetService = (() => {
     for (let i = 1; i < data.length; i++) {
       if (String(data[i][idIdx]) === String(id)) {
         sheet.deleteRow(i + 1)  // +1 because sheet rows are 1-indexed, and data[0] is header
+        invalidateCache_(sheet)
         Logger.log('Hard deleted row with id: ' + id + ' from row ' + (i + 1))
         return { success: true, deletedId: id }
       }

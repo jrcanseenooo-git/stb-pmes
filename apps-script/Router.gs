@@ -167,13 +167,12 @@ const Router = (() => {
       // ─────────────────────────────────────────
       // MOV Files
       // ─────────────────────────────────────────
+      // MOV file uploads were removed by policy: personnel do not upload
+      // evidence files. Means of verification are recorded as pasted links or
+      // text in the IPCRF/CCEF `movReferences` field instead. Guarded so any
+      // stale client call returns a clean 410 rather than a routing 404.
       case 'mov':
-        if (!id && method === 'GET') return MovService.list(params, user)
-        if (id === 'upload') return MovService.upload(body, user)
-        if (id && !sub && method === 'GET') return MovService.get(id, user)
-        if (id && !sub && method === 'DELETE') return MovService.remove(id, user)
-        if (id && sub === 'preview') return MovService.preview(id, user)
-        break
+        throw HttpError('The MOV file module has been removed. Record means of verification as links or text in the IPCRF/CCEF form.', 410)
 
       // ─────────────────────────────────────────
       // Reports

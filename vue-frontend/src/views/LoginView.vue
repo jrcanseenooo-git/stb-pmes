@@ -183,7 +183,6 @@ const ALLOWED_REDIRECT_PATHS = new Set([
   '/ipcrf',
   '/accomplishments',
   '/review',
-  '/mov',
   '/reports',
   '/audit',
   '/users',

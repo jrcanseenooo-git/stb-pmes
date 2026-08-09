@@ -6,7 +6,6 @@ const SHEET = {
   KRAS:               'KRAs',
   INDICATORS:         'SuccessIndicators',
   ACCOMPLISHMENTS:    'Accomplishments',
-  MOV:                'MOVFiles',
   EVALUATIONS:        'Evaluations',
   NOTIFICATIONS:      'Notifications',
   AUDIT:              'AuditLog',
@@ -45,13 +44,26 @@ function doPost(e) {
 }
 
 // ── Rate limiter (per authenticated user, using CacheService) ──
+//
 // GAS does not expose client IP, so limiting is per user ID rather than per IP.
-// Limit: 60 requests per minute per user for general routes.
-function checkRateLimit(userId) {
+//
+// Two independent budgets per minute, because reads and writes cost very
+// different things. A dashboard legitimately fires a burst of reads on load, so
+// a single flat budget either throttles normal browsing or is too loose to stop
+// a write storm. Writes are the expensive, contended path — they take the
+// script lock and mutate sheets — so they get a much tighter budget.
+const RATE_LIMIT_READS_PER_MIN  = 120
+const RATE_LIMIT_WRITES_PER_MIN = 30
+
+function checkRateLimit(userId, httpMethod) {
+  const isWrite = String(httpMethod || 'GET').toUpperCase() !== 'GET'
+  const bucket  = isWrite ? 'w' : 'r'
+  const limit   = isWrite ? RATE_LIMIT_WRITES_PER_MIN : RATE_LIMIT_READS_PER_MIN
+
   let count = 0
   try {
     const cache = CacheService.getScriptCache()
-    const key   = 'rl_' + userId + '_' + Math.floor(Date.now() / 60000)
+    const key   = 'rl_' + bucket + '_' + userId + '_' + Math.floor(Date.now() / 60000)
     count = parseInt(cache.get(key) || '0', 10) + 1
     cache.put(key, String(count), 90) // TTL 90s so it survives the minute boundary
   } catch (e) {
@@ -59,7 +71,14 @@ function checkRateLimit(userId) {
     Logger.log('Rate limiter cache error: ' + e.message)
     return
   }
-  if (count > 60) throw HttpError('Too many requests. Please wait a moment.', 429)
+  if (count > limit) {
+    throw HttpError(
+      isWrite
+        ? 'Too many save requests in a short time. Please wait a moment and try again.'
+        : 'Too many requests. Please wait a moment.',
+      429
+    )
+  }
 }
 
 const RESERVED_KEYS = ['route', '_method', 'token']
@@ -81,8 +100,8 @@ function handleRequest(e, method) {
     const user = AuthService.verifyToken(token)
     if (!user) return respond(401, false, null, 'Unauthorized – invalid or missing token')
 
-    // 2. Rate limit per authenticated user
-    checkRateLimit(user.uid || user.email)
+    // 2. Rate limit per authenticated user, with separate read/write budgets
+    checkRateLimit(user.uid || user.email, httpMethod)
 
     // 3. Build the params/body handed to the router: query + body, minus the
     //    reserved routing keys. Router reads this for both GET filters and writes.

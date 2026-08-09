@@ -384,21 +384,6 @@ export const accomplishmentsApi = {
   history:         (id)                  => gasGet(`accomplishments/${id}/history`)
 }
 
-// ── MOV Files ──────────────────────────────────
-
-export const movApi = {
-  list:    (p = {}) => gasGet('mov',              p),
-  get:     (id)     => gasGet(`mov/${id}`),
-  preview: (id)     => gasGet(`mov/${id}/preview`),
-  delete:  (id)     => gasWrite('DELETE', `mov/${id}`),
-  upload: async (file, meta = {}) => {
-    const base64 = await fileToBase64(file)
-    return gasWrite('POST', 'mov/upload', {
-      fileName: file.name, mimeType: file.type, size: file.size, base64, ...meta
-    })
-  }
-}
-
 // ── Evaluations ────────────────────────────────
 
 export const evaluationApi = {
@@ -587,7 +572,6 @@ export default {
   assessmentContentApi,
   assessmentRulesApi,
   accomplishmentsApi,
-  movApi,
   evaluationApi,
   reportsApi,
   notificationsApi,

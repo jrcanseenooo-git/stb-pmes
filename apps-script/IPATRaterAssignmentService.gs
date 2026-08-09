@@ -44,11 +44,40 @@ const IPATRaterAssignmentService = (() => {
   const isObsoleteAssignment = (r) => ['JFPeer', 'JobFitnessPeer'].includes(String(r && r.raterType || ''))
   const activeProtocolAssignments = (rows) => rows.filter(r => !isObsoleteAssignment(r))
 
+  // Rating writes serialize on the script lock so two raters cannot recompute
+  // the same assessment record concurrently and interleave their score writes.
+  //
+  // Apps Script only offers a script-wide lock (there is no per-record lock), so
+  // every submission cluster-wide queues here. That is acceptable because the
+  // critical section is short, but it means a submission burst — a deadline
+  // afternoon, say — can pile up.
+  //
+  // Two things make that survivable:
+  //   1. A longer total wait, taken in staggered attempts rather than one block.
+  //      Jitter spreads the retry storm out instead of having every waiter wake
+  //      up and collide at the same instant.
+  //   2. Even when the wait is exhausted the caller gets a 429, which the client
+  //      surfaces as "try again" — never a partial write.
+  const LOCK_ATTEMPTS   = 3
+  const LOCK_WAIT_MS    = 15000   // per attempt; ~45s total worst case
+  const LOCK_JITTER_MS  = 400
+
   function withRatingWriteLock(work) {
     const lock = LockService.getScriptLock()
-    if (!lock.tryLock(20000)) {
+    let acquired = false
+
+    for (let attempt = 0; attempt < LOCK_ATTEMPTS && !acquired; attempt++) {
+      acquired = lock.tryLock(LOCK_WAIT_MS)
+      if (!acquired && attempt < LOCK_ATTEMPTS - 1) {
+        // Randomised pause so simultaneous waiters do not retry in lockstep.
+        Utilities.sleep(Math.floor(Math.random() * LOCK_JITTER_MS))
+      }
+    }
+
+    if (!acquired) {
       throw HttpError('The rating system is busy saving other submissions. Please try again in a moment.', 429)
     }
+
     try {
       return work()
     } finally {

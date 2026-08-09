@@ -96,8 +96,7 @@ const OfficeRegistryService = (() => {
     try {
       const active = SpreadsheetService.getAllRows(registrySheet_())
         .filter(row =>
-          String(row.officeStatus || '').toUpperCase() === 'ACTIVE' &&
-          String(row.spreadsheetStatus || '').toUpperCase() === 'ACTIVE'
+          String(row.officeStatus || '').toUpperCase() === 'ACTIVE'
         )
         .map(row => ({
           officeId: row.officeId,
@@ -119,7 +118,7 @@ const OfficeRegistryService = (() => {
     const map = {}
     try {
       registrationOptions().forEach(office => {
-        if (!office || !office.officeId || String(office.officeId).toUpperCase() === 'STB') return
+        if (!office || !office.officeId) return
         map[office.officeId] = getOrgOptionsForOffice_(office.officeId)
       })
     } catch (e) {
@@ -143,9 +142,7 @@ const OfficeRegistryService = (() => {
     const row = findByIdOrCode_(id)
     if (!row) throw HttpError('Office record not found.', 404)
     const officeId = String(row.officeId || '').trim()
-    if (!officeId || officeId.toUpperCase() === 'STB') {
-      throw HttpError('STB uses the central Divisions and Sections reference tables.', 400)
-    }
+    if (!officeId) throw HttpError('Office record has no office ID.', 400)
 
     const divisions = normalizeOptionList_(body.divisions, 'division')
     const divisionIdsByName = {}
@@ -213,10 +210,9 @@ const OfficeRegistryService = (() => {
     const row = findByIdOrCode_(key)
     if (!row) throw HttpError('Selected office is not registered in PMES.', 400)
     if (
-      String(row.officeStatus || '').toUpperCase() !== 'ACTIVE' ||
-      String(row.spreadsheetStatus || '').toUpperCase() !== 'ACTIVE'
+      String(row.officeStatus || '').toUpperCase() !== 'ACTIVE'
     ) {
-      throw HttpError('Selected office portal is not active yet. Please contact the System Admin.', 409)
+      throw HttpError('Selected office/program is not active yet. Please contact the System Admin.', 409)
     }
     return {
       officeId: row.officeId,

@@ -4,6 +4,5 @@
 export { useAuthStore } from './auth'
 export { useKraStore } from './kra'
 export { useAccomplishmentsStore } from './accomplishments'
-export { useMovStore } from './mov'
 export { useDashboardStore } from './dashboard'
 export { useNotificationsStore } from './notifications'

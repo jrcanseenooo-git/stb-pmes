@@ -76,7 +76,6 @@ const routes = [
         path: "accomplishments",
         component: () => import("@/views/AccomplishmentsView.vue"),
       },
-      { path: "mov", component: () => import("@/views/MovView.vue") },
       { path: "reports", component: () => import("@/views/ReportsView.vue") },
       {
         path: "evaluation",

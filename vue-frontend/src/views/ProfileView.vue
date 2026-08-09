@@ -216,10 +216,6 @@
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="1.5" width="13" height="13" rx="2" stroke="#2F80ED" stroke-width="1.4"/><path d="M5 8l2 2 4-4" stroke="#2F80ED" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 View Accomplishments
               </button>
-              <button class="quick-btn" @click="$router.push('/mov')">
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 2h7l3 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="#27AE60" stroke-width="1.4"/><path d="M10 2v3h3" stroke="#27AE60" stroke-width="1.4" stroke-linecap="round"/></svg>
-                Upload MOV
-              </button>
               <button class="quick-btn" @click="$router.push('/evaluation')">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1.5l1.8 3.6 3.7.5-2.75 2.7.65 3.8L8 10.3l-3.4 1.8.65-3.8L2.5 5.6l3.7-.5L8 1.5z" stroke="#E9A840" stroke-width="1.4" stroke-linejoin="round"/></svg>
                 View Ratings

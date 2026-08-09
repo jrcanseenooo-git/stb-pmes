@@ -79,12 +79,6 @@ function initializeSheets() {
       'comment', 'reviewerId', 'reviewerName',
       'createdAt', 'updatedAt'
     ],
-    MOVFiles: [
-      'id', 'driveFileId', 'driveUrl', 'fileName', 'mimeType', 'sizeBytes',
-      'description', 'accomplishmentId', 'kraId', 'siId', 'divisionId',
-      'uploadedBy', 'uploadedByName', 'uploadedAt',
-      'verified', 'verifiedBy', 'verifiedAt', 'deleted', 'deletedAt'
-    ],
     Evaluations: [
       'id', 'userId', 'employeeName', 'divisionId', 'semester', 'year',
       'efficiency', 'quality', 'timeliness', 'overall', 'label',

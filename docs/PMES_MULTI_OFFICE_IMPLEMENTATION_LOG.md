@@ -1749,3 +1749,46 @@ name.
 Same limitation as the prior sidebar entry: `AppLayout.vue` is scoped CSS
 behind login, so the actual wrapped two-line rendering has not been visually
 confirmed — needs the user's own screenshot.
+
+## 2026-08-10 - Deployment: cache, tiered rate limits, MOV removal
+
+Branch: `feature/multi-office-assessment-scope`
+
+### Deployment
+
+Apps Script:
+- Pushed 34 files; `MovService.gs` confirmed absent from the remote project,
+  `DataCacheService.gs` confirmed present.
+- Deployed to the existing deployment ID
+  `AKfycbxz1GwhQ2x6UzIbkQ8mVVCn3Mb-NhsVWy2YKgD9Kpx32Esn9B_mmnpVmF6IntBAexwqfQ`.
+- **Version label mismatch:** requested `PMES_v225_cache_ratelimit_mov_removed`,
+  clasp assigned `@227`. This is the known clasp version-jump behaviour. The
+  label was left as-is rather than spending another version to correct it, since
+  re-deploying to fix the label would itself consume a version and could jump
+  again. **The live version is `@227`, not 225.**
+
+Vercel:
+- `deploy:check` passed (audit, lint, smoke, build), 0 vulnerabilities.
+- Deployed from repository root, `READY`, confirmed live at
+  `https://stb-pmes.vercel.app` with no console errors.
+
+### Risk Note
+
+The read cache changes behaviour on **every** backend read path in the system.
+It was verified by a 7-case logic harness (memoisation, invalidation, office
+isolation, transactional-vs-reference tiering, cross-execution behaviour) but
+has **not** been exercised against live data by a signed-in user. The specific
+things to watch on first real use:
+
+1. A record saved and immediately re-read showing its pre-save value would mean
+   an invalidation path was missed.
+2. One office seeing another office's roster would mean the spreadsheet-id
+   scoping failed — this is the highest-severity possible failure and was the
+   most carefully tested case.
+3. Reference data (assessment content, categories, rules) taking up to 5 minutes
+   to reflect an administrator's edit is expected behaviour, not a bug — that is
+   the tier-2 TTL.
+
+### Pending Verification
+
+Live sign-in by a real user of each scope. Not performed.

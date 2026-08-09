@@ -1303,3 +1303,96 @@ path, office administrator confinement checks, central reconciliation of cluster
 totals against office spreadsheets, performance measurement of the new summary
 routes against a full office dataset, Apps Script deployment, and Vercel
 deployment.
+
+## 2026-08-09 - Report Center and Production Deployment
+
+Branch: `feature/multi-office-assessment-scope`
+
+### Summary
+
+Rebuilt Reports as a Report Center on the shared component set, then deployed
+both the Apps Script backend and the Vercel frontend to production.
+
+### Files Modified
+
+- `vue-frontend/src/views/ReportsView.vue`
+- `vue-frontend/package-lock.json`
+- `docs/PMES_MULTI_OFFICE_IMPLEMENTATION_LOG.md`
+
+### What Changed
+
+- Reports is now a catalog. Report types are grouped into Assessment Analytics,
+  Performance Monitoring and STB Instruments, each card stating what the report
+  covers and which formats it supports. Selecting one opens a run panel with the
+  scope filters, format choice, preview and export.
+- Catalog metadata is frontend-only and keyed by report type. The backend still
+  decides which types a caller may run, and an unrecognized type falls back to a
+  generic description rather than vanishing from the catalog.
+- All existing generate, preview, download and chart behavior is unchanged.
+- Applied `npm audit fix` for the `nanoid` advisory that was blocking
+  `deploy:check`. The gate now passes with 0 vulnerabilities.
+
+### Deployment
+
+Apps Script:
+
+- Pushed 34 files from the repository root.
+- Deployed to the existing deployment ID
+  `AKfycbxz1GwhQ2x6UzIbkQ8mVVCn3Mb-NhsVWy2YKgD9Kpx32Esn9B_mmnpVmF6IntBAexwqfQ`
+  as `PMES_v224_portal_office_cluster_modules`, confirmed at `@224`.
+- The web app URL is unchanged. No new deployment was created.
+- This deploy was required before the frontend: the previous live backend
+  (`@223`) did not contain `PortalService.gs`, so the new portal and office
+  dashboards would have returned 404 for cluster users.
+
+Vercel:
+
+- Ran `npm run deploy:check` from the repository root: audit, lint, smoke and
+  build all passed.
+- Deployed from the repository root to the `stb-pmes` project.
+- Deployment `dpl_427uXVUv72cddNNBofeXjreffjxJ` reported `READY`, target
+  `production`.
+- `https://stb-pmes.vercel.app` confirmed serving the new build.
+
+### Tests Performed
+
+- `npm run lint:check`, `npm run smoke:check`, `npm run build`
+- `npm run deploy:check` from the repository root
+- `clasp deployments` after deploying, to confirm the assigned version
+- Live page load of `https://stb-pmes.vercel.app/auth/login` with a browser
+  console error check
+
+### Test Results
+
+- Pre-deploy gate: passed, 0 vulnerabilities.
+- Apps Script deployment: confirmed at `@224` on the existing deployment ID.
+- Vercel deployment: `READY`, production target.
+- Live sign-in page: rendered correctly with the updated system name, no console
+  errors.
+
+### Pending Verification
+
+Verification stops at the sign-in page. Authenticating as a real user was not
+performed, so nothing behind the login has been exercised in production. The
+`portal/*` routes are deployed but unproven against live data.
+
+Still required, in production, before this can be considered operationally
+validated:
+
+- A participating-office personnel account: sign in, Simplified Dashboard, My
+  Rating Tasks, open a task, save a draft, reload the draft, submit, view results.
+- An office administrator account: confirm office confinement in Personnel
+  Validation and that the Office Assessment Dashboard totals match the office
+  spreadsheet.
+- A central administrator: confirm Cluster Overview totals reconcile against the
+  office spreadsheets.
+- Confirm an STB user is unaffected across Dashboard, KRA, IPCRF/CCEF,
+  Accomplishments, Review, Evaluation, User Management, Audit and Reports.
+- Measure the new summary routes against a full office dataset.
+
+### Rollback
+
+- Frontend: redeploy the previous Vercel production deployment, or
+  `vercel rollback`.
+- Backend: redeploy the previous version to the same deployment ID with
+  `clasp deploy --deploymentId <id> --versionNumber 223`.

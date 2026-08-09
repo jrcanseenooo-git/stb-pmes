@@ -38,6 +38,17 @@ const routes = [
         path: "dashboard",
         component: () => import("@/views/DashboardView.vue"),
       },
+      // Innovation Cluster Personnel Assessment Portal — the restricted
+      // assessment-only experience. Data is office-scoped in the backend; these
+      // routes carry no office identifier of their own.
+      {
+        path: "my-dashboard",
+        component: () => import("@/views/PortalDashboardView.vue"),
+      },
+      {
+        path: "my-tasks",
+        component: () => import("@/views/MyTasksView.vue"),
+      },
       { path: "ipcrf", component: () => import("@/views/IpcrfView.vue") },
       { path: "review", component: () => import("@/views/ReviewView.vue") },
       { path: "kra", component: () => import("@/views/KraView.vue") },
@@ -82,7 +93,14 @@ const router = createRouter({
   routes,
 });
 
-const EVALUATION_ROLLOUT_ALLOWED_PATHS = new Set(['/evaluation', '/profile', '/office-personnel', '/users', '/reports', '/unauthorized'])
+const EVALUATION_ROLLOUT_ALLOWED_PATHS = new Set([
+  '/my-dashboard', '/my-tasks',
+  '/evaluation', '/profile', '/office-personnel', '/users', '/reports', '/unauthorized'
+])
+
+// Restricted-scope users land on the Simplified Dashboard rather than being
+// dropped straight into the rating form with no orientation.
+const RESTRICTED_SCOPE_HOME = '/my-dashboard'
 
 function isEvaluationOnlyRollout(profile) {
   if (profile?.systemAccessMode) return profile.systemAccessMode !== 'full_access'
@@ -163,7 +181,7 @@ router.beforeEach(async (to) => {
     !hasFullSystemAccess(auth.profile) &&
     !EVALUATION_ROLLOUT_ALLOWED_PATHS.has(to.path)
   ) {
-    return { path: "/evaluation" };
+    return { path: RESTRICTED_SCOPE_HOME };
   }
   return true;
 });

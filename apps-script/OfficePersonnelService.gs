@@ -91,6 +91,26 @@ const OfficePersonnelService = (() => {
     })
   }
 
+  // Counterpart to deactivate. Without this a deactivated roster row is a dead
+  // end that only a spreadsheet edit can undo, which is exactly what office
+  // administrators are supposed to be kept out of.
+  function activate(id, user) {
+    canManageOffice_(user, {})
+    return withOffice_({}, user, () => {
+      const sheet = personnelSheet_()
+      const updated = SpreadsheetService.updateRow(sheet, id, {
+        active: true,
+        pendingActivation: false,
+        accountStatus: 'ACTIVE',
+        validatedAt: new Date().toISOString(),
+        validatedBy: user.email || '',
+        updatedAt: new Date().toISOString()
+      })
+      audit_('ACTIVATE_PERSONNEL', id, 'Activated office personnel ' + updated.email, user)
+      return safeRow_(updated)
+    })
+  }
+
   function syncFromCentralUser(centralUser, user) {
     const profile = AuthService.getProfile(user)
     const officeId = String(centralUser.officeId || centralUser.officeCode || '').trim()
@@ -260,5 +280,5 @@ const OfficePersonnelService = (() => {
     }
   }
 
-  return { list, create, update, deactivate, syncFromCentralUser }
+  return { list, create, update, deactivate, activate, syncFromCentralUser }
 })()

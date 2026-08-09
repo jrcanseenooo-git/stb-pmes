@@ -902,9 +902,11 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { dashboardApi, ipatApi, ipatAssignmentsApi, usersApi, assessmentContentApi, assessmentCategoryApi } from '@/services/api'
 import { usePermissions } from '@/composables/usePermissions'
 
+const route = useRoute()
 const { hasPermission, isAdmin } = usePermissions()
 const canViewBureauMonitoring = hasPermission('view_bureau_monitoring')
 const canViewDivisionMonitoring = hasPermission('view_division_monitoring')
@@ -1498,6 +1500,16 @@ async function loadMyTasks() {
     const data = await ipatAssignmentsApi.getMyRatees({ semester: requestedSemester, year: requestedYear })
     if (requestedSemester !== String(tasksSemester.value) || requestedYear !== String(tasksYear.value)) return
     myTasks.value = Array.isArray(data) ? data : (data?.items || [])
+    // Deep link from My Rating Tasks: ?assignment=<id> opens that exact task so
+    // the portal list can hand off directly into the form the user clicked.
+    const requestedAssignment = String(route.query.assignment || '')
+    const deepLinked = requestedAssignment
+      ? myTasks.value.find(t => String(t.id) === requestedAssignment)
+      : null
+    if (deepLinked) {
+      selectTask(deepLinked)
+      return
+    }
     // Auto-open the first pending task so the rating form is front-and-center
     // on arrival instead of an empty panel — rating is the module's main job.
     if (activeView.value === 'my-tasks' && !selectedTask.value && myTasks.value.length) {

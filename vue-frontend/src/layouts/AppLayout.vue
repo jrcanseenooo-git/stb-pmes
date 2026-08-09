@@ -8,8 +8,9 @@
 
         <transition name="fade">
           <div v-if="!collapsed" class="brand-text">
-            <div class="brand-name">{{ brandTitleTop }}</div>
-            <div class="brand-sub">{{ brandTitleBottom }}</div>
+            <div class="brand-name">{{ wordmarkTop }}</div>
+            <div class="brand-sub">{{ wordmarkBottom }}</div>
+            <div class="brand-office" :title="portalSubtitle">{{ portalSubtitle }}</div>
           </div>
         </transition>
       </div>
@@ -29,6 +30,32 @@
             </div>
             <transition name="fade">
               <span v-if="!collapsed" class="nav-label-text">Dashboard</span>
+            </transition>
+          </RouterLink>
+
+          <RouterLink v-if="showPortalNav" to="/my-dashboard" class="nav-item" active-class="active" :title="collapsed ? 'Dashboard' : ''">
+            <div class="nav-icon">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <rect x="1" y="1" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.4" />
+                <rect x="9" y="1" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.4" />
+                <rect x="1" y="9" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.4" />
+                <rect x="9" y="9" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.4" />
+              </svg>
+            </div>
+            <transition name="fade">
+              <span v-if="!collapsed" class="nav-label-text">Dashboard</span>
+            </transition>
+          </RouterLink>
+
+          <RouterLink v-if="showPortalNav" to="/my-tasks" class="nav-item" active-class="active" :title="collapsed ? 'My Rating Tasks' : ''">
+            <div class="nav-icon">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <rect x="2.5" y="1.5" width="11" height="13" rx="2" stroke="currentColor" stroke-width="1.4" />
+                <path d="M5.5 5.5h5M5.5 8h5M5.5 10.5h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+              </svg>
+            </div>
+            <transition name="fade">
+              <span v-if="!collapsed" class="nav-label-text">My Rating Tasks</span>
             </transition>
           </RouterLink>
 
@@ -322,6 +349,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { RouterView, RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { usePermissions } from '@/composables/usePermissions'
+import { useBranding } from '@/composables/useBranding'
 import { useNotificationsStore } from '@/stores/notifications'
 import { useConfirm } from '@/composables/useConfirm'
 import PasswordChangePrompt from '@/components/common/PasswordChangePrompt.vue'
@@ -329,6 +357,7 @@ import LogoutConfirmModal from '@/components/common/LogoutConfirmModal.vue'
 
 const authStore = useAuthStore()
 const { canManageUsers, canManageOfficeUsers, canManageLibraries, canManageFocalAssignments, canManageDatabase, canManageOfficeRegistry, canViewClusterMonitoring, canManageOfficePersonnel, canViewAudit, canGenerateReports, canAccessFullSystem } = usePermissions()
+const { isClusterPortal, portalSubtitle, wordmarkTop, wordmarkBottom, shortName, documentTitle } = useBranding()
 const notifStore = useNotificationsStore()
 const { confirm } = useConfirm()
 
@@ -336,6 +365,10 @@ const { confirm } = useConfirm()
 const accomplishmentsUnread = computed(() =>
   notifStore.notifications.filter(n => !n.read && n.module === 'Accomplishments').length
 )
+// The portal entries replace the STB Dashboard for anyone the rollout guard
+// keeps out of the full system — that is exactly the restricted cluster scope.
+const showPortalNav = computed(() => !canAccessFullSystem.value)
+
 const canAccessUserManagement = computed(() =>
   canManageUsers.value ||
   canManageOfficeUsers.value ||
@@ -361,6 +394,8 @@ let lastProfileRefreshAt = 0
 
 const titleMap = {
   '/dashboard': { title: 'Dashboard', sub: 'Bureau Overview' },
+  '/my-dashboard': { title: 'Dashboard', sub: 'Assessment Overview' },
+  '/my-tasks': { title: 'My Rating Tasks', sub: 'Assigned Assessments' },
   '/ipcrf': { title: 'IPCRF / CCEF Forms', sub: 'Performance Commitments' },
   '/review': { title: 'Review', sub: 'Assigned IPCRF / CCEF Forms' },
   '/kra': { title: 'KRA Library', sub: 'Master KRA & SI List' },
@@ -375,11 +410,26 @@ const titleMap = {
   '/profile': { title: 'Profile & Settings', sub: '' }
 }
 
-const pageTitle = computed(() => titleMap[route.path]?.title ?? 'PMES')
-const pageSub = computed(() => titleMap[route.path]?.sub ?? '')
-const isClusterPortal = computed(() => authStore.profile?.systemScope && authStore.profile.systemScope !== 'STB_FULL')
-const brandTitleTop = computed(() => isClusterPortal.value ? 'INNOVATION CLUSTER' : 'PERFORMANCE MONITORING')
-const brandTitleBottom = computed(() => isClusterPortal.value ? 'ASSESSMENT PORTAL' : 'EVALUATION SYSTEM')
+// Cluster portal users see assessment-neutral wording. The STB labels name
+// STB-only instruments (IPCRF/CCEF, KRA) that the cluster scope never reaches.
+const CLUSTER_TITLE_OVERRIDES = {
+  '/evaluation': { title: 'Evaluation Rating', sub: 'Assessment Form' },
+  '/reports': { title: 'Reports', sub: 'Office Assessment Reports' },
+  '/users': { title: 'Personnel Validation', sub: 'Office Accounts' },
+  '/profile': { title: 'Personal Information', sub: '' }
+}
+
+const activeTitle = computed(() => {
+  if (isClusterPortal.value && CLUSTER_TITLE_OVERRIDES[route.path]) return CLUSTER_TITLE_OVERRIDES[route.path]
+  return titleMap[route.path] ?? null
+})
+
+const pageTitle = computed(() => activeTitle.value?.title ?? shortName.value)
+const pageSub = computed(() => activeTitle.value?.sub ?? '')
+
+watch([pageTitle, portalSubtitle], () => {
+  document.title = documentTitle(pageTitle.value)
+}, { immediate: true })
 
 const currentSemester = computed(() => {
   const now = new Date()
@@ -663,6 +713,21 @@ onUnmounted(() => {
   letter-spacing: .65px;
   text-transform: uppercase;
   white-space: nowrap;
+}
+
+/* Office name. Participating office names are long ("Information and
+   Communications Technology Management Service"), so this wraps to two lines
+   and then clamps rather than stretching the sidebar. */
+.brand-office {
+  margin-top: 6px;
+  color: rgba(255,255,255,.72);
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .sb-nav {

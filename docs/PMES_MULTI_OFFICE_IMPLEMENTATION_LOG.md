@@ -994,3 +994,171 @@ Apps Script deployment: existing deployment updated to `AKfycbxz1GwhQ2x6UzIbkQ8m
 Vercel deployment: production deployment completed and aliased to `https://stb-pmes.vercel.app`; live `/auth/register` returned HTTP `200`.
 
 Still pending: real Google account login validation for one office admin and one office personnel account, visual browser confirmation of the dropdown labels after cache refresh, Drive sharing/access review, Vercel environment review, and concurrent-user behavior testing.
+
+## 2026-08-09 - Portal UI Foundation and Personnel Assessment Entry Point
+
+Branch: `feature/multi-office-assessment-scope`
+
+### Summary
+
+Added the shared UI foundation for the new multi-office modules, dynamic portal
+branding, and the first two Innovation Cluster personnel screens: the Simplified
+Dashboard and My Rating Tasks. Restricted-scope users now land on an orientation
+screen instead of being dropped directly into the STB evaluation form. No Vercel
+or Apps Script deployment was performed.
+
+### Files Added
+
+- `vue-frontend/src/components/ui/PageHeader.vue`
+- `vue-frontend/src/components/ui/DataPanel.vue`
+- `vue-frontend/src/components/ui/StatTile.vue`
+- `vue-frontend/src/components/ui/StatusPill.vue`
+- `vue-frontend/src/components/ui/AppModal.vue`
+- `vue-frontend/src/components/ui/EmptyState.vue`
+- `vue-frontend/src/components/ui/SkeletonRows.vue`
+- `vue-frontend/src/components/ui/ProgressBar.vue`
+- `vue-frontend/src/composables/useBranding.js`
+- `vue-frontend/src/views/PortalDashboardView.vue`
+- `vue-frontend/src/views/MyTasksView.vue`
+- `apps-script/PortalService.gs`
+
+### Files Modified
+
+- `apps-script/Router.gs`
+- `apps-script/OfficeScopeService.gs`
+- `apps-script/OfficePersonnelService.gs`
+- `vue-frontend/src/services/api.js`
+- `vue-frontend/src/router/index.js`
+- `vue-frontend/src/layouts/AppLayout.vue`
+- `vue-frontend/src/views/OfficePersonnelView.vue`
+- `vue-frontend/src/views/EvaluationView.vue`
+- `docs/PMES_MULTI_OFFICE_IMPLEMENTATION_LOG.md`
+
+### What Changed
+
+Shared UI foundation:
+
+- Added eight reusable presentation components aligned to the existing
+  `main.css` component layer. The two new office modules previously shipped
+  private, prefixed CSS that duplicated the shared primitives with different
+  radii, borders and brand colors, so they read as a separate application.
+- `AppModal` adds Esc dismissal, a focus trap, focus restore, and dialog ARIA
+  roles, none of which the hand-rolled overlays had.
+- `DataPanel` centralizes the search, filter, loading-skeleton, error, empty and
+  footer states so each list screen stops reimplementing them.
+
+Dynamic branding:
+
+- Added `useBranding` as the single source of portal naming.
+- STB users now see `Performance Management and Evaluation System` /
+  `Social Technology Bureau` rather than the previous `PERFORMANCE MONITORING` /
+  `EVALUATION SYSTEM` wordmark.
+- Cluster users see `Innovation Cluster Personnel Assessment Portal` with the
+  authenticated user's office name as the subtitle. The office name previously
+  appeared nowhere in the interface.
+- The browser tab title now follows the resolved portal and page.
+- Cluster users no longer see STB instrument names in the page header; the
+  Evaluation subtitle reads `Assessment Form` rather than
+  `Innovations Performance Assessment Tool`.
+
+Personnel portal:
+
+- Added `PortalService` with server-aggregated `summary` and `my-tasks`.
+  Both return counters and a projected task list; no rating rows and no score
+  fields for other personnel are sent to the frontend.
+- Registered `portal` as an office-scoped resource so every read resolves to the
+  caller's designated office spreadsheet.
+- Added `/my-dashboard` and `/my-tasks` and made `/my-dashboard` the landing
+  route for restricted-scope users, replacing the previous forced redirect to
+  `/evaluation`.
+- `My Rating Tasks` deep-links into the existing rating form through
+  `/evaluation?assignment=<id>`, reusing the validated assessment logic.
+
+Defect fixes found during the review:
+
+- Office Personnel `Deactivate` fired immediately with no confirmation. It now
+  uses the existing global confirmation dialog.
+- Office Personnel `Add Personnel` was visible to users without management
+  rights; the route was guarded but the control was not. It is now gated on
+  `canManageOfficePersonnel`.
+- Deactivated roster rows had no reactivation path, so undoing required a direct
+  spreadsheet edit. Added `PATCH office-personnel/:id/activate`.
+
+### Affected Routes and APIs
+
+New backend routes:
+
+- `GET portal/summary`
+- `GET portal/my-tasks`
+- `PATCH office-personnel/:id/activate`
+
+New frontend routes:
+
+- `/my-dashboard`
+- `/my-tasks`
+
+No existing route was renamed or removed.
+
+### Affected Sheets and Fields
+
+- `IPATRaterAssignments`: read-only, filtered to the caller's `raterId`.
+- `IPATRecords`, `IPATCBCRatings`, `IPATJFRatings`: read-only; reduced to a set
+  of record ids to derive draft state. No rating values leave the backend.
+- Office `Personnel`: `active`, `pendingActivation`, `accountStatus`,
+  `validatedAt`, `validatedBy`, `updatedAt` written by the new activate action.
+- Office `AuditLogs`: new `ACTIVATE_PERSONNEL` action.
+
+### Existing STB Functions Preserved
+
+- No STB view, route, or service was removed or renamed.
+- `DashboardService` is untouched; STB users keep the existing Bureau dashboard.
+- The new portal routes are additive and are not shown to STB full-scope users.
+- STB scoring, KRA, IPCRF/CCEF, Accomplishments, Review, User Management, Audit
+  and Reports paths are unchanged.
+- The `EvaluationView` change is additive: the deep-link branch only applies when
+  `?assignment=` is present, otherwise the existing auto-open behavior runs.
+
+### Tests Performed
+
+- `npm run lint:check`
+- `npm run smoke:check`
+- `npm run build`
+- Node `vm.Script` syntax parse of the changed Apps Script files.
+- Frontend source scan for `spreadsheetId` / `spreadsheet_id`.
+- Build artifact check confirming the new route chunks are emitted.
+
+### Test Results
+
+- Frontend lint: passed.
+- Frontend smoke check: passed.
+- Frontend production build: passed; `PortalDashboardView` and `MyTasksView`
+  chunks emitted.
+- Apps Script syntax parse: passed for `PortalService.gs`, `Router.gs`,
+  `OfficeScopeService.gs`, `OfficePersonnelService.gs`.
+- Spreadsheet ID exposure scan: no matches in frontend source.
+
+### Security and Privacy Impact
+
+- `portal/*` accepts no office, spreadsheet, rater or ratee identifier from the
+  client. The office is resolved from the authenticated profile through the
+  existing `OfficeScopeService` resolver.
+- `PortalService.myTasks` deliberately projects a field subset. The existing
+  `ipat-assignments/my-ratees` response includes `overallScore` and record
+  status for the person being rated; those fields are not exposed here.
+- The new activate action is restricted by the same `canManageOffice_` check as
+  deactivate and is written to the office audit log.
+
+### Remaining Risks and Pending Verification
+
+- Not deployed. Apps Script remains at `@217`; Vercel is unchanged.
+- The draft-state derivation reads both rating sheets per request. This is
+  correct but not paginated; it needs measurement against a full office dataset
+  before cluster-wide use.
+- `PortalService.myTasks` reads `rateePosition` and `rateeDivisionName` from the
+  assignment row. If those columns are absent in a provisioned office
+  spreadsheet the fields render as `—`; confirm against a live office roster.
+- Office Registry still uses its original private CSS and has not yet been moved
+  onto the shared components.
+- Live verification still pending: real office personnel login, office admin
+  login, the deep link into the rating form against a live assignment, and
+  browser confirmation of the office-name subtitle.

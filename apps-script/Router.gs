@@ -40,6 +40,16 @@ const Router = (() => {
       // Dashboard — routes: dashboard/summary, /divisions, /status, /activity
       // id = action name
       // ─────────────────────────────────────────
+      // ─────────────────────────────────────────
+      // Portal — the assessment-only experience for participating offices.
+      // Office-scoped by OfficeScopeService; every caller sees only their own
+      // assignments in their own office spreadsheet.
+      // ─────────────────────────────────────────
+      case 'portal':
+        if (id === 'summary' && method === 'GET') return PortalService.summary(params, user)
+        if (id === 'my-tasks' && method === 'GET') return PortalService.myTasks(params, user)
+        break
+
       case 'dashboard':
         if (id === 'summary') return DashboardService.summary(params, user)
         if (id === 'divisions') return DashboardService.divisions(params, user)
@@ -83,6 +93,7 @@ const Router = (() => {
         if (!id && method === 'POST') return OfficePersonnelService.create(body, user)
         if (id && !sub && method === 'PUT') return OfficePersonnelService.update(id, body, user)
         if (id && sub === 'deactivate') return OfficePersonnelService.deactivate(id, user)
+        if (id && sub === 'activate') return OfficePersonnelService.activate(id, user)
         break
 
       // ─────────────────────────────────────────

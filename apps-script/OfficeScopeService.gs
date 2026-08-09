@@ -6,7 +6,8 @@ const OfficeScopeService = (() => {
     'ipat',
     'ipat-assignments',
     'notifications',
-    'audit'
+    'audit',
+    'portal'
   ]
 
   function isAssessmentScopedResource(resource) {

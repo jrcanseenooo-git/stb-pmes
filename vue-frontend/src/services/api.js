@@ -248,6 +248,13 @@ export const authApi = {
 
 // ── Dashboard ──────────────────────────────────
 
+// Innovation Cluster Personnel Assessment Portal — server-aggregated summaries.
+// These return counters, never rating rows.
+export const portalApi = {
+  summary: (p = {}) => gasGet('portal/summary', p),
+  myTasks: (p = {}) => gasGet('portal/my-tasks', p)
+}
+
 export const dashboardApi = {
   summary:         (p = {}) => gasGet('dashboard/summary',   p),
   divisions:       (p = {}) => gasGet('dashboard/divisions', p),
@@ -298,7 +305,8 @@ export const officePersonnelApi = {
   list:       (p = {})   => gasGet('office-personnel', p),
   create:     (data)     => gasWrite('POST', 'office-personnel', data),
   update:     (id, data) => gasWrite('PUT', `office-personnel/${id}`, data),
-  deactivate: (id)       => gasWrite('PATCH', `office-personnel/${id}/deactivate`)
+  deactivate: (id)       => gasWrite('PATCH', `office-personnel/${id}/deactivate`),
+  activate:   (id)       => gasWrite('PATCH', `office-personnel/${id}/activate`)
 }
 
 // ── KRAs & Success Indicators ──────────────────

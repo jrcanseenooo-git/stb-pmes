@@ -594,3 +594,57 @@ What is still pending:
 - Live concurrent-user behavior testing.
 
 This checkpoint does not change the recommendation to avoid live rollout until office scoping, office spreadsheet permissions, and configuration behavior are tested with real or controlled test office data.
+
+## Appendix C — Portal UI checkpoint (2026-08-09)
+
+This checkpoint covers the user-facing layer built on top of the multi-office
+backend backbone recorded in Appendix B.
+
+### What now exists
+
+- A shared presentation component set (`vue-frontend/src/components/ui/`) used by
+  every new module, aligned to the existing `main.css` component layer.
+- Dynamic portal branding resolved from the authenticated scope, including the
+  participating office's name as the subtitle, applied to the shell, page header
+  and browser tab.
+- The restricted personnel experience: Simplified Dashboard, My Rating Tasks,
+  My Results, read-only Assessment Library, Assessment Status, Rating Guide, and
+  read-only Personal Information.
+- The office administrator experience: Office Assessment Dashboard with
+  completion by organizational unit and by rater relationship, neutral attention
+  indicators, and Personnel Validation.
+- The central experience: Cluster Assessment Overview split out of the Office
+  Registry, and an Office Registry focused on provisioning with a stated resume
+  path for interrupted provisioning.
+- Backend summary routes (`portal/*`) that aggregate server-side and return
+  counters rather than rating datasets.
+
+### Confidentiality controls applied
+
+- `portal/my-results` omits rater identities and reduces outstanding rater types
+  to a count, because naming an outstanding relationship identifies one person in
+  most units.
+- `portal/my-tasks` projects a field subset and does not carry the score fields
+  that the underlying STB assignment route returns.
+- Cluster analytics are aggregate only; no individual rating content is included.
+
+### Readiness classification
+
+**DEVELOPMENT_TESTING_READY.**
+
+This is unchanged from the previous checkpoint and is deliberate. The new
+interface is verified only by lint, production build, smoke check, and Apps
+Script syntax parse. It has not been exercised by a real signed-in user of any
+scope, and none of it is deployed.
+
+It cannot advance to USER_ACCEPTANCE_TESTING_READY until at least:
+
+- One participating-office personnel account signs in and completes the full
+  path: dashboard, task list, rating form, draft save, draft reload, final
+  submission, and results.
+- One office administrator account confirms office confinement in Personnel
+  Validation and the Office Assessment Dashboard.
+- One central administrator confirms Cluster Overview totals reconcile against
+  the office spreadsheets.
+- The performance concerns recorded in the Known Issues Register section G are
+  measured against a full office dataset.

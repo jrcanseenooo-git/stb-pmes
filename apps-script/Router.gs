@@ -48,6 +48,9 @@ const Router = (() => {
       case 'portal':
         if (id === 'summary' && method === 'GET') return PortalService.summary(params, user)
         if (id === 'my-tasks' && method === 'GET') return PortalService.myTasks(params, user)
+        if (id === 'my-results' && method === 'GET') return PortalService.myResults(params, user)
+        if (id === 'library' && method === 'GET') return PortalService.library(params, user)
+        if (id === 'office-summary' && method === 'GET') return PortalService.officeSummary(params, user)
         break
 
       case 'dashboard':

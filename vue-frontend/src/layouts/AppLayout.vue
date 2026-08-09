@@ -59,6 +59,28 @@
             </transition>
           </RouterLink>
 
+          <RouterLink v-if="showPortalNav" to="/my-results" class="nav-item" active-class="active" :title="collapsed ? 'My Results' : ''">
+            <div class="nav-icon">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M2 13.5V9M6 13.5V4M10 13.5V6.5M14 13.5V2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+              </svg>
+            </div>
+            <transition name="fade">
+              <span v-if="!collapsed" class="nav-label-text">My Results</span>
+            </transition>
+          </RouterLink>
+
+          <RouterLink v-if="showPortalNav" to="/library" class="nav-item" active-class="active" :title="collapsed ? 'Assessment Library' : ''">
+            <div class="nav-icon">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M2.5 3a1 1 0 011-1H7v12H3.5a1 1 0 01-1-1V3zM13.5 3a1 1 0 00-1-1H9v12h3.5a1 1 0 001-1V3z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
+              </svg>
+            </div>
+            <transition name="fade">
+              <span v-if="!collapsed" class="nav-label-text">Assessment Library</span>
+            </transition>
+          </RouterLink>
+
           <RouterLink v-if="canManageLibraries" to="/kra" class="nav-item" active-class="active" :title="collapsed ? 'KRA Library' : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -187,6 +209,29 @@
             </transition>
           </RouterLink>
 
+          <RouterLink v-if="canManageOfficePersonnel" to="/office-dashboard" class="nav-item" active-class="active" :title="collapsed ? 'Office Dashboard' : ''">
+            <div class="nav-icon">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M2 13.5V9M6 13.5V4M10 13.5V6.5M14 13.5V2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+              </svg>
+            </div>
+            <transition name="fade">
+              <span v-if="!collapsed" class="nav-label-text">Office Dashboard</span>
+            </transition>
+          </RouterLink>
+
+          <RouterLink v-if="canViewClusterMonitoring || canManageOfficeRegistry" to="/cluster-overview" class="nav-item" active-class="active" :title="collapsed ? 'Cluster Overview' : ''">
+            <div class="nav-icon">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.4" />
+                <path d="M1.5 8h13M8 1.5c1.7 1.8 2.6 4 2.6 6.5S9.7 12.7 8 14.5C6.3 12.7 5.4 10.5 5.4 8S6.3 3.3 8 1.5z" stroke="currentColor" stroke-width="1.3" />
+              </svg>
+            </div>
+            <transition name="fade">
+              <span v-if="!collapsed" class="nav-label-text">Cluster Overview</span>
+            </transition>
+          </RouterLink>
+
           <RouterLink v-if="canManageOfficeRegistry || canViewClusterMonitoring" to="/office-registry" class="nav-item" active-class="active" :title="collapsed ? 'Office Registry' : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -211,7 +256,36 @@
             </transition>
           </RouterLink>
 
-          <RouterLink to="/profile" class="nav-item" active-class="active" :title="collapsed ? 'Settings' : ''">
+          <RouterLink v-if="showPortalNav" to="/my-notifications" class="nav-item" active-class="active" :title="collapsed ? 'Assessment Status' : ''">
+            <div class="nav-icon">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M8 1.5a4.5 4.5 0 014.5 4.5v3l1.5 2.5H2L3.5 9V6A4.5 4.5 0 018 1.5zM6.5 12.5a1.5 1.5 0 003 0"
+                  stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+              </svg>
+            </div>
+            <transition name="fade">
+              <span v-if="!collapsed" class="nav-label-text">
+                Assessment Status
+                <span v-if="notifStore.unreadCount > 0" class="nav-badge">{{ notifStore.unreadCount }}</span>
+              </span>
+            </transition>
+            <span v-if="collapsed && notifStore.unreadCount > 0" class="nav-badge-dot"></span>
+          </RouterLink>
+
+          <RouterLink v-if="showPortalNav" to="/help" class="nav-item" active-class="active" :title="collapsed ? 'Rating Guide' : ''">
+            <div class="nav-icon">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.4" />
+                <path d="M6.2 6.1a1.85 1.85 0 013.6.6c0 1.2-1.8 1.5-1.8 2.6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+                <circle cx="8" cy="11.6" r=".8" fill="currentColor" />
+              </svg>
+            </div>
+            <transition name="fade">
+              <span v-if="!collapsed" class="nav-label-text">Rating Guide</span>
+            </transition>
+          </RouterLink>
+
+          <RouterLink :to="personalInfoPath" class="nav-item" active-class="active" :title="collapsed ? personalInfoLabel : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.4" />
@@ -220,14 +294,14 @@
               </svg>
             </div>
             <transition name="fade">
-              <span v-if="!collapsed" class="nav-label-text">Profile Settings</span>
+              <span v-if="!collapsed" class="nav-label-text">{{ personalInfoLabel }}</span>
             </transition>
           </RouterLink>
         </div>
       </nav>
 
       <div class="sb-footer">
-        <div class="sb-user" :class="{ centered: collapsed }" @click="$router.push('/profile')">
+        <div class="sb-user" :class="{ centered: collapsed }" @click="$router.push(personalInfoPath)">
           <div class="user-av">{{ authStore.initials || 'U' }}</div>
 
           <transition name="fade">
@@ -326,7 +400,7 @@
             Export
           </button>-->
 
-          <div class="topbar-avatar" @click="$router.push('/profile')" :title="authStore.fullName">
+          <div class="topbar-avatar" @click="$router.push(personalInfoPath)" :title="authStore.fullName">
             {{ authStore.initials || 'U' }}
           </div>
         </div>
@@ -356,7 +430,7 @@ import PasswordChangePrompt from '@/components/common/PasswordChangePrompt.vue'
 import LogoutConfirmModal from '@/components/common/LogoutConfirmModal.vue'
 
 const authStore = useAuthStore()
-const { canManageUsers, canManageOfficeUsers, canManageLibraries, canManageFocalAssignments, canManageDatabase, canManageOfficeRegistry, canViewClusterMonitoring, canManageOfficePersonnel, canViewAudit, canGenerateReports, canAccessFullSystem } = usePermissions()
+const { canManageUsers, canManageOfficeUsers, canManageLibraries, canManageFocalAssignments, canManageDatabase, canManageOfficeRegistry, canViewClusterMonitoring, canManageOfficePersonnel, canViewAudit, canGenerateReports, canAccessFullSystem, isOfficeAdminScope, isClusterPortalScope } = usePermissions()
 const { isClusterPortal, portalSubtitle, wordmarkTop, wordmarkBottom, shortName, documentTitle } = useBranding()
 const notifStore = useNotificationsStore()
 const { confirm } = useConfirm()
@@ -368,6 +442,15 @@ const accomplishmentsUnread = computed(() =>
 // The portal entries replace the STB Dashboard for anyone the rollout guard
 // keeps out of the full system — that is exactly the restricted cluster scope.
 const showPortalNav = computed(() => !canAccessFullSystem.value)
+
+// Ordinary portal personnel get read-only Personal Information. Office
+// administrators and STB users keep the editable Profile & Settings screen,
+// because they still need account controls such as changing a password.
+const isOrdinaryPortalUser = computed(() =>
+  showPortalNav.value && !isOfficeAdminScope.value && isClusterPortalScope.value
+)
+const personalInfoPath = computed(() => (isOrdinaryPortalUser.value ? '/my-profile' : '/profile'))
+const personalInfoLabel = computed(() => (isOrdinaryPortalUser.value ? 'Personal Information' : 'Profile Settings'))
 
 const canAccessUserManagement = computed(() =>
   canManageUsers.value ||
@@ -396,6 +479,11 @@ const titleMap = {
   '/dashboard': { title: 'Dashboard', sub: 'Bureau Overview' },
   '/my-dashboard': { title: 'Dashboard', sub: 'Assessment Overview' },
   '/my-tasks': { title: 'My Rating Tasks', sub: 'Assigned Assessments' },
+  '/my-results': { title: 'My Results', sub: 'Consolidated Assessment Results' },
+  '/library': { title: 'Assessment Library', sub: 'Official Assessment Content' },
+  '/my-notifications': { title: 'Assessment Status', sub: 'Updates' },
+  '/my-profile': { title: 'Personal Information', sub: '' },
+  '/help': { title: 'Rating Guide', sub: 'Help' },
   '/ipcrf': { title: 'IPCRF / CCEF Forms', sub: 'Performance Commitments' },
   '/review': { title: 'Review', sub: 'Assigned IPCRF / CCEF Forms' },
   '/kra': { title: 'KRA Library', sub: 'Master KRA & SI List' },
@@ -406,7 +494,9 @@ const titleMap = {
   '/audit': { title: 'Audit Trail', sub: 'Activity Log' },
   '/users': { title: 'User Management', sub: 'Access Control' },
   '/office-registry': { title: 'Office Registry', sub: 'Central Administration' },
-  '/office-personnel': { title: 'Office Personnel', sub: 'Office Assessment Roster' },
+  '/office-personnel': { title: 'Personnel Validation', sub: 'Office Assessment Roster' },
+  '/office-dashboard': { title: 'Office Assessment Dashboard', sub: 'Office Monitoring' },
+  '/cluster-overview': { title: 'Cluster Assessment Overview', sub: 'Central Monitoring' },
   '/profile': { title: 'Profile & Settings', sub: '' }
 }
 

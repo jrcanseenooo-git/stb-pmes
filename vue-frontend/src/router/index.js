@@ -49,6 +49,26 @@ const routes = [
         path: "my-tasks",
         component: () => import("@/views/MyTasksView.vue"),
       },
+      {
+        path: "my-results",
+        component: () => import("@/views/MyResultsView.vue"),
+      },
+      {
+        path: "library",
+        component: () => import("@/views/AssessmentLibraryView.vue"),
+      },
+      {
+        path: "my-notifications",
+        component: () => import("@/views/MyNotificationsView.vue"),
+      },
+      {
+        path: "my-profile",
+        component: () => import("@/views/MyProfileView.vue"),
+      },
+      {
+        path: "help",
+        component: () => import("@/views/HelpGuideView.vue"),
+      },
       { path: "ipcrf", component: () => import("@/views/IpcrfView.vue") },
       { path: "review", component: () => import("@/views/ReviewView.vue") },
       { path: "kra", component: () => import("@/views/KraView.vue") },
@@ -79,6 +99,16 @@ const routes = [
         component: () => import("@/views/OfficePersonnelView.vue"),
         meta: { officeAdminAllowed: true },
       },
+      {
+        path: "office-dashboard",
+        component: () => import("@/views/OfficeDashboardView.vue"),
+        meta: { officeAdminAllowed: true },
+      },
+      {
+        path: "cluster-overview",
+        component: () => import("@/views/ClusterOverviewView.vue"),
+        meta: { anyPermission: ['view_cluster_monitoring', 'manage_office_registry'] },
+      },
       { path: "profile", component: () => import("@/views/ProfileView.vue") },
     ],
   },
@@ -94,13 +124,29 @@ const router = createRouter({
 });
 
 const EVALUATION_ROLLOUT_ALLOWED_PATHS = new Set([
-  '/my-dashboard', '/my-tasks',
-  '/evaluation', '/profile', '/office-personnel', '/users', '/reports', '/unauthorized'
+  '/my-dashboard', '/my-tasks', '/my-results', '/library',
+  '/my-notifications', '/my-profile', '/help',
+  '/evaluation', '/profile', '/office-personnel', '/office-dashboard',
+  '/users', '/reports', '/unauthorized'
 ])
 
 // Restricted-scope users land on the Simplified Dashboard rather than being
 // dropped straight into the rating form with no orientation.
 const RESTRICTED_SCOPE_HOME = '/my-dashboard'
+
+// Ordinary participating-office personnel get read-only Personal Information
+// instead of the full Profile & Settings screen. Office administrators keep the
+// full screen because they still need account controls such as password change.
+// This is a route-level block, not a hidden menu item; the backend validates the
+// underlying profile-write routes independently.
+function isOrdinaryPortalUser(profile) {
+  if (!profile) return false
+  const scope = profile.systemScope || 'STB_FULL'
+  if (scope === 'STB_FULL') return false
+  if (scope === 'OFFICE_ADMIN' || scope === 'CLUSTER_ADMIN') return false
+  if (profile.officeRole === 'OFFICE_ADMIN') return false
+  return !hasFullSystemAccess(profile)
+}
 
 function isEvaluationOnlyRollout(profile) {
   if (profile?.systemAccessMode) return profile.systemAccessMode !== 'full_access'
@@ -175,6 +221,11 @@ router.beforeEach(async (to) => {
       permissions.includes('manage_cluster_office_admins') ||
       permissions.includes('manage_office_registry')
     if (!isOfficeAdmin) return { path: "/unauthorized" };
+  }
+  // Ordinary portal personnel are sent to the read-only equivalent rather than
+  // the editable Profile & Settings screen.
+  if (to.path === '/profile' && isOrdinaryPortalUser(auth.profile)) {
+    return { path: '/my-profile' };
   }
   if (
     isEvaluationOnlyRollout(auth.profile) &&

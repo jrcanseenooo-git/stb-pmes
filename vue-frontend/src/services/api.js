@@ -251,8 +251,11 @@ export const authApi = {
 // Innovation Cluster Personnel Assessment Portal — server-aggregated summaries.
 // These return counters, never rating rows.
 export const portalApi = {
-  summary: (p = {}) => gasGet('portal/summary', p),
-  myTasks: (p = {}) => gasGet('portal/my-tasks', p)
+  summary:   (p = {}) => gasGet('portal/summary', p),
+  myTasks:   (p = {}) => gasGet('portal/my-tasks', p),
+  myResults: (p = {}) => gasGet('portal/my-results', p),
+  library:   (p = {}) => gasGet('portal/library', p),
+  officeSummary: (p = {}) => gasGet('portal/office-summary', p)
 }
 
 export const dashboardApi = {

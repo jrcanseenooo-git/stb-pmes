@@ -4,7 +4,7 @@
     <div class="ob-shell">
       <div class="ob-hero">
         <div class="ob-kicker">DSWD INNOVATION CLUSTER</div>
-        <h1 class="ob-title">Performance Monitoring &amp; Evaluation System</h1>
+        <h1 class="ob-title">Performance Management and Evaluation System</h1>
       </div>
 
       <div class="ob-card">

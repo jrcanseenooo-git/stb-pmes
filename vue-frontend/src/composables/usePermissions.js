@@ -114,7 +114,7 @@ export function usePermissions() {
 
   return {
     role, permissions, permissionGroups, hasPermission,
-    systemScope, isStbFullScope, isClusterPortalScope,
+    systemScope, isStbFullScope, isClusterPortalScope, isOfficeAdminScope,
     isAdmin, isDirector, isAsstDir, isDivChief, isSectionHead, isStaff,
     canViewAllDivisions, canApprove, canManageUsers, canManageLibraries,
     canManageFocalAssignments, canViewAudit, canGenerateReports,

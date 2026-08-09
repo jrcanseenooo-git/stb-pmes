@@ -4,7 +4,7 @@
     <div class="pd-shell">
       <div class="pd-hero">
         <div class="pd-kicker">DSWD INNOVATION CLUSTER</div>
-        <h1 class="pd-hero-title">Performance Monitoring &amp; Evaluation System</h1>
+        <h1 class="pd-hero-title">Performance Management and Evaluation System</h1>
       </div>
 
       <div class="pd-card">

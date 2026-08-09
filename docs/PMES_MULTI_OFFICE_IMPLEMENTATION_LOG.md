@@ -1162,3 +1162,144 @@ No existing route was renamed or removed.
 - Live verification still pending: real office personnel login, office admin
   login, the deep link into the rating form against a live assignment, and
   browser confirmation of the office-name subtitle.
+
+## 2026-08-09 - Complete Portal, Office and Cluster Module Set
+
+Branch: `feature/multi-office-assessment-scope`
+
+### Summary
+
+Completed the remaining scoped modules: the restricted personnel experience, the
+office administrator dashboard, and the central cluster overview. Office Registry
+was refactored onto the shared component set and reduced to registry and
+provisioning only. No Vercel or Apps Script deployment was performed.
+
+### Files Added
+
+- `vue-frontend/src/components/ui/BarList.vue`
+- `vue-frontend/src/views/MyResultsView.vue`
+- `vue-frontend/src/views/AssessmentLibraryView.vue`
+- `vue-frontend/src/views/MyNotificationsView.vue`
+- `vue-frontend/src/views/MyProfileView.vue`
+- `vue-frontend/src/views/HelpGuideView.vue`
+- `vue-frontend/src/views/OfficeDashboardView.vue`
+- `vue-frontend/src/views/ClusterOverviewView.vue`
+
+### Files Modified
+
+- `apps-script/PortalService.gs`
+- `apps-script/Router.gs`
+- `vue-frontend/src/services/api.js`
+- `vue-frontend/src/router/index.js`
+- `vue-frontend/src/layouts/AppLayout.vue`
+- `vue-frontend/src/composables/usePermissions.js`
+- `vue-frontend/src/views/OfficeRegistryView.vue`
+- `vue-frontend/src/views/LoginView.vue`
+- `vue-frontend/src/views/RegisterView.vue`
+- `vue-frontend/src/views/PendingView.vue`
+- `docs/PMES_KNOWN_ISSUES.md`
+- `docs/PMES_CLUSTER_READINESS_ASSESSMENT.md`
+- `docs/PMES_MULTI_OFFICE_IMPLEMENTATION_LOG.md`
+
+### What Changed
+
+Personnel scope:
+
+- `My Results` shows the consolidated result per period with a period selector
+  that also serves as assessment history. Rater identities are not shown and the
+  outstanding-rater breakdown is reduced to a count.
+- `Assessment Library` groups published indicators by category with guidance,
+  applicable rater relationships and evidence flags. Read-only; KRA content is
+  structurally absent from office spreadsheets so there is nothing to filter.
+- `Assessment Status` lists assessment notifications only; administrative and
+  system notification types are filtered out.
+- `Rating Guide` documents the rating scale, rater relationships, the submission
+  workflow and common questions, and reads the published content version so the
+  guide and the library are visibly the same release.
+- `Personal Information` is a read-only field grid with no Account Settings card
+  and no editing, and ordinary portal personnel are redirected here from
+  `/profile` at the route level.
+
+Office administrator scope:
+
+- `Office Assessment Dashboard` presents personnel and task KPIs, overall
+  completion, completion by organizational unit, completion by rater
+  relationship, and neutral attention indicators.
+- `Office Personnel` was renamed in the interface to `Personnel Validation` and
+  gained status tabs, counters, activate/deactivate with confirmation, and search.
+
+Central scope:
+
+- `Cluster Assessment Overview` was split out of Office Registry into its own
+  route, with cluster KPIs, completion by office, and an office monitoring table
+  using the neutral status vocabulary.
+- `Office Registry` now covers registry and provisioning only. Provisioning shows
+  its steps, explains why `Activate` is disabled, flags rows left mid-setup, and
+  states the resume path rather than leaving it to be inferred.
+- Registration options now show a parsed preview before saving and warn about
+  sections with no matching division.
+
+Branding:
+
+- The sign-in, registration and pending pages now read
+  `Performance Management and Evaluation System`.
+
+### Affected Routes and APIs
+
+New backend routes:
+
+- `GET portal/my-results`
+- `GET portal/library`
+- `GET portal/office-summary`
+
+New frontend routes:
+
+- `/my-results`, `/library`, `/my-notifications`, `/my-profile`, `/help`
+- `/office-dashboard`, `/cluster-overview`
+
+No existing route was renamed or removed.
+
+### Affected Sheets and Fields
+
+All reads. No new writes were introduced in this slice.
+
+- `Personnel` / `Users`, `RaterAssignments` / `IPATRaterAssignments`,
+  `AssessmentRecords` / `IPATRecords`: read for aggregation.
+- `AssessmentCategories`, `AssessmentContent`: read for the library.
+- `OfficeRegistry`: read via the existing sanitized monitoring route.
+
+### Existing STB Functions Preserved
+
+- No STB view, route, service or sheet was renamed or removed.
+- `DashboardService` and the STB Dashboard are untouched.
+- The new routes are additive and gated so STB full-scope users keep existing
+  navigation.
+- `usePermissions` gained one export (`isOfficeAdminScope`); no existing export
+  changed behavior.
+
+### Tests Performed
+
+- `npm run lint:check`
+- `npm run smoke:check`
+- `npm run build`
+- Node `vm.Script` syntax parse of the changed Apps Script files.
+- Dev server boot with browser console error check on the sign-in page.
+
+### Test Results
+
+- Frontend lint: passed.
+- Frontend smoke check: passed.
+- Frontend production build: passed; all new route chunks emitted.
+- Apps Script syntax parse: passed.
+- Dev server boot: page rendered, no console errors, updated sign-in wording
+  confirmed in the browser.
+
+### Pending Verification
+
+Nothing in this slice has been exercised by a signed-in user. Verification stops
+at the sign-in page because authenticating as a real user was not performed.
+Still pending: participating-office personnel sign-in through the full rating
+path, office administrator confinement checks, central reconciliation of cluster
+totals against office spreadsheets, performance measurement of the new summary
+routes against a full office dataset, Apps Script deployment, and Vercel
+deployment.

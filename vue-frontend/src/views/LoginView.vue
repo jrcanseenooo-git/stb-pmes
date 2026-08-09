@@ -24,9 +24,12 @@
 
       <div class="hero-block">
         <div class="system-kicker">DSWD INNOVATION CLUSTER</div>
+        <!-- Pre-authentication the office is unknown, so the sign-in pages carry
+             the neutral cluster-wide name. The office-specific portal title and
+             subtitle resolve from the profile once the user is signed in. -->
         <h1 class="login-title">
-          <span>Performance Monitoring</span>
-          <span>Evaluation System</span>
+          <span>Performance Management</span>
+          <span>and Evaluation System</span>
         </h1>
         <p class="login-title-sub">Accountability, Accomplishments, and Performance Evaluation</p>
       </div>

@@ -126,3 +126,43 @@ Everything in `DECIDE` status above traces to one of these. They are listed in p
 | Decisions required | 8 |
 
 Three of the five criticals (E-01, D-01, D-04) concern data that already exists rather than code that must be written. They are therefore fixable **this week**, and none of them requires the migration.
+
+## G. Portal UI slice — 2026-08-09
+
+### Fixed in this slice — pending push and deploy
+
+- **Office Personnel `Deactivate` fired with no confirmation.** A single click
+  deactivated a roster row. Now routed through the existing global confirmation
+  dialog. Severity: High (data integrity / operator error).
+- **`Add Personnel` was visible without management rights.** The route was
+  guarded but the control was not. Now gated on `canManageOfficePersonnel`.
+  Severity: Low (the backend already rejected the write).
+- **Deactivated roster rows had no reactivation path.** Undoing a deactivation
+  required a direct spreadsheet edit, which is precisely what office
+  administrators are meant to be kept out of. Added
+  `PATCH office-personnel/:id/activate`. Severity: Medium.
+- **Restricted-scope users were dropped into the STB rating form on login.**
+  They now land on the Simplified Dashboard. Severity: Medium (usability).
+- **Modals had no Esc, focus trap, or dialog ARIA.** Replaced by the shared
+  `AppModal`. Severity: Medium (accessibility).
+- **Ordinary portal personnel could reach the editable Profile & Settings
+  screen.** Now redirected to read-only Personal Information at the route level.
+  Severity: Medium. Note the backend profile-write routes are the actual control;
+  this closes the UI path.
+
+### Open — carried forward from this slice
+
+- **`PortalService` draft-state derivation is unpaginated.** Deriving which
+  tasks are drafts reads both rating sheets in full per request. Correct, but
+  unmeasured against a full office dataset. Resolve before cluster-wide use.
+- **`portal/office-summary` reads three sheets in full per request.** Same
+  concern; acceptable at an office's scale, not yet measured.
+- **`PortalService.myTasks` assumes `rateePosition` and `rateeDivisionName`
+  exist on the assignment row.** Absent columns degrade to an em dash rather
+  than failing. Confirm against a live provisioned office spreadsheet.
+- **Cluster Overview has no per-office drill-down page.** The office monitoring
+  table is read-only; selecting an office does not open an office detail view.
+- **Report Center still uses its own visual language** and has not been moved
+  onto the shared component set.
+- **No automated test coverage for the new routes.** All verification to date is
+  lint, build, smoke check, and Apps Script syntax parse.

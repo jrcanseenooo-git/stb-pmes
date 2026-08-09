@@ -1699,3 +1699,53 @@ cannot be verified without a real login, which was not performed. The same
 applies to the Configure Registration Options modal's live layout with real
 multi-division data (Walang Gutom's actual 9 divisions). Both need the user's
 own screenshot to confirm.
+
+## 2026-08-09 - Cluster Sidebar Wordmark Text Correction
+
+Branch: `feature/multi-office-assessment-scope`
+
+### Summary
+
+Direct correction: the cluster-scope sidebar's second line read "ASSESSMENT
+PORTAL"; changed to "Performance Monitoring and Evaluation System" so cluster
+users see the same system name as STB users, rather than a different portal
+name.
+
+### Files Modified
+
+- `vue-frontend/src/composables/useBranding.js`
+- `vue-frontend/src/layouts/AppLayout.vue`
+
+### What Changed
+
+- `wordmarkBottom` for cluster scope changed from `'ASSESSMENT PORTAL'` to
+  `'Performance Monitoring and Evaluation System'`. `portalTitle` (used for
+  the page header, browser tab, and report headers) is unchanged — cluster
+  users still see "Innovation Cluster Personnel Assessment Portal" there; this
+  edit is specific to the sidebar wordmark's second line.
+- `.brand-sub` changed from `white-space: nowrap` to `white-space: normal`
+  with `line-height: 1.35`, since the new text is a four-word system name, not
+  a short two-word label — it now wraps onto two lines instead of clipping or
+  overflowing.
+
+### Existing STB Functions Preserved
+
+- STB-scope wordmark text (`'PERFORMANCE MANAGEMENT'` / `'AND EVALUATION
+  SYSTEM'`) is unchanged.
+- No route, API, or business logic touched.
+
+### Tests Performed
+
+- `npm run lint:check`, `npm run deploy:check` (audit, lint, smoke, build)
+- Console error check on `https://stb-pmes.vercel.app` after deploy.
+
+### Deployment
+
+- No backend change. Vercel deployed from repository root, confirmed live, no
+  console errors.
+
+### Pending Verification
+
+Same limitation as the prior sidebar entry: `AppLayout.vue` is scoped CSS
+behind login, so the actual wrapped two-line rendering has not been visually
+confirmed — needs the user's own screenshot.

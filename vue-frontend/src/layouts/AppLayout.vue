@@ -794,14 +794,17 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 
+/* Wraps rather than truncates — the cluster-scope text here is a full system
+   name ("Performance Monitoring and Evaluation System"), not a short label. */
 .brand-sub {
   margin-top: 3px;
   color: rgba(255,255,255,.48);
   font-size: 8.5px;
   font-weight: 800;
-  letter-spacing: .65px;
+  letter-spacing: .5px;
   text-transform: uppercase;
-  white-space: nowrap;
+  line-height: 1.35;
+  white-space: normal;
 }
 
 /* Office name. Participating office names are long ("Information and

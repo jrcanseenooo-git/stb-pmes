@@ -30,10 +30,10 @@ export function useBranding() {
     return officeName.value || 'Innovation Cluster'
   })
 
-  // The sidebar wordmark is two stacked lines and must stay short enough not to
-  // wrap awkwardly at the collapsed/expanded breakpoints.
+  // The sidebar wordmark's second line wraps rather than truncates (see
+  // .brand-sub in AppLayout.vue), so it isn't limited to one short line.
   const wordmarkTop = computed(() => (isClusterPortal.value ? 'INNOVATION CLUSTER' : 'PERFORMANCE MANAGEMENT'))
-  const wordmarkBottom = computed(() => (isClusterPortal.value ? 'ASSESSMENT PORTAL' : 'AND EVALUATION SYSTEM'))
+  const wordmarkBottom = computed(() => (isClusterPortal.value ? 'Performance Monitoring and Evaluation System' : 'AND EVALUATION SYSTEM'))
 
   const shortName = computed(() => {
     if (!isClusterPortal.value) return 'PMES'

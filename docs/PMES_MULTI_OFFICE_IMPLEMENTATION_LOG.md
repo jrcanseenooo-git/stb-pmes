@@ -1897,3 +1897,93 @@ Not exercised by a signed-in user. Specifically unverified:
 
 **Recommendation:** run Generate Assignments on one non-STB office before
 running it for STB, so the auto-seed is exercised somewhere recoverable.
+
+## 2026-08-10 - G4, G9, G8 (protocol gaps)
+
+Branch: `feature/multi-office-assessment-scope`
+
+### G4 — FPO manual entry for every office except STB *(deployed @229)*
+
+Per instruction: only STB syncs FPO from IPCRF/CCEF; all other offices type the
+figure in.
+
+- `EvaluationView`: the sync/re-sync control is hidden entirely for non-STB
+  scopes rather than shown and then failing. Copy adapts — the intro refers to
+  the office's own approved instrument, the raw-score line reads "FPO score"
+  not "IPCRF score", and the panel is "FPO Entry" not "Manual FPO Entry" since
+  for those offices it is the only path, not a fallback.
+- `IPATService.syncFPO` rejects non-STB callers (`requireIpcrfFpoOffice_`).
+  Hiding the control is not sufficient alone — without the guard a stale client
+  or crafted request could pull an STB IPCRF rating into another office's record.
+- `setFPO` unchanged; remains the entry path for all offices.
+
+### G9 — Weight-rule validation *(deployed @230)*
+
+- `AssessmentRulesService.update` validates the state the batch *would* produce
+  before writing anything: all three domains present, each strictly between 0
+  and 1, totalling 1.0 ± 0.001. Per-row validation mid-write could otherwise
+  leave an office with CBC updated and FPO not, weights summing to 0.75, and
+  every later score silently wrong.
+- Added `basis` and `approvedBy` columns (protocol IV.D requires a documented
+  basis for any deviation). A departure from 30/55/15 is rejected unless a basis
+  is supplied. `ensureSheet_` appends missing headers, so the live sheet
+  migrates on next access — no manual column insert.
+- Validation only runs when a batch actually touches `domainWeight` rows;
+  editing rater weights alone does not require restating the domain split.
+
+### G8 — FPO position weight differential *(deployed @230)*
+
+Scoped per instruction: the differential applies **only** when the score comes
+from the IPCRF/CCEF sync, which is STB-only. A manually entered FPO figure —
+including STB's — gets no differential, because the office's weighting was
+already applied before the number was typed in. Applying it again would
+double-count.
+
+- New `fpoPositionWeight` rule type with `positionII` / `positionIII` /
+  `positionIV`, seeded at **1.00 (no-op)**.
+- `resolvePositionCategory` maps a position title to a category, with ITO I
+  categorised under Position III per protocol V.B.1.
+- `syncFPO` resolves the category, applies the factor, clamps the result to the
+  1–5 scale, and persists `fpoPositionCategory` + `fpoWeightFactor` for audit.
+  `setFPO` does not call it.
+
+**Why the factors default to 1.00.** The protocol's 22% and 34% differentials
+describe how a position's *targets* are weighted when performance commitments
+are set — that happens inside the IPCR computation. What reaches this system is
+an already-normalised 1–5 final rating; multiplying it by 1.22 would push
+results past the top of the scale. The mechanism is wired and configurable for
+the IPCRF/CCEF rollout, but **the formula must be confirmed before any non-1.00
+value is set.** The clamp means a mis-set factor cannot produce an out-of-range
+score, but it could still distort results.
+
+### G5 — Not implemented, by instruction
+
+Attendance is being handled outside this system; Job Fitness keeps taking the
+rating manually. **Open question raised with the user:** the JF indicator label
+still claims it is "scored based on DTR records using the threshold table",
+which is not true — and it is unconfirmed whether the attendance indicator
+stays in Job Fitness (5 indicators, divisor 5) or is removed (4, divisor 4).
+Removing it would change every JF and overall score. No change made pending
+that answer.
+
+### Tests Performed
+
+- All 35 `.gs` files parse.
+- Weight validation: 10 cases via the public `update()`, including that a
+  rejected batch performs **no writes**.
+- Position mapping: 10 cases. This caught a real bug — the ITO I rule matched
+  only the abbreviation, so "Information Technology Officer I" fell through
+  unmapped. Fixed to accept both forms while keeping "ITO III" on Position III.
+- `deploy:check` true exit code 0.
+
+### Deployment
+
+- Apps Script `@229` (G4), `@230` (G9 + G8). Existing deployment ID reused.
+- Vercel deployed for G4 (frontend change); G9/G8 are backend-only.
+
+### Pending Verification
+
+Not exercised by a signed-in user. Notably: the `AssessmentRules` header
+migration (`basis`, `approvedBy`) and the `IPATRecords` migration
+(`fpoPositionCategory`, `fpoWeightFactor`) both run on first access and have not
+been observed against the live sheets.

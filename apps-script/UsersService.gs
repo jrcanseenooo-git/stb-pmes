@@ -616,8 +616,14 @@ const UsersService = (() => {
   }
 
   function stripSelfForbiddenFields_(body) {
+    // mustChangePassword is a boolean UI flag, not a permission — letting a
+    // user clear it on themselves is how PasswordChangePrompt.vue confirms a
+    // completed password change. Without it here, that write was silently
+    // dropped: the sheet kept mustChangePassword=true forever, so the prompt
+    // reappeared on every profile refresh (a 60s timer, or a route change)
+    // even though the user really had changed their password in Firebase.
     Object.keys(body).forEach(key => {
-      if (['fullName', 'position', 'employeeNo'].indexOf(key) < 0) delete body[key]
+      if (['fullName', 'position', 'employeeNo', 'mustChangePassword'].indexOf(key) < 0) delete body[key]
     })
   }
 

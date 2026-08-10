@@ -148,8 +148,25 @@ const FirebaseAuthService = (() => {
         Logger.log('✅ Firebase user created: ' + email + ' UID: ' + result.localId)
         return { success: true, uid: result.localId, email: result.email }
       } else if (result.error?.message === 'EMAIL_EXISTS') {
+        // A Firebase Auth account for this email already existed — common for
+        // dswd.gov.ph addresses that ever touched Google Sign-In, or a retried
+        // creation. This branch used to just report success without touching
+        // the account, so the temp password shown in the creation modal was
+        // never actually set on the real credential: the account kept
+        // whatever password it already had (often none), first login failed,
+        // and the admin had to use Reset Password — which calls
+        // updatePassword() on the existing uid — to make the account usable.
+        // Setting the password here means the temp password from creation
+        // works the first time, matching what the admin was told happened.
         Logger.log('ℹ️ Firebase user already exists: ' + email)
         const existing = getUserByEmail(email)
+        if (existing?.localId) {
+          try {
+            updatePassword(existing.localId, password)
+          } catch (pwErr) {
+            Logger.log('⚠️ Could not set password on existing Firebase user ' + email + ': ' + pwErr.message)
+          }
+        }
         return { success: true, uid: existing?.localId || '', email, alreadyExisted: true }
       } else {
         Logger.log('❌ Firebase create user error: ' + JSON.stringify(result.error))

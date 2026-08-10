@@ -97,6 +97,23 @@
             </svg>
             Skip for now
           </button>
+          <!--
+            This modal is force-blocking (no Skip) when a password change is
+            required, and its own recent-login error tells the user to sign out
+            and back in — but with Skip hidden and no other control, there was
+            no way to actually do that. A user who hit that specific error was
+            simply stuck behind an overlay with no path forward short of
+            leaving the app by typing a URL directly. Sign Out is always a safe
+            exit from a forced prompt, so it's offered here rather than only
+            in the unreachable sidebar.
+          -->
+          <button v-if="props.force" class="btn-skip" :disabled="signingOut" @click="handleSignOut">
+            <span v-if="signingOut" class="spinner"></span>
+            <svg v-else width="13" height="13" viewBox="0 0 13 13" fill="none">
+              <path d="M5 1.5H2.5a1 1 0 00-1 1v9a1 1 0 001 1H5M9 9.5l3-3-3-3M12 6.5H5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            {{ signingOut ? 'Signing out…' : 'Sign Out' }}
+          </button>
           <button
             class="btn-save"
             :disabled="!canSave || saving"
@@ -127,6 +144,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { updatePassword } from 'firebase/auth'
 import { auth } from '@/firebase'
 import { usersApi } from '@/services/api'
@@ -135,14 +153,27 @@ import { useAuthStore } from '@/stores/auth'
 const props = defineProps({ show: Boolean, force: Boolean })
 const emit  = defineEmits(['changed', 'skip'])
 const authStore = useAuthStore()
+const router = useRouter()
 
 const newPw     = ref('')
 const confirmPw = ref('')
 const showNew   = ref(false)
 const showConfirm = ref(false)
 const saving    = ref(false)
+const signingOut = ref(false)
 const error     = ref('')
 const strength  = ref(0)
+
+async function handleSignOut() {
+  signingOut.value = true
+  try {
+    await authStore.logout()
+    router.push('/auth/login')
+  } catch (e) {
+    error.value = e.message || 'Could not sign out. Please close this tab and reopen the app.'
+    signingOut.value = false
+  }
+}
 
 const requirements = computed(() => [
   { label: 'At least 8 characters',         met: newPw.value.length >= 8 },

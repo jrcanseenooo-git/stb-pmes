@@ -230,11 +230,24 @@ const UsersService = (() => {
       user
     )
 
+    // Admin-created accounts are active immediately — there is no separate
+    // approval step for activate() to catch, so this is the only place that
+    // can push a directly-created office account into its office roster.
+    // Without this, an account created here with officeId/systemScope set to a
+    // participating office existed only in the central directory: it could log
+    // in, but never appeared in that office's Personnel roster and was
+    // invisible to rater-assignment generation for that office.
+    let officePersonnelSync = { synced: false, skipped: true }
+    if (shouldSyncOfficePersonnel_(newUser) && typeof OfficePersonnelService !== 'undefined') {
+      officePersonnelSync = OfficePersonnelService.syncFromCentralUser(newUser, user)
+    }
+
     return {
       ..._safeUser(newUser),
       tempPassword: body.tempPassword || '',
       firebaseCreated: firebaseResult?.success || false,
-      firebaseError:   firebaseResult?.error   || null
+      firebaseError:   firebaseResult?.error   || null,
+      officePersonnelSync
     }
   }
 
@@ -307,8 +320,23 @@ const UsersService = (() => {
       }
     }
 
+    // Re-sync to the office roster if this edit touches office-scoped fields
+    // and the account is active — e.g. a corrected division/section, or an
+    // account moved to a different participating office after creation.
+    // Skipped for inactive/pending accounts: activate() performs the initial
+    // sync when they are approved, and syncing an unapproved account would
+    // put someone on an office roster before an administrator ever approved
+    // them there.
+    let officePersonnelSync = { synced: false, skipped: true }
+    const touchesOfficeFields = ['officeId', 'officeCode', 'systemScope', 'divisionId', 'divisionName', 'section', 'position', 'role', 'fullName']
+      .some(field => Object.prototype.hasOwnProperty.call(updateBody, field))
+    if (touchesOfficeFields && updated.active !== false && String(updated.active).toLowerCase() !== 'false' &&
+        shouldSyncOfficePersonnel_(updated) && typeof OfficePersonnelService !== 'undefined') {
+      officePersonnelSync = OfficePersonnelService.syncFromCentralUser(updated, user)
+    }
+
     AuditService.log('UPDATE_USER', 'Users', `Updated user: ${id}`, user)
-    return updated
+    return { ...updated, officePersonnelSync }
   }
 
   // ── ACTIVATE user ──

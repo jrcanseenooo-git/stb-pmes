@@ -272,6 +272,19 @@ const UsersService = (() => {
     if (canEditOwn && !canManageUsers && !canEditOfficeUser) {
       stripSelfForbiddenFields_(updateBody)
     }
+    // Editing your own row while also holding office-admin permissions took
+    // the canEditOfficeUser branch above (sameOffice_ trivially matches your
+    // own row), not the canEditOwn branch — so stripOfficeAdminForbiddenFields_
+    // ran instead of stripSelfForbiddenFields_ and deleted mustChangePassword
+    // regardless of the allowlist fix there. That denylist exists to stop an
+    // office admin forcing the flag on SOMEONE ELSE's account; it should never
+    // have applied to clearing your own. Restoring it here, after whichever
+    // strip ran, means the self-service password-change confirmation works for
+    // every account tier — ordinary staff, office admin, or central admin —
+    // without weakening what an office admin can do to any other user's row.
+    if (canEditOwn && Object.prototype.hasOwnProperty.call(body, 'mustChangePassword')) {
+      updateBody.mustChangePassword = body.mustChangePassword === true || body.mustChangePassword === 'true'
+    }
     if (Object.prototype.hasOwnProperty.call(updateBody, 'permissionGroups')) {
       updateBody.permissionGroups = _normaliseList(updateBody.permissionGroups)
     }

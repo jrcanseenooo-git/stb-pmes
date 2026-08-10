@@ -369,7 +369,13 @@ const IPATService = (() => {
     'Relevant Work Experience Alignment: demonstrates prior experiences that directly supports the competencies and technical requirements of the current role.',
     'Training and Skills Applicability: actively integrates skills gained from training or professional development directly into work workflows to improve efficiency.',
     'Commitment to Organizational Objectives: demonstrates alignment with program goals through consistent work engagement and support for organizational priorities.',
-    'Attendance and Punctuality Compliance: maintains regular attendance and adheres to prescribed work schedules, with minimal unexcused absences or tardiness. Scored based on DTR records using the threshold table.'
+    // The previous wording claimed this was "scored based on DTR records using
+    // the threshold table". No attendance data is ingested by this system and
+    // none is planned — attendance is tracked outside it — so that sentence
+    // described behaviour that does not exist. It is rated by the supervisor
+    // like every other Job Fitness indicator; the protocol's bands are restated
+    // here so the rater applies them consistently rather than by impression.
+    'Attendance and Punctuality Compliance: maintains regular attendance and adheres to prescribed work schedules, with minimal unexcused absences or tardiness. Rate against the monthly attendance record — 4: 0–2 late, full attendance (excluding filed VL/PL/SL); 3: 3–5 late or 1–2 days unplanned absence; 2: 6–9 late or 3–5 days unplanned absence; 1: 10 or more late, or frequent emergency leaves.'
   ]
 
   // ── Qualitative Descriptors ──────────────────────────────────────────────

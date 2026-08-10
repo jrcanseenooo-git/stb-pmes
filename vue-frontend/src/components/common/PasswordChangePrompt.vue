@@ -39,6 +39,7 @@
                 :type="showNew ? 'text' : 'password'"
                 class="field-input"
                 placeholder="Enter new password"
+                autocomplete="new-password"
                 @input="checkStrength"
               />
               <button type="button" class="pw-toggle" @click="showNew = !showNew">
@@ -76,6 +77,7 @@
                 class="field-input"
                 :class="{ 'input-mismatch': confirmPw && newPw !== confirmPw }"
                 placeholder="Re-enter new password"
+                autocomplete="new-password"
               />
               <button type="button" class="pw-toggle" @click="showConfirm = !showConfirm">
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none">

@@ -73,7 +73,10 @@ const IPATService = (() => {
     return { ...ctx.record, ...updates }
   }
 
-  const CBC_DEDUCTION_HEADERS = [
+  // Columns ensureRecordSchema() adds to IPATRecords if absent. Named for the
+  // migration it performs rather than for one feature, since it now also
+  // carries the FPO position-differential fields.
+  const AUTO_MIGRATED_RECORD_HEADERS = [
     'cbcBaseScore',
     'cbcNteLevel',
     'cbcNteDeductionPct',
@@ -82,7 +85,11 @@ const IPATService = (() => {
     'cbcDeductionNote',
     'cbcDeductionBy',
     'cbcDeductionByName',
-    'cbcDeductionAt'
+    'cbcDeductionAt',
+    // Protocol V.B.1 position weight differential — recorded so a synced score
+    // is auditable: which category was matched and what factor was applied.
+    'fpoPositionCategory',
+    'fpoWeightFactor'
   ]
 
   const CONDUCT_LEVELS = {
@@ -112,7 +119,7 @@ const IPATService = (() => {
     const sheet = SpreadsheetService.getSheet(SHEET.IPAT_RECORDS)
     const lastColumn = Math.max(sheet.getLastColumn(), 1)
     const headers = sheet.getRange(1, 1, 1, lastColumn).getValues()[0].map(String)
-    const missing = CBC_DEDUCTION_HEADERS.filter(h => headers.indexOf(h) < 0)
+    const missing = AUTO_MIGRATED_RECORD_HEADERS.filter(h => headers.indexOf(h) < 0)
     if (missing.length) {
       sheet.getRange(1, headers.length + 1, 1, missing.length).setValues([missing])
       sheet.getRange(1, headers.length + 1, 1, missing.length)
@@ -933,6 +940,48 @@ const IPATService = (() => {
   // instrument and record the figure through setFPO.
   // ─────────────────────────────────────────────
 
+  /**
+   * Applies the protocol V.B.1 position weight differential to a rating pulled
+   * from the IPCRF/CCEF.
+   *
+   * The configured factors default to 1.00, so this is a no-op until somebody
+   * deliberately sets them. That default is intentional: the protocol's 22% and
+   * 34% differentials describe how a position's TARGETS are weighted when
+   * commitments are set, which happens inside the IPCR computation — the value
+   * arriving here is an already-normalised 1–5 final rating. Multiplying it by
+   * 1.22 would push results past the top of the scale.
+   *
+   * The result is clamped to the 1–5 scale regardless, so a mis-set factor
+   * cannot produce an out-of-range score that would corrupt the overall
+   * computation.
+   */
+  function applyFpoPositionDifferential_(record, rawScore) {
+    const raw = Number(rawScore)
+    const fallback = { fpoScore: raw, category: '', factor: 1 }
+
+    try {
+      if (typeof AssessmentRulesService === 'undefined') return fallback
+
+      const positionText = record.position || record.positionLevel || ''
+      const category = AssessmentRulesService.resolvePositionCategory(positionText)
+      if (!category) return fallback
+
+      const weights = AssessmentRulesService.getFpoPositionWeights()
+      const factor = Number(weights[category])
+      if (!isFinite(factor) || factor <= 0 || factor === 1) {
+        return { fpoScore: raw, category: category, factor: 1 }
+      }
+
+      const adjusted = Math.min(5, Math.max(1, raw * factor))
+      return { fpoScore: round2(adjusted), category: category, factor: factor }
+    } catch (e) {
+      // A misconfigured rule must never block a sync — fall back to the raw
+      // IPCRF rating, which is the pre-differential behaviour.
+      Logger.log('[IPAT] FPO position differential skipped: ' + e.message)
+      return fallback
+    }
+  }
+
   // True only for the STB full scope, which is the one office whose FPO
   // instrument (IPCRF/DPCR) is implemented in this system.
   function requireIpcrfFpoOffice_(user) {
@@ -972,10 +1021,21 @@ const IPATService = (() => {
     const recSheet = SpreadsheetService.getSheet(SHEET.IPAT_RECORDS)
     const ctx = getRowContext(recSheet, ipatId)
     if (!ctx) throw HttpError('IPAT record not found', 404)
-    const computed = calculateOverall(ctx.record, sourceForm.finalNumericalRating)
+
+    // Position weight differential (protocol V.B.1) applies ONLY on this path —
+    // a score pulled from the IPCRF/CCEF. A manually entered FPO figure has
+    // already had the office's own weighting applied before it was typed in, so
+    // setFPO deliberately does not call this; applying it there would
+    // double-count. It is STB-only by construction, because syncFPO itself is
+    // STB-only (see requireIpcrfFpoOffice_).
+    const adjusted = applyFpoPositionDifferential_(ctx.record, sourceForm.finalNumericalRating)
+
+    const computed = calculateOverall(ctx.record, adjusted.fpoScore)
     writeRowContext(recSheet, ctx, {
-      fpoScore:    sourceForm.finalNumericalRating,
+      fpoScore:    adjusted.fpoScore,
       ipcrfFormId: sourceForm.id,
+      fpoPositionCategory: adjusted.category,
+      fpoWeightFactor: adjusted.factor,
       overallScore: computed.overallScore,
       descriptor: computed.descriptor,
       status: 'Computed',
@@ -983,10 +1043,15 @@ const IPATService = (() => {
     })
 
     AuditService.log('SYNC_FPO', 'IPAT',
-      `FPO synced from ${sourceForm.type} ${sourceForm.id} (${sourceForm.finalNumericalRating}) for ${ipatId}`, user)
+      `FPO synced from ${sourceForm.type} ${sourceForm.id} (raw ${sourceForm.finalNumericalRating}` +
+      (adjusted.factor !== 1 ? `, ${adjusted.category} ×${adjusted.factor} → ${adjusted.fpoScore}` : '') +
+      `) for ${ipatId}`, user)
 
     return {
-      fpoScore: sourceForm.finalNumericalRating,
+      fpoScore: adjusted.fpoScore,
+      rawFpoScore: sourceForm.finalNumericalRating,
+      fpoPositionCategory: adjusted.category,
+      fpoWeightFactor: adjusted.factor,
       normalizedFpoScore: computed.normalizedFpoScore,
       cbcScore: computed.cbcScore,
       jfScore: computed.jfScore,

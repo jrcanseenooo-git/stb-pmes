@@ -67,7 +67,7 @@ const OfficeSchemaService = (() => {
       'divisionId', 'divisionName', 'organizationalUnitId',
       'position', 'positionLevel', 'semester', 'year', 'hasSubordinate', 'status',
       'cbcBaseScore', 'cbcScore', 'fpoScore', 'jfScore', 'overallScore',
-      'descriptor', 'ipcrfFormId',
+      'descriptor', 'ipcrfFormId', 'fpoPositionCategory', 'fpoWeightFactor',
       'cbcNteLevel', 'cbcNteDeductionPct', 'cbcOffenseLevel', 'cbcOffenseDeduction',
       'cbcDeductionNote', 'cbcDeductionBy', 'cbcDeductionByName', 'cbcDeductionAt',
       'createdAt', 'updatedAt'

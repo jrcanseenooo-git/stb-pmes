@@ -20,13 +20,61 @@
  */
 const PortalService = (() => {
 
+  function normalizeEmail_(value) {
+    return String(value || '').replace(/[\u200B-\u200D\uFEFF]/g, '').trim().toLowerCase()
+  }
+
+  function profileRosterIdentity_(profile) {
+    const ids = {}
+    const emails = {}
+    const addId = (value) => {
+      const key = String(value || '').trim()
+      if (key) ids[key] = true
+    }
+    const addEmail = (value) => {
+      const key = normalizeEmail_(value)
+      if (key) emails[key] = true
+    }
+
+    addId(profile && profile.id)
+    addId(profile && profile.personnelId)
+    addId(profile && profile.officePersonnelId)
+    addEmail(profile && profile.email)
+
+    try {
+      const personnelSheet = SpreadsheetService.getSheet('Personnel')
+      SpreadsheetService.getAllRows(personnelSheet).forEach(row => {
+        const sameEmail = normalizeEmail_(row.email) && emails[normalizeEmail_(row.email)]
+        const sameUid = String(row.uid || '').trim() &&
+          String(profile && profile.uid || '').trim() &&
+          String(row.uid || '').trim() === String(profile.uid || '').trim()
+        if (sameEmail || sameUid) {
+          addId(row.id)
+          addEmail(row.email)
+        }
+      })
+    } catch (e) {
+      Logger.log('[Portal] Personnel identity lookup skipped: ' + e.message)
+    }
+
+    return { ids: Object.keys(ids), emails: Object.keys(emails) }
+  }
+
+  function isProfileRater_(row, identity) {
+    const raterId = String(row && row.raterId || '').trim()
+    const raterEmail = normalizeEmail_(row && row.raterEmail)
+    return (raterId && identity.ids.indexOf(raterId) >= 0) ||
+      (raterEmail && identity.emails.indexOf(raterEmail) >= 0)
+  }
+
   function summary(params, user) {
     const profile = AuthService.getProfile(user)
     const period = resolvePeriod_(params)
+    const identity = profileRosterIdentity_(profile)
 
     const assignSheet = SpreadsheetService.getSheet(SHEET.IPAT_ASSIGNMENTS)
     const myAssignments = SpreadsheetService.getAllRows(assignSheet).filter(row =>
-      String(row.raterId) === String(profile.id) &&
+      isProfileRater_(row, identity) &&
       matchesPeriod_(row, period)
     )
 
@@ -36,7 +84,7 @@ const PortalService = (() => {
     // A task counts as a draft when this rater has already saved at least one
     // response against the linked record but has not submitted. Both rating
     // sheets are read once and reduced to a set of record ids.
-    const startedRecordIds = ratedRecordIds_(profile.id)
+    const startedRecordIds = ratedRecordIds_(identity.ids)
     const draft = outstanding.filter(row => row.ipatRecordId && startedRecordIds[String(row.ipatRecordId)])
     const pending = outstanding.length - draft.length
 
@@ -78,14 +126,15 @@ const PortalService = (() => {
   function myTasks(params, user) {
     const profile = AuthService.getProfile(user)
     const period = resolvePeriod_(params)
+    const identity = profileRosterIdentity_(profile)
 
     const assignSheet = SpreadsheetService.getSheet(SHEET.IPAT_ASSIGNMENTS)
     const rows = SpreadsheetService.getAllRows(assignSheet).filter(row =>
-      String(row.raterId) === String(profile.id) &&
+      isProfileRater_(row, identity) &&
       matchesPeriod_(row, period)
     )
 
-    const startedRecordIds = ratedRecordIds_(profile.id)
+    const startedRecordIds = ratedRecordIds_(identity.ids)
 
     const items = rows.map(row => {
       const submitted = String(row.status) === 'Completed'
@@ -353,13 +402,18 @@ const PortalService = (() => {
 
   // Returns a lookup of record ids this rater has already saved responses for.
   // Two sheet reads, reduced immediately; no rating values leave this function.
-  function ratedRecordIds_(raterId) {
+  function ratedRecordIds_(raterIds) {
+    const idSet = {}
+    ;(Array.isArray(raterIds) ? raterIds : [raterIds]).forEach(id => {
+      const key = String(id || '').trim()
+      if (key) idSet[key] = true
+    })
     const seen = {}
     const collect = (sheetName) => {
       try {
         const sheet = SpreadsheetService.getSheet(sheetName)
         SpreadsheetService.getAllRows(sheet).forEach(row => {
-          if (String(row.raterId) === String(raterId) && row.ipatId) seen[String(row.ipatId)] = true
+          if (idSet[String(row.raterId || '').trim()] && row.ipatId) seen[String(row.ipatId)] = true
         })
       } catch (e) {
         // A missing rating tab means nothing has been saved yet in this office.

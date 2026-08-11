@@ -252,9 +252,31 @@ const AuthService = (() => {
     // request performed a sheet write before doing any of its real work — a
     // round trip added to every single API call, for a field that only needs to
     // change at sign-in.
-    if (options.touchLogin) {
+    //
+    // This write is unlocked and bypasses the read cache — updateRow() re-reads
+    // the whole sheet itself rather than going through
+    // SpreadsheetService.getAllRows(), so it's a full sheet round trip on the
+    // Apps Script side for every login, synchronously, before the profile is
+    // returned. Firebase Authentication itself scales fine under concurrent
+    // sign-ins; this is the layer that doesn't — Apps Script has a real ceiling
+    // on simultaneous executions, so a login burst (everyone signing in at
+    // once) queues here, not at Google's auth servers.
+    //
+    // lastLoginAt is low-value audit data, not anything scoring or business
+    // logic reads, so skip the write when it was already stamped within the
+    // last few minutes. This is the common case of someone reloading the page
+    // or reopening a tab rather than a fresh sign-in, and it's exactly the
+    // write volume a login burst multiplies — cutting it here helps the actual
+    // concurrent-login scenario, not just casual refreshes.
+    const LOGIN_STAMP_MIN_INTERVAL_MS = 5 * 60 * 1000
+    const previousLoginAt = row.lastLoginAt ? new Date(row.lastLoginAt).getTime() : 0
+    const stampedRecently = previousLoginAt > 0 && (Date.now() - previousLoginAt) < LOGIN_STAMP_MIN_INTERVAL_MS
+
+    if (options.touchLogin && !stampedRecently) {
       try {
-        SpreadsheetService.updateRow(sheet, row.id, { lastLoginAt: new Date().toISOString() })
+        const stampedAt = new Date().toISOString()
+        SpreadsheetService.updateRow(sheet, row.id, { lastLoginAt: stampedAt })
+        row.lastLoginAt = stampedAt
       } catch(e) {
         Logger.log('[Auth] Could not update lastLoginAt: ' + e.message)
       }

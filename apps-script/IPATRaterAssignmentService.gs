@@ -44,6 +44,64 @@ const IPATRaterAssignmentService = (() => {
   const isObsoleteAssignment = (r) => ['JFPeer', 'JobFitnessPeer'].includes(String(r && r.raterType || ''))
   const activeProtocolAssignments = (rows) => rows.filter(r => !isObsoleteAssignment(r))
 
+  function normalizeEmail_(value) {
+    return String(value || '').replace(/[\u200B-\u200D\uFEFF]/g, '').trim().toLowerCase()
+  }
+
+  function profileRosterIdentity_(profile) {
+    const ids = {}
+    const emails = {}
+    const addId = (value) => {
+      const key = String(value || '').trim()
+      if (key) ids[key] = true
+    }
+    const addEmail = (value) => {
+      const key = normalizeEmail_(value)
+      if (key) emails[key] = true
+    }
+
+    addId(profile && profile.id)
+    addId(profile && profile.personnelId)
+    addId(profile && profile.officePersonnelId)
+    addEmail(profile && profile.email)
+
+    try {
+      const personnelSheet = SpreadsheetService.getSheet('Personnel')
+      SpreadsheetService.getAllRows(personnelSheet).forEach(row => {
+        const sameEmail = normalizeEmail_(row.email) && emails[normalizeEmail_(row.email)]
+        const sameUid = String(row.uid || '').trim() &&
+          String(profile && profile.uid || '').trim() &&
+          String(row.uid || '').trim() === String(profile.uid || '').trim()
+        if (sameEmail || sameUid) {
+          addId(row.id)
+          addEmail(row.email)
+        }
+      })
+    } catch (e) {
+      // STB/full PMES does not always have the office Personnel tab. The user id
+      // and email collected above remain the canonical fallback.
+      Logger.log('[IPAT Assignments] Personnel identity lookup skipped: ' + e.message)
+    }
+
+    return {
+      ids: Object.keys(ids),
+      emails: Object.keys(emails)
+    }
+  }
+
+  function rowBelongsToProfile_(row, identity) {
+    const raterId = String(row && row.raterId || '').trim()
+    const rateeId = String(row && row.rateeId || '').trim()
+    const raterEmail = normalizeEmail_(row && row.raterEmail)
+    const rateeEmail = normalizeEmail_(row && row.rateeEmail)
+    return {
+      rater: (raterId && identity.ids.indexOf(raterId) >= 0) ||
+        (raterEmail && identity.emails.indexOf(raterEmail) >= 0),
+      ratee: (rateeId && identity.ids.indexOf(rateeId) >= 0) ||
+        (rateeEmail && identity.emails.indexOf(rateeEmail) >= 0)
+    }
+  }
+
   // Rating writes serialize on the script lock so two raters cannot recompute
   // the same assessment record concurrently and interleave their score writes.
   //
@@ -534,9 +592,12 @@ const IPATRaterAssignmentService = (() => {
 
   function getMyRatees(params, user) {
     const profile = AuthService.getProfile(user)
+    const identity = profileRosterIdentity_(profile)
     const assignSheet = SpreadsheetService.getSheet(SHEET.IPAT_ASSIGNMENTS)
 
-    let rows = activeProtocolAssignments(SpreadsheetService.getAllRows(assignSheet)).filter(r => String(r.raterId) === String(profile.id))
+    let rows = activeProtocolAssignments(SpreadsheetService.getAllRows(assignSheet)).filter(r =>
+      rowBelongsToProfile_(r, identity).rater
+    )
     if (params.semester) rows = rows.filter(r => String(r.semester) === String(params.semester))
     if (params.year)     rows = rows.filter(r => String(r.year) === String(params.year))
     if (params.status)   rows = rows.filter(r => r.status === params.status)
@@ -613,7 +674,8 @@ const IPATRaterAssignmentService = (() => {
     const row = rows.find(r => r.id === assignmentId)
     if (!row) throw HttpError('Assignment not found', 404)
     if (isObsoleteAssignment(row)) throw HttpError('This assignment is no longer active under the current protocol', 400)
-    if (row.raterId !== profile.id) {
+    const identity = profileRosterIdentity_(profile)
+    if (!rowBelongsToProfile_(row, identity).rater) {
       const isAdmin = AuthService.hasPermission(profile, 'generate_ipat_assignments') ||
                       AuthService.hasPermission(profile, 'view_bureau_monitoring')
       if (!isAdmin) throw HttpError('Unauthorized', 403)
@@ -632,7 +694,8 @@ const IPATRaterAssignmentService = (() => {
     const row = rows.find(r => r.id === assignmentId)
     if (!row) throw HttpError('Assignment not found', 404)
     if (isObsoleteAssignment(row)) throw HttpError('This assignment is no longer active under the current protocol', 400)
-    if (row.raterId !== profile.id) {
+    const identity = profileRosterIdentity_(profile)
+    if (!rowBelongsToProfile_(row, identity).rater) {
       const isAdmin = AuthService.hasPermission(profile, 'generate_ipat_assignments') ||
                       AuthService.hasPermission(profile, 'view_bureau_monitoring')
       if (!isAdmin) throw HttpError('Unauthorized', 403)
@@ -670,11 +733,14 @@ const IPATRaterAssignmentService = (() => {
 
   function getMyResults(params, user) {
     const profile     = AuthService.getProfile(user)
+    const identity    = profileRosterIdentity_(profile)
     IPATService.ensureRecordSchema()
     const recSheet    = SpreadsheetService.getSheet(SHEET.IPAT_RECORDS)
     const assignSheet = SpreadsheetService.getSheet(SHEET.IPAT_ASSIGNMENTS)
 
-    let rows = SpreadsheetService.getAllRows(recSheet).filter(r => String(r.rateeId) === String(profile.id))
+    let rows = SpreadsheetService.getAllRows(recSheet).filter(r =>
+      rowBelongsToProfile_(r, identity).ratee
+    )
     if (params.semester) rows = rows.filter(r => String(r.semester) === String(params.semester))
     if (params.year)     rows = rows.filter(r => String(r.year)     === String(params.year))
 

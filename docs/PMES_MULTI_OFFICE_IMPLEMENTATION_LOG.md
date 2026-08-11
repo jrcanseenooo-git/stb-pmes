@@ -1987,3 +1987,81 @@ Not exercised by a signed-in user. Notably: the `AssessmentRules` header
 migration (`basis`, `approvedBy`) and the `IPATRecords` migration
 (`fpoPositionCategory`, `fpoWeightFactor`) both run on first access and have not
 been observed against the live sheets.
+
+## 2026-08-11 - Login-stamp throttling, and shipping unstaged office-identity fix
+
+Branch: `feature/multi-office-assessment-scope`
+
+### Summary
+
+Implemented the login-burst mitigation discussed with the user (skip the
+`lastLoginAt` write on repeat logins within a short window). While staging
+that change, `git add apps-script` picked up substantial, complete,
+already-working-tree changes to `PortalService.gs` and
+`IPATRaterAssignmentService.gs` that were never committed — evidently written
+earlier in this session and left uncommitted. Rather than discard or blindly
+ship them, they were inspected in full, confirmed coherent and complete (not a
+half-finished edit), and independently tested before deploying alongside the
+login fix.
+
+### What Shipped
+
+**1. Login-stamp throttling (`AuthService.gs`).** `getProfile(user,
+{touchLogin:true})` — called on every sign-in — used to write `lastLoginAt`
+unconditionally. That write bypasses the read cache (`updateRow` re-reads the
+sheet itself rather than through `SpreadsheetService.getAllRows()`) and has no
+lock, so it's a full synchronous Sheets round trip on Apps Script's side before
+every login's profile is returned. Now skipped when the account was already
+stamped within the last 5 minutes — covers page reloads/reopened tabs, which
+is exactly the write volume a login burst multiplies. Non-touchLogin calls are
+unaffected.
+
+Verified: 4 cases — first login writes, a second login inside the window skips
+the write, a login after 5+ minutes writes again, ordinary authenticated calls
+never write.
+
+**2. Office-scoped rater/ratee identity resolution (`PortalService.gs`,
+`IPATRaterAssignmentService.gs`) — found already in the working tree,
+uncommitted.** `getMyRatees`, `markCompleted`, `submitAssignmentRatings`,
+`getMyResults`, and `PortalService.summary`/`myTasks` matched a caller against
+assignment rows using `String(row.raterId) === String(profile.id)` —
+`profile.id` from the central Users sheet. Office Personnel records have their
+own id space (`PER-...`), so a `raterId`/`rateeId` recorded against an office's
+own Personnel roster would never equal an office-scoped user's central id: an
+office user's My Rating Tasks / My Results could show empty even with real
+assignments.
+
+Added `profileRosterIdentity_()` (both files carry their own copy) which
+resolves every id an account could legitimately be known by — the central
+Users id, and any office Personnel row matched by email or Firebase uid — and
+matches assignment rows against that whole set instead of a single id.
+
+### Tests Performed
+
+- All 35 `.gs` files parse.
+- Login throttling: 4 cases via the real `AuthService.getProfile`, sandboxed.
+- Identity resolution, `IPATRaterAssignmentService.getMyRatees`: 3 cases —
+  direct central-id match, office-Personnel-id match resolved via email/uid,
+  and confirmation an unrelated row is correctly excluded (no false positive).
+- Identity resolution, `PortalService.myTasks`: same 3 cases, run
+  independently against its own copy of the logic since it's a separate
+  implementation, not a shared function.
+- `deploy:check` true exit code 0.
+
+### Deployment
+
+- Apps Script: pushed 35 files, deployed to the existing deployment ID,
+  confirmed live at `@245` via `clasp deployments` (not trusting the version
+  clasp reports at deploy time — see prior deploy-rules note on this).
+- No frontend change in this entry; Vercel not redeployed.
+
+### Pending Verification
+
+Not exercised by a signed-in user. In particular: the identity-resolution
+change is the more consequential of the two — if it has a defect, the
+plausible failure mode is an office user's rating tasks/results showing
+**fewer** rows than they should, or (if the identity set were ever
+over-broad) showing rows that belong to someone else. The test harness checked
+both directions or an office and an office-provisioned STB-style account, but
+has not been run against a real, provisioned office spreadsheet with a real
+roster.

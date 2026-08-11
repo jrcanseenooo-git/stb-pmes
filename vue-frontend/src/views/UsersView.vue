@@ -501,11 +501,13 @@
                 <div v-if="canManageUsers" class="field">
                   <label class="field-label">System Scope</label>
                   <select v-model="form.systemScope" class="field-select">
-                    <option value="STB_FULL">STB Full PMES</option>
-                    <option value="CLUSTER_PORTAL">Innovation Cluster Portal</option>
-                    <option value="OFFICE_ADMIN">Office Admin Portal</option>
-                    <option value="CLUSTER_ADMIN">Central Cluster Admin</option>
+                    <option v-for="opt in systemScopeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
                   </select>
+                  <p class="field-help">{{ systemScopeDescription }}</p>
+                  <div v-if="form.systemScope === 'CLUSTER_ADMIN'" class="access-group-warning" style="margin-top:6px;">
+                    This scope alone grants no abilities — provisioning, monitoring, etc. still come from the
+                    <strong>Access Groups</strong> checked below (the Cluster / Central Administration section).
+                  </div>
                 </div>
                 <div v-if="canManageUsers" class="field">
                   <label class="field-label">Office</label>
@@ -515,6 +517,11 @@
                       {{ office.officeName }}
                     </option>
                   </select>
+                  <p class="field-help">
+                    {{ form.systemScope === 'STB_FULL'
+                      ? 'Locked to STB — STB Full PMES always uses the central STB spreadsheet.'
+                      : 'The one office this account is limited to for office-scoped screens and data.' }}
+                  </p>
                 </div>
                 <div v-if="canManageUsers" class="field full">
                   <label class="field-label">Access Groups</label>
@@ -776,6 +783,37 @@ const clusterAccessGroupOptions = [
 
 const hasClusterGroupSelected = computed(() =>
   clusterAccessGroupOptions.some(g => (form.value.permissionGroups || []).includes(g.value))
+)
+
+// Same fix as Access Groups: the difference between these four was only ever
+// explained in chat, not in the form itself, so it had to be re-explained
+// every time someone hit this screen. Putting the description at the point of
+// decision means it doesn't need to be remembered or asked about again.
+const systemScopeOptions = [
+  {
+    value: 'STB_FULL',
+    label: 'STB Full PMES',
+    description: 'The complete original PMES for Social Technology Bureau — Dashboard, KRA, IPCRF/CCEF, Accomplishments, Evaluation, Reports. Always uses the central STB spreadsheet, never an office one.'
+  },
+  {
+    value: 'CLUSTER_PORTAL',
+    label: 'Innovation Cluster Portal',
+    description: 'Restricted personnel screens only — My Dashboard, My Rating Tasks, My Results, Assessment Library. No KRA, no admin screens. This is what self-registration into a participating office sets automatically.'
+  },
+  {
+    value: 'OFFICE_ADMIN',
+    label: 'Office Admin Portal',
+    description: 'Everything Cluster Portal gets, plus office-scoped admin screens (Personnel Validation, Office Dashboard, Rater Tagging) — strictly limited to the Office selected on the right. Use this to make someone an administrator of one office only.'
+  },
+  {
+    value: 'CLUSTER_ADMIN',
+    label: 'Central Cluster Admin',
+    description: 'Opts out of the "STB is the only full scope" default so cross-office screens (Cluster Overview, Office Registry) become reachable — but grants no ability by itself. What this account can actually do still depends on which Access Groups are checked below.'
+  }
+]
+
+const systemScopeDescription = computed(() =>
+  systemScopeOptions.find(o => o.value === form.value.systemScope)?.description || ''
 )
 
 const search        = ref('')

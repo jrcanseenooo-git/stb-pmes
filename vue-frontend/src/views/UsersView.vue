@@ -518,8 +518,15 @@
                 </div>
                 <div v-if="canManageUsers" class="field full">
                   <label class="field-label">Access Groups</label>
+                  <p class="field-help" style="margin-bottom:10px;">
+                    Groups add system permissions without changing the user's official role. Most accounts need none of these —
+                    only check a box if this specific person needs the extra ability it describes.
+                  </p>
+
+                  <div class="access-group-subhead">STB Bureau Access</div>
+                  <p class="access-group-subnote">Adds abilities within the Social Technology Bureau's own scope.</p>
                   <div class="access-group-grid">
-                    <label v-for="group in accessGroupOptions" :key="group.value" class="access-group-option">
+                    <label v-for="group in stbAccessGroupOptions" :key="group.value" class="access-group-option">
                       <input v-model="form.permissionGroups" type="checkbox" :value="group.value"/>
                       <span>
                         <strong>{{ group.label }}</strong>
@@ -527,7 +534,25 @@
                       </span>
                     </label>
                   </div>
-                  <p class="field-help">Groups add system permissions without changing the user's official role.</p>
+
+                  <details class="cluster-group-disclosure" :open="hasClusterGroupSelected">
+                    <summary class="access-group-subhead">Cluster / Central Administration</summary>
+                    <div class="access-group-warning">
+                      <strong>These are cross-office, not scoped to one office.</strong>
+                      To restrict an account to managing only its own office, use
+                      <strong>System Scope → Office Admin Portal</strong> above instead — do not check a box here for that.
+                      Checking any of these gives visibility or control across every participating office.
+                    </div>
+                    <div class="access-group-grid">
+                      <label v-for="group in clusterAccessGroupOptions" :key="group.value" class="access-group-option">
+                        <input v-model="form.permissionGroups" type="checkbox" :value="group.value"/>
+                        <span>
+                          <strong>{{ group.label }}</strong>
+                          <small>{{ group.description }}</small>
+                        </span>
+                      </label>
+                    </div>
+                  </details>
                 </div>
               </div>
             </div>
@@ -685,7 +710,15 @@ const CANONICAL_SECTIONS = [
   { id: 'SEC-staed-pr', divisionId: 'staed', name: 'Social Technology Promotion Section' }
 ]
 
-const accessGroupOptions = [
+// Split into two groups because they answer two different questions, and
+// mixing them in one flat grid is what made "10 checkboxes, no idea which one"
+// confusing. STB groups add abilities WITHIN the bureau's own scope — safe
+// defaults for STB staff. Cluster groups add abilities ACROSS every
+// participating office and are rarely what a new account needs; checking one
+// of these for someone who should only manage their own office is the most
+// common mistake this form invites; System Scope -> Office Admin Portal is
+// the correct tool for that instead.
+const stbAccessGroupOptions = [
   {
     value: 'system-admin',
     label: 'System Admin Group',
@@ -715,7 +748,10 @@ const accessGroupOptions = [
     value: 'evaluation-manager',
     label: 'Evaluation Manager',
     description: 'Can generate and monitor IPAT evaluation assignments.'
-  },
+  }
+]
+
+const clusterAccessGroupOptions = [
   {
     value: 'cluster-system-admin',
     label: 'Cluster System Admin',
@@ -737,6 +773,10 @@ const accessGroupOptions = [
     description: 'Can monitor participating offices without provisioning access.'
   }
 ]
+
+const hasClusterGroupSelected = computed(() =>
+  clusterAccessGroupOptions.some(g => (form.value.permissionGroups || []).includes(g.value))
+)
 
 const search        = ref('')
 const roleFilter    = ref('')
@@ -1843,6 +1883,26 @@ function showToast(msg, type='success') {
 .access-group-option input{margin-top:2px;accent-color:#0B4BB3;}
 .access-group-option strong{display:block;font-size:12px;color:#0F172A;line-height:1.2;}
 .access-group-option small{display:block;margin-top:3px;font-size:10.5px;color:#7183A3;line-height:1.35;}
+
+.access-group-subhead{
+  font-size:10px;font-weight:700;color:#475569;text-transform:uppercase;
+  letter-spacing:.5px;margin:14px 0 4px;cursor:default;list-style:none;
+}
+.access-group-subhead::-webkit-details-marker{display:none;}
+summary.access-group-subhead{cursor:pointer;display:flex;align-items:center;gap:6px;}
+summary.access-group-subhead::before{
+  content:'▸';display:inline-block;font-size:9px;color:#94A3B8;
+  transition:transform .15s;
+}
+.cluster-group-disclosure[open] summary.access-group-subhead::before{transform:rotate(90deg);}
+.access-group-subnote{margin:0 0 8px;font-size:10.5px;color:#94A3B8;line-height:1.3;}
+.cluster-group-disclosure{margin-top:2px;}
+.access-group-warning{
+  display:flex;flex-direction:column;gap:2px;margin:6px 0 10px;padding:9px 11px;
+  background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;
+  font-size:10.5px;line-height:1.4;color:#92400E;
+}
+.access-group-warning strong{color:#78350F;}
 
 .field-input,.field-select{
   padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:9px;

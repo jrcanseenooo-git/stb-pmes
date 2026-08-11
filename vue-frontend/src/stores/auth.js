@@ -298,27 +298,65 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  // accounts.google.com sets its own Cross-Origin-Opener-Policy on the popup it
+  // opens, stricter than the "same-origin-allow-popups" this app serves. That
+  // blocks Firebase's internal popup.closed heartbeat — the mechanism it uses
+  // to detect someone closing the Google popup without finishing sign-in and
+  // reject with auth/popup-closed-by-user, which is what triggers the redirect
+  // fallback below. When that detection is blocked, signInWithPopup's promise
+  // can hang indefinitely instead of rejecting: no error, no fallback, and the
+  // Sign in button stays disabled with no way out short of a page refresh.
+  // This timeout is a synthetic version of that same rejection so an abandoned
+  // popup still reaches the existing fallback path instead of hanging forever.
+  const GOOGLE_POPUP_TIMEOUT_MS = 75000
+
+  function withPopupTimeout(promise) {
+    let timer = null
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(() => {
+        const e = new Error('Google sign-in popup timed out.')
+        e.code = 'auth/popup-closed-by-user'
+        reject(e)
+      }, GOOGLE_POPUP_TIMEOUT_MS)
+    })
+    return Promise.race([promise, timeout]).finally(() => clearTimeout(timer))
+  }
+
   // ── Google Sign-In ──
   async function loginWithGoogle() {
     loading.value = true
     error.value   = null
+    let redirecting = false
     try {
-      const cred = await signInWithPopup(auth, googleProvider)
-      await adoptFirebaseUser(cred.user)
+      const cred = await withPopupTimeout(signInWithPopup(auth, googleProvider))
+      const adopted = await adoptFirebaseUser(cred.user)
+      if (!adopted) throw new Error(`Only @${ALLOWED_DOMAIN} accounts are permitted.`)
       return { redirected: false }
     } catch (e) {
-      if (e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user') {
-        await signInWithRedirect(auth, googleProvider)
-        return { redirected: true }
+      const popupFallbackCodes = new Set([
+        'auth/popup-blocked',
+        'auth/popup-closed-by-user',
+        'auth/cancelled-popup-request',
+        'auth/operation-not-supported-in-this-environment'
+      ])
+
+      if (popupFallbackCodes.has(e?.code)) {
+        try {
+          redirecting = true
+          await signInWithRedirect(auth, googleProvider)
+          return { redirected: true }
+        } catch (redirectError) {
+          console.warn('[PMES] Google redirect sign-in failed:', redirectError?.code || redirectError?.message)
+          error.value = friendlyGoogleError(redirectError)
+          throw new Error(error.value)
+        }
       }
-      if (e.code === 'auth/network-request-failed') {
-        error.value = 'Network error. Check your connection and try again.'
-      } else {
-        error.value = 'Google sign-in failed. Please try again.'
-      }
+
+      console.warn('[PMES] Google popup sign-in failed:', e?.code || e?.message)
+      error.value = friendlyGoogleError(e)
       throw new Error(error.value)
     } finally {
-      loading.value = false
+      if (!redirecting) loading.value = false
     }
   }
 
@@ -360,6 +398,22 @@ export const useAuthStore = defineStore('auth', () => {
       'auth/invalid-credential':     'Invalid email or password.'
     }
     return map[code] || 'Sign-in failed. Please try again.'
+  }
+
+  function friendlyGoogleError(e) {
+    const code = e?.code || ''
+    const message = String(e?.message || '')
+    if (message.includes(`Only @${ALLOWED_DOMAIN}`)) return message
+    const map = {
+      'auth/account-exists-with-different-credential': 'This email already uses another sign-in method. Use email/password or contact the system administrator.',
+      'auth/network-request-failed': 'Network error. Check your connection and try again.',
+      'auth/popup-blocked': 'Google sign-in popup was blocked. Allow popups for this site and try again.',
+      'auth/popup-closed-by-user': 'Google sign-in was closed before it finished. Please try again.',
+      'auth/unauthorized-domain': 'This website domain is not authorized in Firebase Authentication.',
+      'auth/user-disabled': 'This Google account is disabled in Firebase. Contact the system administrator.',
+      'auth/user-token-expired': 'Your Google session expired. Please try again.'
+    }
+    return map[code] || 'Google sign-in failed. Please try again.'
   }
 
   return {

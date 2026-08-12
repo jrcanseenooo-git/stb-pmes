@@ -241,4 +241,34 @@ router.beforeEach(async (to) => {
   return true;
 });
 
+// A successful navigation means the current build's chunks are loadable
+// again, so a later one-off chunk failure gets its own retry instead of
+// silently no-oping because an earlier failure already spent the guard.
+router.afterEach(() => {
+  sessionStorage.removeItem("pmes:chunk-reload-attempted");
+});
+
+// Every route/layout is its own lazy chunk with a hash tied to the build. A
+// tab left open across a deploy — or a refresh that lands mid-deploy — asks
+// for a chunk hash the CDN no longer has once a newer build replaces it. Vite
+// rejects that dynamic import instead of throwing a catchable render error,
+// so nothing appears: no console output (prod silences it), no fallback UI,
+// just a permanently blank page. The only real fix is a fresh load of the
+// current build; the sessionStorage guard stops a genuinely broken deploy
+// from reloading forever.
+router.onError((error, to) => {
+  const message = String(error?.message || "");
+  const isChunkLoadFailure =
+    /dynamically imported module/i.test(message) ||
+    /Failed to fetch dynamically imported module/i.test(message) ||
+    /Importing a module script failed/i.test(message) ||
+    error?.name === "ChunkLoadError";
+  if (!isChunkLoadFailure) return;
+
+  const key = "pmes:chunk-reload-attempted";
+  if (sessionStorage.getItem(key)) return;
+  sessionStorage.setItem(key, "1");
+  window.location.href = to?.fullPath || window.location.href;
+});
+
 export default router;

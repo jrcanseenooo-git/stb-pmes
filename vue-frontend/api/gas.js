@@ -162,7 +162,14 @@ export default async function handler(req, res) {
     // as latency. Two attempts recovers the common single-shot echo-URL 404
     // without letting a burst of concurrent calls pile up into timeouts — three
     // attempts with backoff pushed 12 concurrent requests past 25s.
-    const RETRYABLE = [404, 429, 500, 502, 503, 504]
+    // 404 only ever shows up on the post-redirect echo-URL fetch, which means
+    // the /exec call itself already ran on Apps Script's side — retrying that
+    // for a write risks double-applying a mutation, so it's excluded there.
+    // The other codes mean Apps Script refused or failed to execute the
+    // request at all (rate limit, cold start, transient outage), which is
+    // safe to retry regardless of whether the call is a read or a write.
+    const RETRYABLE_GET   = [404, 429, 500, 502, 503, 504]
+    const RETRYABLE_WRITE = [429, 500, 502, 503, 504]
     const ATTEMPTS_PER_TARGET = 2
     const looksJson = (t) => {
       const s = String(t || '').trim()
@@ -173,7 +180,7 @@ export default async function handler(req, res) {
     let lastText = ''
 
     for (let i = 0; i < targets.length; i += 1) {
-      for (let attempt = 1; attempt <= (canRetry ? ATTEMPTS_PER_TARGET : 1); attempt += 1) {
+      for (let attempt = 1; attempt <= ATTEMPTS_PER_TARGET; attempt += 1) {
         const upstream = await postAppsScript(targets[i], body)
 
         const text = await upstream.text()
@@ -189,7 +196,9 @@ export default async function handler(req, res) {
           return res.send(text)
         }
 
-        const retryable = canRetry && (RETRYABLE.includes(upstream.status) || !looksJson(text))
+        const retryable = canRetry
+          ? (RETRYABLE_GET.includes(upstream.status) || !looksJson(text))
+          : RETRYABLE_WRITE.includes(upstream.status)
         if (!retryable) break
 
         console.warn(

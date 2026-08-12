@@ -663,10 +663,17 @@
                 <span v-if="copied" class="copied-tag">Copied!</span>
               </div>
             </div>
+            <div class="access-group-warning" style="margin-top:10px;">
+              Copy this now — the system never stores the plain-text password, only a hash.
+              Once you apply the reset, this is the only place it will ever be shown; the Temp
+              Password column reflects it only until this page is next refreshed.
+            </div>
           </div>
           <div class="modal-footer">
-            <button class="btn" @click="showResetModal = false">Cancel</button>
-            <button class="btn btn-primary" @click="confirmReset">Apply Reset</button>
+            <button class="btn" :disabled="resettingPw" @click="showResetModal = false">Cancel</button>
+            <button class="btn btn-primary" :disabled="resettingPw" @click="confirmReset">
+              {{ resettingPw ? 'Applying...' : 'Apply Reset' }}
+            </button>
           </div>
         </div>
       </div>
@@ -824,6 +831,7 @@ const pageSize      = ref(10)
 const pageSizeOptions = [10, 25, 50]
 const showModal     = ref(false)
 const showResetModal = ref(false)
+const resettingPw    = ref(false)
 const showFocalPanel = ref(false)
 const showMaintenancePanel = ref(false)
 const editingUser   = ref(null)
@@ -1619,12 +1627,13 @@ function resetPassword(user) { resetTarget.value = user; resetTempPw.value = gen
 async function confirmReset() {
   const ok = await confirm(CONFIRMS.resetPassword(resetTarget.value.name))
   if (!ok) return
+  resettingPw.value = true
   try {
     await usersApi.resetPassword(resetTarget.value.id, { tempPassword: resetTempPw.value })
     resetTarget.value.tempPassword = resetTempPw.value
     showToast(`Password reset for ${resetTarget.value.name}.`)
   } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
-  finally { showResetModal.value = false }
+  finally { resettingPw.value = false; showResetModal.value = false }
 }
 
 // ── Helpers ──

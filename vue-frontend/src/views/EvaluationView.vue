@@ -621,9 +621,10 @@
                 </button>
               </template>
               <template v-else-if="!canAdmin && activeRecord?.status !== 'Final'">
-                <button v-if="activeRecord?.status === 'Computed'" class="btn btn-finalize" @click="finalizeRecord">
-                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1L2 3.5V6.5c0 2.76 2 5.15 4.5 5.5C9 11.65 11 9.26 11 6.5V3.5L6.5 1z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M4.5 6.5l1.5 1.5 2.5-2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                  Finalize Assessment
+                <button v-if="activeRecord?.status === 'Computed'" class="btn btn-finalize" :disabled="finalizing" @click="finalizeRecord">
+                  <span v-if="finalizing" class="spinner-sm" style="border-top-color:#fff"></span>
+                  <svg v-else width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1L2 3.5V6.5c0 2.76 2 5.15 4.5 5.5C9 11.65 11 9.26 11 6.5V3.5L6.5 1z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M4.5 6.5l1.5 1.5 2.5-2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  {{ finalizing ? 'Finalizing...' : 'Finalize Assessment' }}
                 </button>
                 <button class="btn btn-primary" :disabled="computingOverall" @click="computeOverall"><span v-if="computingOverall" class="spinner-sm"></span>{{ computingOverall ? 'Computing…' : 'Compute Overall Score' }}</button>
               </template>
@@ -1284,6 +1285,7 @@ const computingJF = ref(false)
 const computingOverall  = ref(false)
 const showValidation    = ref(false)
 const submittingRating  = ref(false)
+const finalizing        = ref(false)
 
 const toast = ref({ show: false, msg: '', type: 'success' })
 
@@ -2077,11 +2079,13 @@ async function recomputeOverallAfterComponentChange() {
 }
 
 async function finalizeRecord() {
+  if (finalizing.value) return
+  finalizing.value = true
   try {
     await ipatApi.updateStatus(activeRecord.value.id, 'Final')
     _syncRecord({ status: 'Final' })
     showToast('Assessment finalized')
-  } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
+  } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') } finally { finalizing.value = false }
 }
 
 </script>
@@ -2531,8 +2535,8 @@ async function finalizeRecord() {
 .toast-slide-enter-from,.toast-slide-leave-to{opacity:0;transform:translateY(8px);}
 
 /* View tabs */
-.view-tabs {display: flex;width: 100%;gap: 8px;margin-top: 8px;margin-bottom: 5px;padding: 0 12px;box-sizing: border-box;}
-.view-tab {flex: 1;min-width: 0;height: 36px;padding: 6px 12px;display: flex;align-items: center;justify-content: center;gap: 7px;border: 1px solid #dbe4f0;border-radius: 18px;background: #ffffff;color: #52627a;font-size: 13px;font-weight: 600;line-height: 1;cursor: pointer;white-space: nowrap;}
+.view-tabs {display: flex;flex-wrap: wrap;align-items:center;width: 100%;gap: 8px;margin-top: 8px;margin-bottom: 5px;padding: 0 12px;box-sizing: border-box;}
+.view-tab {flex: 0 1 auto;min-width: max-content;max-width: 100%;height: 36px;padding: 6px 12px;display: inline-flex;align-items: center;justify-content: center;gap: 7px;border: 1px solid #dbe4f0;border-radius: 18px;background: #ffffff;color: #52627a;font-size: 13px;font-weight: 600;line-height: 1;cursor: pointer;white-space: nowrap;}
 .view-tab.active {background: #071d36;border-color: #071d36;color: #ffffff;}
 .view-tab-badge {display: inline-flex;align-items: center;justify-content: center;min-width: 18px;height: 18px;padding: 0 5px;border-radius: 999px;background: #ef4444;color: #ffffff;font-size: 10px;font-weight: 700;line-height: 1;}
 /* Sits in the tab row but performs an action rather than switching views, so it

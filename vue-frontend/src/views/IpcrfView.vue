@@ -131,10 +131,10 @@
               <div class="fli-foot" @click.stop>
                 <span class="fli-date">{{ fmtDate(form.updatedAt || form.createdAt) }}</span>
                 <div class="fli-actions">
-                  <button v-if="canReviewForm(form)"
-                    class="btn btn-xs btn-success" @click.stop="quickApprove(form)">Approve</button>
-                  <button v-if="canReviewForm(form)"
-                    class="btn btn-xs btn-warn" @click.stop="quickReturn(form)">Return</button>
+                  <button v-if="canReviewForm(form)" :disabled="quickBusyId === form.id"
+                    class="btn btn-xs btn-success" @click.stop="quickApprove(form)">{{ quickBusyId === form.id ? 'Approving...' : 'Approve' }}</button>
+                  <button v-if="canReviewForm(form)" :disabled="quickBusyId === form.id"
+                    class="btn btn-xs btn-warn" @click.stop="quickReturn(form)">{{ quickBusyId === form.id ? 'Returning...' : 'Return' }}</button>
                 </div>
               </div>
             </div>
@@ -319,7 +319,7 @@
               <!-- Workflow bar -->
               <div v-if="['Draft', 'Returned'].includes(activeForm?.status) && activeForm?.userId === authStore.profileId" class="wf-bar">
                 <span class="wf-info">{{ allEntries.length }} indicator{{ allEntries.length !== 1 ? 's' : '' }}</span>
-                <button class="btn btn-primary btn-sm" @click="doSubmit">Submit for Review</button>
+                <button class="btn btn-primary btn-sm" :disabled="wfBusy" @click="doSubmit">{{ wfBusy ? 'Submitting...' : 'Submit for Review' }}</button>
               </div>
               <div v-else-if="['Draft', 'Returned'].includes(activeForm?.status)" class="wf-bar">
                 <span class="wf-info muted-text">Waiting on {{ activeForm?.employeeName }} to submit this for review.</span>
@@ -327,8 +327,8 @@
               <div v-else-if="activeForm?.status === 'Submitted'" class="wf-bar">
                 <span class="wf-info">Pending review</span>
                 <div v-if="canReviewActiveForm" style="display:flex;gap:8px">
-                  <button class="btn btn-success btn-sm" @click="doApprove">Approve</button>
-                  <button class="btn btn-warn btn-sm" @click="doReturn">Return</button>
+                  <button class="btn btn-success btn-sm" :disabled="wfBusy" @click="doApprove">{{ wfBusy ? 'Approving...' : 'Approve' }}</button>
+                  <button class="btn btn-warn btn-sm" :disabled="wfBusy" @click="doReturn">{{ wfBusy ? 'Returning...' : 'Return' }}</button>
                 </div>
               </div>
               <div v-else-if="activeForm?.status === 'Approved' && activeForm?.userId === authStore.profileId" class="wf-bar">
@@ -986,6 +986,8 @@ const feedbackForm = ref({ feedbackStrengths: '', feedbackComments: '', feedback
 const finalizeForm = ref({ dateSignedRatee: '', dateSignedSupervisor: '', dateSignedAuthority: '' })
 const ratingBusy   = ref(false)
 const scoreBusy    = ref(false)
+const wfBusy       = ref(false)
+const quickBusyId  = ref('')
 const lastAutoScoreKey = ref('')
 let autoScoreTimer = null
 
@@ -1500,16 +1502,18 @@ async function quickSubmit(form)  {
   try { const u = await ipcrfApi.submitForm(form.id);  _syncList(form.id, u); showToast('Submitted') } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
 }
 async function quickApprove(form) {
-  if (!canReviewForm(form)) return
+  if (!canReviewForm(form) || quickBusyId.value) return
   const ok = await confirm(CONFIRMS.approveForm(form.employeeName, form.type))
   if (!ok) return
-  try { const u = await ipcrfApi.approveForm(form.id); _syncList(form.id, u); showToast('Approved') } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
+  quickBusyId.value = form.id
+  try { const u = await ipcrfApi.approveForm(form.id); _syncList(form.id, u); showToast('Approved') } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') } finally { quickBusyId.value = '' }
 }
 async function quickReturn(form)  {
-  if (!canReviewForm(form)) return
+  if (!canReviewForm(form) || quickBusyId.value) return
   const ok = await confirm(CONFIRMS.returnForm(form.employeeName))
   if (!ok) return
-  try { const u = await ipcrfApi.returnForm(form.id, { remarks: confirmState.inputValue });  _syncList(form.id, u); showToast('Returned') } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
+  quickBusyId.value = form.id
+  try { const u = await ipcrfApi.returnForm(form.id, { remarks: confirmState.inputValue });  _syncList(form.id, u); showToast('Returned') } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') } finally { quickBusyId.value = '' }
 }
 function _syncList(id, u) { const i = forms.value.findIndex(f => f.id === id); if (i !== -1) forms.value[i] = { ...forms.value[i], ...u } }
 
@@ -1620,26 +1624,32 @@ async function doDelete() {
 }
 
 async function doSubmit()  {
+  if (wfBusy.value) return
   const ok = await confirm(CONFIRMS.submitForm(activeForm.value.type, activeForm.value.year))
   if (!ok) return
-  try { const u = await ipcrfApi.submitForm(activeForm.value.id);  _sync(u); showToast('Submitted') }       catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
+  wfBusy.value = true
+  try { const u = await ipcrfApi.submitForm(activeForm.value.id);  _sync(u); showToast('Submitted') }       catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') } finally { wfBusy.value = false }
 }
 async function doApprove() {
-  if (!canReviewActiveForm.value) return
+  if (!canReviewActiveForm.value || wfBusy.value) return
   const ok = await confirm(CONFIRMS.approveForm(activeForm.value.employeeName, activeForm.value.type))
   if (!ok) return
-  try { const u = await ipcrfApi.approveForm(activeForm.value.id); _sync(u); showToast('Approved') }       catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
+  wfBusy.value = true
+  try { const u = await ipcrfApi.approveForm(activeForm.value.id); _sync(u); showToast('Approved') }       catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') } finally { wfBusy.value = false }
 }
 async function doReturn()  {
-  if (!canReviewActiveForm.value) return
+  if (!canReviewActiveForm.value || wfBusy.value) return
   const ok = await confirm(CONFIRMS.returnForm(activeForm.value.employeeName))
   if (!ok) return
-  try { const u = await ipcrfApi.returnForm(activeForm.value.id, { remarks: confirmState.inputValue });  _sync(u); showToast('Returned for revision') } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
+  wfBusy.value = true
+  try { const u = await ipcrfApi.returnForm(activeForm.value.id, { remarks: confirmState.inputValue });  _sync(u); showToast('Returned for revision') } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') } finally { wfBusy.value = false }
 }
 async function doCompute() {
+  if (wfBusy.value) return
   const ok = await confirm(CONFIRMS.computeScore(activeForm.value.employeeName))
   if (!ok) return
-  try { const u = await ipcrfApi.computeScore(activeForm.value.id); _sync(u); showToast(`${u.finalNumericalRating} - ${u.adjectivalRating}`) } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
+  wfBusy.value = true
+  try { const u = await ipcrfApi.computeScore(activeForm.value.id); _sync(u); showToast(`${u.finalNumericalRating} - ${u.adjectivalRating}`) } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') } finally { wfBusy.value = false }
 }
 
 async function doMarkRated() {

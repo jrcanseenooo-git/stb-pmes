@@ -1,4 +1,7 @@
 {
+  "functions": {
+    "api/gas.js": { "maxDuration": 30 }
+  },
   "headers": [
     {
       "source": "/((?!api/).*)",

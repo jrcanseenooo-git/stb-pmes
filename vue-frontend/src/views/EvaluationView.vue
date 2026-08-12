@@ -927,7 +927,9 @@ import { useRoute } from 'vue-router'
 import { dashboardApi, ipatApi, ipatAssignmentsApi, usersApi, assessmentContentApi, assessmentCategoryApi } from '@/services/api'
 import { usePermissions } from '@/composables/usePermissions'
 import { useBranding } from '@/composables/useBranding'
+import { useConfirm } from '@/composables/useConfirm'
 
+const { confirm } = useConfirm()
 const route = useRoute()
 const { hasPermission, isAdmin } = usePermissions()
 const { isClusterPortal } = useBranding()
@@ -2080,6 +2082,15 @@ async function recomputeOverallAfterComponentChange() {
 
 async function finalizeRecord() {
   if (finalizing.value) return
+  const ok = await confirm({
+    type:         'approve',
+    title:        'Finalize Assessment',
+    message:      `This locks ${activeRecord.value?.employeeName || 'this'} assessment as Final. Scores and ratings can no longer be changed after this.`,
+    note:         'Only do this once you are sure every rating and computed score is correct.',
+    confirmLabel: 'Yes, Finalize',
+    cancelLabel:  'Not yet'
+  })
+  if (!ok) return
   finalizing.value = true
   try {
     await ipatApi.updateStatus(activeRecord.value.id, 'Final')

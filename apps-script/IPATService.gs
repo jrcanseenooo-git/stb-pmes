@@ -434,10 +434,46 @@ const IPATService = (() => {
     return matches.sort((a, b) => recordScore(b, assignments) - recordScore(a, assignments))[0]
   }
 
+  // IPAT_ASSIGNMENTS is deliberately excluded from DataCacheService's
+  // cross-execution tier everywhere else — a stale read there could hand out a
+  // rating task that was already completed, or hide one that wasn't. This one
+  // caller only uses assignments to break ties between legacy duplicate
+  // IPATRecords rows for the same ratee/period (new duplicates are blocked at
+  // creation; this exists for the ones that predate that guard), so a short,
+  // narrowly-scoped cache here can never affect a live score or rating — the
+  // only thing that can lag by the TTL is which duplicate record wins the
+  // tie-break display.
+  const CANONICAL_TIEBREAK_CACHE_TTL_SECONDS = 20
+
+  function cachedAssignmentsForTiebreak_() {
+    const sheet = SpreadsheetService.getSheet(SHEET.IPAT_ASSIGNMENTS)
+    let ownerId = 'default'
+    try { ownerId = sheet.getParent().getId() } catch (e) { /* fall back to 'default' */ }
+    const key = 'ipat_tiebreak_assignments::' + ownerId
+
+    try {
+      const cache = CacheService.getScriptCache()
+      const raw = cache.get(key)
+      if (raw) return JSON.parse(raw)
+    } catch (e) {
+      Logger.log('[IPATService] tiebreak cache read failed: ' + e.message)
+    }
+
+    const rows = activeProtocolAssignments(SpreadsheetService.getAllRows(sheet))
+    try {
+      const cache = CacheService.getScriptCache()
+      const payload = JSON.stringify(rows)
+      if (payload.length <= 95 * 1024) cache.put(key, payload, CANONICAL_TIEBREAK_CACHE_TTL_SECONDS)
+    } catch (e) {
+      Logger.log('[IPATService] tiebreak cache write skipped: ' + e.message)
+    }
+    return rows
+  }
+
   function collapseCanonicalRecords(rows) {
     let assignments = []
     try {
-      assignments = activeProtocolAssignments(SpreadsheetService.getAllRows(SpreadsheetService.getSheet(SHEET.IPAT_ASSIGNMENTS)))
+      assignments = cachedAssignmentsForTiebreak_()
     } catch (e) {
       return rows
     }

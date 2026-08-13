@@ -104,6 +104,96 @@ const DashboardService = (() => {
     })
   }
 
+  // The frontend used to call summary/divisions/status/activity as four
+  // separate requests. Each one is its own Apps Script execution, and each
+  // independently re-read the full Accomplishments (and Users/Divisions)
+  // sheet from scratch — the per-execution memo in DataCacheService only
+  // helps repeated reads *within* one execution, not across four separate
+  // ones. Four full-table reads per dashboard load, and once the frontend
+  // started firing them concurrently instead of one-after-another, four
+  // executions competing for Apps Script's limited concurrency at once —
+  // a direct contributor to requests timing out under Vercel's Hobby-plan
+  // function limit. This reads each sheet exactly once and computes all
+  // four results from that single pass.
+  function all(params, user) {
+    const profile  = AuthService.getProfile(user)
+    const accSheet = SpreadsheetService.getSheet(SHEET.ACCOMPLISHMENTS)
+    const usrSheet = SpreadsheetService.getSheet(SHEET.USERS)
+
+    const allAccs  = SpreadsheetService.getAllRows(accSheet).filter(r => !r.deleted)
+    const allUsers = SpreadsheetService.getAllRows(usrSheet).filter(r => r.active)
+    const scopedAccs  = applyScope(allAccs, profile)
+    const scopedUsers = applyUserScope(allUsers, profile)
+
+    // summary
+    let periodAccs = scopedAccs
+    if (params.semester) periodAccs = periodAccs.filter(r => String(r.semester) === String(params.semester))
+    if (params.year)     periodAccs = periodAccs.filter(r => r.year == params.year)
+    const completed = periodAccs.filter(r => ['Completed','Approved'].includes(r.status)).length
+    const delayed   = periodAccs.filter(r => r.status === 'Delayed').length
+    const pending   = periodAccs.filter(r => r.status === 'Submitted').length
+    const total     = periodAccs.length
+    const summaryResult = {
+      totalPersonnel: scopedUsers.length,
+      totalTargets:   total,
+      completionRate: total ? Math.round((completed / total) * 100) : 0,
+      delayed, pending, completed
+    }
+
+    // statusBreakdown
+    const STATUS_LIST = ['Not Started','Ongoing','Submitted','For Revision','Approved','Delayed','Completed']
+    const statusResult = STATUS_LIST.map(s => ({
+      status: s,
+      count:  periodAccs.filter(r => r.status === s).length
+    })).filter(s => s.count > 0)
+
+    // monthlyActivity
+    const type = params.type || 'IPCR'
+    const typeAccs = applyScope(allAccs.filter(r => r.type === type && r.submittedAt), profile)
+    const activityYear = params.year || new Date().getFullYear()
+    const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+    const monthlyResult = MONTHS.map((label, idx) => ({
+      label,
+      count: typeAccs.filter(r => {
+        const d = new Date(r.submittedAt)
+        return d.getFullYear() == activityYear && d.getMonth() === idx
+      }).length
+    }))
+
+    // divisions — permission-gated like the standalone endpoint, but
+    // returns an empty array here instead of throwing 403, since a combined
+    // endpoint can't fail the whole dashboard load over one section a given
+    // user isn't permitted to see.
+    let divisionsResult = []
+    const canSeeDivisions = AuthService.hasPermission(profile, 'view_bureau_monitoring') ||
+      AuthService.hasPermission(profile, 'view_division_monitoring')
+    if (canSeeDivisions) {
+      const divSheet = SpreadsheetService.getSheet(SHEET.DIVISIONS)
+      let divs = SpreadsheetService.getAllRows(divSheet)
+      let dAccs = allAccs
+      if (!AuthService.hasPermission(profile, 'view_bureau_monitoring')) {
+        divs  = divs.filter(d => d.id === profile.divisionId)
+        dAccs = dAccs.filter(r => r.divisionId === profile.divisionId)
+      }
+      divisionsResult = divs.map(div => {
+        const divAccs = dAccs.filter(r => r.divisionId === div.id)
+        const divCompleted = divAccs.filter(r => ['Completed','Approved'].includes(r.status)).length
+        const divTotal = divAccs.length
+        return {
+          id:             div.id,
+          name:           div.name,
+          completionRate: divTotal ? Math.round((divCompleted / divTotal) * 100) : 0,
+          total:          divTotal,
+          completed:      divCompleted,
+          delayed:        divAccs.filter(r => r.status === 'Delayed').length,
+          color:          div.color || 'blue'
+        }
+      })
+    }
+
+    return { summary: summaryResult, divisions: divisionsResult, statusBreakdown: statusResult, monthlyActivity: monthlyResult }
+  }
+
   // ── Scope helpers ──
   function applyScope(rows, profile) {
     if (AuthService.hasPermission(profile, 'view_bureau_monitoring')) return rows
@@ -117,5 +207,5 @@ const DashboardService = (() => {
     return users.filter(u => u.id === profile.id)
   }
 
-  return { summary, divisions, statusBreakdown, monthlyActivity }
+  return { summary, divisions, statusBreakdown, monthlyActivity, all }
 })()

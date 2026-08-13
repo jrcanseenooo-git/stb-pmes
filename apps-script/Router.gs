@@ -54,6 +54,7 @@ const Router = (() => {
         break
 
       case 'dashboard':
+        if (id === 'all') return DashboardService.all(params, user)
         if (id === 'summary') return DashboardService.summary(params, user)
         if (id === 'divisions') return DashboardService.divisions(params, user)
         if (id === 'status') return DashboardService.statusBreakdown(params, user)

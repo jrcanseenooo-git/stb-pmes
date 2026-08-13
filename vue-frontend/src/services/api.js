@@ -259,6 +259,7 @@ export const portalApi = {
 }
 
 export const dashboardApi = {
+  all:             (p = {}) => gasGet('dashboard/all',       p),
   summary:         (p = {}) => gasGet('dashboard/summary',   p),
   divisions:       (p = {}) => gasGet('dashboard/divisions', p),
   statusBreakdown: (p = {}) => gasGet('dashboard/status',    p),

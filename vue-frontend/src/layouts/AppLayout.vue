@@ -677,11 +677,17 @@ async function refreshRealtimeShell(options = {}) {
   const forceProfile = options.forceProfile === true
   const now = Date.now()
   try {
-    if (forceProfile || now - lastProfileRefreshAt > 60000) {
-      await authStore.fetchProfile()
+    // Profile and notifications are independent reads — notifications don't
+    // need a fresh profile to fetch — so on first mount (forceProfile: true,
+    // both firing) they run in parallel rather than paying two sequential
+    // Apps Script round trips right as the app becomes visible.
+    const shouldRefreshProfile = forceProfile || now - lastProfileRefreshAt > 60000
+    const tasks = [notifStore.fetchAll({ silent: true })]
+    if (shouldRefreshProfile) {
+      tasks.push(authStore.fetchProfile())
       lastProfileRefreshAt = now
     }
-    await notifStore.fetchAll({ silent: true })
+    await Promise.all(tasks)
   } catch {
     // Background refresh should never interrupt the user.
   }

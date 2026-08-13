@@ -27,12 +27,22 @@ export const useDashboardStore = defineStore('dashboard', () => {
         return fallback
       }
     }
-    summary.value         = await tryFetch(() => dashboardApi.summary(requestParams),         null)
-    divisions.value       = canSeeDivisions
-      ? await tryFetch(() => dashboardApi.divisions(requestParams), [])
-      : []
-    statusBreakdown.value = await tryFetch(() => dashboardApi.statusBreakdown(requestParams),  [])
-    monthlyActivity.value = await tryFetch(() => dashboardApi.monthlyActivity(requestParams),  [])
+    // These four reads are independent — none needs another's result — so
+    // running them in parallel cuts total wait roughly 4x instead of paying
+    // each round trip in series, and shortens how long this page load keeps
+    // Apps Script's limited concurrent-execution slots occupied. tryFetch
+    // already catches its own failures and returns the fallback, so a slow
+    // or failed call here can never reject Promise.all or block the others.
+    const [summaryResult, divisionsResult, statusResult, activityResult] = await Promise.all([
+      tryFetch(() => dashboardApi.summary(requestParams), null),
+      canSeeDivisions ? tryFetch(() => dashboardApi.divisions(requestParams), []) : Promise.resolve([]),
+      tryFetch(() => dashboardApi.statusBreakdown(requestParams), []),
+      tryFetch(() => dashboardApi.monthlyActivity(requestParams), [])
+    ])
+    summary.value         = summaryResult
+    divisions.value       = divisionsResult
+    statusBreakdown.value = statusResult
+    monthlyActivity.value = activityResult
     if (!silent) loading.value = false
   }
 

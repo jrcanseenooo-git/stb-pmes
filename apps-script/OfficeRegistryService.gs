@@ -330,6 +330,33 @@ const OfficeRegistryService = (() => {
     return { office: safeRegistryRow_(findByIdOrCode_(id)), validation }
   }
 
+  // Adds headers the spec has grown since this office was provisioned —
+  // e.g. an office activated before fpoPositionCategory/fpoWeightFactor were
+  // added to AssessmentRecords. Only ever appends new columns to an existing
+  // sheet; a missing sheet or a duplicate-header error still needs a human,
+  // so this re-validates afterward and reports whatever is still wrong
+  // rather than claiming success.
+  function repair(id, user) {
+    const profile = requireCentralAdmin_(user)
+    const row = findByIdOrCode_(id)
+    if (!row) throw HttpError('Office record not found.', 404)
+    if (isStbRow_(row)) throw HttpError('STB uses the central PMES database and does not require office spreadsheet repair.', 400)
+    if (!row.spreadsheetId) throw HttpError('Office has no provisioned spreadsheet to repair.', 400)
+
+    const repaired = OfficeSchemaService.repairSpreadsheet(row.spreadsheetId)
+    const validation = OfficeSchemaService.validateSpreadsheet(row.spreadsheetId, row)
+    SpreadsheetService.updateRow(registrySheet_(), row.id, {
+      spreadsheetStatus: validation.valid ? 'FOR_VALIDATION' : 'INVALID_SCHEMA',
+      lastValidatedAt: new Date().toISOString(),
+      provisioningError: validation.valid ? '' : validation.errors.join(' | '),
+      updatedAt: new Date().toISOString(),
+      updatedBy: profile.email || user.email || ''
+    })
+    auditCentral_('REPAIR_OFFICE_SCHEMA', 'Office', row.officeId, '', validation.valid ? 'SUCCESS' : 'PARTIAL',
+      'Repaired office schema for ' + row.officeCode + (repaired.length ? ': ' + repaired.join(' | ') : ' (nothing to add)'), user)
+    return { office: safeRegistryRow_(findByIdOrCode_(id)), repaired, validation }
+  }
+
   function activate(id, user) {
     const profile = requireCentralAdmin_(user)
     const row = findByIdOrCode_(id)
@@ -735,6 +762,7 @@ const OfficeRegistryService = (() => {
     list,
     picker,
     get,
+    repair,
     monitoring,
     registrationOptions,
     registrationOrgOptions,

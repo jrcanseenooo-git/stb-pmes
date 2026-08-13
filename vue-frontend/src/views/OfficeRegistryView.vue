@@ -85,6 +85,16 @@
                     {{ busyId === office.officeId && busyAction === 'validate' ? 'Validating...' : 'Validate' }}
                   </button>
                   <button
+                    v-if="!isStbOffice(office) && office.spreadsheetStatus === 'INVALID_SCHEMA'"
+                    class="pui-btn pui-btn-sm"
+                    type="button"
+                    :disabled="busyId === office.officeId"
+                    title="Add any headers the schema now requires that this spreadsheet predates. Does not touch existing data — a missing sheet or duplicate header still needs a person."
+                    @click="repairOffice(office)"
+                  >
+                    {{ busyId === office.officeId && busyAction === 'repair' ? 'Repairing...' : 'Repair' }}
+                  </button>
+                  <button
                     v-if="!isStbOffice(office)"
                     class="pui-btn pui-btn-sm"
                     type="button"
@@ -450,6 +460,17 @@ async function validateOffice(office) {
   })
   if (!ok) return
   await runOfficeAction(office, 'validate', () => officeRegistryApi.validate(office.officeId), 'Could not validate this office.')
+}
+
+async function repairOffice(office) {
+  const ok = await confirm({
+    title: 'Repair Office Spreadsheet',
+    message: `Adds any headers the current schema requires that ${office.officeName || office.officeCode}'s spreadsheet is missing. Existing rows and data are never touched.`,
+    note: 'If the failure is something other than missing headers — a missing sheet or a duplicate column — this will not fix it, and Validate will still report what remains.',
+    confirmLabel: 'Repair'
+  })
+  if (!ok) return
+  await runOfficeAction(office, 'repair', () => officeRegistryApi.repair(office.officeId), 'Could not repair this office.')
 }
 
 async function activateOffice(office) {

@@ -89,6 +89,7 @@ const Router = (() => {
         if (id && sub === 'org-options' && method === 'GET') return OfficeRegistryService.orgOptions(id, user)
         if (id && sub === 'org-options' && method === 'PUT') return OfficeRegistryService.saveOrgOptions(id, body, user)
         if (id && sub === 'validate' && method === 'POST') return OfficeRegistryService.validate(id, user)
+        if (id && sub === 'repair' && method === 'POST') return OfficeRegistryService.repair(id, user)
         if (id && sub === 'activate' && method === 'POST') return OfficeRegistryService.activate(id, user)
         break
 

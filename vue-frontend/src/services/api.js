@@ -302,6 +302,7 @@ export const officeRegistryApi = {
   orgOptions:(id)      => gasGet(`office-registry/${id}/org-options`),
   saveOrgOptions:(id, data) => gasWrite('PUT', `office-registry/${id}/org-options`, data),
   validate: (id)       => gasWrite('POST', `office-registry/${id}/validate`),
+  repair:   (id)       => gasWrite('POST', `office-registry/${id}/repair`),
   activate: (id)       => gasWrite('POST', `office-registry/${id}/activate`)
 }
 

@@ -31,6 +31,23 @@ const OfficeRegistryService = (() => {
     return SpreadsheetService.paginate(rows.map(safeRegistryRow_), params.page, params.pageSize || 50)
   }
 
+  // A minimal office picker for the Add/Edit User form. That form needs a
+  // simple id/name list of active offices to assign an office-scoped account
+  // to — it does not need the full registry (admin emails, spreadsheet/schema
+  // status, provisioning history) that requireCentralAdmin_ exists to gate.
+  // Without this, any admin with User Management access but not a central
+  // Access Group (the common case for an office-level super admin editing
+  // their own account) gets a 403 from list() and can never populate or
+  // change the Office field at all.
+  function picker(params, user) {
+    AuthService.requirePermission(user, 'manage_users')
+    const rows = SpreadsheetService.getAllRows(registrySheet_())
+      .filter(r => r.officeStatus === 'ACTIVE' || r.spreadsheetStatus === 'ACTIVE')
+      .map(r => ({ officeId: r.officeId, officeCode: r.officeCode, officeName: r.officeName }))
+      .sort((a, b) => String(a.officeCode).localeCompare(String(b.officeCode)))
+    return { items: rows }
+  }
+
   function get(id, user) {
     requireCentralAdmin_(user)
     const row = findByIdOrCode_(id)
@@ -709,6 +726,7 @@ const OfficeRegistryService = (() => {
 
   return {
     list,
+    picker,
     get,
     monitoring,
     registrationOptions,

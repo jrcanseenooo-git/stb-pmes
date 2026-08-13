@@ -294,6 +294,7 @@ export const maintenanceApi = {
 
 export const officeRegistryApi = {
   list:     (p = {})   => gasGet('office-registry', p),
+  picker:   (p = {})   => gasGet('office-registry/picker', p),
   get:      (id)       => gasGet(`office-registry/${id}`),
   spec:     ()         => gasGet('office-registry/spec'),
   monitoring:(p = {})  => gasGet('office-registry/monitoring', p),

@@ -1028,14 +1028,12 @@ onMounted(async () => {
 async function loadOfficeOptions() {
   officeOptionsError.value = false
   try {
-    const data = await officeRegistryApi.list({ pageSize: 200 })
-    officeOptions.value = (data.items || data || [])
-      .filter(office => office.officeStatus === 'ACTIVE' || office.spreadsheetStatus === 'ACTIVE')
-      .map(office => ({
-        officeId: office.officeId,
-        officeCode: office.officeCode,
-        officeName: office.officeName
-      }))
+    // The full registry (officeRegistryApi.list) is central-admin-only and 403s
+    // for any admin who only has User Management access — this picker endpoint
+    // is authorized under manage_users instead, since assigning a user to an
+    // office is a user-management task, not a central-registry one.
+    const data = await officeRegistryApi.picker()
+    officeOptions.value = data.items || (Array.isArray(data) ? data : [])
   } catch (e) {
     console.warn('[PMES] Office registry unavailable for user form:', e?.message || e)
     officeOptions.value = []

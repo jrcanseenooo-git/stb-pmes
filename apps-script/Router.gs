@@ -82,6 +82,7 @@ const Router = (() => {
       case 'office-registry':
         if (!id && method === 'GET') return OfficeRegistryService.list(params, user)
         if (!id && method === 'POST') return OfficeRegistryService.provision(body, user)
+        if (id === 'picker' && method === 'GET') return OfficeRegistryService.picker(params, user)
         if (id === 'spec' && method === 'GET') return OfficeSchemaService.getSpec()
         if (id === 'monitoring' && method === 'GET') return OfficeRegistryService.monitoring(params, user)
         if (id && !sub && method === 'GET') return OfficeRegistryService.get(id, user)

@@ -58,7 +58,15 @@
               <!-- A registry row left mid-provisioning is recoverable, not broken.
                    Provisioning has timed out in production before, so the resume
                    path is stated rather than left for the operator to infer. -->
-              <small v-if="needsResume(office)" style="display:block; color:#b45309; font-weight:700; margin-top:3px;">
+              <template v-if="office.spreadsheetStatus === 'INVALID_SCHEMA'">
+                <small v-if="office.provisioningError" style="display:block; color:#b91c1c; font-weight:700; margin-top:3px; max-width:260px;">
+                  {{ office.provisioningError }}
+                </small>
+                <small v-else style="display:block; color:#b45309; font-weight:700; margin-top:3px;">
+                  Schema validation failed — run Validate again to see the specific reason.
+                </small>
+              </template>
+              <small v-else-if="needsResume(office)" style="display:block; color:#b45309; font-weight:700; margin-top:3px;">
                 Setup incomplete — run Validate, then Activate.
               </small>
             </td>

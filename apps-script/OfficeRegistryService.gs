@@ -609,9 +609,16 @@ const OfficeRegistryService = (() => {
   }
 
   function safeRegistryRow_(row) {
+    // spreadsheetId is credential-like — it can open the office's spreadsheet
+    // directly — so that alone is stripped. provisioningError is diagnostic
+    // text only, and every caller of this function already sits behind
+    // requireCentralAdmin_; stripping it just hid the reason a "Needs Repair"
+    // office needs repair from the only people allowed to see this screen,
+    // with no way to recover it short of re-running Validate.
     const { spreadsheetId, provisioningError, ...safe } = row || {}
     return {
       ...safe,
+      provisioningError: provisioningError || '',
       hasSpreadsheet: !!spreadsheetId,
       hasProvisioningError: !!provisioningError
     }

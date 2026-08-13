@@ -517,11 +517,7 @@
                       {{ office.officeName }}
                     </option>
                   </select>
-                  <p class="field-help">
-                    {{ form.systemScope === 'STB_FULL'
-                      ? 'Locked to STB — STB Full PMES always uses the central STB spreadsheet.'
-                      : 'The one office this account is limited to for office-scoped screens and data.' }}
-                  </p>
+                  <p class="field-help">{{ officeFieldHelp }}</p>
                 </div>
                 <div v-if="canManageUsers" class="field full">
                   <label class="field-label">Access Groups</label>
@@ -846,6 +842,7 @@ const showPw        = ref({})
 const toast         = ref({ show: false, msg: '', type: 'success' })
 const users         = ref([])
 const officeOptions = ref([])
+const officeOptionsError = ref(false)
 // Backend paginate() defaults to 50; this view shows the whole directory at once,
 // so ask for a ceiling well above any realistic office headcount. If the cluster
 // ever exceeds this, loadUsers() warns instead of truncating silently.
@@ -1029,6 +1026,7 @@ onMounted(async () => {
 })
 
 async function loadOfficeOptions() {
+  officeOptionsError.value = false
   try {
     const data = await officeRegistryApi.list({ pageSize: 200 })
     officeOptions.value = (data.items || data || [])
@@ -1041,8 +1039,21 @@ async function loadOfficeOptions() {
   } catch (e) {
     console.warn('[PMES] Office registry unavailable for user form:', e?.message || e)
     officeOptions.value = []
+    officeOptionsError.value = true
   }
 }
+
+const officeFieldHelp = computed(() => {
+  if (form.value.systemScope === 'STB_FULL') {
+    return 'Locked to STB — STB Full PMES always uses the central STB spreadsheet.'
+  }
+  if (!officeOptions.value.length) {
+    return officeOptionsError.value
+      ? 'Could not load participating offices — the dropdown is disabled until this loads. Refresh the page and try again.'
+      : 'Disabled: no participating office is active yet. Provision and activate one in Office Registry first.'
+  }
+  return 'The one office this account is limited to for office-scoped screens and data.'
+})
 
 async function loadUsers() {
   loading.value = true

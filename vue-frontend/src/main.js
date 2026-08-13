@@ -22,6 +22,44 @@ app.use(router)
 app.use(Toast)
 app.mount('#app')
 
+function hideBootSplash() {
+  const splash = document.getElementById('pmes-boot-splash')
+  if (!splash) return
+  splash.classList.add('pmes-boot-splash-hide')
+  window.setTimeout(() => splash.remove(), 280)
+}
+
+function updateBootSplash(message) {
+  const copy = document.getElementById('pmes-boot-copy')
+  if (!copy) return
+  copy.textContent = message
+}
+
+// router.isReady() is the fast, correct signal — but a splash whose only exit
+// is a single promise is a splash that can get stuck forever the moment that
+// promise misbehaves for any reason, and it was: production was confirmed
+// showing this splash indefinitely over already-rendered pages, blocking
+// every click underneath it (position:fixed + full-viewport + no
+// pointer-events:none until the hide class lands). Two independent,
+// idempotent fallbacks — the window 'load' event and a hard cap — guarantee
+// the splash cannot outlive the app being visibly ready, regardless of what
+// router.isReady() is doing.
+router.isReady().catch(() => {}).finally(hideBootSplash)
+window.addEventListener('load', hideBootSplash)
+window.setTimeout(hideBootSplash, 3000)
+
+window.setTimeout(() => {
+  updateBootSplash('Still loading your workspace. This can take a little longer after a refresh.')
+}, 8000)
+
+window.addEventListener('error', () => {
+  updateBootSplash('The app is taking longer than expected. Please refresh if this message stays on screen.')
+})
+
+window.addEventListener('unhandledrejection', () => {
+  updateBootSplash('The app is taking longer than expected. Please refresh if this message stays on screen.')
+})
+
 // When Firebase can no longer refresh the ID token the session is dead, and
 // every subsequent request would fail with "Unauthorized". Send the user to
 // sign in once instead of letting the failures pile up on screen. Guarded so a

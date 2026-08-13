@@ -35,18 +35,22 @@ function updateBootSplash(message) {
   copy.textContent = message
 }
 
-// router.isReady() is the fast, correct signal — but a splash whose only exit
-// is a single promise is a splash that can get stuck forever the moment that
-// promise misbehaves for any reason, and it was: production was confirmed
-// showing this splash indefinitely over already-rendered pages, blocking
-// every click underneath it (position:fixed + full-viewport + no
-// pointer-events:none until the hide class lands). Two independent,
-// idempotent fallbacks — the window 'load' event and a hard cap — guarantee
-// the splash cannot outlive the app being visibly ready, regardless of what
-// router.isReady() is doing.
+// router.isReady() is the correct signal — it resolves once the guard chain
+// for a protected route (session check + profile fetch) has actually
+// settled, which the splash's own copy promises to wait for. It is NOT a
+// fast, fixed-duration thing: a slow backend round trip genuinely needs the
+// splash to stay up longer, not less.
+//
+// A window 'load'-based or few-second fallback was tried here to guard
+// against router.isReady() hanging, but 'load' fires as soon as static
+// assets finish downloading — long before Firebase session restore or a
+// backend profile fetch completes — so it hid the splash mid-guard and
+// exposed a blank #app until the route actually rendered. The only fallback
+// left is a generous last-resort cap: long enough that no real session/
+// profile round trip should ever reach it, short enough that a genuinely
+// hung promise still recovers instead of trapping the page forever.
 router.isReady().catch(() => {}).finally(hideBootSplash)
-window.addEventListener('load', hideBootSplash)
-window.setTimeout(hideBootSplash, 3000)
+window.setTimeout(hideBootSplash, 15000)
 
 window.setTimeout(() => {
   updateBootSplash('Still loading your workspace. This can take a little longer after a refresh.')

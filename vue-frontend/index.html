@@ -26,6 +26,13 @@
       background: #f6f9fd;
     }
 
+    /* Set synchronously, before the splash markup below is parsed, by the
+       inline script at the top of <body> — so a refresh on /auth/* never
+       paints the splash at all rather than painting-then-hiding it. */
+    html.pmes-skip-splash #pmes-boot-splash {
+      display: none !important;
+    }
+
     #pmes-boot-splash {
       position: fixed;
       inset: 0;
@@ -131,31 +138,29 @@
   </style>
 </head>
 <body>
+  <script>
+    // The splash exists to cover real work: checking a session, fetching a
+    // profile, resolving where a signed-in user belongs. None of that
+    // happens on the sign-in page itself — there is no session yet — so a
+    // refresh there should just show the login form, not a loading screen
+    // pretending to check for one. Runs before the splash markup below is
+    // parsed, so this is a skip, not a flash of splash then hide.
+    if (location.pathname.indexOf('/auth') === 0) {
+      document.documentElement.classList.add('pmes-skip-splash');
+    }
+  </script>
   <div id="pmes-boot-splash" role="status" aria-live="polite" aria-label="Loading PMES">
     <div class="pmes-boot-inner">
       <div class="pmes-boot-mark" aria-hidden="true">PMES</div>
       <div>
         <p class="pmes-boot-kicker">DSWD Innovation Cluster</p>
         <h1 class="pmes-boot-title">Performance Monitoring and Evaluation System</h1>
-        <p id="pmes-boot-copy" class="pmes-boot-copy">Loading...</p>
+        <p id="pmes-boot-copy" class="pmes-boot-copy">Loading your workspace and checking your session...</p>
       </div>
       <div class="pmes-boot-progress" aria-hidden="true"></div>
     </div>
   </div>
   <div id="app"></div>
-  <script>
-    // Runs before the Vue bundle even starts fetching, so the splash never
-    // shows the misleading "checking your session" copy on /auth/* pages —
-    // there is no session to check there, and saying so read as if the app
-    // were stuck verifying something on a plain sign-in page load.
-    (function () {
-      var copy = document.getElementById('pmes-boot-copy');
-      if (!copy) return;
-      copy.textContent = location.pathname.indexOf('/auth') === 0
-        ? 'Loading the sign-in page...'
-        : 'Loading your workspace and checking your session...';
-    })();
-  </script>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>

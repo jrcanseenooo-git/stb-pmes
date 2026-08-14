@@ -69,6 +69,7 @@ const Router = (() => {
         if (!id && method === 'POST') return UsersService.create(body, user)
         if (id && !sub && method === 'GET') return UsersService.get(id, user)
         if (id && !sub && method === 'PUT') return UsersService.update(id, body, user)
+        if (id && !sub && method === 'DELETE') return UsersService.remove(id, user)
         if (id && sub === 'deactivate') return UsersService.deactivate(id, user)
         if (id && sub === 'activate') return UsersService.activate(id, user)
         if (id && sub === 'decline') return UsersService.decline(id, user)

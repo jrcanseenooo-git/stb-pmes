@@ -416,6 +416,38 @@ const UsersService = (() => {
     return { success: true }
   }
 
+  // ── DELETE user (permanent — unlike deactivate) ──
+  // Exists specifically for accounts that should never have existed at all
+  // (duplicate/broken rows from a failed create, a typo'd email) rather than
+  // as a replacement for deactivate — deactivate is still the right call for
+  // a real employee who's left, since it keeps their history intact.
+  function remove(id, user) {
+    const profile = AuthService.getProfile(user)
+    const sheet = _usersSheet()
+    const row   = SpreadsheetService.getRow(sheet, id)
+    if (!row) throw HttpError('User not found', 404)
+    requireUserAdministration_(profile, row)
+
+    if (String(row.id) === String(profile.id)) {
+      throw HttpError('You cannot delete your own account.', 400)
+    }
+
+    // Best-effort: free the email in Firebase too, so a corrected
+    // re-creation isn't blocked by a stale account still holding it. A
+    // Firebase failure here must not block removing the bad row itself.
+    if (row.uid) {
+      try {
+        FirebaseAuthService.deleteUser(row.uid)
+      } catch (e) {
+        Logger.log('Could not delete Firebase user during removal: ' + e.message)
+      }
+    }
+
+    SpreadsheetService.hardDeleteRow(sheet, id)
+    AuditService.log('DELETE_USER', 'Users', `Permanently deleted user: ${row.email}`, user)
+    return { success: true, deletedId: id }
+  }
+
   // ── RESET PASSWORD ──
   function resetPassword(id, body, user) {
     AuthService.requirePermission(user, 'manage_users')
@@ -640,5 +672,5 @@ const UsersService = (() => {
     })
   }
 
-  return { list, get, create, update, updateOwnProfile, activate, deactivate, resetPassword, selfRegister, decline }
+  return { list, get, create, update, updateOwnProfile, activate, deactivate, remove, resetPassword, selfRegister, decline }
 })()

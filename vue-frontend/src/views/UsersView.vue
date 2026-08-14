@@ -360,6 +360,11 @@
                         <path d="M2 6a4 4 0 017-2M10 6a4 4 0 01-7 2M10 4v3H7" stroke="#EF4444" stroke-width="1.2" stroke-linecap="round"/>
                       </svg>
                     </button>
+                    <button v-if="canManageUsers" class="icon-btn-sm danger" :disabled="busyUserId === u.id" title="Delete permanently" @click="deleteUser(u)">
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                        <path d="M2 3h8M5 3V2h2v1M3.5 3v6.5c0 .28.22.5.5.5h4c.28 0 .5-.22.5-.5V3" stroke="#EF4444" stroke-width="1.2" stroke-linecap="round"/>
+                      </svg>
+                    </button>
                   </div>
                 </td>
               </tr>
@@ -1629,6 +1634,22 @@ async function deactivateUser(user) {
   if (!ok) return
   try   { await usersApi.deactivate(user.id); user.status = 'Inactive'; showToast(`${user.name} deactivated.`, 'warning') }
   catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
+}
+
+async function deleteUser(user) {
+  const ok = await confirm(CONFIRMS.deleteUser(user.name, user.email))
+  if (!ok) return
+  busyUserId.value = user.id
+  try {
+    await usersApi.remove(user.id)
+    users.value = users.value.filter(u => u.id !== user.id)
+    showToast(`${user.name} permanently deleted.`, 'warning')
+  } catch (e) {
+    console.error(e)
+    showToast(e?.message || 'Something went wrong. Please try again.', 'error')
+  } finally {
+    busyUserId.value = ''
+  }
 }
 
 // ── Reset password ──

@@ -256,6 +256,35 @@ const FirebaseAuthService = (() => {
     }
   }
 
+  // ── DELETE a Firebase user (irreversible — unlike disableUser) ──
+  // Used only by UsersService.remove(), which hard-deletes the PMES account
+  // row. Deleting rather than disabling frees the email address so a
+  // corrected re-creation isn't blocked by a stale, disabled account still
+  // holding it.
+  function deleteUser(uid) {
+    const token = getAdminToken()
+
+    try {
+      const response = UrlFetchApp.fetch(`${ADMIN_BASE}/accounts:delete`, {
+        method:             'POST',
+        contentType:        'application/json',
+        headers:            { Authorization: 'Bearer ' + token },
+        payload:            JSON.stringify({ localId: uid }),
+        muteHttpExceptions: true
+      })
+
+      if (response.getResponseCode() === 200) {
+        Logger.log('✅ Firebase user deleted: ' + uid)
+        return { success: true }
+      }
+      const result = JSON.parse(response.getContentText())
+      throw new Error(result.error?.message || 'Failed to delete user')
+    } catch (e) {
+      Logger.log('FirebaseAuthService.deleteUser error: ' + e.message)
+      throw e
+    }
+  }
+
   // ── GET user by email ──
   function getUserByEmail(email) {
     const token = getAdminToken()
@@ -337,6 +366,7 @@ const FirebaseAuthService = (() => {
     updatePassword,
     disableUser,
     enableUser,
+    deleteUser,
     getUserByEmail,
     updateDisplayName,
     testSetup

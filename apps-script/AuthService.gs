@@ -157,6 +157,15 @@ const AuthService = (() => {
       const nowSec = Math.floor(Date.now() / 1000)
       if (payload.exp && payload.exp < nowSec) return null
       if (payload.iat && payload.iat > nowSec + 300) return null   // 5-min skew
+      // Nightly forced logout: a token issued before the last midnight
+      // cutoff is treated as expired, even though Firebase itself still
+      // considers it valid — this is what actually logs out a session left
+      // open overnight. Signing in again issues a fresh token with a newer
+      // iat, so this never affects someone logging in after the cutoff.
+      if (payload.iat && typeof SystemSettingsService !== 'undefined') {
+        const cutoff = SystemSettingsService.getLogoutCutoffAt()
+        if (cutoff && payload.iat < cutoff) return null
+      }
       if (FIREBASE_PROJECT_ID) {
         if (payload.aud !== FIREBASE_PROJECT_ID) return null
         if (payload.iss !== 'https://securetoken.google.com/' + FIREBASE_PROJECT_ID) return null

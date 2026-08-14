@@ -100,9 +100,56 @@ const SystemSettingsService = (() => {
     return list(user)
   }
 
+  // ── Nightly forced logout ──
+  // Stores the cutoff as a Unix-seconds timestamp (matching a Firebase ID
+  // token's `iat` claim, which is what AuthService.verifyToken compares it
+  // against). A session whose token was issued before this cutoff is
+  // rejected on its next request, forcing re-login — a session that logs in
+  // *after* the cutoff is unaffected, since its token's iat is newer.
+  const LOGOUT_CUTOFF_KEY = 'globalLogoutCutoffAt'
+
+  function getLogoutCutoffAt() {
+    try {
+      const sheet = ensureSheet_()
+      const row = SpreadsheetService.getAllRows(sheet).find(r => r.key === LOGOUT_CUTOFF_KEY)
+      const value = Number(row && row.value)
+      return Number.isFinite(value) ? value : 0
+    } catch (e) {
+      Logger.log('[SystemSettings] getLogoutCutoffAt fallback: ' + e.message)
+      return 0
+    }
+  }
+
+  // Not exposed via list()/update() or any Router route — only the
+  // time-driven trigger (MidnightLogoutService.runMidnightLogout) calls
+  // this, so there is no path for a regular admin request to force-logout
+  // everyone by accident.
+  function setLogoutCutoffToNow_() {
+    const sheet = ensureSheet_()
+    const rows = SpreadsheetService.getAllRows(sheet)
+    const row = rows.find(r => r.key === LOGOUT_CUTOFF_KEY)
+    const nowSec = Math.floor(Date.now() / 1000)
+    const payload = {
+      key: LOGOUT_CUTOFF_KEY,
+      value: String(nowSec),
+      description: 'Unix timestamp (seconds). Sessions with a token issued before this are forced to re-login. Set nightly by the midnight logout trigger.',
+      updatedBy: 'system',
+      updatedByName: 'Midnight Logout Trigger',
+      updatedAt: new Date().toISOString()
+    }
+    if (row) {
+      SpreadsheetService.updateRow(sheet, row.id, payload)
+    } else {
+      SpreadsheetService.appendRow(sheet, { id: SpreadsheetService.generateId('SET-'), ...payload })
+    }
+    return nowSec
+  }
+
   return {
     getAccessMode,
     list,
-    update
+    update,
+    getLogoutCutoffAt,
+    setLogoutCutoffToNow_
   }
 })()

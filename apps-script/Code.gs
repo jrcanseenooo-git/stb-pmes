@@ -117,7 +117,18 @@ function handleRequest(e, method) {
   } catch (err) {
     Logger.log('PMES Error: ' + err.message + '\n' + err.stack)
     const code = err.statusCode || 500
-    const clientMsg = safeClientErrorMessage(code)
+    // Every HttpError(message, code) thrown across the services is written
+    // specifically for the end user — "An account for this email already
+    // exists", "This active question has already been used", and dozens
+    // more — so a code under 500 is always a deliberate, curated
+    // business-logic message and should reach the user as written. This
+    // used to discard err.message unconditionally and substitute a generic,
+    // status-code-keyed string regardless of what was actually thrown,
+    // which is how a duplicate-email 409 during user creation surfaced as
+    // "This record was already updated" instead of the real reason. Only an
+    // unexpected 500 falls back to the generic message, since an uncaught
+    // exception's message can contain raw internals never meant for users.
+    const clientMsg = (code < 500 && err.message) ? err.message : safeClientErrorMessage(code)
     return respond(code, false, null, clientMsg)
   }
 }

@@ -1561,10 +1561,16 @@ async function saveUser() {
       const idx = users.value.findIndex(u => u.id === editingUser.value.id)
       if (idx !== -1) users.value[idx] = mapUser(updated)
       showToast('User updated successfully.')
+      if (updated?.officePersonnelSync?.error) {
+        showToast(`Saved, but not yet added to the office roster: ${updated.officePersonnelSync.error}`, 'warning')
+      }
     } else {
       const newUser = await usersApi.create({ ...payload, tempPassword: form.value.tempPassword, mustChangePassword: true })
       users.value.unshift(mapUser(newUser))
       showToast(`User created! Temp password: ${form.value.tempPassword}`)
+      if (newUser?.officePersonnelSync?.error) {
+        showToast(`Account created, but not yet added to the office roster: ${newUser.officePersonnelSync.error}`, 'warning')
+      }
     }
     closeModal()
   } catch (e) {

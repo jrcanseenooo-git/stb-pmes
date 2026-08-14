@@ -239,7 +239,21 @@ const UsersService = (() => {
     // invisible to rater-assignment generation for that office.
     let officePersonnelSync = { synced: false, skipped: true }
     if (shouldSyncOfficePersonnel_(newUser) && typeof OfficePersonnelService !== 'undefined') {
-      officePersonnelSync = OfficePersonnelService.syncFromCentralUser(newUser, user)
+      // The account row and Firebase login above are already created and
+      // durable by this point — a roster-sync problem (most commonly: the
+      // office isn't ACTIVE yet) must not be reported as account creation
+      // having failed. An uncaught throw here used to abort the whole
+      // response even though the user account genuinely existed, which is
+      // exactly what surfaced as "Office assessment portal is not active
+      // yet." on Create User: the account was created, the error was real,
+      // but it described a side effect, not the actual operation the admin
+      // asked for.
+      try {
+        officePersonnelSync = OfficePersonnelService.syncFromCentralUser(newUser, user)
+      } catch (e) {
+        Logger.log('Office personnel sync failed during create: ' + e.message)
+        officePersonnelSync = { synced: false, skipped: false, error: e.message }
+      }
     }
 
     return {
@@ -345,7 +359,17 @@ const UsersService = (() => {
       .some(field => Object.prototype.hasOwnProperty.call(updateBody, field))
     if (touchesOfficeFields && updated.active !== false && String(updated.active).toLowerCase() !== 'false' &&
         shouldSyncOfficePersonnel_(updated) && typeof OfficePersonnelService !== 'undefined') {
-      officePersonnelSync = OfficePersonnelService.syncFromCentralUser(updated, user)
+      // The account edit itself already succeeded above — a roster-sync
+      // problem (e.g. the office isn't ACTIVE yet) must not be reported as
+      // the whole update having failed. Matches the same never-fail-the-
+      // primary-action pattern already used for the Firebase display-name
+      // sync a few lines up.
+      try {
+        officePersonnelSync = OfficePersonnelService.syncFromCentralUser(updated, user)
+      } catch (e) {
+        Logger.log('Office personnel sync failed during update: ' + e.message)
+        officePersonnelSync = { synced: false, skipped: false, error: e.message }
+      }
     }
 
     AuditService.log('UPDATE_USER', 'Users', `Updated user: ${id}`, user)
@@ -368,7 +392,14 @@ const UsersService = (() => {
     }
     let officePersonnelSync = { synced: false, skipped: true }
     if (shouldSyncOfficePersonnel_(approvedRow) && typeof OfficePersonnelService !== 'undefined') {
-      officePersonnelSync = OfficePersonnelService.syncFromCentralUser(approvedRow, user)
+      // A roster-sync failure (e.g. the office isn't ACTIVE yet) must not
+      // block the approval itself from being written below.
+      try {
+        officePersonnelSync = OfficePersonnelService.syncFromCentralUser(approvedRow, user)
+      } catch (e) {
+        Logger.log('Office personnel sync failed during activation: ' + e.message)
+        officePersonnelSync = { synced: false, skipped: false, error: e.message }
+      }
     }
 
     SpreadsheetService.updateRow(sheet, id, {

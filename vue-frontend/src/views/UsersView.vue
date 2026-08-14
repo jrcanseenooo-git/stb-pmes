@@ -1563,7 +1563,7 @@ async function saveUser() {
     }
     closeModal()
   } catch (e) {
-    console.error(e); showToast('Something went wrong. Please try again.', 'error')
+    console.error(e); showToast(e?.message || 'Something went wrong. Please try again.', 'error')
   } finally {
     saving.value = false
   }

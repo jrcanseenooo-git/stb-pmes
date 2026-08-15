@@ -1518,12 +1518,18 @@ async function moveQuestion(id, direction) {
   const current = rows[currentIndex]
   const next = rows[nextIndex]
   const currentSequence = current.sequence
-  applyLocalQuestion({ sequence: next.sequence }, current.id)
+  const nextSequence = next.sequence
+  applyLocalQuestion({ sequence: nextSequence }, current.id)
   applyLocalQuestion({ sequence: currentSequence }, next.id)
   try {
     await assessmentContentApi.reorder(categoryQuestions.value.map((q, index) => ({ id: q.id, sequence: index + 1 })))
   } catch (e) {
     console.error(e)
+    // Undo the optimistic swap so the on-screen order matches what the
+    // backend actually has, instead of silently drifting out of sync.
+    applyLocalQuestion({ sequence: currentSequence }, current.id)
+    applyLocalQuestion({ sequence: nextSequence }, next.id)
+    showToast('Could not save the new order. Please try again.', 'error')
   }
 }
 </script>

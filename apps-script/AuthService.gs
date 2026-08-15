@@ -86,7 +86,6 @@ const AuthService = (() => {
     ],
     'office-assessment-admin': [
       'manage_office_users',
-      'generate_ipat_assignments',
       'manage_ipat_scores',
       'view_bureau_monitoring',
       'view_division_monitoring'
@@ -157,14 +156,24 @@ const AuthService = (() => {
       const nowSec = Math.floor(Date.now() / 1000)
       if (payload.exp && payload.exp < nowSec) return null
       if (payload.iat && payload.iat > nowSec + 300) return null   // 5-min skew
-      // Nightly forced logout: a token issued before the last midnight
-      // cutoff is treated as expired, even though Firebase itself still
-      // considers it valid — this is what actually logs out a session left
-      // open overnight. Signing in again issues a fresh token with a newer
-      // iat, so this never affects someone logging in after the cutoff.
-      if (payload.iat && typeof SystemSettingsService !== 'undefined') {
+      // Nightly forced logout: a session last *authenticated* before the
+      // midnight cutoff is rejected, even though Firebase itself still
+      // considers the token valid — this is what actually logs out a
+      // session left open overnight.
+      //
+      // This compares auth_time, not iat. iat is when THIS token was
+      // minted, and the client already force-refreshes and retries once on
+      // any 401 (see gasSend in api.js) — that refresh mints a brand-new
+      // token with iat = right now, which is always after any past cutoff,
+      // so an iat-based check silently defeats itself on the very first
+      // retry. auth_time is when the user last actually signed in with
+      // credentials; a silent token refresh never changes it, only a real
+      // interactive sign-in does — which is exactly the case that should
+      // stay exempt.
+      if (typeof SystemSettingsService !== 'undefined') {
         const cutoff = SystemSettingsService.getLogoutCutoffAt()
-        if (cutoff && payload.iat < cutoff) return null
+        const authTime = payload.auth_time || payload.iat
+        if (cutoff && authTime && authTime < cutoff) return null
       }
       if (FIREBASE_PROJECT_ID) {
         if (payload.aud !== FIREBASE_PROJECT_ID) return null
@@ -475,10 +484,7 @@ const AuthService = (() => {
     const roleGroups = ROLE_GROUPS[normalizedProfile.role] || []
     const explicitGroups = _splitList(normalizedProfile.permissionGroups)
     const scopeGroups = []
-    if (
-      String(normalizedProfile.systemScope || '') === 'OFFICE_ADMIN' ||
-      String(normalizedProfile.officeRole || '') === 'OFFICE_ADMIN'
-    ) {
+    if (String(normalizedProfile.officeRole || '') === 'OFFICE_ADMIN') {
       scopeGroups.push('office-assessment-admin')
     }
     const groups = _unique(roleGroups.concat(explicitGroups).concat(scopeGroups))

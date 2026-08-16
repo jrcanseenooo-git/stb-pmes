@@ -136,7 +136,11 @@ const OfficeRegistryService = (() => {
     try {
       registrationOptions().forEach(office => {
         if (!office || !office.officeId) return
-        map[office.officeId] = getOrgOptionsForOffice_(office.officeId)
+        const options = getOrgOptionsForOffice_(office.officeId)
+        officeAliasKeys_(office).forEach(key => {
+          map[key] = options
+          map[key.toUpperCase()] = options
+        })
       })
     } catch (e) {
       Logger.log('[OfficeRegistry] registrationOrgOptions error: ' + (e && e.message || e))
@@ -145,9 +149,9 @@ const OfficeRegistryService = (() => {
   }
 
   function orgOptions(id, user) {
-    requireCentralAdmin_(user)
     const row = findByIdOrCode_(id)
     if (!row) throw HttpError('Office record not found.', 404)
+    requireOrgOptionsAccess_(row, user)
     return {
       office: safeRegistryRow_(row),
       ...getOrgOptionsForOffice_(row.officeId)
@@ -155,9 +159,9 @@ const OfficeRegistryService = (() => {
   }
 
   function saveOrgOptions(id, body, user) {
-    const profile = requireCentralAdmin_(user)
     const row = findByIdOrCode_(id)
     if (!row) throw HttpError('Office record not found.', 404)
+    const profile = requireOrgOptionsAccess_(row, user)
     const officeId = String(row.officeId || '').trim()
     if (!officeId) throw HttpError('Office record has no office ID.', 400)
 
@@ -179,15 +183,9 @@ const OfficeRegistryService = (() => {
     const roles = normalizeOptionList_(body.requestedRoles || body.roles, 'role')
       .map(item => ({ ...item, id: item.id || optionId_(officeId, 'ROLE', item.name), parentId: '' }))
 
-    const sheet = orgOptionsSheet_()
-    SpreadsheetService.getAllRows(sheet)
-      .filter(item => String(item.officeId || '') === officeId)
-      .forEach(item => SpreadsheetService.hardDeleteRow(sheet, item.id))
-
     const now = new Date().toISOString()
     const updatedBy = profile.email || user.email || ''
-    divisions.concat(sections).concat(roles).forEach((item, index) => {
-      SpreadsheetService.appendRow(sheet, {
+    const savedRows = divisions.concat(sections).concat(roles).map((item, index) => ({
         id: item.id,
         officeId,
         optionType: item.optionType,
@@ -199,13 +197,14 @@ const OfficeRegistryService = (() => {
         createdAt: now,
         updatedAt: now,
         updatedBy
-      })
-    })
+    }))
+
+    replaceOrgOptionRows_(officeId, savedRows)
 
     auditCentral_('SAVE_OFFICE_ORG_OPTIONS', 'Office', officeId, '', 'SUCCESS', 'Updated registration options for ' + row.officeCode, user)
     return {
       office: safeRegistryRow_(row),
-      ...getOrgOptionsForOffice_(officeId)
+      ...orgOptionsFromRows_(savedRows)
     }
   }
 
@@ -320,7 +319,7 @@ const OfficeRegistryService = (() => {
     if (!row.spreadsheetId) throw HttpError('Office has no provisioned spreadsheet to validate.', 400)
     const validation = OfficeSchemaService.validateSpreadsheet(row.spreadsheetId, row)
     SpreadsheetService.updateRow(registrySheet_(), row.id, {
-      spreadsheetStatus: validation.valid ? 'FOR_VALIDATION' : 'INVALID_SCHEMA',
+      spreadsheetStatus: passingStatusFor_(row, validation),
       lastValidatedAt: new Date().toISOString(),
       provisioningError: validation.valid ? '' : validation.errors.join(' | '),
       updatedAt: new Date().toISOString(),
@@ -346,7 +345,7 @@ const OfficeRegistryService = (() => {
     const repaired = OfficeSchemaService.repairSpreadsheet(row.spreadsheetId)
     const validation = OfficeSchemaService.validateSpreadsheet(row.spreadsheetId, row)
     SpreadsheetService.updateRow(registrySheet_(), row.id, {
-      spreadsheetStatus: validation.valid ? 'FOR_VALIDATION' : 'INVALID_SCHEMA',
+      spreadsheetStatus: passingStatusFor_(row, validation),
       lastValidatedAt: new Date().toISOString(),
       provisioningError: validation.valid ? '' : validation.errors.join(' | '),
       updatedAt: new Date().toISOString(),
@@ -564,6 +563,42 @@ const OfficeRegistryService = (() => {
       AuthService.hasPermission(profile, 'view_cluster_monitoring')
   }
 
+  // Status to record after a validate/repair run.
+  //
+  // A passing check used to always write FOR_VALIDATION, including for an
+  // office that was already ACTIVE — which silently took a live office
+  // offline, because getSpreadsheetForOffice requires spreadsheetStatus
+  // ACTIVE. Re-checking a healthy office is a read; it must not be able to
+  // revoke access as a side effect. So a passing check now leaves an ACTIVE
+  // office ACTIVE, and only promotes a not-yet-active office to "Ready to
+  // Activate". A FAILING check still marks INVALID_SCHEMA even if the office
+  // was active — a genuinely broken workbook should stop being served.
+  function passingStatusFor_(row, validation) {
+    if (!validation.valid) return 'INVALID_SCHEMA'
+    return String(row.spreadsheetStatus || '') === 'ACTIVE' ? 'ACTIVE' : 'FOR_VALIDATION'
+  }
+
+  function requireOrgOptionsAccess_(row, user) {
+    const profile = AuthService.getProfile(user)
+    if (isCentralAdminProfile_(profile)) return profile
+
+    const officeRole = String(profile.officeRole || '').toUpperCase()
+    const canManageOwnOffice = officeRole === 'OFFICE_ADMIN' ||
+      AuthService.hasPermission(profile, 'manage_office_users')
+    if (!canManageOwnOffice) {
+      throw HttpError('Access denied. Office administrator role required.', 403)
+    }
+
+    const rowOfficeKeys = officeAliasKeys_(row).map(normalizeOfficeLookupKey_).filter(Boolean)
+    const profileOfficeKeys = officeAliasKeys_(profile).map(normalizeOfficeLookupKey_).filter(Boolean)
+    const isOwnOffice = profileOfficeKeys.some(key => rowOfficeKeys.indexOf(key) >= 0)
+    const isStb = rowOfficeKeys.indexOf('STB') >= 0 || rowOfficeKeys.indexOf('SOCIAL TECHNOLOGY BUREAU') >= 0
+    if (!isOwnOffice || isStb) {
+      throw HttpError('Access denied. You can only configure registration options for your own office.', 403)
+    }
+    return profile
+  }
+
   function registrySheet_() {
     const ss = SpreadsheetService.getSpreadsheet()
     let sheet = ss.getSheetByName(SHEET.OFFICE_REGISTRY)
@@ -606,14 +641,51 @@ const OfficeRegistryService = (() => {
   }
 
   function findByIdOrCode_(idOrCode) {
-    const key = String(idOrCode || '').trim().toUpperCase()
+    const key = normalizeOfficeLookupKey_(idOrCode)
     if (!key) return null
     if (key === 'STB' || key === 'SOCIAL TECHNOLOGY BUREAU') return builtInStbRow_()
     return SpreadsheetService.getAllRows(registrySheet_()).find(r =>
-      String(r.id || '').toUpperCase() === key ||
-      String(r.officeId || '').toUpperCase() === key ||
-      String(r.officeCode || '').toUpperCase() === key
+      officeAliasKeys_(r).some(alias => normalizeOfficeLookupKey_(alias) === key)
     ) || null
+  }
+
+  function officeAliasKeys_(office) {
+    const keys = [
+      office && office.id,
+      office && office.officeId,
+      office && office.officeCode,
+      office && office.officeShortName,
+      office && office.officeName,
+      office && office.office
+    ].map(item => String(item || '').trim()).filter(Boolean)
+
+    const normalized = keys.map(normalizeOfficeLookupKey_)
+    function hasAny(candidates) {
+      return candidates.some(candidate => normalized.indexOf(normalizeOfficeLookupKey_(candidate)) >= 0)
+    }
+    function add(items) {
+      items.forEach(item => {
+        const value = String(item || '').trim()
+        if (value && keys.indexOf(value) < 0) keys.push(value)
+      })
+    }
+
+    if (hasAny(['WGP', 'WALANG-GUTOM', 'WALANG GUTOM', 'WALANG GUTOM PROGRAM', 'OFF-WALANG-GUTOM'])) {
+      add(['WGP', 'WALANG-GUTOM', 'WALANG GUTOM PROGRAM', 'OFF-WALANG-GUTOM'])
+    }
+    if (hasAny(['TBTP', 'TARA-BASA', 'TARA BASA', 'TARA BASA TUTORING PROGRAM', 'TARA, BASA! TUTORING PROGRAM', 'OFF-TARA-BASA'])) {
+      add(['TBTP', 'TARA-BASA', 'TARA BASA TUTORING PROGRAM', 'OFF-TARA-BASA'])
+    }
+
+    return keys
+  }
+
+  function normalizeOfficeLookupKey_(value) {
+    return String(value || '')
+      .trim()
+      .toUpperCase()
+      .replace(/[!,.]/g, '')
+      .replace(/\s+/g, ' ')
   }
 
   function normalizeInput_(body) {
@@ -697,6 +769,10 @@ const OfficeRegistryService = (() => {
         String(row.active).toLowerCase() !== 'false'
       )
       .sort((a, b) => Number(a.sequence || 0) - Number(b.sequence || 0) || String(a.name || '').localeCompare(String(b.name || '')))
+    return orgOptionsFromRows_(rows)
+  }
+
+  function orgOptionsFromRows_(rows) {
     const divisions = rows
       .filter(row => row.optionType === 'division')
       .map(row => ({ id: row.id, officeId: row.officeId, name: row.name, code: row.code || '' }))
@@ -711,6 +787,37 @@ const OfficeRegistryService = (() => {
       divisions,
       sections,
       requestedRoles: requestedRoles.length ? requestedRoles : DEFAULT_REQUESTED_ROLES
+    }
+  }
+
+  function replaceOrgOptionRows_(officeId, replacementRows) {
+    const sheet = orgOptionsSheet_()
+    const lastColumn = Math.max(sheet.getLastColumn(), ORG_OPTION_HEADERS.length)
+    const headers = sheet.getRange(1, 1, 1, lastColumn).getValues()[0]
+    const lastRow = sheet.getLastRow()
+    const existing = lastRow > 1
+      ? sheet.getRange(2, 1, lastRow - 1, lastColumn).getValues()
+      : []
+    const officeIdIdx = headers.indexOf('officeId')
+    const keptRows = existing.filter(row => String(row[officeIdIdx] || '') !== officeId)
+    const replacementValues = replacementRows.map(item => headers.map(header => {
+      const value = item[header]
+      return value === undefined || value === null ? '' : value
+    }))
+    const values = keptRows.concat(replacementValues)
+
+    if (lastRow > 1) {
+      sheet.getRange(2, 1, lastRow - 1, lastColumn).clearContent()
+    }
+    if (values.length) {
+      sheet.getRange(2, 1, values.length, lastColumn).setValues(values)
+    }
+    try {
+      if (typeof DataCacheService !== 'undefined') {
+        DataCacheService.invalidate(sheet.getParent().getId(), sheet.getName())
+      }
+    } catch (e) {
+      Logger.log('[OfficeRegistry] org options cache invalidation failed: ' + (e && e.message || e))
     }
   }
 

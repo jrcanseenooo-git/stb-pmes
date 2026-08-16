@@ -41,15 +41,27 @@ const DiagnosticsService = (() => {
 
       // An office admin only ever sees their own office; a central admin sees
       // every registered office so one call covers the whole cluster.
+      // STB is not a registry row — it is the built-in central office — so it
+      // has to be added explicitly or the report silently covers only 6 of 7.
+      const stbOffice = {
+        officeId: 'STB',
+        officeCode: 'STB',
+        officeName: 'Social Technology Bureau',
+        officeStatus: 'ACTIVE',
+        spreadsheetStatus: 'ACTIVE',
+        hasSpreadsheet: true,
+        isBuiltInCentral: true
+      }
+
       const offices = isCentral
-        ? registryRows.map(r => ({
+        ? [stbOffice].concat(registryRows.map(r => ({
             officeId: String(r.officeId || '').trim(),
             officeCode: String(r.officeCode || '').trim(),
             officeName: String(r.officeName || '').trim(),
             officeStatus: String(r.officeStatus || '').trim(),
             spreadsheetStatus: String(r.spreadsheetStatus || '').trim(),
             hasSpreadsheet: !!r.spreadsheetId
-          }))
+          })))
         : [{ officeId: resolvedOfficeId, officeCode: String(profile.officeCode || '').trim(), officeName: String(profile.officeName || '').trim() }]
 
       const perOffice = offices.map(office => {

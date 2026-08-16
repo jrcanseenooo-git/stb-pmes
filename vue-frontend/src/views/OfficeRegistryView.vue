@@ -1,17 +1,23 @@
 <template>
   <div class="pui-page">
     <PageHeader
-      kicker="Central Administration"
-      title="Office Registry"
-      subtitle="Provision, validate and activate evaluation-only spreadsheets for participating offices."
+      :kicker="centralRegistryMode ? 'Central Administration' : 'Office Administration'"
+      :title="centralRegistryMode ? 'Office Registry' : 'Office Structure'"
+      :subtitle="centralRegistryMode
+        ? 'Provision, validate and activate evaluation-only spreadsheets for participating offices.'
+        : `Maintain the registration divisions, sections and role choices for ${ownOffice.officeName || 'your office'}.`"
     >
       <template #actions>
-        <RouterLink v-if="canViewClusterMonitoring" to="/cluster-overview" class="pui-btn">Cluster Overview</RouterLink>
+        <RouterLink v-if="centralRegistryMode && canViewClusterMonitoring" to="/cluster-overview" class="pui-btn">Cluster Overview</RouterLink>
         <button v-if="canManageOfficeRegistry" class="pui-btn pui-btn-primary" type="button" @click="openProvisionModal">Add Office</button>
+        <button v-if="ownOfficeStructureMode" class="pui-btn pui-btn-primary" type="button" @click="openOrgOptionsModal(ownOffice)">
+          Configure
+        </button>
       </template>
     </PageHeader>
 
     <DataPanel
+      v-if="centralRegistryMode"
       title="Participating Offices"
       :subtitle="`${filteredOffices.length} of ${offices.length} offices shown`"
       :loading="loading"
@@ -48,7 +54,7 @@
         <tbody>
           <tr v-for="office in filteredOffices" :key="office.officeId">
             <td>
-              <strong>{{ office.officeCode }}</strong>
+              <strong>{{ officeDisplayCode(office) }}</strong>
               <small>{{ office.officeName }}</small>
             </td>
             <td style="white-space:nowrap;">{{ office.primaryAdminEmail || '—' }}</td>
@@ -116,6 +122,45 @@
                   </button>
                 </template>
                 <span v-else style="font-size:11px; font-weight:700; color:#64748b;">Monitoring only</span>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </DataPanel>
+
+    <DataPanel
+      v-else
+      title="Registration Options"
+      :subtitle="ownOffice.officeName || ownOffice.officeCode || 'Your office'"
+      :loading="loading"
+      :error="error"
+      error-title="The office structure could not be loaded"
+      :empty="false"
+      refreshable
+      :last-updated="lastUpdatedLabel"
+      @refresh="loadOffices"
+    >
+      <table class="pui-table">
+        <thead>
+          <tr>
+            <th scope="col">Office</th>
+            <th scope="col">Available Action</th>
+            <th scope="col" style="text-align:right;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <strong>{{ officeDisplayCode(ownOffice) }}</strong>
+              <small>{{ ownOffice.officeName }}</small>
+            </td>
+            <td>Configure divisions, sections and registration role choices for this office only.</td>
+            <td>
+              <div style="display:flex; justify-content:flex-end;">
+                <button class="pui-btn pui-btn-sm" type="button" @click="openOrgOptionsModal(ownOffice)">
+                  Configure
+                </button>
               </div>
             </td>
           </tr>
@@ -214,19 +259,35 @@
       title="Configure Registration Options"
       :description="`${orgOffice?.officeName || 'Office'} divisions, sections and requested roles.`"
       wide
-      :busy="orgSaving"
+      :busy="orgSaving || orgLoading"
       @close="closeOrgOptionsModal"
     >
-      <form id="org-form" style="display:grid; gap:16px;" @submit.prevent="saveOrgOptions">
+      <div v-if="orgLoading" class="org-loading" role="status" aria-live="polite">
+        <span class="org-loading-spinner" aria-hidden="true"></span>
+        <div>
+          <p class="org-loading-title">Loading registration options</p>
+          <p class="pui-hint">Reading the current divisions, sections and roles from the database...</p>
+        </div>
+      </div>
+
+      <form v-else id="org-form" style="display:grid; gap:16px;" @submit.prevent="saveOrgOptions">
         <label>
           <span class="pui-label">Divisions / Units</span>
-          <textarea
-            v-model="orgForm.divisionsText"
-            class="pui-textarea"
-            style="font-family:monospace; font-size:12px;"
-            rows="5"
-            placeholder="One per line&#10;Operations Division&#10;ADMIN | Administrative Unit"
-          ></textarea>
+          <div class="numbered-textarea">
+            <ol class="line-number-gutter" aria-hidden="true">
+              <li v-for="(line, index) in numberedEntries(orgForm.divisionsText)" :key="`${index}-${line}`">
+                <span class="line-number-value">{{ index + 1 }}</span>
+                <span class="line-number-measure">{{ line || ' ' }}</span>
+              </li>
+            </ol>
+            <textarea
+              v-autosize
+              v-model="orgForm.divisionsText"
+              class="pui-textarea numbered-input"
+              :rows="textareaRows(orgForm.divisionsText, 3)"
+              placeholder="One per line&#10;Operations Division&#10;ADMIN | Administrative Unit"
+            ></textarea>
+          </div>
           <small class="pui-hint">One line per unit. Optional format: <code>CODE | Name</code>.</small>
         </label>
 
@@ -248,31 +309,47 @@
           <div v-else class="org-section-grid">
             <div v-for="name in parsedDivisionNames" :key="name" class="org-section-card">
               <p class="org-section-title">{{ name }}</p>
-              <textarea
-                v-model="sectionsByDivision[name]"
-                class="pui-textarea"
-                style="font-family:monospace; font-size:12px; resize:vertical;"
-                rows="3"
-                placeholder="One section per line"
-              ></textarea>
+              <div class="numbered-textarea">
+                <ol class="line-number-gutter" aria-hidden="true">
+                  <li v-for="(line, index) in numberedEntries(sectionsByDivision[name])" :key="`${index}-${line}`">
+                    <span class="line-number-value">{{ index + 1 }}</span>
+                    <span class="line-number-measure">{{ line || ' ' }}</span>
+                  </li>
+                </ol>
+                <textarea
+                  v-autosize
+                  v-model="sectionsByDivision[name]"
+                  class="pui-textarea numbered-input"
+                  :rows="textareaRows(sectionsByDivision[name], 2)"
+                  placeholder="One section per line"
+                ></textarea>
+              </div>
             </div>
           </div>
         </div>
 
         <label>
           <span class="pui-label">Requested Roles</span>
-          <textarea
-            v-model="orgForm.rolesText"
-            class="pui-textarea"
-            style="font-family:monospace; font-size:12px;"
-            rows="4"
-            placeholder="Technical Staff&#10;Section Head&#10;Division Chief"
-          ></textarea>
+          <div class="numbered-textarea">
+            <ol class="line-number-gutter" aria-hidden="true">
+              <li v-for="(line, index) in numberedEntries(orgForm.rolesText)" :key="`${index}-${line}`">
+                <span class="line-number-value">{{ index + 1 }}</span>
+                <span class="line-number-measure">{{ line || ' ' }}</span>
+              </li>
+            </ol>
+            <textarea
+              v-autosize
+              v-model="orgForm.rolesText"
+              class="pui-textarea numbered-input"
+              :rows="textareaRows(orgForm.rolesText, 3)"
+              placeholder="Technical Staff&#10;Section Head&#10;Division Chief"
+            ></textarea>
+          </div>
           <small class="pui-hint">Request choices only. An administrator still validates the approved role.</small>
         </label>
       </form>
 
-      <div class="pui-alert" style="background:#f8fafc; border:1px solid #e2e8f0; color:#334155;">
+      <div v-if="!orgLoading" class="pui-alert" style="background:#f8fafc; border:1px solid #e2e8f0; color:#334155;">
         <p class="pui-alert-title" style="color:#334155;">This will be saved as</p>
         <p>
           {{ parsedPreview.divisions }} division(s) ·
@@ -287,7 +364,7 @@
 
       <template #footer>
         <button class="pui-btn" type="button" :disabled="orgSaving" @click="closeOrgOptionsModal">Cancel</button>
-        <button class="pui-btn pui-btn-primary" type="submit" form="org-form" :disabled="orgSaving">
+        <button class="pui-btn pui-btn-primary" type="submit" form="org-form" :disabled="orgSaving || orgLoading">
           {{ orgSaving ? 'Saving...' : 'Save Registration Options' }}
         </button>
       </template>
@@ -299,15 +376,23 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { officeRegistryApi } from '@/services/api'
+import { useAuthStore } from '@/stores/auth'
 import { usePermissions } from '@/composables/usePermissions'
 import { useConfirm } from '@/composables/useConfirm'
+import { officeAcronym } from '@/utils/officeAcronyms'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import DataPanel from '@/components/ui/DataPanel.vue'
 import StatusPill from '@/components/ui/StatusPill.vue'
 import AppModal from '@/components/ui/AppModal.vue'
 
-const { canManageOfficeRegistry, canViewClusterMonitoring } = usePermissions()
+const authStore = useAuthStore()
+const { canManageOfficeRegistry, canConfigureOfficeStructure, canViewClusterMonitoring } = usePermissions()
 const { confirm } = useConfirm()
+
+const vAutosize = {
+  mounted: autosizeTextarea,
+  updated: autosizeTextarea
+}
 
 const PROVISION_STEPS = [
   'Validate office code and details',
@@ -330,12 +415,25 @@ const lastValidation = ref(null)
 const lastUpdatedAt = ref(null)
 const orgOffice = ref(null)
 const orgError = ref('')
+const orgLoading = ref(false)
 const orgSaving = ref(false)
 const orgForm = ref({ divisionsText: '', rolesText: '' })
 const sectionsByDivision = ref({})
 const form = ref(defaultForm())
 
 onMounted(loadOffices)
+
+const centralRegistryMode = computed(() => canManageOfficeRegistry.value || canViewClusterMonitoring.value)
+const ownOfficeStructureMode = computed(() => !centralRegistryMode.value && canConfigureOfficeStructure.value)
+const ownOffice = computed(() => {
+  const profile = authStore.profile || {}
+  return {
+    officeId: profile.officeId || profile.officeCode || '',
+    officeCode: profile.officeCode || profile.officeId || '',
+    officeShortName: profile.officeShortName || profile.officeCode || profile.officeId || '',
+    officeName: profile.officeName || profile.office || profile.officeCode || 'Your office'
+  }
+})
 
 function defaultForm() {
   return { officeCode: '', officeName: '', officeShortName: '', primaryAdminEmail: '' }
@@ -384,6 +482,10 @@ function isStbOffice(office) {
   return String(office?.officeId || office?.officeCode || '').toUpperCase() === 'STB'
 }
 
+function officeDisplayCode(office) {
+  return officeAcronym(office) || office?.officeCode || ''
+}
+
 function canActivate(office) {
   return office.spreadsheetStatus === 'FOR_VALIDATION'
 }
@@ -403,8 +505,12 @@ async function loadOffices() {
   loading.value = true
   error.value = ''
   try {
-    const data = await officeRegistryApi.list({ pageSize: 200 })
-    offices.value = data.items || []
+    if (centralRegistryMode.value) {
+      const data = await officeRegistryApi.list({ pageSize: 200 })
+      offices.value = data.items || []
+    } else {
+      offices.value = ownOffice.value.officeId ? [ownOffice.value] : []
+    }
     lastUpdatedAt.value = new Date()
   } catch (e) {
     error.value = e?.message || 'Please check your connection and try again.'
@@ -455,7 +561,8 @@ async function provisionOffice() {
 async function validateOffice(office) {
   const ok = await confirm({
     title: 'Validate Office Spreadsheet',
-    message: `Check ${office.officeName || office.officeCode}'s spreadsheet against the required schema. This only reads the spreadsheet — nothing is changed.`,
+    message: `Check ${office.officeName || office.officeCode}'s spreadsheet against the required schema. The spreadsheet's contents are not modified — only the recorded validation result is updated.`,
+    note: 'An office that is already active stays active if the check passes. If the check fails it is marked "Needs Repair" and its portal stops being served until it is fixed.',
     confirmLabel: 'Validate'
   })
   if (!ok) return
@@ -501,10 +608,8 @@ async function runOfficeAction(office, action, work, fallbackMessage) {
 async function openOrgOptionsModal(office) {
   orgOffice.value = office
   orgError.value = ''
-  orgForm.value = {
-    divisionsText: '',
-    rolesText: 'Technical Staff\nSection Head\nDivision Chief\nAssistant Bureau Director\nBureau Director'
-  }
+  orgLoading.value = true
+  orgForm.value = { divisionsText: '', rolesText: '' }
   sectionsByDivision.value = {}
   showOrgModal.value = true
   try {
@@ -527,6 +632,8 @@ async function openOrgOptionsModal(office) {
     )
   } catch (e) {
     orgError.value = e?.message || 'Could not load registration options.'
+  } finally {
+    orgLoading.value = false
   }
 }
 
@@ -580,6 +687,22 @@ function sectionsFromGroupedInputs() {
   )
 }
 
+function numberedEntries(value) {
+  const entries = String(value || '').split(/\r?\n/)
+  return entries.length ? entries : ['']
+}
+
+function textareaRows(value, minRows = 2) {
+  return Math.max(minRows, String(value || '').split(/\r?\n/).length)
+}
+
+function autosizeTextarea(el) {
+  requestAnimationFrame(() => {
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  })
+}
+
 function formatDate(value) {
   if (!value) return '—'
   const date = new Date(value)
@@ -589,6 +712,36 @@ function formatDate(value) {
 </script>
 
 <style scoped>
+.org-loading {
+  min-height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 28px;
+  color: #334155;
+}
+
+.org-loading-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid #dbeafe;
+  border-top-color: #0f4c9a;
+  border-radius: 50%;
+  animation: org-spin 0.85s linear infinite;
+  flex: 0 0 auto;
+}
+
+.org-loading-title {
+  margin: 0 0 4px;
+  color: #0f172a;
+  font-weight: 800;
+}
+
+@keyframes org-spin {
+  to { transform: rotate(360deg); }
+}
+
 .org-section-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -617,6 +770,76 @@ function formatDate(value) {
   font-size: 11.5px;
   font-weight: 800;
   overflow-wrap: anywhere;
+}
+
+.numbered-textarea {
+  position: relative;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.numbered-textarea:focus-within {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 1px #2563eb;
+}
+
+.line-number-gutter {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  margin: 0;
+  padding: 9px 0;
+  list-style: none;
+  overflow: hidden;
+  background: #f8fafc;
+  color: #64748b;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 18px;
+  pointer-events: none;
+}
+
+.line-number-gutter li {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  min-height: 18px;
+}
+
+.line-number-value {
+  padding-right: 8px;
+  border-right: 1px solid #e2e8f0;
+  text-align: right;
+}
+
+.line-number-measure {
+  visibility: hidden;
+  padding: 0 10px 0 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.numbered-input {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 18px;
+  overflow: hidden;
+  padding: 9px 10px 9px 46px;
+  resize: none;
+}
+
+.numbered-input:focus {
+  outline: none;
+  box-shadow: none;
 }
 
 @media (max-width: 760px) {

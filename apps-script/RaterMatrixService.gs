@@ -108,29 +108,57 @@ const RaterMatrixService = (() => {
     return s
   }
 
-  function rows_(officeId) {
+  function rows_(officeId, user) {
     const all = SpreadsheetService.getAllRows(sheet_())
     const key = String(officeId || '').trim()
-    return all
-      .filter(r => (!key || String(r.officeId || '') === key))
+    // Match every known spelling of this office, not just the exact string the
+    // caller resolved. A profile carrying 'WGP' must still find rows saved as
+    // 'OFF-WALANG-GUTOM' (and vice versa), or the matrix looks empty purely
+    // because of how the office id happened to be written.
+    const keys = key ? officeLookupKeys_(officeId) : null
+    const roles = validRoleSet_(officeId, user)
+    const rows = all
+      .filter(r => (!keys || keys[normalizeOfficeKey_(r.officeId)]))
       .filter(r => r.active !== false && String(r.active).toLowerCase() !== 'false')
+
+    // Do not hide already-saved matrix rows just because the live Office
+    // Structure lookup is temporarily unresolved. Reset/seed still requires
+    // Office Structure roles, but display/edit must preserve database truth.
+    const visible = hasRoleSet_(roles)
+      ? rows.map(r => sanitizeForOfficeRoles_(r, roles)).filter(Boolean)
+      : rows
+
+    return visible
       .sort((a, b) => (Number(a.sequence) || 0) - (Number(b.sequence) || 0))
   }
 
   // ── Public API ────────────────────────────────────────────────────────────
 
+  // The RaterMatrix table, OfficeOrgOptions and OfficeRegistry are all central
+  // configuration. Every public entry point binds to the central database
+  // explicitly rather than inheriting whatever spreadsheet the current request
+  // happens to be scoped to — assignment generation, for example, runs inside
+  // an office-scoped request but must still read the central matrix.
+  // officePersonnelRows_ sets its own office override for the Personnel read,
+  // which is the one genuinely per-office thing this service touches.
+  function central_(work) {
+    return SpreadsheetService.withCentralSpreadsheet(work)
+  }
+
   function list(params, user) {
-    const profile = AuthService.getProfile(user)
-    requireView_(profile)
-    const officeId = resolveOfficeId_(profile, params)
-    const items = rows_(officeId)
-    return {
-      officeId: officeId,
-      items: items,
-      scopes: SCOPES,
-      raterTypes: VALID_RATER_TYPES,
-      isSeeded: items.length > 0
-    }
+    return central_(() => {
+      const profile = AuthService.getProfile(user)
+      requireView_(profile)
+      const officeId = resolveOfficeId_(profile, params)
+      const items = rows_(officeId, user)
+      return {
+        officeId: officeId,
+        items: items,
+        scopes: SCOPES,
+        raterTypes: VALID_RATER_TYPES,
+        isSeeded: items.length > 0
+      }
+    })
   }
 
   /**
@@ -140,54 +168,61 @@ const RaterMatrixService = (() => {
    * with no supervisor and silently under-rate everyone in it.
    */
   function save(body, user) {
-    const profile = AuthService.getProfile(user)
-    requireManage_(profile)
-    const officeId = resolveOfficeId_(profile, body)
-    if (!officeId) throw HttpError('An office must be resolved before saving a rater matrix.', 400)
+    return central_(() => {
+      const profile = AuthService.getProfile(user)
+      requireManage_(profile)
+      const officeId = resolveOfficeId_(profile, body)
+      if (!officeId) throw HttpError('An office must be resolved before saving a rater matrix.', 400)
 
-    const incoming = Array.isArray(body.items) ? body.items : []
-    const cleaned = incoming.map((item, index) => normalizeRow_(item, officeId, index))
+      const incoming = Array.isArray(body.items) ? body.items : []
+      const roles = validRoleSet_(officeId, user)
+      const normalized = incoming.map((item, index) => normalizeRow_(item, officeId, index))
+      const cleaned = hasRoleSet_(roles)
+        ? normalized.map(row => sanitizeForOfficeRoles_(row, roles)).filter(Boolean)
+        : normalized
 
-    validateMatrix_(cleaned)
+      validateMatrix_(cleaned)
 
-    const s = sheet_()
-    SpreadsheetService.getAllRows(s)
-      .filter(r => String(r.officeId || '') === officeId)
-      .forEach(r => SpreadsheetService.hardDeleteRow(s, r.id))
+      const s = sheet_()
+      // Clear by the same alias-aware key set the read path uses. Strict
+      // equality here would leave rows stored under another spelling of the
+      // same office (WGP vs OFF-WALANG-GUTOM) in place, so a save would
+      // silently duplicate the matrix instead of replacing it.
+      const officeKeys = officeLookupKeys_(officeId)
+      SpreadsheetService.getAllRows(s)
+        .filter(r => officeKeys[normalizeOfficeKey_(r.officeId)])
+        .forEach(r => SpreadsheetService.hardDeleteRow(s, r.id))
 
-    const now = new Date().toISOString()
-    const by = profile.email || user.email || ''
-    cleaned.forEach(row => {
-      SpreadsheetService.appendRow(s, {
-        ...row,
-        createdAt: now,
-        updatedAt: now,
-        updatedBy: by
+      const now = new Date().toISOString()
+      const by = profile.email || user.email || ''
+      cleaned.forEach(row => {
+        SpreadsheetService.appendRow(s, {
+          ...row,
+          createdAt: now,
+          updatedAt: now,
+          updatedBy: by
+        })
       })
-    })
 
-    audit_('SAVE_RATER_MATRIX', officeId, `Saved ${cleaned.length} rater matrix rows`, user)
-    return list({ officeId: officeId }, user)
+      audit_('SAVE_RATER_MATRIX', officeId, `Saved ${cleaned.length} rater matrix rows`, user)
+      return list({ officeId: officeId }, user)
+    })
   }
 
   /** Write the STB hierarchy into an office that has no matrix yet. */
   function seedDefaults(body, user) {
-    const profile = AuthService.getProfile(user)
-    requireManage_(profile)
-    const officeId = resolveOfficeId_(profile, body)
-    if (!officeId) throw HttpError('An office must be resolved before seeding.', 400)
+    return central_(() => {
+      const profile = AuthService.getProfile(user)
+      requireManage_(profile)
+      const officeId = resolveOfficeId_(profile, body)
+      if (!officeId) throw HttpError('An office must be resolved before seeding.', 400)
 
-    const expanded = []
-    STB_DEFAULT_MATRIX.forEach(row => expanded.push(row))
-    // Mirror the Technical Staff block onto the other staff role names so a
-    // roster using 'Staff' or 'Administrative Staff' is covered too.
-    STAFF_ALIASES.forEach(alias => {
-      STB_DEFAULT_MATRIX
-        .filter(r => r.rateeRole === 'Technical Staff')
-        .forEach(r => expanded.push({ ...r, rateeRole: alias }))
+      const expanded = isStbOffice_(officeId)
+        ? stbDefaultRows_()
+        : officeDefaultRows_(officeId, user)
+
+      return save({ officeId: officeId, items: expanded }, user)
     })
-
-    return save({ officeId: officeId, items: expanded }, user)
   }
 
   /**
@@ -343,14 +378,18 @@ const RaterMatrixService = (() => {
    * generating assignments rather than discovering it afterwards.
    */
   function coverage(params, user) {
+    return central_(() => coverageInner_(params, user))
+  }
+
+  function coverageInner_(params, user) {
     const profile = AuthService.getProfile(user)
     requireView_(profile)
     const officeId = resolveOfficeId_(profile, params)
-    const matrix = rows_(officeId)
+    const matrix = rows_(officeId, user)
     const configuredRoles = {}
     matrix.forEach(r => { configuredRoles[String(r.rateeRole || '').trim()] = true })
 
-    const users = SpreadsheetService.getAllRows(SpreadsheetService.getSheet(SHEET.USERS))
+    const users = officePersonnelRows_(officeId, user)
       .filter(u => u.active === true || String(u.active).toLowerCase() === 'true')
 
     const roleCounts = {}
@@ -385,7 +424,6 @@ const RaterMatrixService = (() => {
       AuthService.hasPermission(profile, 'manage_office_registry') ||
       AuthService.hasPermission(profile, 'view_cluster_monitoring') ||
       AuthService.hasPermission(profile, 'manage_office_users') ||
-      String(profile.systemScope || '') === 'OFFICE_ADMIN' ||
       String(profile.officeRole || '') === 'OFFICE_ADMIN'
     if (!ok) throw HttpError('Access denied to the rater matrix.', 403)
   }
@@ -393,7 +431,6 @@ const RaterMatrixService = (() => {
   function requireManage_(profile) {
     const ok = AuthService.hasPermission(profile, 'generate_ipat_assignments') ||
       AuthService.hasPermission(profile, 'manage_office_registry') ||
-      String(profile.systemScope || '') === 'OFFICE_ADMIN' ||
       String(profile.officeRole || '') === 'OFFICE_ADMIN'
     if (!ok) throw HttpError('Access denied. Assignment administration permission required.', 403)
   }
@@ -404,6 +441,256 @@ const RaterMatrixService = (() => {
       AuthService.hasPermission(profile, 'view_cluster_monitoring')
     if (explicit && central) return explicit
     return String(profile.officeId || profile.officeCode || 'STB').trim() || 'STB'
+  }
+
+  function stbDefaultRows_() {
+    const expanded = []
+    STB_DEFAULT_MATRIX.forEach(row => expanded.push(row))
+    STAFF_ALIASES.forEach(alias => {
+      STB_DEFAULT_MATRIX
+        .filter(r => r.rateeRole === 'Technical Staff')
+        .forEach(r => expanded.push({ ...r, rateeRole: alias }))
+    })
+    return expanded
+  }
+
+  function officeDefaultRows_(officeId, user) {
+    const roles = roleOrderForOffice_(officeId, user)
+    if (!roles.length) {
+      const keys = Object.keys(officeLookupKeys_(officeId)).join(', ')
+      throw HttpError(
+        'No office roles were found in Office Structure for office "' + String(officeId || '') +
+        '". Checked keys: ' + keys + '. The Office Structure may be saved under a different office id.',
+        409
+      )
+    }
+    const rows = []
+    roles.forEach((role, index) => {
+      rows.push({ rateeRole: role, raterType: 'Self', sourceRoles: '', scope: 'self', fallbackScope: '' })
+      rows.push({ rateeRole: role, raterType: 'Peer', sourceRoles: role, scope: 'office-wide', fallbackScope: '' })
+
+      const lowerRoles = roles.slice(0, index)
+      const supervisorRole = roles[index + 1]
+      const skipSupervisorRole = roles[index + 2]
+      if (lowerRoles.length) {
+        rows.push({
+          rateeRole: role,
+          raterType: 'Subordinate',
+          sourceRoles: lowerRoles.join(','),
+          scope: 'office-wide',
+          fallbackScope: ''
+        })
+      }
+      if (supervisorRole) {
+        rows.push({
+          rateeRole: role,
+          raterType: 'Supervisor',
+          sourceRoles: supervisorRole,
+          scope: 'office-wide',
+          fallbackScope: ''
+        })
+      }
+      if (skipSupervisorRole) {
+        rows.push({
+          rateeRole: role,
+          raterType: 'SkipSupervisor',
+          sourceRoles: skipSupervisorRole,
+          scope: 'office-wide',
+          fallbackScope: ''
+        })
+      }
+    })
+    return rows
+  }
+
+  function sanitizeForOfficeRoles_(row, roles) {
+    if (!roles) return row
+    const rateeRole = String(row.rateeRole || '').trim()
+    if (!roles[rateeRole]) return null
+    if (String(row.scope || '') === 'self') return row
+
+    const sourceRoles = String(row.sourceRoles || '')
+      .split(',')
+      .map(s => s.trim())
+      .filter(role => role && roles[role])
+    if (!sourceRoles.length) return null
+    return {
+      ...row,
+      sourceRoles: sourceRoles.join(',')
+    }
+  }
+
+  function hasRoleSet_(roles) {
+    return !!(roles && Object.keys(roles).length)
+  }
+
+  function validRoleSet_(officeId, user) {
+    if (isStbOffice_(officeId)) return null
+    const roles = roleOrderForOffice_(officeId, user)
+    const set = {}
+    roles.forEach(role => { set[role] = true })
+    return set
+  }
+
+  function roleOrderForOffice_(officeId, user) {
+    const seen = {}
+    const roles = []
+    function add(role) {
+      const name = String(role || '').trim()
+      if (!name || seen[name]) return
+      seen[name] = true
+      roles.push(name)
+    }
+
+    try {
+      const options = OfficeRegistryService.registrationOrgOptions()
+      const canonicalId = canonicalOfficeId_(officeId)
+      ;[
+        options[canonicalId],
+        options[officeId],
+        options[String(officeId || '').toUpperCase()],
+        options[String(canonicalId || '').toUpperCase()]
+      ].forEach(direct => {
+        ;((direct && direct.requestedRoles) || []).forEach(add)
+      })
+    } catch (e) {
+      Logger.log('[RaterMatrix] role options unavailable: ' + (e && e.message || e))
+    }
+
+    if (!roles.length) {
+      try {
+        const direct = OfficeRegistryService.orgOptions(officeId, user)
+        ;((direct && direct.requestedRoles) || []).forEach(add)
+      } catch (e) {
+        Logger.log('[RaterMatrix] direct role options unavailable for ' + officeId + ': ' + (e && e.message || e))
+      }
+    }
+
+    if (!roles.length) {
+      try {
+        const canonicalId = canonicalOfficeId_(officeId)
+        const direct = OfficeRegistryService.orgOptions(canonicalId, user)
+        ;((direct && direct.requestedRoles) || []).forEach(add)
+      } catch (e) {
+        Logger.log('[RaterMatrix] canonical role options unavailable for ' + officeId + ': ' + (e && e.message || e))
+      }
+    }
+
+    if (!roles.length) {
+      roleRowsForOffice_(officeId).forEach(row => add(row.name))
+    }
+
+    if (!roles.length) {
+      matrixRolesForOffice_(officeId).forEach(add)
+    }
+
+    return roles
+  }
+
+  function roleRowsForOffice_(officeId) {
+    try {
+      const keys = officeLookupKeys_(officeId)
+      const sheet = SpreadsheetService.getSheet(SHEET.OFFICE_ORG_OPTIONS || 'OfficeOrgOptions')
+      return SpreadsheetService.getAllRows(sheet)
+        .filter(row => keys[normalizeOfficeKey_(row.officeId)])
+        .filter(row => String(row.optionType || '').trim().toLowerCase() === 'role')
+        .filter(row => row.active !== false && String(row.active).toLowerCase() !== 'false')
+        .sort((a, b) => Number(a.sequence || 0) - Number(b.sequence || 0) || String(a.name || '').localeCompare(String(b.name || '')))
+    } catch (e) {
+      Logger.log('[RaterMatrix] direct role row lookup failed for ' + officeId + ': ' + (e && e.message || e))
+      return []
+    }
+  }
+
+  function matrixRolesForOffice_(officeId) {
+    try {
+      const keys = officeLookupKeys_(officeId)
+      const roles = []
+      const seen = {}
+      SpreadsheetService.getAllRows(sheet_())
+        .filter(row => keys[normalizeOfficeKey_(row.officeId)])
+        .filter(row => row.active !== false && String(row.active).toLowerCase() !== 'false')
+        .sort((a, b) => Number(a.sequence || 0) - Number(b.sequence || 0))
+        .forEach(row => {
+          const role = String(row.rateeRole || '').trim()
+          if (!role || seen[role]) return
+          seen[role] = true
+          roles.push(role)
+        })
+      return roles
+    } catch (e) {
+      Logger.log('[RaterMatrix] matrix role fallback failed for ' + officeId + ': ' + (e && e.message || e))
+      return []
+    }
+  }
+
+  function officeLookupKeys_(officeId) {
+    const raw = String(officeId || '').trim()
+    const canonical = canonicalOfficeId_(raw)
+    const values = [raw, canonical]
+    const key = normalizeOfficeKey_(raw)
+    const canonicalKey = normalizeOfficeKey_(canonical)
+
+    if (key === 'WGP' || key === 'WALANG-GUTOM' || key === 'WALANG GUTOM PROGRAM' || canonicalKey === 'OFF-WALANG-GUTOM') {
+      values.push('WGP', 'OFF-WGP', 'WALANG-GUTOM', 'WALANG GUTOM PROGRAM', 'OFF-WALANG-GUTOM')
+    }
+    if (key === 'TBTP' || key === 'TARA-BASA' || key === 'TARA BASA TUTORING PROGRAM' || canonicalKey === 'OFF-TARA-BASA') {
+      values.push('TBTP', 'OFF-TBTP', 'TARA-BASA', 'TARA BASA TUTORING PROGRAM', 'OFF-TARA-BASA')
+    }
+    if (raw && raw.indexOf('OFF-') !== 0) values.push('OFF-' + raw)
+
+    const out = {}
+    values.forEach(value => {
+      const normalized = normalizeOfficeKey_(value)
+      if (normalized) out[normalized] = true
+    })
+    return out
+  }
+
+  function normalizeOfficeKey_(value) {
+    return String(value || '')
+      .trim()
+      .toUpperCase()
+      .replace(/[!,.]/g, '')
+      .replace(/\s+/g, ' ')
+  }
+
+  function canonicalOfficeId_(officeId) {
+    const key = String(officeId || '').trim().toUpperCase()
+    if (!key || key === 'STB') return 'STB'
+    if (key === 'WGP' || key === 'WALANG-GUTOM' || key === 'WALANG GUTOM PROGRAM') return 'OFF-WALANG-GUTOM'
+    if (key === 'TBTP' || key === 'TARA-BASA' || key === 'TARA BASA TUTORING PROGRAM') return 'OFF-TARA-BASA'
+    if (key === 'PAG-ABOT') return 'OFF-PAG-ABOT'
+    if (key === 'BANGUN') return 'OFF-BANGUN'
+    if (key === 'EPAHP') return 'OFF-EPAHP'
+    if (key === 'OUSI') return 'OFF-OUSI'
+    return key
+  }
+
+  function officePersonnelRows_(officeId, user) {
+    if (isStbOffice_(officeId)) {
+      return SpreadsheetService.getAllRows(SpreadsheetService.getSheet(SHEET.USERS))
+        .filter(u => isStbUser_(u))
+    }
+    try {
+      const ss = OfficeRegistryService.getSpreadsheetForOffice(officeId, user)
+      return SpreadsheetService.withSpreadsheet(ss, () => {
+        return SpreadsheetService.getAllRows(SpreadsheetService.getSheet('Personnel'))
+      })
+    } catch (e) {
+      Logger.log('[RaterMatrix] office personnel unavailable for ' + officeId + ': ' + (e && e.message || e))
+      return []
+    }
+  }
+
+  function isStbOffice_(officeId) {
+    const key = String(officeId || '').trim().toUpperCase()
+    return !key || key === 'STB' || key === 'SOCIAL TECHNOLOGY BUREAU'
+  }
+
+  function isStbUser_(user) {
+    const key = String(user.officeId || user.officeCode || user.office || 'STB').trim().toUpperCase()
+    return !key || key === 'STB' || key === 'SOCIAL TECHNOLOGY BUREAU'
   }
 
   function audit_(action, officeId, summary, user) {

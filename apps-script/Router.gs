@@ -76,6 +76,13 @@ const Router = (() => {
         if (id && sub === 'reset-password') return UsersService.resetPassword(id, body, user)
         break
 
+      // Read-only multi-office boundary report. Deliberately NOT in
+      // OfficeScopeService.SCOPED_RESOURCES — it must describe the central
+      // database, not be redirected into an office workbook.
+      case 'diagnostics':
+        if (id === 'office-boundary' && method === 'GET') return DiagnosticsService.officeBoundary(params, user)
+        break
+
       case 'system-settings':
         if (!id && method === 'GET') return SystemSettingsService.list(user)
         if (!id && method === 'PUT') return SystemSettingsService.update(body, user)

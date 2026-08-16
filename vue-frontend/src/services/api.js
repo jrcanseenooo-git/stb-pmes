@@ -383,6 +383,14 @@ export const raterMatrixApi = {
   seedDefaults: ()            => gasWrite('POST', 'rater-matrix/seed-defaults')
 }
 
+// ── Diagnostics (read-only multi-office boundary report) ───────────────
+// Reachable from the browser console while signed in via
+// `window.pmesDiagnostics()` — see main.js. Temporary verification aid.
+
+export const diagnosticsApi = {
+  officeBoundary: (p = {}) => gasGet('diagnostics/office-boundary', p)
+}
+
 // ── Accomplishments ────────────────────────────
 
 export const accomplishmentsApi = {

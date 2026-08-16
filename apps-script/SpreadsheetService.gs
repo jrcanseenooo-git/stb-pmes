@@ -91,6 +91,33 @@ const SpreadsheetService = (() => {
     return withSpreadsheet(SpreadsheetApp.openById(spreadsheetId), work)
   }
 
+  // Runs `work` against the CENTRAL PMES database, temporarily suspending any
+  // office-scope override currently in effect.
+  //
+  // Office scoping (OfficeScopeService) sets a process-wide override so that a
+  // whole request's sheet reads land in one office workbook. That is right for
+  // working data — Personnel, assessment records, ratings — but shared system
+  // configuration (OfficeRegistry, OfficeOrgOptions, RaterMatrix, Users) lives
+  // ONLY in the central workbook. A service that owns central config must not
+  // silently follow an ambient override into a per-office workbook, where the
+  // tab does not exist and gets created empty: reads then return nothing and
+  // writes land in a shadow copy nobody else can see.
+  //
+  // Nesting is safe — the previous override is restored on the way out, so a
+  // caller can hop central -> office -> central within one request.
+  function withCentralSpreadsheet(work) {
+    const previousSs = _overrideSs
+    const previousId = _overrideSsId
+    _overrideSs = null
+    _overrideSsId = ''
+    try {
+      return work()
+    } finally {
+      _overrideSs = previousSs
+      _overrideSsId = previousId
+    }
+  }
+
   // Same resolution as getSheet() but returns null instead of throwing. The
   // initializers use this so they never create a duplicate empty tab for a sheet
   // that already exists under its other name.
@@ -277,6 +304,6 @@ const SpreadsheetService = (() => {
     appendRow, updateRow,
     hardDeleteRow, softDelete,
     generateId, paginate, filterRows,
-    withSpreadsheet, withSpreadsheetId
+    withSpreadsheet, withSpreadsheetId, withCentralSpreadsheet
   }
 })()

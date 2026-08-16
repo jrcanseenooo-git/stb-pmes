@@ -1,11 +1,27 @@
 const OfficeScopeService = (() => {
+  // Resources whose WORKING DATA lives in the per-office workbook. Listing a
+  // resource here redirects its entire request — every sheet read and write —
+  // into that office's spreadsheet.
+  //
+  // Shared system configuration is deliberately NOT listed: OfficeRegistry,
+  // OfficeOrgOptions, RaterMatrix and Users live only in the central PMES
+  // database, keyed by officeId. 'rater-matrix' WAS listed here and that was
+  // the bug: an office admin's request was redirected into their own
+  // workbook, where the RaterMatrix tab does not exist, so saved rows were
+  // invisible and a seed wrote a shadow matrix nobody else could see, while a
+  // central admin (unscoped) read and wrote the real central table. The two
+  // never saw each other's data.
+  //
+  // Services that own central config now bind to it explicitly via
+  // SpreadsheetService.withCentralSpreadsheet, so they stay correct even when
+  // called from inside a scoped request (e.g. assignment generation, which is
+  // legitimately office-scoped but must read the central rater matrix).
   const SCOPED_RESOURCES = [
     'assessment-categories',
     'assessment-content',
     'assessment-rules',
     'ipat',
     'ipat-assignments',
-    'rater-matrix',
     'notifications',
     'audit',
     'portal'

@@ -16,7 +16,8 @@ The matrix below records the audit **as found**. Fixes applied since:
 |---|---|---|---|
 | **C-2 — Office Admin privilege escalation** | **Fixed** | this commit | Not until Apps Script is redeployed |
 | C-1 — `docgen` IDOR | **Fixed** | `f366748` | Live (Apps Script @300) |
-| **H-3 — Accomplishment attribution spoofing** | **Fixed** | this commit | Not until Apps Script is redeployed |
+| H-3 — Accomplishment attribution spoofing | **Fixed** | `ff91ded` | Live (Apps Script @302) |
+| **H-4 — IPCRF form created against another user** | **Fixed** | this commit | Not until Apps Script is redeployed |
 | H-1 — proxy retries writes | **Fixed** | `7977f34` | Not until Vercel redeploys |
 | H-2 — missing write locks | **Fixed** | this commit | Not until Apps Script is redeployed |
 | M-1 — formula injection | **Fixed** | this commit | Not until Apps Script is redeployed |
@@ -202,6 +203,38 @@ chief filing within their own division — pass in both versions.
 **Note:** accomplishment ratings do *not* feed IPCRF scoring. `computeScore` reads FormEntries,
 and the sync runs entry → accomplishment only. So this is an attribution and reporting-integrity
 issue, not score manipulation.
+
+**H-4. IPCRF/CCEF forms could be created against another user** *(found during Phase 8)*
+
+`IPCRFService.create` accepted `body.userId` with no check on whether the caller may file a
+form for that person, while every derived field was computed from the **caller's** profile.
+
+A form filed against someone else therefore carried:
+
+- the wrong **employment type** — an IPCRF where a Contract of Service employee needs a CCEF,
+  i.e. the wrong assessment instrument entirely
+- the wrong **position level**, which selects the KRA entry weights the final score is computed
+  from
+- the wrong **division and section**, which decide whose review queue the form appears in
+
+It also denied the real owner their own form, since the duplicate check would then find one and
+return 409.
+
+The function already carried the comment "Never trust frontend input for these - always compute
+server-side" above the weight derivation. That was true of the weights and false of the identity
+they were derived for.
+
+**Fixed by** deriving type, level, position, division and section from the person the form is
+FOR, and gating with the existing `_guardAccess`.
+
+Verified with 6 cases against both versions. Before: a staff member could file a form against
+anyone; the form carried the caller's position level and name; a COS employee in another
+division received an IPCRF in the caller's division; an unknown target was accepted. After: all
+refused. Creating your own form, and a division chief creating within their own division, pass
+in both versions.
+
+**Note:** `PositionHelper.resolveWeights` currently returns a constant 70/30, so the core/support
+weight impact was latent rather than active. `positionLevel` and form type were not.
 
 ### MEDIUM — 2
 

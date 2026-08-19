@@ -14,6 +14,7 @@ The matrix below records the audit **as found**. Fixes applied since:
 
 | Finding | Status | Commit | Live? |
 |---|---|---|---|
+| **C-2 — Office Admin privilege escalation** | **Fixed** | this commit | Not until Apps Script is redeployed |
 | C-1 — `docgen` IDOR | **Fixed** | `f366748` | Not until Apps Script is redeployed |
 | H-1 — proxy retries writes | **Fixed** | `7977f34` | Not until Vercel redeploys |
 | H-2 — missing write locks | **Fixed** | this commit | Not until Apps Script is redeployed |
@@ -115,6 +116,40 @@ personal-data disclosure. The central spreadsheet ID is not secret (it is hardco
 **Fix direction:** resolve the file ID from a form/record the caller is authorized to read
 (as the `ipcrf/:id/generate-*` routes already do) rather than accepting a raw Drive ID; and
 add a permission guard on the route.
+
+**C-2. Office Administrator could escalate to cluster-wide read** *(found during Phase 8, 2026-08-20)*
+
+`UsersService.update` guards the office-admin path with `stripOfficeAdminForbiddenFields_`,
+a **denylist of 19 fields that did not include `role`**. It blocked only the literal string
+`'System Administrator'`.
+
+An office admin editing their own row lands in that branch rather than the self-edit branch,
+because `sameOffice_` trivially matches their own record — the code's own comment at
+`UsersService.gs:330` documents this. And `RoleLabelService.canonicalRole` is a passthrough
+that returns unknown input verbatim: **no role allowlist exists anywhere in the backend**.
+
+Chain:
+
+1. `officeRole === 'OFFICE_ADMIN'` alone satisfies `hasOfficeUserAdministration_`
+2. `PUT users/{ownId}` with `{ "role": "Undersecretary" }`
+3. `ROLE_GROUPS['Undersecretary']` → `cluster-monitoring-admin` → `view_cluster_monitoring`
+4. `OfficeScopeService.canUseExplicitOffice_` accepts that permission as authority to pass an
+   explicit `officeId`, redirecting any scoped resource into **any office's workbook**
+
+**Impact:** an office-scoped administrator reaching every participating office's assessment
+data — the same isolation break as C-1, reached through authorization rather than file access.
+
+**Fixed by:** refusing `Undersecretary` alongside `System Administrator` on this path, and
+stripping `role`/`requestedRole` entirely on a self-edit (changing your own role has no
+legitimate use — a real promotion is done by someone holding `manage_users`, who never reaches
+this branch). Verified: the escalation returns 403, while an office admin can still set an
+ordinary role on another user and the original 19-field denylist still applies.
+
+**Left open deliberately:** an office admin can still assign `Bureau Director` /
+`Assistant Bureau Director` to *another* user in their office, which grants
+`view_bureau_monitoring`. Those labels appear in the office personnel role lists, so blocking
+them could break legitimate use. **This is a policy question for the system owner:** should an
+office administrator be able to grant bureau-level monitoring at all?
 
 ### HIGH — 2
 

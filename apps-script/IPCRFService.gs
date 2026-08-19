@@ -191,31 +191,52 @@ const IpcrfService = (() => {
     const profile = AuthService.getProfile(user)
     const now     = new Date().toISOString()
 
+    const sheet = SpreadsheetService.getSheet(SHEET.IPCRF_FORMS)
+
+    // Whose form this is. body.userId was accepted with no check on whether the
+    // caller may create a form for that person, while every derived field below
+    // was computed from the CALLER's profile - so a form could be filed against
+    // someone else carrying the wrong employment type (IPCRF where a COS
+    // employee needs a CCEF), the wrong position level (which selects the KRA
+    // entry weights the score is computed from), and the wrong division and
+    // section (which decide whose review queue it lands in). It also blocked
+    // the real owner from creating their own form, because the duplicate check
+    // below would then find one.
+    //
+    // Everything is now derived from the person the form is FOR, and
+    // _guardAccess decides whether the caller may file it - the same rule used
+    // by update, submit and the rest of this service.
+    const targetUserId = String(body.userId || profile.id)
+    const owner = targetUserId === profile.id
+      ? profile
+      : SpreadsheetService.getAllRows(SpreadsheetService.getSheet(SHEET.USERS))
+        .find(u => String(u.id) === targetUserId)
+    if (!owner) throw HttpError('The person this form is for could not be found.', 404)
+
     // Prevent duplicate form per user per year/type
-    const sheet    = SpreadsheetService.getSheet(SHEET.IPCRF_FORMS)
-    const _type = _formTypeForProfile(profile)
+    const _type = _formTypeForProfile(owner)
     const existing = SpreadsheetService.getAllRows(sheet).find(r =>
-      r.userId   === (body.userId || profile.id) &&
+      r.userId   === targetUserId &&
       String(r.year) === String(body.year) &&
       r.type === _type
     )
     if (existing) throw HttpError(`An ${_type} form already exists for ${body.year}`, 409)
 
-    // ── Derive position level and weights from user's position title ──
+    // ── Derive position level and weights from the owner's position title ──
     // Never trust frontend input for these - always compute server-side.
-    const _level   = PositionHelper.resolveLevel(profile.position || '')
-    const _weights = PositionHelper.resolveWeights(profile)
+    const _level   = PositionHelper.resolveLevel(owner.position || '')
+    const _weights = PositionHelper.resolveWeights(owner)
 
     const form = {
       id:                    SpreadsheetService.generateId('FORM-'),
       type:                  _type,
-      userId:                body.userId           || profile.id,
-      employeeName:          body.employeeName     || _profileEmployeeName(profile),
-      position:              profile.position      || '',
+      userId:                targetUserId,
+      employeeName:          _profileEmployeeName(owner),
+      position:              owner.position        || '',
       positionLevel:         _level,
-      divisionId:            profile.divisionId    || '',
-      divisionName:          profile.divisionName  || '',
-      sectionName:           profile.section       || '',
+      divisionId:            owner.divisionId      || '',
+      divisionName:          owner.divisionName    || '',
+      sectionName:           owner.section         || '',
       year:                  body.year             || new Date().getFullYear(),
       status:                'Draft',
       coreFunctionWeight:    _weights.core,
@@ -240,6 +261,10 @@ const IpcrfService = (() => {
       createdAt:    now,
       updatedAt:    now
     }
+
+    // Checked against the resolved row, so the division being tested is the
+    // owner's real one rather than anything the caller supplied.
+    _guardAccess(form, profile)
 
     SpreadsheetService.appendRow(sheet, form)
     AuditService.log('CREATE', 'IPCRF', `Created IPCRF form ${form.id}`, user)

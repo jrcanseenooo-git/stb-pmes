@@ -713,8 +713,13 @@ const IPATRaterAssignmentService = (() => {
     if (!Array.isArray(cbcRatings)) cbcRatings = []
     if (!Array.isArray(jfRatings))  jfRatings  = []
 
-    if (cbcRatings.length) IPATService.saveCBCRatings(row.ipatRecordId, { ratings: cbcRatings }, user)
-    if (jfRatings.length)  IPATService.saveJFRatings(row.ipatRecordId, { ratings: jfRatings }, user)
+    // The unlocked variants: this runs inside withRatingWriteLock already, and
+    // the locking entry points would try to take the same script lock a second
+    // time in one execution. Keeping the whole submission - both rating sets
+    // and the assignment row below - under the single outer lock is also what
+    // stops a submission from half-applying.
+    if (cbcRatings.length) IPATService.saveCBCRatingsUnlocked(row.ipatRecordId, { ratings: cbcRatings }, user)
+    if (jfRatings.length)  IPATService.saveJFRatingsUnlocked(row.ipatRecordId, { ratings: jfRatings }, user)
 
     const completed = completeAssignmentFromRows(assignSheet, assignmentId, row, rows, user)
     return {

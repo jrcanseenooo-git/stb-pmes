@@ -8,6 +8,32 @@ items marked *Not verified* were not reachable by code reading alone.
 
 ---
 
+## Remediation status
+
+The matrix below records the audit **as found**. Fixes applied since:
+
+| Finding | Status | Commit | Live? |
+|---|---|---|---|
+| C-1 — `docgen` IDOR | **Fixed** | `f366748` | Not until Apps Script is redeployed |
+| H-1 — proxy retries writes | **Fixed** | `7977f34` | Not until Vercel redeploys |
+| H-2 — missing write locks | **Fixed** | this commit | Not until Apps Script is redeployed |
+| M-1 — formula injection | Open | — | — |
+| M-2 — security headers | Open | — | — |
+
+Two additional defects were found while fixing the above, and are fixed in the same commits:
+
+- **Write failover between deployments** (with H-1): a write that was deliberately *not*
+  retried was still re-sent to the next url in `GAS_WEB_APP_URL`. With two urls configured a
+  single write reached Apps Script four times.
+- **`UsersService.create` had no duplicate-email check at all** (with H-2): only
+  `selfRegister` checked. The administrator path appended the Users row before calling
+  Firebase, whose `EMAIL_EXISTS` branch reports success — so creating the same person twice
+  left two Users rows for one email, which `getProfile` resolves against.
+
+**The deployment recommendation in section F is superseded** — see the end of this document.
+
+---
+
 ## 0. Coverage statement
 
 This pass covered the highest-risk areas: secrets/config, authentication, authorization,
@@ -203,3 +229,22 @@ rather than confidentiality.
 
 This verdict is **interim** — it reflects Phase 1 only. It is not a substitute for a formal VA
 or PIA, and Phases 10–14 and 18 have not been performed.
+
+---
+
+## G. Revised recommendation (after C-1, H-1, H-2)
+
+**CONDITIONAL GO**, conditional on all of the following:
+
+1. Apps Script redeployed and Vercel redeployed — **none of the fixes are live until then.**
+2. Manual confirmation on the deployed build of:
+   - Print still works for a form's owner, and `docgen/{centralSpreadsheetId}/print` returns 404
+   - Rater submission still saves both CBC and JF ratings (this path now runs the rating
+     upsert through a nested-lock-safe route — it is the most-used write in the system)
+   - Creating a user with an existing email now returns 409 rather than a second row
+3. The live Users sheet is checked for duplicate-email rows created before the fix, since
+   `getProfile` resolves a signed-in account by email.
+4. M-1 and M-2 accepted as known, tracked residual risk, or fixed first.
+
+Still outside this verdict: Phases 11, 13, 14 and 18 (assets, responsive, accessibility, QA
+regression), formal VA, and formal PIA. None of those are satisfied by code review.

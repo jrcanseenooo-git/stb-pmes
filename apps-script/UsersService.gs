@@ -19,7 +19,17 @@ const UsersService = (() => {
   // Role is forced to Technical Staff and the account is created inactive + pending, so
   // a self-registering user can never grant themselves elevated access - an
   // admin reviews and sets the real role on approval.
+  // Serialised: the "does an account already exist?" check below and the
+  // append that follows must not interleave with another registration for the
+  // same person, or a first login submitted twice creates two accounts.
   function selfRegister(body, user) {
+    return withWriteLock(
+      () => selfRegister_(body, user),
+      'Registration is busy right now. Please try again in a moment.'
+    )
+  }
+
+  function selfRegister_(body, user) {
     const sheet = _usersSheet()
     const email = String(user.email || '').trim().toLowerCase()
     if (!email) throw HttpError('No authenticated email found for registration.', 400)
@@ -160,9 +170,35 @@ const UsersService = (() => {
 
   // ── CREATE user - also creates Firebase Auth account ──
   function create(body, user) {
+    return withWriteLock(
+      () => create_(body, user),
+      'User administration is busy right now. Please try again in a moment.'
+    )
+  }
+
+  function create_(body, user) {
     AuthService.requirePermission(user, 'manage_users')
 
     const sheet = _usersSheet()
+
+    // A duplicate check was missing here entirely. selfRegister has always
+    // refused an email that already holds an account, but the administrator
+    // path did not: it appended the Users row first and only then called
+    // Firebase, which is the only thing that would have objected - and its
+    // EMAIL_EXISTS branch reports success. So creating the same person twice,
+    // whether by a double-clicked Save or two administrators working the same
+    // list, left two Users rows for one email. That is ambiguous everywhere
+    // downstream, because getProfile resolves a signed-in account by matching
+    // on exactly this field.
+    const email = String(body.email || '').trim().toLowerCase()
+    if (email) {
+      const clash = SpreadsheetService.getAllRows(sheet).find(r => {
+        if (r.deleted === true || String(r.deleted).toLowerCase() === 'true') return false
+        return String(r.email || '').trim().toLowerCase() === email
+      })
+      if (clash) throw HttpError('An account for this email already exists.', 409)
+    }
+
     const now   = new Date().toISOString()
     const id    = SpreadsheetService.generateId('USR-')
 

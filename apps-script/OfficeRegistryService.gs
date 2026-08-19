@@ -335,7 +335,18 @@ const OfficeRegistryService = (() => {
     }
   }
 
+  // Serialised: the office-code uniqueness check and the registry append that
+  // follows must not interleave with another provisioning run. Two offices
+  // sharing one code would each get a workbook, and office scoping resolves a
+  // request to a workbook by that code.
   function provision(body, user) {
+    return withWriteLock(
+      () => provision_(body, user),
+      'Office provisioning is busy right now. Please try again in a moment.'
+    )
+  }
+
+  function provision_(body, user) {
     const profile = requireCentralAdmin_(user)
     const now = new Date().toISOString()
     const input = normalizeInput_(body)

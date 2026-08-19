@@ -181,3 +181,48 @@ function HttpError(message, code) {
   e.statusCode = code || 400
   return e
 }
+
+// ── Serialise duplicate-sensitive writes ──
+//
+// Several mutations have a check-then-write shape: read the sheet, confirm
+// nothing already matches, then append. Apps Script serves concurrent requests
+// as separate executions, so two of them - a double-clicked Save, or a client
+// that resent - can both pass the check before either appends, and both then
+// write. The result is two accounts for one email, two offices for one code,
+// or two rating rows for one indicator, and nobody sees an error.
+//
+// Modelled on withRatingWriteLock in IPATRaterAssignmentService, which has
+// carried this pattern in production: bounded waits so a caller never hangs
+// indefinitely, jittered retries so simultaneous waiters do not collide in
+// lockstep, and a 429 - never a partial write - once the budget is spent.
+//
+// Wrap only the check and its write. This is one global script lock, so
+// whatever runs inside it blocks every other writer for the duration.
+function withWriteLock(work, busyMessage) {
+  const LOCK_ATTEMPTS  = 3
+  const LOCK_WAIT_MS   = 15000   // per attempt; ~45s total worst case
+  const LOCK_JITTER_MS = 400
+
+  const lock = LockService.getScriptLock()
+  let acquired = false
+
+  for (let attempt = 0; attempt < LOCK_ATTEMPTS && !acquired; attempt++) {
+    acquired = lock.tryLock(LOCK_WAIT_MS)
+    if (!acquired && attempt < LOCK_ATTEMPTS - 1) {
+      Utilities.sleep(Math.floor(Math.random() * LOCK_JITTER_MS))
+    }
+  }
+
+  if (!acquired) {
+    throw HttpError(
+      busyMessage || 'The system is busy saving other changes. Please try again in a moment.',
+      429
+    )
+  }
+
+  try {
+    return work()
+  } finally {
+    lock.releaseLock()
+  }
+}

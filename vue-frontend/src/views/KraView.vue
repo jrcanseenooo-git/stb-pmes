@@ -410,11 +410,11 @@
           <div class="modal-body" v-if="viewItem">
             <div class="view-section">
               <div class="view-label">Performance Indicator</div>
-              <div class="view-text">{{ viewItem.performanceIndicator || '—' }}</div>
+              <div class="view-text">{{ viewItem.performanceIndicator || '-' }}</div>
             </div>
             <div class="view-section">
               <div class="view-label">Means of Verification</div>
-              <div class="view-text">{{ viewItem.meansOfVerification || '—' }}</div>
+              <div class="view-text">{{ viewItem.meansOfVerification || '-' }}</div>
             </div>
             <div class="view-2col">
               <div class="view-section">
@@ -949,10 +949,10 @@ const paginatedKRAs = computed(() => {
 })
 
 const pageRangeLabel = computed(() => {
-  if (!filteredKRAs.value.length) return '0–0 of 0'
+  if (!filteredKRAs.value.length) return '0-0 of 0'
   const start = (currentPage.value - 1) * pageSize.value + 1
   const end   = Math.min(currentPage.value * pageSize.value, filteredKRAs.value.length)
-  return `${start}–${end} of ${filteredKRAs.value.length}`
+  return `${start}-${end} of ${filteredKRAs.value.length}`
 })
 
 const pageNumbers = computed(() => {
@@ -1518,12 +1518,18 @@ async function moveQuestion(id, direction) {
   const current = rows[currentIndex]
   const next = rows[nextIndex]
   const currentSequence = current.sequence
-  applyLocalQuestion({ sequence: next.sequence }, current.id)
+  const nextSequence = next.sequence
+  applyLocalQuestion({ sequence: nextSequence }, current.id)
   applyLocalQuestion({ sequence: currentSequence }, next.id)
   try {
     await assessmentContentApi.reorder(categoryQuestions.value.map((q, index) => ({ id: q.id, sequence: index + 1 })))
   } catch (e) {
     console.error(e)
+    // Undo the optimistic swap so the on-screen order matches what the
+    // backend actually has, instead of silently drifting out of sync.
+    applyLocalQuestion({ sequence: currentSequence }, current.id)
+    applyLocalQuestion({ sequence: nextSequence }, next.id)
+    showToast('Could not save the new order. Please try again.', 'error')
   }
 }
 </script>

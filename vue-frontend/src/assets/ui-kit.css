@@ -1,0 +1,698 @@
+/**
+ * ui-kit.css - shared component styles for the multi-office portal modules.
+ *
+ * This app's Tailwind build (main.css: @tailwind base/components/utilities)
+ * has never been imported since the initial commit - a deliberate prior
+ * decision, because Tailwind's preflight reset and global `*` rules would
+ * visually alter every existing hand-styled STB screen. That stylesheet stays
+ * dead. This file is hand-written, plain CSS with no reset and no `*`
+ * selector, scoped entirely to classes prefixed `pui-` (Portal UI) so it
+ * cannot collide with or affect any existing view's markup or scoped styles.
+ *
+ * Values (colors, radii, spacing) are matched to this app's actual established
+ * visual language - DashboardView.vue's stat cards, AppLayout's sidebar, and
+ * the original OfficeRegistryView/OfficePersonnelView - not to Tailwind's
+ * defaults.
+ */
+
+/* Scoped to `pui-` classes only (attribute selector, not `*`) - every element
+   with padding + width:100% in this file needs border-box or its rendered
+   width exceeds its container under the browser's content-box default,
+   producing exactly the horizontal-scrollbar symptom this was written to fix. */
+[class^="pui-"],
+[class*=" pui-"] {
+  box-sizing: border-box;
+}
+
+.pui-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+
+.pui-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid #eef2f7;
+  flex-wrap: wrap;
+}
+
+.pui-card-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0;
+}
+
+.pui-card-subtitle {
+  font-size: 12px;
+  color: #64748b;
+  margin: 2px 0 0;
+}
+
+/* No padding here - AppLayout's .page-body already pads routed content. */
+.pui-page {
+  display: grid;
+  gap: 16px;
+  color: #1a2332;
+  font-size: 13px;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+/* ── Page header ─────────────────────────────────────────────────────── */
+
+.pui-header {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 18px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.pui-header-kicker {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: #2563eb;
+  margin: 0 0 4px;
+}
+
+.pui-header-title {
+  font-size: 21px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0;
+  line-height: 1.25;
+}
+
+.pui-header-subtitle {
+  font-size: 12px;
+  color: #64748b;
+  margin: 5px 0 0;
+  max-width: 60ch;
+}
+
+.pui-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────────── */
+
+.pui-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 13px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .12s, border-color .12s;
+  white-space: nowrap;
+}
+
+.pui-btn:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+.pui-btn:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+.pui-btn-primary {
+  border-color: #0b3b75;
+  background: #0b3b75;
+  color: #fff;
+}
+
+.pui-btn-primary:hover:not(:disabled) {
+  background: #0a2f5e;
+  border-color: #0a2f5e;
+}
+
+.pui-btn-danger {
+  border-color: #fecaca;
+  background: #fff7f7;
+  color: #b91c1c;
+}
+
+.pui-btn-danger:hover:not(:disabled) {
+  background: #fee2e2;
+}
+
+.pui-btn-sm {
+  height: 28px;
+  padding: 0 9px;
+  font-size: 11px;
+  border-radius: 7px;
+}
+
+.pui-btn-block {
+  width: 100%;
+}
+
+/* ── Badges / status pills ──────────────────────────────────────────── */
+
+.pui-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 800;
+  white-space: nowrap;
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.pui-badge-good  { background: #ecfdf5; color: #047857; }
+.pui-badge-warn  { background: #fffbeb; color: #b45309; }
+.pui-badge-bad   { background: #fef2f2; color: #b91c1c; }
+.pui-badge-brand { background: #eff6ff; color: #1d4ed8; }
+.pui-badge-neutral { background: #f1f5f9; color: #475569; }
+
+/* Per-file-format tones, distinct from the status tones above so a PDF badge
+   doesn't read as an error and an Excel badge doesn't read as "on track". */
+.pui-badge-pdf   { background: #fdf2f8; color: #be185d; }
+.pui-badge-excel { background: #ecfdf5; color: #047857; }
+.pui-badge-csv   { background: #eff6ff; color: #1d4ed8; }
+
+/* ── Forms ───────────────────────────────────────────────────────────── */
+
+.pui-label {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #475569;
+}
+
+.pui-input,
+.pui-select,
+.pui-textarea {
+  width: 100%;
+  border: 1px solid #dbe4f0;
+  border-radius: 8px;
+  padding: 0 11px;
+  height: 36px;
+  font: inherit;
+  font-size: 13px;
+  color: #0f172a;
+  background: #fff;
+  outline: none;
+  transition: border-color .12s, box-shadow .12s;
+}
+
+.pui-textarea {
+  height: auto;
+  padding: 9px 11px;
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.pui-input:focus,
+.pui-select:focus,
+.pui-textarea:focus {
+  border-color: #1d4ed8;
+  box-shadow: 0 0 0 3px rgba(29, 78, 216, .12);
+}
+
+.pui-input:disabled {
+  background: #f8fafc;
+  color: #94a3b8;
+}
+
+.pui-hint {
+  margin-top: 5px;
+  font-size: 11px;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+/* ── Table ───────────────────────────────────────────────────────────── */
+
+.pui-table-wrap {
+  overflow: auto;
+}
+
+.pui-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.pui-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  height: 34px;
+  text-align: left;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 10.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  border-bottom: 1px solid #e5edf7;
+  padding: 0 12px;
+  white-space: nowrap;
+}
+
+.pui-table td {
+  border-bottom: 1px solid #eef2f7;
+  padding: 10px 12px;
+  vertical-align: middle;
+  color: #334155;
+}
+
+.pui-table tbody tr:hover td {
+  background: rgba(239, 246, 255, .55);
+}
+
+.pui-table td strong {
+  display: block;
+  font-size: 13px;
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.pui-table td small,
+.pui-table td .pui-td-note {
+  display: block;
+  color: #94a3b8;
+  font-size: 10.5px;
+  margin-top: 2px;
+  line-height: 1.3;
+}
+
+/* ── Empty / error / loading states ─────────────────────────────────── */
+
+.pui-empty {
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.pui-empty-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #334155;
+  margin: 0;
+}
+
+.pui-empty-desc {
+  margin: 6px auto 0;
+  max-width: 42ch;
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.pui-alert {
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.pui-alert-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+}
+
+.pui-alert-error strong,
+.pui-alert-title {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #991b1b;
+  margin-bottom: 2px;
+}
+
+.pui-alert-info {
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  color: #1e3a8a;
+}
+
+.pui-alert-warn {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+}
+
+.pui-skeleton {
+  padding: 14px;
+  display: grid;
+  gap: 9px;
+}
+
+.pui-skeleton-row {
+  height: 34px;
+  border-radius: 8px;
+  background: #f1f5f9;
+  animation: pui-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pui-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .55; }
+}
+
+/* ── Modal ───────────────────────────────────────────────────────────── */
+
+.pui-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, .45);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  z-index: 200;
+}
+
+.pui-modal {
+  width: 100%;
+  max-width: 620px;
+  max-height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #dbe4f0;
+  box-shadow: 0 24px 80px rgba(15, 23, 42, .22);
+  padding: 20px;
+  display: grid;
+  gap: 16px;
+}
+
+.pui-modal-wide {
+  max-width: 880px;
+}
+
+.pui-modal-hd {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pui-modal-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0;
+}
+
+.pui-modal-desc {
+  font-size: 12px;
+  color: #64748b;
+  margin: 4px 0 0;
+}
+
+.pui-modal-close {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  background: #f1f5f9;
+  border-radius: 8px;
+  font-weight: 800;
+  color: #475569;
+  cursor: pointer;
+}
+
+.pui-modal-close:hover {
+  background: #e2e8f0;
+}
+
+.pui-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ── Grid helpers ────────────────────────────────────────────────────── */
+
+.pui-grid { display: grid; gap: 12px; }
+.pui-grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.pui-grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.pui-grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.pui-span-2 { grid-column: span 2; }
+.pui-row { display: flex; align-items: center; gap: 8px; }
+.pui-row-between { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.pui-row-wrap { flex-wrap: wrap; }
+
+/* Fixed-sidebar run panel (e.g. Report Center: filters left, results right). */
+.pui-run-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .pui-run-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .pui-grid-2,
+  .pui-grid-3,
+  .pui-grid-4 {
+    grid-template-columns: 1fr;
+  }
+  .pui-span-2 {
+    grid-column: auto;
+  }
+}
+
+/* ── Stat tile ───────────────────────────────────────────────────────── */
+
+.pui-stat {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.pui-stat-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pui-stat-label {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: #64748b;
+}
+
+.pui-stat-hint {
+  font-size: 10px;
+  font-weight: 700;
+  color: #94a3b8;
+}
+
+.pui-stat-value-row {
+  margin-top: 6px;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.pui-stat-value {
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1;
+  color: #0f172a;
+}
+
+.pui-stat-value-good { color: #047857; }
+.pui-stat-value-warn { color: #b45309; }
+.pui-stat-value-bad  { color: #b91c1c; }
+.pui-stat-value-loading { color: #cbd5e1; }
+
+.pui-stat-total {
+  font-size: 12px;
+  font-weight: 700;
+  color: #94a3b8;
+}
+
+.pui-stat-caption {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+/* ── Progress bar ────────────────────────────────────────────────────── */
+
+.pui-progress-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.pui-progress-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #475569;
+}
+
+.pui-progress-value {
+  font-size: 12px;
+  font-weight: 800;
+  color: #0f172a;
+  flex-shrink: 0;
+}
+
+.pui-progress-track {
+  height: 8px;
+  width: 100%;
+  border-radius: 999px;
+  background: #f1f5f9;
+  overflow: hidden;
+}
+
+.pui-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width .5s ease;
+  background: #1d4ed8;
+}
+
+.pui-progress-fill-good { background: #10b981; }
+.pui-progress-fill-warn { background: #f59e0b; }
+.pui-progress-fill-bad  { background: #ef4444; }
+
+/* ── Bar list ────────────────────────────────────────────────────────── */
+
+.pui-barlist-row {
+  margin-bottom: 14px;
+}
+
+.pui-barlist-row:last-child {
+  margin-bottom: 0;
+}
+
+.pui-barlist-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.pui-barlist-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #334155;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pui-barlist-value {
+  font-size: 12px;
+  font-weight: 800;
+  color: #0f172a;
+  flex-shrink: 0;
+}
+
+.pui-barlist-value .pui-muted {
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+/* ── Icon chip (category / catalog card accents) ────────────────────── */
+
+.pui-icon-chip {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.pui-icon-chip-sm {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+}
+
+/* ── Misc ────────────────────────────────────────────────────────────── */
+
+.pui-muted { color: #64748b; }
+.pui-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: #f1f5f9;
+  border-radius: 10px;
+  padding: 3px;
+}
+
+.pui-tab {
+  border: 0;
+  background: transparent;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 11.5px;
+  font-weight: 800;
+  color: #64748b;
+  cursor: pointer;
+  transition: background .12s, color .12s;
+  white-space: nowrap;
+}
+
+.pui-tab:hover {
+  color: #334155;
+}
+
+.pui-tab-active {
+  background: #fff;
+  color: #1d4ed8;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .08);
+}
+
+.pui-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

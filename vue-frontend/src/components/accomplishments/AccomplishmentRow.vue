@@ -92,7 +92,7 @@ function hashStr(s) {
 }
 
 const formattedDeadline = computed(() =>
-  props.item.deadline ? dayjs(props.item.deadline).format('MMM D') : '—'
+  props.item.deadline ? dayjs(props.item.deadline).format('MMM D') : '-'
 )
 
 const isOverdue = computed(() =>

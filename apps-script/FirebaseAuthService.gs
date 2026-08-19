@@ -1,7 +1,7 @@
 /**
  * FirebaseAuthService.gs
  * Manages Firebase Auth users from Apps Script using a Service Account JWT.
- * No GCP project linking required — works with any Firebase project.
+ * No GCP project linking required - works with any Firebase project.
  *
  * Setup required:
  *   1. Firebase Console → Project Settings → Service Accounts
@@ -19,7 +19,7 @@ const FirebaseAuthService = (() => {
   const PROJECT_ID   = PROPS.getProperty('FIREBASE_PROJECT_ID')   || 'pmes-1cb6d'
   const CLIENT_EMAIL = PROPS.getProperty('FIREBASE_CLIENT_EMAIL') || ''
   const PRIVATE_KEY  = (PROPS.getProperty('FIREBASE_PRIVATE_KEY') || '').replace(/\\n/g, '\n')
-  // Public Firebase Web API key (NOT a secret — it is already shipped in the
+  // Public Firebase Web API key (NOT a secret - it is already shipped in the
   // frontend bundle). Prefer a Script Property; fall back to the known value so
   // token verification cannot silently fail-open if the property is unset.
   const WEB_API_KEY  = PROPS.getProperty('FIREBASE_WEB_API_KEY') || 'AIzaSyDf-fc_WBHb45Env4XJ5Gsw6lRfHORptnQ'
@@ -63,10 +63,23 @@ const FirebaseAuthService = (() => {
   }
 
   // ── Build a signed JWT and exchange it for an access token ──
+  // Service-account access tokens are valid for an hour, but this signed a fresh
+  // RSA-SHA256 JWT and did a full OAuth exchange on EVERY call - two extra
+  // network round trips plus a signing operation before the real request could
+  // start. That is the bulk of the wait when approving a user. Cache it in
+  // CacheService (shared across executions) and re-use it until it nearly
+  // expires. A cache failure just falls through to minting a new one.
+  const ADMIN_TOKEN_CACHE_KEY = 'fb_admin_token'
+
   function getAdminToken() {
     if (!CLIENT_EMAIL || !PRIVATE_KEY) {
       throw new Error('Missing FIREBASE_CLIENT_EMAIL or FIREBASE_PRIVATE_KEY in Script Properties')
     }
+
+    try {
+      const cached = CacheService.getScriptCache().get(ADMIN_TOKEN_CACHE_KEY)
+      if (cached) return cached
+    } catch (e) { /* cache unavailable - mint a fresh token below */ }
 
     const now     = Math.floor(Date.now() / 1000)
     const header  = Utilities.base64EncodeWebSafe(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))
@@ -96,6 +109,14 @@ const FirebaseAuthService = (() => {
     if (!tokenResult.access_token) {
       throw new Error('Failed to get access token: ' + JSON.stringify(tokenResult))
     }
+
+    // Cache for slightly less than the token's own lifetime so it is never
+    // served past expiry. Google returns expires_in (typically 3600s); hold it
+    // for that minus a 5-minute safety margin, capped at CacheService's 6h max.
+    try {
+      const ttl = Math.max(60, Math.min(21600, (Number(tokenResult.expires_in) || 3600) - 300))
+      CacheService.getScriptCache().put(ADMIN_TOKEN_CACHE_KEY, tokenResult.access_token, ttl)
+    } catch (e) { /* non-fatal: the token still works, it just won't be re-used */ }
 
     return tokenResult.access_token
   }
@@ -127,8 +148,25 @@ const FirebaseAuthService = (() => {
         Logger.log('✅ Firebase user created: ' + email + ' UID: ' + result.localId)
         return { success: true, uid: result.localId, email: result.email }
       } else if (result.error?.message === 'EMAIL_EXISTS') {
+        // A Firebase Auth account for this email already existed - common for
+        // dswd.gov.ph addresses that ever touched Google Sign-In, or a retried
+        // creation. This branch used to just report success without touching
+        // the account, so the temp password shown in the creation modal was
+        // never actually set on the real credential: the account kept
+        // whatever password it already had (often none), first login failed,
+        // and the admin had to use Reset Password - which calls
+        // updatePassword() on the existing uid - to make the account usable.
+        // Setting the password here means the temp password from creation
+        // works the first time, matching what the admin was told happened.
         Logger.log('ℹ️ Firebase user already exists: ' + email)
         const existing = getUserByEmail(email)
+        if (existing?.localId) {
+          try {
+            updatePassword(existing.localId, password)
+          } catch (pwErr) {
+            Logger.log('⚠️ Could not set password on existing Firebase user ' + email + ': ' + pwErr.message)
+          }
+        }
         return { success: true, uid: existing?.localId || '', email, alreadyExisted: true }
       } else {
         Logger.log('❌ Firebase create user error: ' + JSON.stringify(result.error))
@@ -218,6 +256,35 @@ const FirebaseAuthService = (() => {
     }
   }
 
+  // ── DELETE a Firebase user (irreversible - unlike disableUser) ──
+  // Used only by UsersService.remove(), which hard-deletes the PMES account
+  // row. Deleting rather than disabling frees the email address so a
+  // corrected re-creation isn't blocked by a stale, disabled account still
+  // holding it.
+  function deleteUser(uid) {
+    const token = getAdminToken()
+
+    try {
+      const response = UrlFetchApp.fetch(`${ADMIN_BASE}/accounts:delete`, {
+        method:             'POST',
+        contentType:        'application/json',
+        headers:            { Authorization: 'Bearer ' + token },
+        payload:            JSON.stringify({ localId: uid }),
+        muteHttpExceptions: true
+      })
+
+      if (response.getResponseCode() === 200) {
+        Logger.log('✅ Firebase user deleted: ' + uid)
+        return { success: true }
+      }
+      const result = JSON.parse(response.getContentText())
+      throw new Error(result.error?.message || 'Failed to delete user')
+    } catch (e) {
+      Logger.log('FirebaseAuthService.deleteUser error: ' + e.message)
+      throw e
+    }
+  }
+
   // ── GET user by email ──
   function getUserByEmail(email) {
     const token = getAdminToken()
@@ -268,6 +335,7 @@ const FirebaseAuthService = (() => {
   function testSetup() {
     Logger.log('Testing Firebase Service Account access...')
     Logger.log('Project ID:    ' + PROJECT_ID)
+    const testEmail = PROPS.getProperty('FIREBASE_TEST_EMAIL')
     Logger.log('Client Email:  ' + (CLIENT_EMAIL || '❌ NOT SET'))
     Logger.log('Private Key:   ' + (PRIVATE_KEY ? '✅ set (' + PRIVATE_KEY.length + ' chars)' : '❌ NOT SET'))
 
@@ -275,12 +343,17 @@ const FirebaseAuthService = (() => {
       const token = getAdminToken()
       Logger.log('✅ Access token obtained (length: ' + token.length + ')')
 
-      const admin = getUserByEmail('jrbcancino@dswd.gov.ph')
+      if (!testEmail) {
+        Logger.log('Set FIREBASE_TEST_EMAIL to test account lookup.')
+        return
+      }
+
+      const admin = getUserByEmail(testEmail)
       if (admin) {
         Logger.log('✅ Firebase Admin API working! Found user: ' + admin.email)
         Logger.log('   UID: ' + admin.localId)
       } else {
-        Logger.log('⚠️ API works but user not found — check the email address')
+        Logger.log('⚠️ API works but user not found - check the email address')
       }
     } catch (e) {
       Logger.log('❌ Error: ' + e.message)
@@ -293,6 +366,7 @@ const FirebaseAuthService = (() => {
     updatePassword,
     disableUser,
     enableUser,
+    deleteUser,
     getUserByEmail,
     updateDisplayName,
     testSetup

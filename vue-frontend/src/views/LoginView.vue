@@ -15,18 +15,21 @@
       <div class="orbit-ring ring-b"></div>
       <div class="route-node node-a"></div>
       <div class="route-node node-b"></div>
-      <div class="status-chip chip-a">Ehh kasi namaaan...</div>
-      <div class="status-chip chip-b">Anooo 'to ?</div>
+      <div class="status-chip chip-a">Behavior shapes performance</div>
+      <div class="status-chip chip-b">Competence in action</div>
     </div>
 
     <!-- Center stage -->
     <main class="stage">
 
       <div class="hero-block">
-        <div class="system-kicker">SOCIAL TECHNOLOGY BUREAU</div>
+        <div class="system-kicker">DSWD INNOVATION CLUSTER</div>
+        <!-- Pre-authentication the office is unknown, so the sign-in pages carry
+             the neutral cluster-wide name. The office-specific portal title and
+             subtitle resolve from the profile once the user is signed in. -->
         <h1 class="login-title">
-          <span>Performance Monitoring</span>
-          <span>Evaluation System</span>
+          <span>Performance Management</span>
+          <span>and Evaluation System</span>
         </h1>
         <p class="login-title-sub">Accountability, Accomplishments, and Performance Evaluation</p>
       </div>
@@ -51,15 +54,15 @@
         </transition>
 
         <!-- Google SSO -->
-        <button class="btn-google" @click="handleGoogleLogin" :disabled="loading" type="button">
-          <span v-if="loading && loginMethod === 'google'" class="spin spin-dark"></span>
+        <button class="btn-google" @click="handleGoogleLogin" :disabled="loading || googleRedirectPending" type="button">
+          <span v-if="googleSigningIn" class="spin spin-dark"></span>
           <svg v-else width="18" height="18" viewBox="0 0 18 18" fill="none">
             <path d="M17.1 9.2c0-.65-.06-1.28-.16-1.88H9v3.56h4.58a3.93 3.93 0 01-1.7 2.57v2.14h2.75c1.6-1.48 2.53-3.65 2.53-6.38z" fill="#4285F4"/>
             <path d="M9 18c2.3 0 4.23-.76 5.63-2.06l-2.75-2.14c-.76.51-1.73.82-2.88.82-2.22 0-4.1-1.5-4.77-3.51H1.4v2.2A8.5 8.5 0 009 18z" fill="#34A853"/>
             <path d="M4.23 11.11A5.1 5.1 0 014 9.5c0-.56.1-1.1.23-1.61V5.69H1.4A8.5 8.5 0 000 9.5c0 1.37.33 2.66.91 3.81l2.2-1.72 1.12-.48z" fill="#FBBC05"/>
             <path d="M9 3.58c1.26 0 2.38.43 3.27 1.28l2.45-2.45A8.5 8.5 0 001.4 5.69l2.83 2.2C4.9 5.9 6.78 3.58 9 3.58z" fill="#EA4335"/>
           </svg>
-          {{ loading && loginMethod === 'google' ? 'Connecting…' : 'Continue with Google' }}
+          {{ googleSigningIn ? 'Signing in...' : 'Continue with Google' }}
         </button>
 
         <!-- Divider -->
@@ -139,10 +142,10 @@
             <path d="M6.5 1.5L2 3.5V6.5c0 2.76 2 5.15 4.5 5.5C9 11.65 11 9.26 11 6.5V3.5L6.5 1.5z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
             <path d="M4.5 6.5l1.5 1.5 2.5-2.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
-          Access is restricted to DSWD STB personnel only.
+          Access is restricted to DSWD Innovation Cluster personnel only.
         </div>
 
-        <p class="form-footer">DSWD · Social Technology Bureau · {{ currentYear }} · v2.0</p>
+        <p class="form-footer">DSWD · Innovation Cluster · {{ currentYear }} · v2.0</p>
 
       </div>
     </main>
@@ -151,7 +154,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
@@ -168,6 +171,12 @@ const error       = ref('')
 
 const domain      = import.meta.env.VITE_ALLOWED_EMAIL_DOMAIN || 'dswd.gov.ph'
 const currentYear = computed(() => new Date().getFullYear())
+const GOOGLE_REDIRECT_PENDING_KEY = 'pmes.googleRedirectPending'
+const googleRedirectPending = ref(sessionStorage.getItem(GOOGLE_REDIRECT_PENDING_KEY) === '1')
+const googleSigningIn = computed(() =>
+  googleRedirectPending.value || (loading.value && loginMethod.value === 'google')
+)
+const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms))
 
 const ALLOWED_REDIRECT_PATHS = new Set([
   '/dashboard',
@@ -175,10 +184,13 @@ const ALLOWED_REDIRECT_PATHS = new Set([
   '/ipcrf',
   '/accomplishments',
   '/review',
-  '/mov',
   '/reports',
   '/audit',
   '/users',
+  '/office-registry',
+  '/office-management',
+  '/office-personnel',
+  '/office-dashboard',
   '/profile',
   '/kra'
 ])
@@ -193,6 +205,47 @@ function safeRedirectTarget(value) {
 }
 
 const redirect = computed(() => safeRedirectTarget(route.query.redirect))
+
+onMounted(async () => {
+  if (googleRedirectPending.value) {
+    loading.value = true
+    loginMethod.value = 'google'
+  }
+  if (!authStore.initialised) await authStore.init()
+  let routed = await routeSignedInUser()
+  if (!routed && googleRedirectPending.value) {
+    await wait(900)
+    if (!authStore.initialised) await authStore.init()
+    routed = await routeSignedInUser()
+  }
+  if (!routed && googleRedirectPending.value) {
+    clearGoogleRedirectPending()
+  }
+})
+
+async function routeSignedInUser() {
+  if (!authStore.isAuthenticated) return false
+  if (authStore.needsRegistration) {
+    clearGoogleRedirectPending()
+    await router.replace('/auth/register')
+    return true
+  }
+  if (authStore.needsActivation) {
+    clearGoogleRedirectPending()
+    await router.replace('/auth/pending')
+    return true
+  }
+  clearGoogleRedirectPending()
+  await router.replace(redirect.value)
+  return true
+}
+
+function clearGoogleRedirectPending() {
+  sessionStorage.removeItem(GOOGLE_REDIRECT_PENDING_KEY)
+  googleRedirectPending.value = false
+  loading.value = false
+  if (loginMethod.value === 'google') loginMethod.value = ''
+}
 
 async function handleEmailLogin() {
   error.value       = ''
@@ -213,17 +266,29 @@ async function handleGoogleLogin() {
   error.value       = ''
   loading.value     = true
   loginMethod.value = 'google'
+  googleRedirectPending.value = true
+  sessionStorage.setItem(GOOGLE_REDIRECT_PENDING_KEY, '1')
   try {
-    await authStore.loginWithGoogle()
-    router.push(redirect.value)
-  } catch (e) {
-    const message = e?.message || ''
-    if (!message.includes('popup-closed')) {
-      error.value = message || 'Google sign-in failed. Please try again.'
+    const result = await authStore.loginWithGoogle()
+    if (result?.redirected) {
+      return
     }
+    await routeSignedInUser()
+  } catch (e) {
+    if (e?.redirected) {
+      googleRedirectPending.value = true
+      sessionStorage.setItem(GOOGLE_REDIRECT_PENDING_KEY, '1')
+      return
+    }
+    console.warn('[PMES] Google sign-in failed:', e?.code || e?.message)
+    clearGoogleRedirectPending()
+    const message = e?.message || ''
+    error.value = message || 'Google sign-in failed. Please try again.'
   } finally {
-    loading.value     = false
-    loginMethod.value = ''
+    if (!googleRedirectPending.value) {
+      loading.value     = false
+      loginMethod.value = ''
+    }
   }
 }
 </script>
@@ -239,7 +304,7 @@ async function handleGoogleLogin() {
   height: 100%;
 }
 
-/* ══ ROOT — fullscreen single column, colored backdrop ══ */
+/* ══ ROOT - fullscreen single column, colored backdrop ══ */
 .login-root {
   position: fixed;
   inset: 0;
@@ -255,7 +320,7 @@ async function handleGoogleLogin() {
     linear-gradient(162deg, #040c1c 0%, #081830 35%, #0c2040 65%, #0e2850 100%);
 }
 
-/* Dot-grid texture overlay (kept — this is the colored-side texture, not the white grid) */
+/* Dot-grid texture overlay (kept - this is the colored-side texture, not the white grid) */
 .bg-texture {
   position: absolute;
   inset: 0;
@@ -508,6 +573,7 @@ async function handleGoogleLogin() {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  max-width: min(92vw, 720px);
   min-height: 24px;
   padding: 4px 12px;
   margin-bottom: 12px;
@@ -517,7 +583,9 @@ async function handleGoogleLogin() {
   color: rgba(255,255,255,.82);
   font-size: 11px;
   font-weight: 800;
-  letter-spacing: 1.8px;
+  line-height: 1.35;
+  letter-spacing: 1px;
+  text-align: center;
 }
 
 .login-title {

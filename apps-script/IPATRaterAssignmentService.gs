@@ -35,14 +35,114 @@
 const IPATRaterAssignmentService = (() => {
 
   // ── Position level helpers ────────────────────────────────────────────────
-  const isStaff         = (r) => ['Staff', 'Technical Staff', 'Administrative Staff'].includes(r)
-  const isSectionHead   = (r) => r === 'Section Head'
-  const isDivisionChief = (r) => r === 'Division Chief'
-  const isABD           = (r) => r === 'Assistant Bureau Director'
-  const isDirector      = (r) => r === 'Bureau Director'
-  const isEvaluatable   = (r) => r !== 'System Administrator' && !!r
+  const roleOf          = (r) => typeof RoleLabelService !== 'undefined' ? RoleLabelService.canonicalRole(r) : String(r || '').trim()
+  const isStaff         = (r) => ['Technical Staff', 'Administrative Staff'].includes(roleOf(r))
+  const isSectionHead   = (r) => roleOf(r) === 'Section Head'
+  const isDivisionChief = (r) => roleOf(r) === 'Division Chief'
+  const isABD           = (r) => roleOf(r) === 'Assistant Bureau Director'
+  const isDirector      = (r) => roleOf(r) === 'Bureau Director'
+  const isEvaluatable   = (r) => roleOf(r) !== 'System Administrator' && !!roleOf(r)
   const isObsoleteAssignment = (r) => ['JFPeer', 'JobFitnessPeer'].includes(String(r && r.raterType || ''))
   const activeProtocolAssignments = (rows) => rows.filter(r => !isObsoleteAssignment(r))
+
+  function normalizeEmail_(value) {
+    return String(value || '').replace(/[\u200B-\u200D\uFEFF]/g, '').trim().toLowerCase()
+  }
+
+  function profileRosterIdentity_(profile) {
+    const ids = {}
+    const emails = {}
+    const addId = (value) => {
+      const key = String(value || '').trim()
+      if (key) ids[key] = true
+    }
+    const addEmail = (value) => {
+      const key = normalizeEmail_(value)
+      if (key) emails[key] = true
+    }
+
+    addId(profile && profile.id)
+    addId(profile && profile.personnelId)
+    addId(profile && profile.officePersonnelId)
+    addEmail(profile && profile.email)
+
+    try {
+      const personnelSheet = SpreadsheetService.getSheet('Personnel')
+      SpreadsheetService.getAllRows(personnelSheet).forEach(row => {
+        const sameEmail = normalizeEmail_(row.email) && emails[normalizeEmail_(row.email)]
+        const sameUid = String(row.uid || '').trim() &&
+          String(profile && profile.uid || '').trim() &&
+          String(row.uid || '').trim() === String(profile.uid || '').trim()
+        if (sameEmail || sameUid) {
+          addId(row.id)
+          addEmail(row.email)
+        }
+      })
+    } catch (e) {
+      // STB/full PMES does not always have the office Personnel tab. The user id
+      // and email collected above remain the canonical fallback.
+      Logger.log('[IPAT Assignments] Personnel identity lookup skipped: ' + e.message)
+    }
+
+    return {
+      ids: Object.keys(ids),
+      emails: Object.keys(emails)
+    }
+  }
+
+  function rowBelongsToProfile_(row, identity) {
+    const raterId = String(row && row.raterId || '').trim()
+    const rateeId = String(row && row.rateeId || '').trim()
+    const raterEmail = normalizeEmail_(row && row.raterEmail)
+    const rateeEmail = normalizeEmail_(row && row.rateeEmail)
+    return {
+      rater: (raterId && identity.ids.indexOf(raterId) >= 0) ||
+        (raterEmail && identity.emails.indexOf(raterEmail) >= 0),
+      ratee: (rateeId && identity.ids.indexOf(rateeId) >= 0) ||
+        (rateeEmail && identity.emails.indexOf(rateeEmail) >= 0)
+    }
+  }
+
+  // Rating writes serialize on the script lock so two raters cannot recompute
+  // the same assessment record concurrently and interleave their score writes.
+  //
+  // Apps Script only offers a script-wide lock (there is no per-record lock), so
+  // every submission cluster-wide queues here. That is acceptable because the
+  // critical section is short, but it means a submission burst - a deadline
+  // afternoon, say - can pile up.
+  //
+  // Two things make that survivable:
+  //   1. A longer total wait, taken in staggered attempts rather than one block.
+  //      Jitter spreads the retry storm out instead of having every waiter wake
+  //      up and collide at the same instant.
+  //   2. Even when the wait is exhausted the caller gets a 429, which the client
+  //      surfaces as "try again" - never a partial write.
+  const LOCK_ATTEMPTS   = 3
+  const LOCK_WAIT_MS    = 15000   // per attempt; ~45s total worst case
+  const LOCK_JITTER_MS  = 400
+
+  function withRatingWriteLock(work) {
+    const lock = LockService.getScriptLock()
+    let acquired = false
+
+    for (let attempt = 0; attempt < LOCK_ATTEMPTS && !acquired; attempt++) {
+      acquired = lock.tryLock(LOCK_WAIT_MS)
+      if (!acquired && attempt < LOCK_ATTEMPTS - 1) {
+        // Randomised pause so simultaneous waiters do not retry in lockstep.
+        Utilities.sleep(Math.floor(Math.random() * LOCK_JITTER_MS))
+      }
+    }
+
+    if (!acquired) {
+      throw HttpError('The rating system is busy saving other submissions. Please try again in a moment.', 429)
+    }
+
+    try {
+      return work()
+    } finally {
+      lock.releaseLock()
+    }
+  }
 
   // ── Random selection with anti-repeat ────────────────────────────────────
   function _selectRandom(pool, excludeIds, prevId) {
@@ -144,7 +244,7 @@ const IPATRaterAssignmentService = (() => {
       u.id !== ratee.id && isStaff(u.role) && (u.divisionId || '') === div
     )
 
-    // Same-section pool — if ratee has no section set, treat whole division as the section
+    // Same-section pool - if ratee has no section set, treat whole division as the section
     const sectionPeers = sec
       ? divStaff.filter(u => (u.section || '').trim() === sec)
       : divStaff
@@ -186,20 +286,20 @@ const IPATRaterAssignmentService = (() => {
     const div = ratee.divisionId || ''
     const sec = (ratee.section  || '').trim()
 
-    // Peer — co-Section Head in same division
+    // Peer - co-Section Head in same division
     const shPeers = allUsers.filter(u => u.id !== ratee.id && isSectionHead(u.role) && (u.divisionId || '') === div)
     const peer = _selectRandom(shPeers, [ratee.id], _prevRaterId(prevAssign, ratee.id, 'Peer'))
 
-    // Subordinate — Technical Staff in same section; fallback to any staff in division
+    // Subordinate - Technical Staff in same section; fallback to any staff in division
     const subordinates = sec
       ? allUsers.filter(u => isStaff(u.role) && (u.divisionId || '') === div && (u.section || '').trim() === sec)
       : allUsers.filter(u => isStaff(u.role) && (u.divisionId || '') === div)
     const subordinate = _selectRandom(subordinates, [], _prevRaterId(prevAssign, ratee.id, 'Subordinate'))
 
-    // Supervisor — Division Chief of same division
+    // Supervisor - Division Chief of same division
     const supervisor = allUsers.find(u => isDivisionChief(u.role) && u.divisionId === div)
 
-    // Skip Supervisor — any ABD
+    // Skip Supervisor - any ABD
     const skipSupervisor = allUsers.find(u => isABD(u.role))
 
     const result = [{ raterId: ratee.id, raterName: ratee.fullName, raterType: 'Self' }]
@@ -213,18 +313,18 @@ const IPATRaterAssignmentService = (() => {
   function _assignForDivisionChief(ratee, allUsers, prevAssign) {
     const div = ratee.divisionId || ''
 
-    // Peer — other Division Chiefs
+    // Peer - other Division Chiefs
     const dcPeers = allUsers.filter(u => u.id !== ratee.id && isDivisionChief(u.role))
     const peer = _selectRandom(dcPeers, [ratee.id], _prevRaterId(prevAssign, ratee.id, 'Peer'))
 
-    // Subordinate — random Section Head in same division
+    // Subordinate - random Section Head in same division
     const subordinates = allUsers.filter(u => isSectionHead(u.role) && u.divisionId === div)
     const subordinate = _selectRandom(subordinates, [], _prevRaterId(prevAssign, ratee.id, 'Subordinate'))
 
-    // Supervisor — any ABD
+    // Supervisor - any ABD
     const supervisor = allUsers.find(u => isABD(u.role))
 
-    // Skip Supervisor — Bureau Director
+    // Skip Supervisor - Bureau Director
     const skipSupervisor = allUsers.find(u => isDirector(u.role))
 
     const result = [{ raterId: ratee.id, raterName: ratee.fullName, raterType: 'Self' }]
@@ -236,15 +336,15 @@ const IPATRaterAssignmentService = (() => {
   }
 
   function _assignForABD(ratee, allUsers, prevAssign) {
-    // Peer — other ABDs
+    // Peer - other ABDs
     const abdPeers = allUsers.filter(u => u.id !== ratee.id && isABD(u.role))
     const peer = _selectRandom(abdPeers, [ratee.id], _prevRaterId(prevAssign, ratee.id, 'Peer'))
 
-    // Subordinate — random Division Chief
+    // Subordinate - random Division Chief
     const subordinates = allUsers.filter(u => isDivisionChief(u.role))
     const subordinate = _selectRandom(subordinates, [], _prevRaterId(prevAssign, ratee.id, 'Subordinate'))
 
-    // Supervisor — Bureau Director
+    // Supervisor - Bureau Director
     const supervisor = allUsers.find(u => isDirector(u.role))
 
     const result = [{ raterId: ratee.id, raterName: ratee.fullName, raterType: 'Self' }]
@@ -255,7 +355,7 @@ const IPATRaterAssignmentService = (() => {
   }
 
   function _assignForDirector(ratee, allUsers, prevAssign) {
-    // Subordinate — random ABD
+    // Subordinate - random ABD
     const subordinates = allUsers.filter(u => isABD(u.role))
     const subordinate = _selectRandom(subordinates, [], _prevRaterId(prevAssign, ratee.id, 'Subordinate'))
 
@@ -264,12 +364,27 @@ const IPATRaterAssignmentService = (() => {
     return result
   }
 
+  // Loads the office's rater matrix, seeding the STB hierarchy on first use.
+  //
+  // Auto-seeding matters for backwards compatibility: STB and the already
+  // provisioned offices have no RaterMatrix rows yet, and without this the very
+  // first generation after deploy would report every role as unmapped. The seed
+  // is a transcription of the five functions this replaced, so a freshly seeded
+  // office behaves exactly as it did before.
+  function _loadMatrixRows(body, user) {
+    let result = RaterMatrixService.list({ officeId: body.officeId || '' }, user)
+    if (!result.items.length) {
+      result = RaterMatrixService.seedDefaults({ officeId: body.officeId || '' }, user)
+    }
+    return result.items
+  }
+
   // ── GENERATE ASSIGNMENTS ─────────────────────────────────────────────────
 
   function generateAssignments(body, user) {
     const profile = AuthService.getProfile(user)
-    if (!AuthService.hasPermission(profile, 'generate_ipat_assignments')) {
-      throw HttpError('Only administrators can generate evaluation assignments', 403)
+    if (profile.role !== 'System Administrator') {
+      throw HttpError('Only the System Administrator can generate evaluation assignments', 403)
     }
 
     const semester = String(body.semester || '')
@@ -306,23 +421,49 @@ const IPATRaterAssignmentService = (() => {
     const touchedRateeIds = new Set()
     const createdRecordIds = new Set()
 
+    // Rater rules now come from the per-office RaterMatrix rather than the five
+    // hardcoded STB role branches this replaced. An office using its own role
+    // names no longer falls through to an empty list and a silent skip.
+    const matrixRows = _loadMatrixRows(body, user)
+    const matrixHelpers = { selectRandom: _selectRandom, prevRaterId: _prevRaterId }
+
+    // Exceptions are collected and returned rather than swallowed. A role with
+    // no matrix entry, or a configured rater who does not exist on the roster,
+    // used to vanish without trace; both are now reported to the administrator.
+    const unmappedRoles = {}
+    const incompleteRatees = []
+
     evaluatable.forEach(ratee => {
-      const role = ratee.role || ''
-      let raterList = []
+      const role = roleOf(ratee.role)
+      const resolution = RaterMatrixService.resolveRatersFor(
+        ratee, allUsers, prevAssign, matrixRows, matrixHelpers
+      )
 
-      if (isStaff(role))         raterList = _assignForStaff(ratee, allUsers, prevAssign)
-      else if (isSectionHead(role))   raterList = _assignForSectionHead(ratee, allUsers, prevAssign)
-      else if (isDivisionChief(role)) raterList = _assignForDivisionChief(ratee, allUsers, prevAssign)
-      else if (isABD(role))           raterList = _assignForABD(ratee, allUsers, prevAssign)
-      else if (isDirector(role))      raterList = _assignForDirector(ratee, allUsers, prevAssign)
+      if (resolution.unmappedRole) {
+        const role = roleOf(ratee.role) || '(no role)'
+        unmappedRoles[role] = (unmappedRoles[role] || 0) + 1
+        return
+      }
 
-      if (!raterList.length) return
+      const raterList = resolution.raters
+      if (!raterList.length) {
+        incompleteRatees.push({ rateeName: ratee.fullName, role: role, missing: resolution.missing })
+        return
+      }
+      if (resolution.missing.length) {
+        incompleteRatees.push({ rateeName: ratee.fullName, role: role, missing: resolution.missing })
+      }
 
       // Auto-create IPAT record if not yet existing for this period
       let ipatRecord = _findCanonicalIpatRecord(existingRec, existingAssign, ratee.id, semester, year)
 
       if (!ipatRecord) {
-        const hasSubordinate = isSectionHead(role) || isDivisionChief(role) || isABD(role) || isDirector(role)
+        // Derived from the matrix, not from the STB role names. This flag drives
+        // the CBC weight split - with a subordinate the weights are Self/Peer/
+        // Subordinate 15 each; without one the subordinate's 15% moves to a
+        // second peer. Reading it from the resolved rater set means an office
+        // with its own hierarchy gets the correct split automatically.
+        const hasSubordinate = raterList.some(r => r.raterType === 'Subordinate')
         const newId = SpreadsheetService.generateId('IPAT-')
         const newRec = {
           id:            newId,
@@ -417,6 +558,17 @@ const IPATRaterAssignmentService = (() => {
     assignments.forEach(a => { breakdown[a.raterType] = (breakdown[a.raterType] || 0) + 1 })
     replacedAssignments.forEach(a => { breakdown[a.raterType] = (breakdown[a.raterType] || 0) + 1 })
 
+    const unmappedList = Object.keys(unmappedRoles).map(role => ({
+      role: role,
+      personnel: unmappedRoles[role]
+    }))
+
+    if (unmappedList.length) {
+      AuditService.log('ASSIGNMENT_EXCEPTIONS', 'IPAT',
+        `${unmappedList.length} role(s) had no rater matrix entry and were skipped: ` +
+        unmappedList.map(u => `${u.role} (${u.personnel})`).join(', '), user)
+    }
+
     return {
       generated:  assignments.length,
       replaced:   replacedAssignments.length,
@@ -425,7 +577,15 @@ const IPATRaterAssignmentService = (() => {
       existing:   new Set(existingAssign.map(a => a.rateeId)).size,
       breakdown,
       semester,
-      year
+      year,
+      // Exceptions the previous implementation discarded silently. `unmapped`
+      // means the role has no matrix entry at all - nobody in it will be rated.
+      // `incomplete` means the role is mapped but a configured rater could not
+      // be found on the roster, so that person is rated by fewer raters than
+      // intended.
+      unmapped: unmappedList,
+      unmappedPersonnel: unmappedList.reduce((s, u) => s + u.personnel, 0),
+      incomplete: incompleteRatees
     }
   }
 
@@ -433,9 +593,12 @@ const IPATRaterAssignmentService = (() => {
 
   function getMyRatees(params, user) {
     const profile = AuthService.getProfile(user)
+    const identity = profileRosterIdentity_(profile)
     const assignSheet = SpreadsheetService.getSheet(SHEET.IPAT_ASSIGNMENTS)
 
-    let rows = activeProtocolAssignments(SpreadsheetService.getAllRows(assignSheet)).filter(r => String(r.raterId) === String(profile.id))
+    let rows = activeProtocolAssignments(SpreadsheetService.getAllRows(assignSheet)).filter(r =>
+      rowBelongsToProfile_(r, identity).rater
+    )
     if (params.semester) rows = rows.filter(r => String(r.semester) === String(params.semester))
     if (params.year)     rows = rows.filter(r => String(r.year) === String(params.year))
     if (params.status)   rows = rows.filter(r => r.status === params.status)
@@ -505,14 +668,15 @@ const IPATRaterAssignmentService = (() => {
 
   // ── MARK ASSIGNMENT COMPLETED ─────────────────────────────────────────────
 
-  function markCompleted(assignmentId, user) {
+  function markCompletedUnlocked(assignmentId, user) {
     const profile = AuthService.getProfile(user)
     const assignSheet = SpreadsheetService.getSheet(SHEET.IPAT_ASSIGNMENTS)
     const rows = SpreadsheetService.getAllRows(assignSheet)
     const row = rows.find(r => r.id === assignmentId)
     if (!row) throw HttpError('Assignment not found', 404)
     if (isObsoleteAssignment(row)) throw HttpError('This assignment is no longer active under the current protocol', 400)
-    if (row.raterId !== profile.id) {
+    const identity = profileRosterIdentity_(profile)
+    if (!rowBelongsToProfile_(row, identity).rater) {
       const isAdmin = AuthService.hasPermission(profile, 'generate_ipat_assignments') ||
                       AuthService.hasPermission(profile, 'view_bureau_monitoring')
       if (!isAdmin) throw HttpError('Unauthorized', 403)
@@ -520,19 +684,27 @@ const IPATRaterAssignmentService = (() => {
     return completeAssignmentFromRows(assignSheet, assignmentId, row, rows, user)
   }
 
-  function submitAssignmentRatings(assignmentId, body, user) {
+  function markCompleted(assignmentId, user) {
+    return withRatingWriteLock(() => markCompletedUnlocked(assignmentId, user))
+  }
+
+  function submitAssignmentRatingsUnlocked(assignmentId, body, user) {
     const profile = AuthService.getProfile(user)
     const assignSheet = SpreadsheetService.getSheet(SHEET.IPAT_ASSIGNMENTS)
     const rows = SpreadsheetService.getAllRows(assignSheet)
     const row = rows.find(r => r.id === assignmentId)
     if (!row) throw HttpError('Assignment not found', 404)
     if (isObsoleteAssignment(row)) throw HttpError('This assignment is no longer active under the current protocol', 400)
-    if (row.raterId !== profile.id) {
+    const identity = profileRosterIdentity_(profile)
+    if (!rowBelongsToProfile_(row, identity).rater) {
       const isAdmin = AuthService.hasPermission(profile, 'generate_ipat_assignments') ||
                       AuthService.hasPermission(profile, 'view_bureau_monitoring')
       if (!isAdmin) throw HttpError('Unauthorized', 403)
     }
     if (!row.ipatRecordId) throw HttpError('Assignment has no linked assessment record', 400)
+    if (String(row.status || 'Pending') === 'Completed') {
+      throw HttpError('This rating assignment has already been submitted.', 409)
+    }
 
     let cbcRatings = body.cbcRatings || []
     let jfRatings  = body.jfRatings  || []
@@ -553,16 +725,23 @@ const IPATRaterAssignmentService = (() => {
     }
   }
 
+  function submitAssignmentRatings(assignmentId, body, user) {
+    return withRatingWriteLock(() => submitAssignmentRatingsUnlocked(assignmentId, body, user))
+  }
+
   // ── GET MY OWN RESULTS (ratee views their final score) ───────────────────
   // Section 2: "The person being rated shall be able to view the final ratings."
 
   function getMyResults(params, user) {
     const profile     = AuthService.getProfile(user)
+    const identity    = profileRosterIdentity_(profile)
     IPATService.ensureRecordSchema()
     const recSheet    = SpreadsheetService.getSheet(SHEET.IPAT_RECORDS)
     const assignSheet = SpreadsheetService.getSheet(SHEET.IPAT_ASSIGNMENTS)
 
-    let rows = SpreadsheetService.getAllRows(recSheet).filter(r => String(r.rateeId) === String(profile.id))
+    let rows = SpreadsheetService.getAllRows(recSheet).filter(r =>
+      rowBelongsToProfile_(r, identity).ratee
+    )
     if (params.semester) rows = rows.filter(r => String(r.semester) === String(params.semester))
     if (params.year)     rows = rows.filter(r => String(r.year)     === String(params.year))
 
@@ -584,21 +763,9 @@ const IPATRaterAssignmentService = (() => {
       const pendingRaters   = assignments.filter(a => a.status !== 'Completed').map(a => a.raterType)
       const allComplete     = totalRaters > 0 && completedRaters === totalRaters
 
-      // Auto-compute on first view if all raters are done but scores are missing or incomplete
-      const needsCompute = allComplete && (!r.cbcScore || !r.overallScore || (r.cbcScore && !r.jfScore))
-      if (needsCompute) {
-        try {
-          IPATService.computeCBC(r.id, user)
-          try { IPATService.computeJF(r.id, user) } catch (je) {
-            Logger.log('[PMES] getMyResults computeJF skipped: ' + je.message)
-          }
-          IPATService.computeOverall(r.id, user)
-          const freshRec = SpreadsheetService.getRow(recSheet, r.id)
-          if (freshRec) r = freshRec
-        } catch (e) {
-          Logger.log('[PMES] getMyResults auto-compute failed for ' + r.id + ': ' + e.message)
-        }
-      }
+      // Reads must stay read-only under load. Final scores are computed by the
+      // locked submit/complete path when the last assignment is completed, not by
+      // every ratee opening the Results tab at the same time.
 
       const ntePct = Number(r.cbcNteDeductionPct || 0)
       const offenseDeduction = Number(r.cbcOffenseDeduction || 0)
@@ -649,9 +816,52 @@ const IPATRaterAssignmentService = (() => {
 
   // ── DELETE ALL ASSIGNMENTS FOR A PERIOD (admin, to regenerate) ────────────
 
+  // Dry run for deleteForPeriod. Destructive maintenance routes follow a
+  // GET-preview-then-POST-confirm pattern (see DatabaseMaintenanceService), so an
+  // administrator can see exactly what a reset would remove before running it.
+  function previewDeleteForPeriod(params, user) {
+    const profile = AuthService.getProfile(user)
+    if (profile.role !== 'System Administrator') {
+      throw HttpError('Unauthorized - System Administrator required', 403)
+    }
+
+    const sem = String(params.semester || '')
+    const yr  = String(params.year || '')
+    if (!sem || !yr) throw HttpError('semester and year are required', 400)
+
+    const counts = {}
+    const countIn = (sheetName, filter) => {
+      try {
+        counts[sheetName] = SpreadsheetService
+          .getAllRows(SpreadsheetService.getSheet(sheetName))
+          .filter(filter).length
+      } catch (e) { counts[sheetName] = 0 }
+    }
+
+    const inPeriod = r => String(r.semester) === sem && String(r.year) === yr
+    countIn(SHEET.IPAT_ASSIGNMENTS, inPeriod)
+    countIn(SHEET.IPAT_RECORDS,     inPeriod)
+    countIn(SHEET.IPAT_CBC_RATINGS, inPeriod)
+    countIn(SHEET.IPAT_JF_RATINGS,  inPeriod)
+
+
+    const total = Object.keys(counts).reduce((s, k) => s + counts[k], 0)
+    return {
+      semester: sem,
+      year: yr,
+      counts,
+      total,
+      destructive: true,
+      confirmationRequired: 'RESET ' + sem + ' ' + yr,
+      warning: 'This permanently removes every IPAT assignment, record, rating and ' +
+               'development plan for the period. Submitted ratings are NOT recoverable ' +
+               'from the application. Take a spreadsheet backup first.'
+    }
+  }
+
   function deleteForPeriod(semester, year, user) {
     const profile = AuthService.getProfile(user)
-    if (!['System Administrator'].includes(profile.role)) throw HttpError('Unauthorized — System Administrator required', 403)
+    if (!['System Administrator'].includes(profile.role)) throw HttpError('Unauthorized - System Administrator required', 403)
 
     const sem = String(semester)
     const yr  = String(year)
@@ -668,28 +878,10 @@ const IPATRaterAssignmentService = (() => {
       } catch(e) { counts[sheetName] = 0 }
     }
 
-    // Collect IPAT record IDs first (needed for EDAP which links via ipatId)
-    var recSheet = null
-    var periodRecordIds = new Set()
-    try {
-      recSheet = SpreadsheetService.getSheet(SHEET.IPAT_RECORDS)
-      SpreadsheetService.getAllRows(recSheet).forEach(function(r) {
-        if (String(r.semester) === sem && String(r.year) === yr) periodRecordIds.add(r.id)
-      })
-    } catch(e) {}
-
     purgeSheet(SHEET.IPAT_ASSIGNMENTS,  'semester', 'year')
     purgeSheet(SHEET.IPAT_RECORDS,      'semester', 'year')
     purgeSheet(SHEET.IPAT_CBC_RATINGS,  'semester', 'year')
     purgeSheet(SHEET.IPAT_JF_RATINGS,   'semester', 'year')
-
-    // EDAP links via ipatId, not semester/year
-    try {
-      var edapSheet = SpreadsheetService.getSheet(SHEET.IPAT_EDAP)
-      var edapRows  = SpreadsheetService.getAllRows(edapSheet).filter(function(r) { return periodRecordIds.has(r.ipatId) })
-      edapRows.forEach(function(r) { try { SpreadsheetService.hardDeleteRow(edapSheet, r.id) } catch(e) {} })
-      counts[SHEET.IPAT_EDAP] = edapRows.length
-    } catch(e) { counts[SHEET.IPAT_EDAP] = 0 }
 
     const total = Object.values(counts).reduce((s, n) => s + n, 0)
     AuditService.log('RESET_PERIOD', 'IPAT',
@@ -705,6 +897,7 @@ const IPATRaterAssignmentService = (() => {
     list,
     markCompleted,
     submitAssignmentRatings,
+    previewDeleteForPeriod,
     deleteForPeriod
   }
 })()

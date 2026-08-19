@@ -33,15 +33,7 @@ function initIPATSheets() {
     'semester','year','createdAt','updatedAt'
   ])
 
-  // 4. IPATEdap
-  _createSheetIfMissing(ss, 'IPATEdap', [
-    'id','ipatId','rateeId','rateeName',
-    'rows',
-    'sem1Status','sem1Notes','sem2Status','sem2Notes',
-    'createdAt','updatedAt'
-  ])
-
-  // 5. IPATRaterAssignments — auto-generated rater assignments per period
+  // 4. IPATRaterAssignments - auto-generated rater assignments per period
   _createSheetIfMissing(ss, 'IPATRaterAssignments', [
     'id','semester','year',
     'rateeId','rateeName','rateeDivisionId','rateeRole','rateeSection',
@@ -55,7 +47,10 @@ function initIPATSheets() {
 }
 
 function _createSheetIfMissing(ss, name, headers) {
-  let sheet = ss.getSheetByName(name)
+  // Alias-aware - see SHEET_NAME_FALLBACKS in SpreadsheetService. A tab already
+  // renamed (e.g. IPATRecords -> AssessmentRecords) must not be re-created here
+  // as an empty duplicate under its old name.
+  let sheet = SpreadsheetService.findSheet(name)
   if (!sheet) {
     sheet = ss.insertSheet(name)
     sheet.getRange(1, 1, 1, headers.length).setValues([headers])

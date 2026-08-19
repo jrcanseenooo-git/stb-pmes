@@ -1,63 +1,12 @@
-﻿<template>
+<template>
   <div class="eval-page">
 
     <!-- Content card -->
     <div class="content-card">
 
-    <!-- Header -->
-    <div class="page-hd">
-      <div class="page-title-block">
-        <h2 class="page-title">Evaluation Ratings</h2>
-        <p class="page-sub">Innovations Performance Assessment Tool</p>
-      </div>
-
-      <div class="page-hd-side">
-        <!-- Domain weight bar -->
-        <!-- <div class="domain-bar" aria-label="Evaluation domain weights">
-          <div class="domain-item d-cbc">
-            <div class="domain-pct">30%</div>
-            <div class="domain-text">
-              <div class="domain-label">Core Behavioral Competencies</div>
-              <div class="domain-sub">5 HEARTWORK Values</div>
-            </div>
-          </div>
-          <div class="domain-sep">+</div>
-          <div class="domain-item d-fpo">
-            <div class="domain-pct">55%</div>
-            <div class="domain-text">
-              <div class="domain-label">Functional Performance Output</div>
-              <div class="domain-sub">IPCRF/CCEF Final Rating</div>
-            </div>
-          </div>
-          <div class="domain-sep">+</div>
-          <div class="domain-item d-jf">
-            <div class="domain-pct">15%</div>
-            <div class="domain-text">
-              <div class="domain-label">Job Fitness</div>
-              <div class="domain-sub">Self + Supervisor</div>
-            </div>
-          </div>
-          <div class="domain-sep">=</div>
-          <div class="domain-item d-overall">
-            <div class="domain-pct">100%</div>
-            <div class="domain-text">
-              <div class="domain-label">Overall Score</div>
-              <div class="domain-sub">1.00 - 4.00 Scale</div>
-            </div>
-          </div>
-        </div> -->
-
-        <div class="page-actions">
-          <button v-if="canAdmin" class="btn btn-outline" @click="openGenerateModal">
-            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-              <circle cx="6.5" cy="6.5" r="5.5" stroke="currentColor" stroke-width="1.4"/>
-              <path d="M6.5 3.5v3l2 1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-            </svg>
-            Generate Assignments
-          </button>
-        </div>
-      </div>
-    </div>
+    <!-- Page header removed: the title moved to the app bar, the domain-weight
+         bar was retired, and Generate Assignments now sits in the view-tab row.
+         An empty .page-hd cost 12px of dead space above the panel. -->
 
     <!-- View toggle -->
     <!-- <div class="view-tabs">
@@ -83,8 +32,8 @@
         <div v-if="activeView !== 'all'" class="tasks-period-bar">
           <label class="tasks-period-label">Period:</label>
           <select v-model="tasksSemester" class="filter-select" style="width:175px">
-            <option value="1">1st Semester (Jan&#8211;Jun)</option>
-            <option value="2">2nd Semester (Jul&#8211;Dec)</option>
+            <option value="1">1st Semester (Jan-Jun)</option>
+            <option value="2">2nd Semester (Jul-Dec)</option>
           </select>
           <select v-model="tasksYear" class="filter-select" style="width:80px">
             <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}</option>
@@ -116,16 +65,37 @@
               <option value="">All Divisions</option>
               <option v-for="d in availableDivisions" :key="d.key" :value="d.key">{{ d.name }}</option>
             </select>
+            <!-- loadRecords() filters by tasksSemester/tasksYear, but this bar had no
+                 period control - so on All Assessments an administrator was locked to
+                 the current period and could not reach an earlier one. -->
+            <select v-model="tasksSemester" class="filter-select filter-select-period">
+              <option value="1">1st Semester (Jan-Jun)</option>
+              <option value="2">2nd Semester (Jul-Dec)</option>
+            </select>
+            <select v-model="tasksYear" class="filter-select filter-select-year">
+              <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}</option>
+            </select>
           </div>
         </div>
 
         <div class="view-tabs">
-          <button :class="['view-tab', activeView === 'my-tasks' && 'active']" @click="switchToMyTasks">
-            My Rating Tasks
-            <span v-if="pendingTaskCount > 0" class="view-tab-badge">{{ pendingTaskCount }}</span>
-          </button>
-          <button :class="['view-tab', activeView === 'my-results' && 'active']" @click="switchToMyResults">
-            My Results
+          <template v-if="showPersonalTabs">
+            <button :class="['view-tab', activeView === 'my-tasks' && 'active']" @click="switchToMyTasks">
+              My Rating Tasks
+              <span v-if="pendingTaskCount > 0" class="view-tab-badge">{{ pendingTaskCount }}</span>
+            </button>
+            <button :class="['view-tab', activeView === 'my-results' && 'active']" @click="switchToMyResults">
+              My Results
+            </button>
+          </template>
+          <!-- System Administrator: Generate Assignments takes the space the two
+               personal tabs would have occupied. -->
+          <button v-if="canGenerate" class="view-tab view-tab-action" @click="openGenerateModal">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+              <circle cx="6.5" cy="6.5" r="5.5" stroke="currentColor" stroke-width="1.4"/>
+              <path d="M6.5 3.5v3l2 1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+            </svg>
+            Generate Assignments
           </button>
           <button v-if="canAdmin" :class="['view-tab', activeView === 'all' && 'active']" @click="switchToAll">
             All Assessments
@@ -144,7 +114,7 @@
           <div v-else-if="!myTasks.length" class="eval-lp-empty">
             <svg width="36" height="36" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="18" stroke="#E2E8F0" stroke-width="2"/><path d="M16 24h16M24 16v16" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round"/></svg>
             <p>No rating tasks found</p>
-            <span>{{ canAdmin ? 'Use Generate Assignments to create rater assignments.' : 'You have no assigned evaluations for this period.' }}</span>
+            <span>{{ canGenerate ? 'Use Generate Assignments to create rater assignments.' : 'You have no assigned evaluations for this period.' }}</span>
           </div>
           <div v-else class="eli-list">
             <div v-for="task in myTasks" :key="task.id"
@@ -223,7 +193,8 @@
           <div v-else-if="!filteredRecords.length" class="eval-lp-empty">
             <svg width="36" height="36" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="18" stroke="#E2E8F0" stroke-width="2"/><path d="M24 14v10l6 4" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round"/></svg>
             <p>{{ records.length === 0 ? 'No assessments yet' : 'No matches' }}</p>
-            <span>{{ records.length === 0 ? 'Generate assignments to start.' : 'Try adjusting your filters.' }}</span>
+            <span>{{ records.length === 0 ? (canGenerate ? 'Generate assignments to start.' : 'No assessments for this period yet.') : 'Try adjusting your filters.' }}</span>
+            <small v-if="recordsLoadState.message" class="load-state-note">{{ recordsLoadState.message }}</small>
           </div>
           <div v-else class="eli-list all-records-list">
             <div v-for="rec in filteredRecords" :key="rec.id"
@@ -233,17 +204,21 @@
                 <div class="eli-av eli-av-rec">{{ initials(rec.rateeName) }}</div>
                 <div class="eli-info">
                   <div class="eli-name">{{ rec.rateeName }}</div>
-                  <div class="eli-meta">{{ rec.divisionName || '—' }}</div>
+                  <div class="eli-meta">{{ rec.divisionName || '-' }}</div>
                 </div>
-                <span :class="['status-badge', statusClass(rec.status)]">{{ rec.status }}</span>
+                <span :class="['status-badge', statusClass(rec.status)]">{{ statusLabel(rec.status) }}</span>
               </div>
-              <!-- <div class="eli-chips">
+              <!-- Uses the same displayOverallScore/displayDescriptor helpers as the
+                   ratee's My Results list rather than the raw record fields, so an
+                   administrator and the employee always read identical figures. -->
+              <div class="eli-chips">
                 <span class="eli-period-pill">S{{ rec.semester }} {{ rec.year }}</span>
-                <template v-if="rec.overallScore">
-                  <span class="eli-score-big">{{ rec.overallScore }}</span>
-                  <span v-if="rec.descriptor" :class="['eli-desc-chip', descriptorClass(rec.descriptor)]">{{ rec.descriptor }}</span>
+                <template v-if="displayOverallScore(rec)">
+                  <span class="eli-score-big">{{ displayOverallScore(rec) }}</span>
+                  <span class="eli-score-percent">{{ scoreEquivalentPct(displayOverallScore(rec)) }}</span>
+                  <span v-if="displayDescriptor(rec)" :class="['eli-desc-chip', descriptorClass(displayDescriptor(rec))]">{{ displayDescriptor(rec) }}</span>
                 </template>
-              </div> -->
+              </div>
             </div>
           </div>
         </template>
@@ -290,12 +265,12 @@
                     <div class="sidebar-employee-name">{{ (activeRecord || selectedTask || selectedRecord).rateeName }}</div>
                     <div class="sidebar-employee-desc" v-if="activeAssignment">{{ raterRoleDesc(activeAssignment.raterType) }}</div>
                     <div class="sidebar-employee-desc" v-else>
-                      {{ activeRecord?.divisionName || selectedRecord?.divisionName || '—' }}
+                      {{ activeRecord?.divisionName || selectedRecord?.divisionName || '-' }}
                       <template v-if="activeRecord?.position"> · {{ activeRecord.position }}</template>
                     </div>
                     <div class="sidebar-badges">
                       <span v-if="activeAssignment" :class="['rtype-badge', rterTypeCls(activeAssignment.raterType)]">{{ raterTypeLabel(activeAssignment.raterType) }}</span>
-                      <span v-else-if="activeRecord" :class="['status-badge', statusClass(activeRecord.status)]">{{ activeRecord.status }}</span>
+                      <span v-else-if="activeRecord" :class="['status-badge', statusClass(activeRecord.status)]">{{ statusLabel(activeRecord.status) }}</span>
                       <span class="period-badge">S{{ (activeRecord || selectedTask || selectedRecord).semester }} {{ (activeRecord || selectedTask || selectedRecord).year }}</span>
                     </div>
                   </div>
@@ -332,16 +307,6 @@
                       <span class="sidebar-domain-fill" :style="{ width: (JF_INDICATORS.length ? Math.round(jfAnsweredCount / JF_INDICATORS.length * 100) : 0) + '%' }"></span>
                     </span>
                   </button>
-                  <!-- <button v-if="!activeAssignment" :class="['sidebar-domain', activeTab === 'edap' && 'active', edapRequired && 'needs-action']" @click="activeTab = 'edap'">
-                    <span class="sidebar-domain-top">
-                      <span class="sidebar-domain-title">D. Employee Development &amp; Action Plan</span>
-                      <span class="sidebar-domain-arrow">›</span>
-                    </span>
-                    <span class="sidebar-domain-progress">{{ edapRequired ? 'Required' : 'Optional' }}</span>
-                    <span class="sidebar-domain-bar">
-                      <span class="sidebar-domain-fill" :style="{ width: (edapRequired ? 0 : 100) + '%' }"></span>
-                    </span>
-                  </button> -->
                 </nav>
 
                 <div class="sidebar-card">
@@ -371,9 +336,19 @@
                     <h3>{{ activeDomainTitle }}</h3>
                     <p>{{ activeDomainDescription }}</p>
                   </div>
-                  <button class="eval-form-close" @click="closeDetailModal" title="Back to list">
-                    <svg width="14" height="14" viewBox="0 0 15 15" fill="none"><path d="M2 2l11 11M13 2L2 13" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
-                  </button>
+                  <div class="assessment-content-actions">
+                    <!-- This header is sticky and renders on every domain tab, so the
+                         deduction control stays reachable from FPO and Job Fitness
+                         too. Putting it inside the CBC tab hid it everywhere else. -->
+                    <button v-if="!activeAssignment && canEditCbcDeduction(activeRecord)"
+                            class="conduct-deduction-btn" @click="openCbcDeductionModal">
+                      Conduct Deduction
+                      <span v-if="hasCbcDeduction(activeRecord)" class="conduct-dot"></span>
+                    </button>
+                    <button class="eval-form-close" @click="closeDetailModal" title="Back to list">
+                      <svg width="14" height="14" viewBox="0 0 15 15" fill="none"><path d="M2 2l11 11M13 2L2 13" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+                    </button>
+                  </div>
                 </div>
 
               <!-- Finalized note (rater) -->
@@ -384,22 +359,41 @@
 
               <!-- Score summary (admin/self view only) -->
               <div v-if="!activeAssignment" class="score-summary-bar">
-                <div class="sscore"><div class="sscore-lbl">CBC (30%)</div><div :class="['sscore-val', activeRecord?.cbcScore ? 'has-val' : '']">{{ cbcWeighted }}</div></div>
+                <!-- Percentage equivalents mirror the ratee's My Results panel so an
+                     administrator reads the same figures the employee sees. The large
+                     number is the weighted contribution; the equivalent is derived from
+                     the RAW domain score (score ÷ 4), which is why each uses a different
+                     source. FPO passes the isFpo flag because it is normalised from the
+                     IPCRF 1-5 scale before conversion. -->
+                <div class="sscore">
+                  <div class="sscore-lbl">CBC (30%)</div>
+                  <div :class="['sscore-val', activeRecord?.cbcScore ? 'has-val' : '']">{{ cbcWeighted }}</div>
+                  <div v-if="activeRecord?.cbcScore" class="sscore-eq">{{ scoreEquivalentPct(activeRecord.cbcScore) }} equivalent</div>
+                </div>
                 <div class="sscore-op">+</div>
-                <div class="sscore"><div class="sscore-lbl">FPO (55%)</div><div :class="['sscore-val', activeRecord?.fpoScore ? 'has-val' : '']">{{ fpoWeighted }}</div></div>
+                <div class="sscore">
+                  <div class="sscore-lbl">FPO (55%)</div>
+                  <div :class="['sscore-val', activeRecord?.fpoScore ? 'has-val' : '']">{{ fpoWeighted }}</div>
+                  <div v-if="activeRecord?.fpoScore" class="sscore-eq">{{ scoreEquivalentPct(activeRecord.fpoScore, true) }} equivalent</div>
+                </div>
                 <div class="sscore-op">+</div>
-                <div class="sscore"><div class="sscore-lbl">JF (15%)</div><div :class="['sscore-val', activeRecord?.jfScore ? 'has-val' : '']">{{ jfWeighted }}</div></div>
+                <div class="sscore">
+                  <div class="sscore-lbl">JF (15%)</div>
+                  <div :class="['sscore-val', activeRecord?.jfScore ? 'has-val' : '']">{{ jfWeighted }}</div>
+                  <div v-if="activeRecord?.jfScore" class="sscore-eq">{{ scoreEquivalentPct(activeRecord.jfScore) }} equivalent</div>
+                </div>
                 <div class="sscore-op">=</div>
                 <div class="sscore sscore-overall">
                   <div class="sscore-lbl">Overall</div>
                   <div v-if="displayOverallScore(activeRecord)" :class="['sscore-val', descriptorClass(displayDescriptor(activeRecord))]" style="font-size:22px;font-weight:800">{{ displayOverallScore(activeRecord) }}</div>
-                  <div v-else class="sscore-val">—</div>
+                  <div v-else class="sscore-val">-</div>
+                  <div v-if="displayOverallScore(activeRecord)" class="sscore-eq sscore-eq-strong">{{ scoreEquivalentPct(displayOverallScore(activeRecord)) }} equivalent</div>
                   <div v-if="displayDescriptor(activeRecord)" :class="['sscore-desc', descriptorClass(displayDescriptor(activeRecord))]">{{ displayDescriptor(activeRecord) }}</div>
                 </div>
-                <button v-if="canEditCbcDeduction(activeRecord)" class="conduct-deduction-btn" @click="openCbcDeductionModal">
-                  Conduct Deduction
-                  <span v-if="hasCbcDeduction(activeRecord)" class="conduct-dot"></span>
-                </button>
+                <!-- Conduct Deduction lives in the CBC tab intro row below. It was
+                     here, but it cost ~150px of the summary bar and forced the four
+                     score cards to scroll sideways. It is also a CBC-domain action
+                     (NTE / offence level), so it belongs beside the CBC ratings. -->
               </div>
 
               <!-- ── CBC TAB ── -->
@@ -417,14 +411,14 @@
                       <span class="scale-hint">1 = Never · 2 = Rarely · 3 = Frequently · 4 = Always</span>
                     </template>
                     <template v-else>
-                      Rate each behavioral indicator using the <strong>1–4 Likert scale</strong>:
+                      Rate each behavioral indicator using the <strong>1-4 Likert scale</strong>:
                       <span class="scale-hint">1 = Never · 2 = Rarely · 3 = Frequently · 4 = Always</span>
                     </template>
                   </div>
                   <div class="rater-row">
                     <div class="rater-selector">
                       <span class="rater-label">{{ canAdmin ? 'Viewing ratings from:' : 'Rating as:' }}</span>
-                      <select v-model="cbcRaterType" class="field-input" style="width:220px">
+                      <select v-model="cbcRaterType" class="field-input rater-select">
                         <option value="Self">Self (15%)</option>
                         <option value="Peer">Peer (15%)</option>
                         <option value="Peer1">Peer 1 (15%)</option>
@@ -437,6 +431,16 @@
                     <div class="has-sub-note">
                       Subordinates: <strong>{{ activeRecord?.hasSubordinate ? 'Yes' : 'No' }}</strong>
                       {{ !activeRecord?.hasSubordinate ? '- Peer1 + Peer2 each 15%' : '' }}
+                    </div>
+                    <!-- Admins review submitted ratings; only the assigned rater can
+                         change them. Saying so stops people hunting for a Save button
+                         that intentionally does not exist on this screen. -->
+                    <div v-if="canAdmin && !activeAssignment" class="readonly-note">
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                        <rect x="2.5" y="5.5" width="7" height="5" rx="1" stroke="currentColor" stroke-width="1.1"/>
+                        <path d="M4.2 5.5V4a1.8 1.8 0 0 1 3.6 0v1.5" stroke="currentColor" stroke-width="1.1"/>
+                      </svg>
+                      Read-only - submitted by the rater
                     </div>
                   </div>
                 </template>
@@ -474,40 +478,73 @@
 
               <!-- ── FPO TAB ── -->
               <div v-if="activeTab === 'fpo'" class="modal-body-scroll">
+                <!--
+                  The protocol defines a different Functional Performance Output
+                  instrument per office: STB uses the DSPMS IPCRF/DPCR, while
+                  Pag-abot, Walang Gutom and Tara-Basa each adopted their own.
+                  Only STB's instrument lives in this system, so only STB can
+                  auto-sync. Every other office records the figure its own
+                  instrument produced, and the IPCRF sync control is hidden
+                  rather than shown-and-failing.
+                -->
                 <div class="tab-intro">
-                  The <strong>Functional Performance Output</strong> domain uses the employee's <strong>IPCRF/DPCR Final Numerical Rating</strong> (1–5 scale) as the basis. It constitutes <strong>55%</strong> of the overall IPAT score.
+                  <template v-if="usesIpcrfForFpo">
+                    The <strong>Functional Performance Output</strong> domain uses the employee's <strong>IPCRF/DPCR Final Numerical Rating</strong> (1-5 scale) as the basis. It constitutes <strong>55%</strong> of the overall IPAT score.
+                  </template>
+                  <template v-else>
+                    The <strong>Functional Performance Output</strong> domain uses this office's own approved performance instrument, as provided for in the assessment protocol. Enter the resulting rating (1-5 scale) below. It constitutes <strong>55%</strong> of the overall assessment score.
+                  </template>
                 </div>
                 <div class="fpo-panel">
                   <div class="fpo-current">
                     <div class="fpo-label">FPO Weighted Score</div>
                     <div class="fpo-score">{{ fpoWeighted }}</div>
-                    <div v-if="activeRecord?.fpoScore" class="fpo-converted">Raw IPCRF score: <strong>{{ activeRecord.fpoScore }}</strong> × 0.55</div>
+                    <div v-if="activeRecord?.fpoScore" class="fpo-converted">
+                      Raw {{ usesIpcrfForFpo ? 'IPCRF' : 'FPO' }} score: <strong>{{ activeRecord.fpoScore }}</strong> × 0.55
+                    </div>
                   </div>
-                  <div class="fpo-update">
+                  <div v-if="usesIpcrfForFpo" class="fpo-update">
                     <label class="field-label">Auto-sync from IPCRF/CCEF</label>
                     <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
                       <button class="btn btn-primary" :disabled="syncingFPO" @click="syncFPOScore"><span v-if="syncingFPO" class="spinner-sm"></span>{{ syncingFPO ? 'Syncing…' : (activeRecord?.fpoScore ? 'Re-sync Score' : 'Sync Score') }}</button>
                     </div>
-                    <span v-if="fpoSource" style="font-size:10px;color:#16A34A;margin-top:6px;display:block">Pulled from {{ fpoSource.type }} ({{ fpoSource.status }}) — S{{ fpoSource.semester }} {{ fpoSource.year }}{{ fpoSource.adjectivalRating ? ' · ' + fpoSource.adjectivalRating : '' }}</span>
+                    <span v-if="fpoSource" style="font-size:10px;color:#16A34A;margin-top:6px;display:block">Pulled from {{ fpoSource.type }} ({{ fpoSource.status }}) - S{{ fpoSource.semester }} {{ fpoSource.year }}{{ fpoSource.adjectivalRating ? ' · ' + fpoSource.adjectivalRating : '' }}</span>
                     <span v-else style="font-size:10px;color:#94A3B8;margin-top:4px;display:block">Pulls automatically from the employee's IPCRF/CCEF for this period.</span>
                   </div>
                 </div>
                 <div v-if="canAdmin" class="fpo-manual-panel">
-                  <div class="fpo-manual-title">Manual FPO Entry</div>
-                  <p class="fpo-manual-hint">For periods where IPCRF/CCEF is unavailable (e.g. 1st Semester), enter the FPO score manually.</p>
+                  <div class="fpo-manual-title">{{ usesIpcrfForFpo ? 'Manual FPO Entry' : 'FPO Entry' }}</div>
+                  <p class="fpo-manual-hint">
+                    {{ usesIpcrfForFpo
+                      ? 'For periods where IPCRF/CCEF is unavailable (e.g. 1st Semester), enter the FPO score manually.'
+                      : 'Enter the rating produced by this office\'s approved performance instrument for this period.' }}
+                  </p>
                   <div class="fpo-manual-row">
                     <div class="fpo-manual-input-group">
-                      <label class="field-label">IPCRF Score (1–5)</label>
-                      <input v-model="fpoManualInput" type="number" step="0.01" min="1" max="5" class="field-input fpo-manual-field" placeholder="e.g. 4.5" @blur="onFpoManualBlur" @keyup.enter="$event.target.blur()"/>
+                      <label class="fpo-manual-label" for="fpoManualInput">
+                        {{ usesIpcrfForFpo ? 'IPCRF Final Rating' : 'FPO Rating' }}
+                        <span class="fpo-manual-range">1.00 - 5.00</span>
+                      </label>
+                      <div class="fpo-input-shell">
+                        <input id="fpoManualInput" v-model="fpoManualInput" type="number" step="0.01" min="1" max="5"
+                               class="fpo-manual-field" placeholder="0.00" inputmode="decimal"
+                               @blur="onFpoManualBlur" @keyup.enter="$event.target.blur()"/>
+                        <span class="fpo-input-affix">/ 5</span>
+                      </div>
+                      <span class="fpo-manual-help">Type the rating, then press Enter or click away to save.</span>
                     </div>
                     <div v-if="fpoManualInput && Number(fpoManualInput) >= 1 && Number(fpoManualInput) <= 5" class="fpo-manual-result">
                       <span class="fpo-calc-formula">{{ fpoManualInput }} × 0.55</span>
                       <span class="fpo-calc-eq">=</span>
                       <span class="fpo-calc-value">{{ fpoManualWeighted }}</span>
+                      <span class="fpo-calc-caption">weighted FPO</span>
+                    </div>
+                    <div v-else-if="fpoManualInput" class="fpo-manual-invalid">
+                      Enter a value between 1.00 and 5.00.
                     </div>
                     <div class="fpo-manual-status">
                       <span v-if="savingFpoManual" class="fpo-saving-indicator"><span class="spinner-sm"></span> Saving…</span>
-                      <span v-if="fpoManualSaved" class="fpo-saved-indicator">Saved</span>
+                      <span v-else-if="fpoManualSaved" class="fpo-saved-indicator">✓ Saved</span>
                     </div>
                   </div>
                 </div>
@@ -534,7 +571,7 @@
                   </div>
                   <div class="rater-selector" style="margin-bottom:16px">
                     <span class="rater-label">{{ canAdmin ? 'Viewing ratings from:' : 'Rating as:' }}</span>
-                    <select v-model="jfRaterType" class="field-input" style="width:220px">
+                    <select v-model="jfRaterType" class="field-input rater-select">
                       <option value="Self">Self (Ratee)</option>
                       <option value="Supervisor">Immediate Supervisor</option>
                     </select>
@@ -542,7 +579,7 @@
                 </template>
                 <div v-if="!activeAssignment && loadedRec?.jfVarianceFlagged" class="variance-banner">
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1L1 14h14L8 1z" fill="#FEF9C3" stroke="#CA8A04" stroke-width="1.2"/><path d="M8 6v4M8 11.5v.5" stroke="#CA8A04" stroke-width="1.4" stroke-linecap="round"/></svg>
-                  <div><strong>Significant variance detected</strong> — the Self-rating and Supervisor rating differ by {{ loadedRec.jfVarianceGap }} points. This record is flagged for Skip Supervisor review per Section 11 of the evaluation guidelines.</div>
+                  <div><strong>Significant variance detected</strong> - the Self-rating and Supervisor rating differ by {{ loadedRec.jfVarianceGap }} points. This record is flagged for Skip Supervisor review per Section 11 of the evaluation guidelines.</div>
                 </div>
                 <div class="jf-list">
                   <div v-for="(ind, idx) in JF_INDICATORS" :key="idx" :class="['jf-row', showValidation && getJFRating(idx) === null ? 'unanswered' : '']">
@@ -568,67 +605,26 @@
                 </div>
               </div>
 
-              <!-- ── EDAP TAB ── -->
-              <div v-if="activeTab === 'edap'" class="modal-body-scroll">
-                <div class="tab-intro">
-                  The <strong>Employee Development and Action Plan (EDAP)</strong> documents learning interventions when any domain score falls at <strong>Level 1 (1.00–1.49)</strong> or <strong>Level 2 (1.50–2.49)</strong>. It follows the 70-20-10 Learning Framework.
-                </div>
-                <div v-if="!edapRequired" class="edap-ok">
-                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="8" fill="#F0FDF4" stroke="#22C55E" stroke-width="1.3"/><path d="M5.5 9l2.5 2.5 4.5-4.5" stroke="#22C55E" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                  No EDAP required. All domain scores are above Level 2.
-                </div>
-                <template v-else>
-                  <div class="edap-section-title">Competency Action Matrix</div>
-                  <p class="edap-hint">Identify top 2–3 priority competency areas below target levels.</p>
-                  <div v-for="(row, i) in edapRows" :key="i" class="edap-row">
-                    <div class="edap-row-hd">
-                      <span class="edap-row-num">{{ i + 1 }}</span>
-                      <button class="edap-row-remove" v-if="edapRows.length > 1" @click="edapRows.splice(i, 1)">×</button>
-                    </div>
-                    <div class="edap-fields">
-                      <div class="edap-field full"><label class="field-label">Priority Development Area <span class="req">*</span></label><input v-model="row.area" class="field-input" placeholder="Specify competency gap (e.g., Technical Mastery — Marunong)"/></div>
-                      <div class="edap-field"><label class="field-label">Target Level</label><select v-model="row.targetLevel" class="field-input"><option value="2">Level 2 (Intermediate)</option><option value="3">Level 3 (Advanced)</option><option value="4">Level 4 (Expert)</option></select></div>
-                      <div class="edap-field"><label class="field-label">Target Completion Date</label><input v-model="row.targetDate" type="date" class="field-input"/></div>
-                      <div class="edap-field full"><label class="field-label">Proposed Learning Interventions <span class="edap-framework-hint">(70% Experience · 20% Relationship · 10% Formal)</span></label><textarea v-model="row.interventions" class="field-input" rows="2" placeholder="Describe specific learning activities aligned with the 70-20-10 framework…"></textarea></div>
-                      <div class="edap-field full"><label class="field-label">Expected Output / Success Indicators</label><input v-model="row.successIndicators" class="field-input" placeholder="e.g., Complete policy brief, demonstrate improved facilitation in next quarter"/></div>
-                    </div>
-                  </div>
-                  <button class="btn edap-add-btn" @click="edapRows.push({ area:'', targetLevel:'3', targetDate:'', interventions:'', successIndicators:'' })">+ Add Development Area</button>
-                  <div class="edap-section-title" style="margin-top:20px">Commitments</div>
-                  <div class="edap-commit-box"><div class="edap-commit-label">Employee Commitment</div><p class="edap-commit-text">I commit to actively pursuing the learning interventions detailed above, allocating the necessary focus, and applying newly gained proficiencies directly to my assigned targets.</p></div>
-                  <div class="edap-commit-box"><div class="edap-commit-label">Supervisor Support Commitment</div><p class="edap-commit-text">I commit to supporting this development pathway by providing regular coaching, facilitating access to the necessary workplace assignments, and monitoring progress milestones.</p></div>
-                  <div class="edap-section-title" style="margin-top:20px">Monitoring &amp; Catch-up Tracker</div>
-                  <div class="edap-tracker">
-                    <div class="edap-tracker-row">
-                      <div class="edap-tracker-sem">1st Semester</div>
-                      <div class="edap-status-group"><label v-for="s in EDAP_STATUSES" :key="s.val" class="edap-status-opt"><input type="radio" v-model="edapSem1Status" :value="s.val"/><span :class="['edap-status-chip', `chip-${s.cls}`]">{{ s.label }}</span></label></div>
-                      <textarea v-model="edapSem1Notes" class="field-input edap-notes" rows="2" placeholder="Supervisor feedback / progress notes…"></textarea>
-                    </div>
-                    <div class="edap-tracker-row">
-                      <div class="edap-tracker-sem">2nd Semester</div>
-                      <div class="edap-status-group"><label v-for="s in EDAP_STATUSES" :key="s.val" class="edap-status-opt"><input type="radio" v-model="edapSem2Status" :value="s.val"/><span :class="['edap-status-chip', `chip-${s.cls}`]">{{ s.label }}</span></label></div>
-                      <textarea v-model="edapSem2Notes" class="field-input edap-notes" rows="2" placeholder="Supervisor feedback / progress notes…"></textarea>
-                    </div>
-                  </div>
-                  <div class="modal-actions" style="padding:16px 0 0"><button class="btn btn-primary" :disabled="savingEdap" @click="saveEdap"><span v-if="savingEdap" class="spinner-sm"></span>{{ savingEdap ? 'Saving…' : 'Save EDAP' }}</button></div>
-                </template>
-              </div>
-
-            <!-- Sticky footer actions -->
-            <div class="eval-form-footer">
+            <!-- Sticky footer actions.
+                 Every branch below requires either an active rating assignment or
+                 a non-admin viewer, so for an administrator the bar rendered with
+                 nothing in it - an empty strip pinned to the bottom of the screen.
+                 Render it only when it actually has an action. -->
+            <div v-if="hasFooterActions" class="eval-form-footer">
               <template v-if="activeAssignment">
                 <div class="eval-footer-progress">
                   <span :class="['eval-footer-count', allRaterAnswered ? 'done' : '']">{{ raterAnsweredTotal }} / {{ raterTotal }} answered</span>
                 </div>
-                <button class="btn btn-submit-rating" :disabled="submittingRating" @click="submitRatings">
+                <button class="btn btn-submit-rating" :disabled="submittingRating || selectedAssignmentCompleted" @click="submitRatings">
                   <span v-if="submittingRating" class="spinner-sm" style="border-top-color:#fff"></span>
-                  {{ submittingRating ? 'Submitting…' : (selectedTask?.status === 'Completed' ? 'Update Ratings' : 'Submit Ratings') }}
+                  {{ submittingRating ? 'Submitting...' : (selectedAssignmentCompleted ? 'Submitted' : 'Submit Ratings') }}
                 </button>
               </template>
               <template v-else-if="!canAdmin && activeRecord?.status !== 'Final'">
-                <button v-if="activeRecord?.status === 'Computed'" class="btn btn-finalize" @click="finalizeRecord">
-                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1L2 3.5V6.5c0 2.76 2 5.15 4.5 5.5C9 11.65 11 9.26 11 6.5V3.5L6.5 1z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M4.5 6.5l1.5 1.5 2.5-2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                  Finalize Assessment
+                <button v-if="activeRecord?.status === 'Computed'" class="btn btn-finalize" :disabled="finalizing" @click="finalizeRecord">
+                  <span v-if="finalizing" class="spinner-sm" style="border-top-color:#fff"></span>
+                  <svg v-else width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1L2 3.5V6.5c0 2.76 2 5.15 4.5 5.5C9 11.65 11 9.26 11 6.5V3.5L6.5 1z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M4.5 6.5l1.5 1.5 2.5-2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  {{ finalizing ? 'Finalizing...' : 'Finalize Assessment' }}
                 </button>
                 <button class="btn btn-primary" :disabled="computingOverall" @click="computeOverall"><span v-if="computingOverall" class="spinner-sm"></span>{{ computingOverall ? 'Computing…' : 'Compute Overall Score' }}</button>
               </template>
@@ -665,7 +661,7 @@
             </div>
             <template v-else>
               <div :class="['rp-score-hero', descriptorClass(displayDescriptor(selectedResult))]">
-                <div class="rp-score-big">{{ displayOverallScore(selectedResult) ?? '—' }}</div>
+                <div class="rp-score-big">{{ displayOverallScore(selectedResult) ?? '-' }}</div>
                 <div v-if="displayOverallScore(selectedResult)" class="rp-score-equivalent">{{ scoreEquivalentPct(displayOverallScore(selectedResult)) }} equivalent</div>
                 <div v-if="displayDescriptor(selectedResult)" class="rp-score-desc">{{ displayDescriptor(selectedResult) }}</div>
               </div>
@@ -739,8 +735,8 @@
               <div class="field">
                 <label class="field-label">Semester <span class="req">*</span></label>
                 <select v-model="createForm.semester" class="field-input">
-                  <option value="1">1st Semester (Jan–Jun)</option>
-                  <option value="2">2nd Semester (Jul–Dec)</option>
+                  <option value="1">1st Semester (Jan-Jun)</option>
+                  <option value="2">2nd Semester (Jul-Dec)</option>
                 </select>
               </div>
               <div class="field">
@@ -748,17 +744,17 @@
                 <input v-model.number="createForm.year" type="number" class="field-input"/>
               </div>
               <div class="field full">
-                <label class="field-label">FPO Score — IPCRF Final Numerical Rating</label>
+                <label class="field-label">FPO Score - IPCRF Final Numerical Rating</label>
                 <div class="fpo-auto-note">
-                  Pulled automatically from the ratee's own rated IPCRF/CCEF for this same period — no manual entry needed.
+                  Pulled automatically from the ratee's own rated IPCRF/CCEF for this same period - no manual entry needed.
                   If their IPCRF/CCEF isn't rated yet, you can sync it later from the assessment detail view.
                 </div>
               </div>
               <div class="field full">
                 <label class="field-label">Does the ratee have subordinates?</label>
                 <div class="toggle-row">
-                  <button :class="['toggle-btn', createForm.hasSubordinate === true && 'active']" @click="createForm.hasSubordinate = true">Yes — Peer weight: 15%</button>
-                  <button :class="['toggle-btn', createForm.hasSubordinate === false && 'active']" @click="createForm.hasSubordinate = false">No — Peer weight: 30%</button>
+                  <button :class="['toggle-btn', createForm.hasSubordinate === true && 'active']" @click="createForm.hasSubordinate = true">Yes - Peer weight: 15%</button>
+                  <button :class="['toggle-btn', createForm.hasSubordinate === false && 'active']" @click="createForm.hasSubordinate = false">No - Peer weight: 30%</button>
                 </div>
               </div>
             </div>
@@ -808,8 +804,8 @@
               <div class="field">
                 <label class="field-label">Semester <span class="req">*</span></label>
                 <select v-model="generateForm.semester" class="field-input">
-                  <option value="1">1st Semester (Jan–Jun)</option>
-                  <option value="2">2nd Semester (Jul–Dec)</option>
+                  <option value="1">1st Semester (Jan-Jun)</option>
+                  <option value="2">2nd Semester (Jul-Dec)</option>
                 </select>
               </div>
               <div class="field">
@@ -822,7 +818,7 @@
                   <ul style="margin:6px 0 0 18px;padding:0;font-size:12px;line-height:1.7">
                     <li>Creates missing IPAT records for active employees</li>
                     <li>Backfills missing Self, CBC Peer, Supervisor, and Skip Supervisor assignments</li>
-                    <li>Preserves existing assignments, submitted ratings, computed scores, and EDAP entries</li>
+                    <li>Preserves existing assignments, submitted ratings, and computed scores</li>
                     <li>Avoids repeating same Peer/Subordinate from the previous cycle</li>
                     <li>Employees will see their assigned ratees in <em>My Rating Tasks</em></li>
                   </ul>
@@ -887,7 +883,7 @@
             <div class="conduct-preview">
               <div>
                 <span>CBC percentage raw score</span>
-                <strong>{{ cbcDeductionPreview.basePct !== null ? `${cbcDeductionPreview.basePct}%` : '—' }}</strong>
+                <strong>{{ cbcDeductionPreview.basePct !== null ? `${cbcDeductionPreview.basePct}%` : '-' }}</strong>
               </div>
               <div>
                 <span>NTE deduction</span>
@@ -899,7 +895,7 @@
               </div>
               <div class="conduct-preview-final">
                 <span>CBC contribution to overall</span>
-                <strong>{{ cbcDeductionPreview.cbcWeightedScore ?? '—' }}</strong>
+                <strong>{{ cbcDeductionPreview.cbcWeightedScore ?? '-' }}</strong>
               </div>
             </div>
           </div>
@@ -927,10 +923,26 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
-import { dashboardApi, ipatApi, ipatAssignmentsApi, usersApi, assessmentContentApi, assessmentCategoryApi } from '@/services/api'
+import { useRoute } from 'vue-router'
+import { ipatApi, ipatAssignmentsApi, usersApi, assessmentContentApi, assessmentCategoryApi } from '@/services/api'
 import { usePermissions } from '@/composables/usePermissions'
+import { useBranding } from '@/composables/useBranding'
+import { useConfirm } from '@/composables/useConfirm'
+import { useOrgOptions } from '@/composables/useOrgOptions'
 
-const { hasPermission } = usePermissions()
+const { confirm } = useConfirm()
+const route = useRoute()
+const { hasPermission, isAdmin } = usePermissions()
+const { isClusterPortal } = useBranding()
+const canViewBureauMonitoring = hasPermission('view_bureau_monitoring')
+const canViewDivisionMonitoring = hasPermission('view_division_monitoring')
+const { loadOrgOptions, currentDivisions } = useOrgOptions()
+
+// Only STB's Functional Performance Output instrument (the DSPMS IPCRF/DPCR)
+// exists in this system. Participating offices adopted their own instruments
+// under the protocol, so for them the FPO figure is recorded manually and the
+// IPCRF auto-sync control is hidden rather than offered and then failing.
+const usesIpcrfForFpo = computed(() => !isClusterPortal.value)
 
 // ── Assessment content fetched from backend ──
 const assessmentQuestions  = ref([])
@@ -994,20 +1006,33 @@ const activeStatus = ref('All')
 const search       = ref('')
 const filterDiv    = ref('')
 const divisionOptions = ref([])
-const FALLBACK_DIVISIONS = [
-  { id: 'dfd', name: 'Design Formulation Division' },
-  { id: 'pid', name: 'Pilot Implementation Division' },
-  { id: 'staed', name: 'Social Technology Analysis and Evaluation Division' },
-  { id: 'ap', name: 'Admin Pool' }
-]
+const recordsLoadState = ref({ status: 'idle', message: '' })
 
 function divisionKey(name) {
   return String(name || '').trim().toLowerCase().replace(/\s+/g, ' ')
 }
 
 // View toggle
-const canAdmin = hasPermission('generate_ipat_assignments')
-const activeView  = ref('my-tasks')
+// "Can administer assessments" - gates the All Assessments view and the
+// administrative detail panel. Distinct from being able to GENERATE assignments,
+// which is System Administrator-only. Both the System Administrator and the
+// Bureau Director / Assistant Bureau Director hold manage_ipat_scores.
+const canAdmin = hasPermission('manage_ipat_scores')
+
+// A pure System Administrator maintains the system but is not assessed by it, so
+// "My Rating Tasks" and "My Results" are always empty for them and only take up
+// space. They get Generate Assignments in that row instead.
+//
+// Division Chief / Assistant Bureau Director / Bureau Director are themselves
+// ratees even when they hold evaluation-admin functions, so they keep both
+// personal tabs - and generating assignments is reserved to the System
+// Administrator, so they do not get that button.
+const isSystemAdmin  = isAdmin
+const showPersonalTabs = computed(() => !isSystemAdmin.value)
+const canGenerate      = computed(() => isSystemAdmin.value)
+// A System Administrator has no personal tabs, so landing on 'my-tasks' would
+// strand them on a permanently empty view with no control to leave it.
+const activeView  = ref(isSystemAdmin.value ? 'all' : 'my-tasks')
 
 // My Tasks state
 const myTasks         = ref([])
@@ -1040,7 +1065,7 @@ const showCreateModal = ref(false)
 const activeRecord    = ref(null)
 const activeTab       = ref('cbc')
 
-const loadedRec     = ref(null)   // full record from get() — carries cbcRatings + jfRatings
+const loadedRec     = ref(null)   // full record from get() - carries cbcRatings + jfRatings
 const loadingDetail = ref(false)
 const allUsers      = ref([])
 const loadingUsers  = ref(false)
@@ -1068,13 +1093,13 @@ const cbcWeighted = computed(() => {
 })
 const fpoWeighted = computed(() => {
   let s = Number(activeRecord.value?.fpoScore)
-  if (!s) return '—'
+  if (!s) return '-'
   if (s > 4) s = Math.round(((s - 1) / 4 * 3 + 1) * 100) / 100
   return (Math.round(s * 0.55 * 100) / 100).toFixed(2)
 })
 const jfWeighted = computed(() => {
   const s = Number(activeRecord.value?.jfScore)
-  if (!s) return '—'
+  if (!s) return '-'
   return (Math.round(s * 0.15 * 100) / 100).toFixed(2)
 })
 const fpoManualWeighted = computed(() => {
@@ -1093,20 +1118,20 @@ function normalizedFourPointScore(value, isFpo = false) {
 
 function weightedDomainScore(value, weight, isFpo = false) {
   const score = normalizedFourPointScore(value, isFpo)
-  if (score === null) return '—'
+  if (score === null) return '-'
   return (Math.round(score * weight * 100) / 100).toFixed(2)
 }
 
 function cbcWeightedScore(record) {
   const score = normalizedFourPointScore(record?.cbcScore)
-  if (score === null) return '—'
+  if (score === null) return '-'
   const weighted = score * 0.30
   return (Math.round(weighted * 100) / 100).toFixed(2)
 }
 
 function scoreEquivalentPct(value, isFpo = false) {
   const score = normalizedFourPointScore(value, isFpo)
-  if (score === null) return '—'
+  if (score === null) return '-'
   const pct = Math.max(0, Math.min(100, (score / 4) * 100))
   return `${Number(pct.toFixed(1)).toLocaleString()}%`
 }
@@ -1151,7 +1176,11 @@ const cbcDeductionPreview = computed(() =>
 )
 
 function canEditCbcDeduction(record) {
-  return Boolean(record?.cbcDeductionCanEdit || canAdmin)
+  // canAdmin is a ComputedRef - without .value this expression was always truthy,
+  // so the Conduct Deduction control (NTE / administrative-offence data) rendered
+  // for every user. The backend already refused the write with a 403; this makes
+  // the UI agree with it.
+  return Boolean(record?.cbcDeductionCanEdit || canAdmin.value)
 }
 
 function hasCbcDeduction(record) {
@@ -1253,28 +1282,7 @@ const computingJF = ref(false)
 const computingOverall  = ref(false)
 const showValidation    = ref(false)
 const submittingRating  = ref(false)
-
-// EDAP state
-const EDAP_STATUSES = [
-  { val: 'not-started', label: 'Not Started', cls: 'gray' },
-  { val: 'on-track',    label: 'On Track',    cls: 'green' },
-  { val: 'delayed',     label: 'Delayed',     cls: 'orange' },
-  { val: 'completed',   label: 'Completed',   cls: 'blue' }
-]
-const defaultEdapRow = () => ({ area: '', targetLevel: '3', targetDate: '', interventions: '', successIndicators: '' })
-const edapRows     = ref([defaultEdapRow()])
-const edapSem1Status = ref('not-started')
-const edapSem2Status = ref('not-started')
-const edapSem1Notes  = ref('')
-const edapSem2Notes  = ref('')
-const savingEdap     = ref(false)
-
-const edapRequired = computed(() => {
-  const rec = activeRecord.value
-  if (!rec) return false
-  const scores = [Number(rec.cbcScore), Number(rec.jfScore)].filter(s => s > 0)
-  return scores.some(s => s < 2.50)
-})
+const finalizing        = ref(false)
 
 const toast = ref({ show: false, msg: '', type: 'success' })
 
@@ -1284,12 +1292,24 @@ const createForm = ref({
   hasSubordinate: false
 })
 
+// The stored status value stays 'Draft' - renaming it in the sheet would break
+// every existing record and the backend's own transitions. Only the label the
+// user reads changes. 'Final' is no longer offered as a filter; those records
+// remain visible under 'All'.
 const statusTabs = [
   { label: 'All',      value: 'All'      },
-  { label: 'Draft',    value: 'Draft'    },
-  { label: 'Computed', value: 'Computed' },
-  { label: 'Final',    value: 'Final'    }
+  { label: 'Pending',  value: 'Draft'    },
+  { label: 'Computed', value: 'Computed' }
 ]
+
+// The footer holds: the rater's Submit/Update button (needs activeAssignment),
+// or the ratee's Finalize / Compute / "Finalized" badge (needs !canAdmin).
+// With neither, it has no content and should not occupy the screen.
+const hasFooterActions = computed(() => !!activeAssignment.value || !canAdmin.value)
+const selectedAssignmentCompleted = computed(() => {
+  const status = activeAssignment.value?.status || selectedTask.value?.status || ''
+  return String(status) === 'Completed'
+})
 
 // ── Computed ──
 const canCreate = computed(() => canAdmin.value)
@@ -1328,7 +1348,6 @@ const availableDivisions = computed(() => {
 
   divisionOptions.value.forEach(d => addDivision(d))
   records.value.forEach(r => addDivision({ id: r.divisionId, name: r.divisionName || r.divisionId }))
-  FALLBACK_DIVISIONS.forEach(d => addDivision(d))
 
   return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name))
 })
@@ -1360,8 +1379,7 @@ const activeDomainTitle = computed(() => {
   const labels = {
     cbc: 'Core Behavioral Competencies',
     fpo: 'Functional Performance and Output',
-    jf: 'Job Fitness',
-    edap: 'Employee Development and Action Plan'
+    jf: 'Job Fitness'
   }
   return labels[activeTab.value] || ''
 })
@@ -1369,20 +1387,18 @@ const activeDomainDescription = computed(() => {
   const desc = {
     cbc: 'Rate each HEARTWORK behavior using the 1-4 scale.',
     fpo: 'Review the synced IPCRF/CCEF final numerical rating.',
-    jf: 'Rate job fitness indicators and optional supporting evidence.',
-    edap: 'Document development actions when lower domain scores require intervention.'
+    jf: 'Rate job fitness indicators and optional supporting evidence.'
   }
   return desc[activeTab.value] || ''
 })
 const activeProgressAnswered = computed(() => {
   if (activeTab.value === 'jf') return jfAnsweredCount.value
   if (activeTab.value === 'fpo') return activeRecord.value?.fpoScore ? 1 : 0
-  if (activeTab.value === 'edap') return edapRequired.value ? 0 : 1
   return cbcAnsweredCount.value
 })
 const activeProgressTotal = computed(() => {
   if (activeTab.value === 'jf') return JF_INDICATORS.value.length
-  if (activeTab.value === 'fpo' || activeTab.value === 'edap') return 1
+  if (activeTab.value === 'fpo') return 1
   return cbcTotalCount.value
 })
 const activeProgressPercent = computed(() => {
@@ -1413,6 +1429,10 @@ function taskDivisionLabel(task) {
   return divisionNames[normalized.toLowerCase()] || normalized.toUpperCase()
 }
 function statusClass(s) { return { Draft: 'st-draft', Computed: 'st-blue', Final: 'st-green' }[s] || 'st-draft' }
+// Display-only mapping. 'Draft' remains the stored value everywhere - in the
+// sheet, in the API and in IPCRFService's status transitions - so this changes
+// what the user reads without touching a single record.
+function statusLabel(s) { return s === 'Draft' ? 'Pending' : (s || '') }
 function descriptorClass(d) {
   if (!d) return ''
   if (d.includes('Outstanding'))  return 'desc-excellent'
@@ -1461,11 +1481,26 @@ function _populateJFRatings(raterType, ratings) {
 watch(cbcRaterType, (type) => { if (loadedRec.value) _populateCBCRatings(type, loadedRec.value.cbcRatings) })
 watch(jfRaterType,  (type) => { if (loadedRec.value) _populateJFRatings(type,  loadedRec.value.jfRatings) })
 watch([tasksSemester, tasksYear], handlePeriodChange)
+watch([canAdmin, isSystemAdmin], ([admin, sysAdmin]) => {
+  if (!admin) return
+  if (sysAdmin && activeView.value !== 'all') {
+    activeView.value = 'all'
+  }
+  if (activeView.value === 'all') {
+    loadRecords()
+  }
+}, { immediate: true, flush: 'post' })
+watch(activeView, (view) => {
+  if (view === 'all' && canAdmin.value) loadRecords()
+})
 
 onMounted(() => {
   loadAssessmentContent()
   loadDivisionOptions()
-  loadMyTasks()
+  // Load the list that matches the landing view rather than always fetching the
+  // administrator's (always empty) personal rating tasks.
+  if (canAdmin.value || activeView.value === 'all') loadRecords()
+  else loadMyTasks()
 })
 
 async function handlePeriodChange() {
@@ -1491,8 +1526,18 @@ async function loadMyTasks() {
     const data = await ipatAssignmentsApi.getMyRatees({ semester: requestedSemester, year: requestedYear })
     if (requestedSemester !== String(tasksSemester.value) || requestedYear !== String(tasksYear.value)) return
     myTasks.value = Array.isArray(data) ? data : (data?.items || [])
+    // Deep link from My Rating Tasks: ?assignment=<id> opens that exact task so
+    // the portal list can hand off directly into the form the user clicked.
+    const requestedAssignment = String(route.query.assignment || '')
+    const deepLinked = requestedAssignment
+      ? myTasks.value.find(t => String(t.id) === requestedAssignment)
+      : null
+    if (deepLinked) {
+      selectTask(deepLinked)
+      return
+    }
     // Auto-open the first pending task so the rating form is front-and-center
-    // on arrival instead of an empty panel — rating is the module's main job.
+    // on arrival instead of an empty panel - rating is the module's main job.
     if (activeView.value === 'my-tasks' && !selectedTask.value && myTasks.value.length) {
       selectTask(myTasks.value.find(t => t.status !== 'Completed') || myTasks.value[0])
     }
@@ -1565,10 +1610,13 @@ async function switchToAll() {
 }
 
 async function loadDivisionOptions() {
+  if (!canAdmin.value && !canViewBureauMonitoring.value && !canViewDivisionMonitoring.value) {
+    divisionOptions.value = []
+    return
+  }
   try {
-    const data = await dashboardApi.divisions({ pageSize: 200 })
-    const rows = Array.isArray(data) ? data : (data?.items || [])
-    divisionOptions.value = rows
+    await loadOrgOptions()
+    divisionOptions.value = currentDivisions.value
       .map(d => ({
         id: d.id || d.divisionId,
         name: d.name || d.divisionName
@@ -1591,7 +1639,7 @@ function selectRecord(rec) {
   selectedTask.value   = null
   selectedResult.value = null
   selectedRecord.value = rec
-  activeAssignment.value = null   // admin view — not a rater assignment
+  activeAssignment.value = null   // admin view - not a rater assignment
   openDetailModal(rec)
 }
 
@@ -1630,6 +1678,10 @@ function closeDetailModal() {
 async function submitRatings() {
   const assignment = activeAssignment.value
   if (!assignment) return
+  if (String(assignment.status || '') === 'Completed') {
+    showToast('This rating assignment has already been submitted and is locked.', 'error')
+    return
+  }
 
   const isJobFitnessOnly = isJobFitnessOnlyAssignment(assignment)
   const cbcOk = isJobFitnessOnly || cbcAnsweredCount.value >= cbcTotalCount.value
@@ -1751,7 +1803,7 @@ function rterTypeCls(type) {
   return cls[type] || ''
 }
 
-// Strong accent color per rater type — drives the colored spine on each task card
+// Strong accent color per rater type - drives the colored spine on each task card
 function raterAccent(type) {
   const map = {
     Self:          '#3B82F6',
@@ -1769,11 +1821,19 @@ async function loadRecords() {
   const requestedSemester = String(tasksSemester.value)
   const requestedYear = String(tasksYear.value)
   loading.value = true
+  recordsLoadState.value = { status: 'loading', message: 'Loading assessments…' }
   try {
     const r = await ipatApi.list({ pageSize: 500, semester: requestedSemester, year: requestedYear })
     if (requestedSemester !== String(tasksSemester.value) || requestedYear !== String(tasksYear.value)) return
-    const freshRecords = r?.items || (Array.isArray(r) ? r : [])
+    const freshRecords = Array.isArray(r) ? r : (Array.isArray(r?.items) ? r.items : [])
     records.value = freshRecords
+    const total = Number(r?.total)
+    recordsLoadState.value = {
+      status: 'loaded',
+      message: freshRecords.length
+        ? `Loaded ${freshRecords.length}${Number.isFinite(total) ? ` of ${total}` : ''} assessment record(s).`
+        : ''
+    }
     if (activeView.value === 'all') {
       const selectedId = selectedRecord.value?.id || activeRecord.value?.id
       const refreshed = selectedId ? records.value.find(row => row.id === selectedId) : null
@@ -1788,6 +1848,10 @@ async function loadRecords() {
     }
   } catch (e) {
     console.error(e)
+    recordsLoadState.value = {
+      status: 'error',
+      message: `Could not load assessments: ${e?.message || 'request failed'}`
+    }
     showToast(records.value.length
       ? 'Could not refresh assessments. Showing the last loaded data.'
       : 'Could not load assessments. Please try again.', 'error')
@@ -1846,24 +1910,13 @@ async function openDetailModal(rec) {
   fpoManualSaved.value  = false
   loadedRec.value       = null
   loadingDetail.value   = true
-  _resetEdap()
   try {
-    const [full, edap] = await Promise.all([
-      ipatApi.get(rec.id),
-      ipatApi.getEdap(rec.id).catch(() => null)
-    ])
+    const full = await ipatApi.get(rec.id)
     loadedRec.value = full
     activeRecord.value = { ...rec, ...full }
     fpoManualInput.value = full.fpoScore ? String(full.fpoScore) : ''
     _populateCBCRatings(cbcRaterType.value, full.cbcRatings)
     _populateJFRatings(jfRaterType.value,   full.jfRatings)
-    if (edap) {
-      edapRows.value       = edap.rows?.length ? edap.rows : [defaultEdapRow()]
-      edapSem1Status.value = edap.sem1Status || 'not-started'
-      edapSem1Notes.value  = edap.sem1Notes  || ''
-      edapSem2Status.value = edap.sem2Status || 'not-started'
-      edapSem2Notes.value  = edap.sem2Notes  || ''
-    }
   } catch (e) {
     console.error(e); showToast('Could not load record. Please try again.', 'error')
   } finally {
@@ -1962,7 +2015,7 @@ async function syncFPOScore() {
 // ── JF ──
 async function saveJFRatings() {
   const ratings = JF_INDICATORS.value.map((_, idx) => ({
-    // Only send minimal fields — full indicator text causes URL to exceed GAS limits
+    // Only send minimal fields - full indicator text causes URL to exceed GAS limits
     indicatorIdx: idx,
     rating: getJFRating(idx) || 1,
     evidence: jfEvidence.value[idx] || '',
@@ -2000,7 +2053,7 @@ async function computeOverall() {
   try {
     const r = await ipatApi.computeOverall(activeRecord.value.id)
     _syncRecord({ overallScore: r.overallScore, descriptor: r.descriptor, cbcScore: r.cbcScore, fpoScore: r.fpoScore, jfScore: r.jfScore, status: 'Computed' })
-    showToast(`Overall: ${r.overallScore} — ${r.descriptor}`)
+    showToast(`Overall: ${r.overallScore} - ${r.descriptor}`)
   } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
   finally { computingOverall.value = false }
 }
@@ -2021,38 +2074,24 @@ async function recomputeOverallAfterComponentChange() {
 }
 
 async function finalizeRecord() {
+  if (finalizing.value) return
+  const ok = await confirm({
+    type:         'approve',
+    title:        'Finalize Assessment',
+    message:      `This locks ${activeRecord.value?.employeeName || 'this'} assessment as Final. Scores and ratings can no longer be changed after this.`,
+    note:         'Only do this once you are sure every rating and computed score is correct.',
+    confirmLabel: 'Yes, Finalize',
+    cancelLabel:  'Not yet'
+  })
+  if (!ok) return
+  finalizing.value = true
   try {
     await ipatApi.updateStatus(activeRecord.value.id, 'Final')
     _syncRecord({ status: 'Final' })
     showToast('Assessment finalized')
-  } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
+  } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') } finally { finalizing.value = false }
 }
 
-// ── EDAP ──
-async function saveEdap() {
-  const filled = edapRows.value.filter(r => r.area.trim())
-  if (!filled.length) { showToast('Enter at least one development area', 'error'); return }
-  savingEdap.value = true
-  try {
-    await ipatApi.saveEdap(activeRecord.value.id, {
-      rows:      JSON.stringify(filled),
-      sem1Status: edapSem1Status.value,
-      sem1Notes:  edapSem1Notes.value,
-      sem2Status: edapSem2Status.value,
-      sem2Notes:  edapSem2Notes.value
-    })
-    showToast('EDAP saved')
-  } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
-  finally { savingEdap.value = false }
-}
-
-function _resetEdap() {
-  edapRows.value       = [defaultEdapRow()]
-  edapSem1Status.value = 'not-started'
-  edapSem2Status.value = 'not-started'
-  edapSem1Notes.value  = ''
-  edapSem2Notes.value  = ''
-}
 </script>
 
 <style scoped>
@@ -2091,6 +2130,7 @@ function _resetEdap() {
 .eval-lp-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;gap:8px;color:#94A3B8;text-align:center;}
 .eval-lp-empty p{margin:0;font-size:13px;font-weight:600;color:#64748B;}
 .eval-lp-empty span{font-size:12px;color:#94A3B8;}
+.eval-lp-empty .load-state-note{display:block;max-width:280px;margin-top:4px;font-size:11px;line-height:1.4;color:#64748B;}
 
 /* ── Right panel ── */
 .eval-rp-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:10px;color:#94A3B8;text-align:center;padding:40px;}
@@ -2169,15 +2209,27 @@ function _resetEdap() {
 .domain-sep{display:flex;align-items:center;font-size:17px;font-weight:800;color:#CBD5E1;flex-shrink:0;}
 
 /* Filters */
-.filter-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap;}
-.status-tabs{display:flex;gap:4px;}
-.status-tab{padding:5px 14px;border-radius:20px;font-size:12px;font-weight:500;border:1px solid #E2E8F0;background:#fff;color:#64748B;cursor:pointer;transition:all .15s;}
+/* The left panel is narrow, so every control here must be able to shrink and
+   wrap rather than overflow. Fixed pixel widths previously forced the period
+   selects onto their own row and truncated "1st Semester (Jan-Jun)". */
+.filter-bar{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
+.status-tabs{display:flex;flex-wrap:nowrap;gap:6px;flex:1 1 auto;}
+/* flex:1 1 0 makes the three tabs share the row evenly and consume the full
+   width - previously they were content-sized and left dead space to the right. */
+.status-tab{flex:1 1 0;min-width:0;text-align:center;padding:6px 10px;border-radius:20px;font-size:12px;font-weight:500;border:1px solid #E2E8F0;background:#fff;color:#64748B;cursor:pointer;transition:all .15s;white-space:nowrap;}
 .status-tab.active{background:#0D2137;color:#fff;border-color:#0D2137;}
-.filter-right{display:flex;gap:8px;align-items:center;}
-.srch-wrap{position:relative;}
+.filter-right{display:flex;flex-wrap:wrap;gap:8px;align-items:center;flex:1 1 300px;justify-content:flex-end;min-width:0;}
+.srch-wrap{position:relative;flex:1 1 190px;min-width:170px;}
 .srch-icon{position:absolute;left:9px;top:50%;transform:translateY(-50%);pointer-events:none;}
-.srch-inp{padding:7px 11px 7px 28px;border:1px solid #E2E8F0;border-radius:8px;font-size:12px;outline:none;width:200px;background:#fff;}
-.filter-select{padding:7px 10px;border:1px solid #E2E8F0;border-radius:7px;font-size:12px;color:#374151;background:#fff;outline:none;cursor:pointer;}
+.srch-inp{padding:7px 11px 7px 28px;border:1px solid #E2E8F0;border-radius:8px;font-size:12px;outline:none;width:100%;box-sizing:border-box;background:#fff;}
+/* min-width:0 lets a flex select shrink below its intrinsic content width, which
+   is what stops the row from overflowing when the panel narrows. */
+.filter-select{padding:7px 10px;border:1px solid #E2E8F0;border-radius:7px;font-size:12px;color:#374151;background:#fff;outline:none;cursor:pointer;flex:1 1 140px;min-width:0;max-width:100%;box-sizing:border-box;text-overflow:ellipsis;}
+/* max-width stops the period select absorbing all the slack on its row and
+   rendering at 340px next to a 92px year select. */
+.filter-select-period{flex:1 1 160px;max-width:210px;}
+.filter-select-year{flex:0 1 92px;min-width:78px;max-width:110px;}
+.filter-select:not(.filter-select-period):not(.filter-select-year){max-width:230px;}
 
 /* Records grid */
 .records-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-bottom:16px;}
@@ -2247,14 +2299,60 @@ function _resetEdap() {
 .modal-footer{display:flex;justify-content:flex-end;gap:8px;padding:14px 24px;border-top:1px solid #F1F5F9;background:#F8FAFC;flex-shrink:0;}
 
 /* Score summary bar */
-.score-summary-bar{display:flex;align-items:center;gap:10px;padding:14px 24px;background:linear-gradient(180deg,#FBFDFF,#F6FAFF);border-bottom:1px solid #E6EEF8;flex-shrink:0;flex-wrap:wrap;}
-.sscore{text-align:center;flex:1;min-width:84px;padding:8px 10px;border-radius:10px;background:#FFFFFF;border:1px solid #EAF0F7;}
-.sscore-lbl{font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;}
-.sscore-val{font-size:20px;font-weight:800;color:#CBD5E1;}
+/* align-items:stretch keeps the cards the same height once the equivalent
+   percentages and the descriptor made their content uneven.
+   Always one horizontal row - CBC + FPO + JF = Overall reads as a formula, and
+   stacking it vertically breaks that. flex-wrap:nowrap holds the line at every
+   zoom level; the cards shrink instead, and if the pane is genuinely too narrow
+   the bar scrolls sideways rather than reflowing into a column. */
+.score-summary-bar{container-type:inline-size;display:flex;align-items:stretch;flex-wrap:nowrap;overflow-x:auto;gap:8px;padding:14px 20px;background:linear-gradient(180deg,#FBFDFF,#F6FAFF);border-bottom:1px solid #E6EEF8;flex-shrink:0;}
+/* flex:1 1 0 shares the row proportionally; min-width is the floor that stops
+   the cards collapsing to unreadable slivers (they hit 19px without it). Once
+   the four cards plus the button no longer fit at that floor, the bar scrolls
+   sideways - it never reflows into a column. */
+.sscore{text-align:center;flex:1 1 0;min-width:82px;padding:9px 7px;border-radius:10px;background:#FFFFFF;border:1px solid #EAF0F7;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;}
+.sscore-lbl{font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px;}
+.sscore-val{font-size:20px;font-weight:800;color:#CBD5E1;line-height:1.15;}
 .sscore-val.has-val{color:#0F172A;}
 .sscore-desc{font-size:10px;font-weight:600;margin-top:4px;padding:2px 6px;border-radius:8px;}
-.sscore-op{font-size:18px;font-weight:700;color:#CBD5E1;flex-shrink:0;}
-.conduct-deduction-btn{margin-left:auto;border:1px solid #FCD34D;background:#FFFBEB;color:#92400E;border-radius:10px;padding:9px 12px;font-size:12px;font-weight:900;display:flex;align-items:center;gap:7px;cursor:pointer;white-space:nowrap;}
+.sscore-eq{font-size:10px;font-weight:700;color:#0F766E;margin-top:3px;line-height:1.2;}
+.sscore-eq-strong{font-size:11px;background:#ECFDF5;border:1px solid #BBF7D0;border-radius:999px;padding:2px 8px;display:inline-block;margin-top:5px;}
+.sscore-op{font-size:18px;font-weight:700;color:#CBD5E1;flex:0 0 auto;display:flex;align-items:center;justify-content:center;}
+/* The Overall card carries an extra pill and the descriptor, so give it a little
+   more of the row than the three domain cards. */
+.sscore-overall{flex:1.3 1 0;}
+/* The score itself must stay on one line; the "equivalent" caption may wrap.
+   Keeping nowrap on the caption pinned each card's min-content near 114px, which
+   is what forced the bar to scroll on narrow panes. */
+.sscore-val{white-space:nowrap;}
+.sscore-eq{white-space:normal;overflow-wrap:anywhere;}
+
+/* Progressive compaction, keyed on the bar's OWN width (it sits in a split pane,
+   so a viewport media query would be wrong). The aim is that the four cards
+   always fit - the bar never scrolls and never stacks. */
+@container (max-width: 620px) {
+  .score-summary-bar{gap:6px;padding:12px 12px;}
+  .sscore-op{display:none;}          /* decorative once space is tight */
+  .sscore{min-width:72px;padding:8px 5px;}
+  .sscore-lbl{font-size:9px;letter-spacing:0;margin-bottom:1px;}
+  .sscore-val{font-size:17px;}
+  .sscore-eq{font-size:9px;margin-top:2px;}
+  .sscore-eq-strong{font-size:9.5px;padding:1px 6px;margin-top:3px;}
+  .sscore-desc{font-size:9px;padding:1px 5px;margin-top:3px;}
+}
+@container (max-width: 420px) {
+  .score-summary-bar{gap:5px;padding:10px 8px;}
+  .sscore{min-width:62px;padding:7px 4px;}
+  .sscore-val{font-size:15px;}
+  .sscore-lbl{font-size:8.5px;}
+  /* Below this the caption costs more than it explains - the weighted value and
+     the descriptor still carry the meaning. */
+  .sscore-eq:not(.sscore-eq-strong){display:none;}
+}
+/* Now sits in the CBC tab intro row rather than the score bar. flex-shrink:0
+   keeps the label on one line; align-self:center holds it beside the intro text
+   instead of stretching to the block's height. */
+.conduct-deduction-btn{align-self:center;flex:0 0 auto;border:1px solid #FCD34D;background:#FFFBEB;color:#92400E;border-radius:10px;padding:9px 14px;font-size:12px;font-weight:900;display:flex;align-items:center;gap:7px;cursor:pointer;white-space:nowrap;}
 .conduct-deduction-btn:hover{border-color:#F59E0B;background:#FEF3C7;}
 .conduct-dot{width:8px;height:8px;border-radius:999px;background:#F59E0B;box-shadow:0 0 0 3px rgba(245,158,11,.16);}
 .conduct-modal{max-width:620px;}
@@ -2279,10 +2377,23 @@ function _resetEdap() {
 /* Tab content */
 .tab-intro{font-size:12px;color:#64748B;background:#F8FAFC;border:1px solid #F1F5F9;border-radius:8px;padding:10px 14px;margin-bottom:16px;line-height:1.6;}
 .scale-hint{display:block;font-size:11px;color:#94A3B8;margin-top:3px;}
-.rater-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap;}
-.rater-selector{display:flex;align-items:center;gap:10px;}
+/* Intro text on the left, Conduct Deduction on the right. The button wraps below
+   the text only if the pane is genuinely too narrow for both. */
+.tab-intro-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px 14px;}
+.tab-intro-text{flex:1 1 260px;min-width:0;}
+/* justify-content was space-between, which stranded the subordinates badge
+   against the far right edge - several hundred pixels from the select whose
+   weighting it explains. Grouping them reads as one statement, and the badge
+   still drops to its own line when the pane is too narrow. */
+.rater-row{display:flex;align-items:center;justify-content:flex-start;gap:10px 12px;margin-bottom:16px;flex-wrap:wrap;}
+.rater-selector{display:flex;align-items:center;gap:10px;flex:0 1 auto;min-width:0;}
 .rater-label{font-size:12px;font-weight:600;color:#374151;flex-shrink:0;}
-.has-sub-note{font-size:11px;color:#64748B;background:#FEF9C3;padding:4px 10px;border-radius:6px;}
+/* Was a fixed inline width:220px on the select, which could not shrink. */
+.rater-select{flex:0 1 220px;min-width:150px;max-width:220px;}
+/* align-self:center pins the badge to the select's optical centre rather than
+   letting it stretch; the border and line-height stop it reading as loose text
+   and let it wrap cleanly instead of overflowing. */
+.has-sub-note{align-self:center;font-size:11px;color:#854D0E;background:#FEF9C3;border:1px solid #FDE68A;padding:5px 10px;border-radius:6px;line-height:1.35;max-width:100%;}
 
 /* HEARTWORK themes */
 .theme-section{margin-bottom:20px;}
@@ -2330,29 +2441,55 @@ function _resetEdap() {
 .action-bar{display:flex;gap:8px;padding-top:14px;border-top:1px solid #F1F5F9;margin-top:8px;}
 
 /* FPO tab */
-.fpo-panel{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:16px;}
-.fpo-current{background:#F8FAFC;border:1px solid #F1F5F9;border-radius:10px;padding:16px;text-align:center;}
+/* auto-fit collapses the two columns to one when the detail pane is narrow,
+   instead of squeezing the 36px score and the sync button side by side. */
+.fpo-panel{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-bottom:16px;align-items:stretch;}
+.fpo-current{background:#F8FAFC;border:1px solid #F1F5F9;border-radius:10px;padding:16px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;}
 .fpo-label{font-size:11px;font-weight:600;color:#94A3B8;margin-bottom:8px;}
 .fpo-score{font-size:36px;font-weight:800;color:#0F172A;line-height:1;}
 .fpo-converted{font-size:11px;color:#64748B;margin-top:6px;}
 .fpo-update{display:flex;flex-direction:column;}
 .fpo-auto-note{font-size:11px;color:#64748B;background:#F8FAFC;border:1px solid #F1F5F9;border-radius:8px;padding:10px 12px;line-height:1.5;}
 
-.fpo-manual-panel{background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:16px;margin-bottom:16px;}
+.fpo-manual-panel{container-type:inline-size;background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:16px;margin-bottom:16px;}
 .fpo-manual-title{font-size:13px;font-weight:700;color:#92400E;margin-bottom:4px;}
 .fpo-manual-hint{font-size:11px;color:#A16207;line-height:1.5;margin-bottom:12px;}
-.fpo-manual-row{display:flex;align-items:flex-end;gap:12px;}
-.fpo-manual-input-group{flex:0 0 140px;margin-right:auto;}
-.fpo-manual-field{width:100%;font-size:18px;font-weight:700;text-align:center;padding:8px 12px;}
-.fpo-manual-result{display:flex;align-items:baseline;gap:6px;padding-bottom:6px;margin-right:40px;}
+.fpo-manual-row{display:grid;grid-template-columns:minmax(180px,.8fr) minmax(240px,1fr);grid-template-areas:"label label" "input result" "help status";align-items:start;column-gap:14px;row-gap:5px;}
+.fpo-manual-input-group{display:contents;}
+.fpo-manual-label{grid-area:label;display:flex;align-items:baseline;gap:8px;font-size:11.5px;font-weight:700;color:#92400E;}
+.fpo-manual-range{font-size:10px;font-weight:600;color:#A16207;background:#FEF3C7;border-radius:999px;padding:1px 7px;}
+/* The bare number input read as static text. A white shell with a clear border,
+   a visible focus ring and a "/ 5" affix makes it obviously editable. */
+.fpo-input-shell{grid-area:input;display:flex;align-items:center;gap:6px;min-height:45px;background:#FFFFFF;border:1.5px solid #FCD34D;border-radius:9px;padding:0 12px;transition:border-color .15s,box-shadow .15s;}
+.fpo-input-shell:focus-within{border-color:#F59E0B;box-shadow:0 0 0 3px rgba(245,158,11,.18);}
+.fpo-manual-field{flex:1 1 auto;width:100%;min-width:0;box-sizing:border-box;font-size:20px;font-weight:800;color:#0F172A;text-align:left;padding:9px 0;border:0;outline:none;background:transparent;}
+.fpo-input-affix{font-size:13px;font-weight:700;color:#A16207;flex-shrink:0;}
+.fpo-manual-help{grid-area:help;font-size:10.5px;color:#A16207;line-height:1.35;}
+.fpo-manual-invalid{grid-area:result;align-self:start;font-size:11px;font-weight:700;color:#B91C1C;background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:7px 12px;}
+.fpo-calc-caption{font-size:10px;font-weight:700;color:#A16207;text-transform:uppercase;letter-spacing:.04em;width:100%;}
+.fpo-manual-result{grid-area:result;display:flex;align-items:baseline;flex-wrap:wrap;gap:8px;min-height:45px;padding:9px 14px;background:#FFFFFF;border:1px solid #FDE68A;border-radius:9px;}
 .fpo-calc-formula{font-size:13px;color:#64748B;white-space:nowrap;}
 .fpo-calc-eq{font-size:15px;color:#94A3B8;font-weight:600;}
 .fpo-calc-value{font-size:24px;font-weight:800;color:#0F172A;line-height:1;}
-.fpo-manual-status{display:flex;align-items:center;padding-bottom:8px;}
+.fpo-manual-status{grid-area:status;display:flex;align-items:center;min-height:16px;justify-content:flex-start;}
+@container (max-width:420px){
+  .fpo-manual-row{grid-template-columns:1fr;grid-template-areas:"label" "input" "help" "result" "status";}
+  .fpo-manual-result{justify-content:center;}
+  .fpo-manual-status{justify-content:center;}
+}
 .fpo-saving-indicator{font-size:11px;color:#94A3B8;display:flex;align-items:center;gap:4px;}
-.fpo-saved-indicator{font-size:11px;font-weight:600;color:#16A34A;}
-.rating-readonly{cursor:default;opacity:.5;}
-.rating-readonly.selected{opacity:1;background:#1E40AF;color:#fff;border-color:#1E40AF;}
+.fpo-saved-indicator{font-size:11px;font-weight:700;color:#16A34A;}
+/* An administrator sees submitted ratings, and cannot change them - only the
+   assigned rater can. The selected chip used to render in the same solid
+   interactive blue as a clickable button, so the panel looked editable and
+   people went looking for a Save button that does not exist. Read-only state now
+   reads as a record, not a control: no hover, no pointer, muted fill. */
+.rating-readonly{cursor:default;opacity:.45;background:#F8FAFC;border-style:dashed;}
+.rating-readonly.selected{opacity:1;background:#EAF1FC;color:#1E3A8A;border-color:#BFD3F0;border-style:solid;font-weight:800;box-shadow:none;}
+.rating-readonly:hover{background:#F8FAFC;border-color:#D8E3F0;color:#475569;}
+.rating-readonly.selected:hover{background:#EAF1FC;border-color:#BFD3F0;color:#1E3A8A;}
+/* States plainly why nothing here can be edited. */
+.readonly-note{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#475569;background:#F1F5F9;border:1px solid #E2E8F0;border-radius:6px;padding:5px 10px;}
 .jf-evidence-readonly{font-size:11px;color:#64748B;margin-top:2px;font-style:italic;}
 
 /* JF tab */
@@ -2379,43 +2516,9 @@ function _resetEdap() {
 /* Detail loading */
 .detail-loading{display:flex;align-items:center;gap:8px;padding:10px 24px;font-size:12px;color:#64748B;background:#FAFBFF;border-bottom:1px solid #F1F5F9;flex-shrink:0;}
 
-/* EDAP tab alert */
+/* Domain tab alert */
 .dtab-alert{color:#B45309 !important;background:#FFFBEB;}
 .dtab-alert.active{background:#FEF3C7 !important;color:#92400E !important;border-bottom-color:#F59E0B !important;}
-
-/* EDAP panel */
-.edap-ok{display:flex;align-items:center;gap:10px;padding:20px 24px;font-size:13px;color:#15803D;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;margin:16px 24px;}
-.edap-section-title{font-size:12px;font-weight:700;color:#0F172A;text-transform:uppercase;letter-spacing:.04em;padding:0 24px;margin-top:16px;margin-bottom:6px;}
-.edap-hint{font-size:12px;color:#64748B;padding:0 24px;margin-bottom:12px;}
-.edap-row{border:1px solid #E2E8F0;border-radius:10px;margin:0 24px 12px;overflow:hidden;}
-.edap-row-hd{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#F8FAFC;border-bottom:1px solid #E2E8F0;}
-.edap-row-num{font-size:11px;font-weight:700;color:#475569;}
-.edap-row-remove{background:none;border:none;cursor:pointer;color:#94A3B8;font-size:16px;line-height:1;padding:0 2px;}
-.edap-row-remove:hover{color:#EF4444;}
-.edap-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px;}
-.edap-field{display:flex;flex-direction:column;gap:5px;}
-.edap-field.full{grid-column:span 2;}
-.edap-field textarea.field-input{resize:vertical;min-height:52px;}
-.edap-framework-hint{font-size:10px;color:#94A3B8;font-weight:400;margin-left:4px;}
-.edap-add-btn{margin:4px 24px 8px;font-size:12px;color:#1A56B0;background:#EFF6FF;border-color:#BFDBFE;}
-.edap-add-btn:hover{background:#DBEAFE;}
-.edap-commit-box{margin:8px 24px;padding:10px 14px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;}
-.edap-commit-label{font-size:11px;font-weight:700;color:#374151;margin-bottom:4px;}
-.edap-commit-text{font-size:12px;color:#64748B;font-style:italic;}
-.edap-tracker{margin:0 24px;border:1px solid #E2E8F0;border-radius:10px;overflow:hidden;}
-.edap-tracker-row{padding:12px;border-bottom:1px solid #F1F5F9;}
-.edap-tracker-row:last-child{border-bottom:none;}
-.edap-tracker-sem{font-size:12px;font-weight:700;color:#0F172A;margin-bottom:8px;}
-.edap-status-group{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
-.edap-status-opt{display:inline-flex;align-items:center;gap:5px;cursor:pointer;}
-.edap-status-opt input[type=radio]{display:none;}
-.edap-status-chip{font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;border:1.5px solid transparent;cursor:pointer;transition:all .12s;}
-.edap-status-opt input:checked + .edap-status-chip{border-color:currentColor;}
-.chip-gray{background:#F1F5F9;color:#64748B;}
-.chip-green{background:#F0FDF4;color:#15803D;}
-.chip-orange{background:#FFFBEB;color:#B45309;}
-.chip-blue{background:#EFF6FF;color:#1D4ED8;}
-.edap-notes{margin-top:4px;resize:vertical;min-height:52px;}
 
 /* Finalize */
 .btn-finalize{background:#F0FDF4;color:#15803D;border-color:#BBF7D0;font-weight:600;}
@@ -2433,10 +2536,14 @@ function _resetEdap() {
 .toast-slide-enter-from,.toast-slide-leave-to{opacity:0;transform:translateY(8px);}
 
 /* View tabs */
-.view-tabs {display: flex;width: 100%;gap: 8px;margin-top: 8px;margin-bottom: 5px;padding: 0 12px;box-sizing: border-box;}
-.view-tab {flex: 1;min-width: 0;height: 36px;padding: 6px 12px;display: flex;align-items: center;justify-content: center;gap: 7px;border: 1px solid #dbe4f0;border-radius: 18px;background: #ffffff;color: #52627a;font-size: 13px;font-weight: 600;line-height: 1;cursor: pointer;white-space: nowrap;}
+.view-tabs {display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));align-items:center;width:100%;gap:8px;margin-top:8px;margin-bottom:5px;padding:0 12px;box-sizing:border-box;}
+.view-tab {width:100%;min-width:0;max-width:100%;height:36px;padding:6px 10px;display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid #dbe4f0;border-radius:18px;background:#ffffff;color:#52627a;font-size:13px;font-weight:600;line-height:1;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .view-tab.active {background: #071d36;border-color: #071d36;color: #ffffff;}
 .view-tab-badge {display: inline-flex;align-items: center;justify-content: center;min-width: 18px;height: 18px;padding: 0 5px;border-radius: 999px;background: #ef4444;color: #ffffff;font-size: 10px;font-weight: 700;line-height: 1;}
+/* Sits in the tab row but performs an action rather than switching views, so it
+   is styled as a distinct control and never takes the .active treatment. */
+.view-tab-action {border-style: dashed;border-color: #b9c8dc;color: #1e3f61;background: #f8fbff;}
+.view-tab-action:hover {background: #eef5ff;border-color: #8fa9c9;}
 
 /* My Tasks */
 .tasks-period-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
@@ -2557,6 +2664,9 @@ function _resetEdap() {
 .eval-form-title{font-size:16px;font-weight:800;color:#0F172A;letter-spacing:-.3px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .eval-form-sub{font-size:12px;color:#64748B;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .eval-form-hd-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+/* Keeps Conduct Deduction and the close button together at the top-right of the
+   sticky header, so the deduction control is reachable from every domain tab. */
+.assessment-content-actions{display:flex;align-items:center;gap:10px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;}
 .eval-form-close{width:30px;height:30px;border-radius:8px;border:1px solid #E2E8F0;background:#fff;color:#94A3B8;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;flex-shrink:0;}
 .eval-form-close:hover{background:#FEF2F2;border-color:#FECACA;color:#EF4444;}
 .eval-form-scroll{display:block;}
@@ -2571,8 +2681,15 @@ function _resetEdap() {
 .eval-footer-count{font-size:12px;font-weight:700;color:#B45309;background:#FEF3E2;padding:5px 12px;border-radius:20px;}
 .eval-footer-count.done{color:#047857;background:#ECFDF5;}
 
-/* ════════════ LEFT PANEL — card polish ════════════ */
-.eval-tp-left{width:560px;background:#FBFDFF;}
+/* ════════════ LEFT PANEL - card polish ════════════ */
+/* Fluid rather than a fixed 560px stepped down at breakpoints. The percentage
+   basis resolves against the shell's own width, so the list gives space back to
+   the assessment content continuously as the window narrows, instead of holding
+   a fixed width until the next breakpoint fires. */
+/* The list gives width back to the assessment content first. A lower floor
+   (216px) and a smaller share (30%) mean the right column keeps enough room for
+   the four score cards, so that bar never has to scroll. */
+.eval-tp-left{width:auto;flex:0 1 clamp(216px, 30%, 560px);min-width:0;background:#FBFDFF;}
 .eli-list{padding:12px;display:flex;flex-direction:column;gap:10px;align-items:stretch;}
 .eli{position:relative;overflow:visible;border:1px solid #E6EDF6;border-radius:12px;background:#fff;padding:11px 14px 11px 16px;
   min-height:56px;flex:0 0 auto;box-shadow:0 1px 3px rgba(15,23,42,.04);transition:box-shadow .16s,border-color .16s,transform .09s;}
@@ -2608,7 +2725,7 @@ function _resetEdap() {
   .page-sub{font-size:12.5px;}
   .content-card{padding:18px 20px;border-radius:18px;}
   .eval-tp-shell{height:calc(100vh - 170px);min-height:780px;border-radius:16px;}
-  .eval-tp-left{width:640px;}
+  .eval-tp-left{flex-basis:clamp(268px, 34%, 640px);}
   .eval-tp-left .tasks-period-bar,
   .eval-tp-left .filter-bar{padding:18px 22px;}
   .view-tabs{padding:0 16px;gap:10px;}
@@ -2654,7 +2771,7 @@ function _resetEdap() {
 @media (min-width: 2800px) {
   .eval-page{font-size:15px;}
   .eval-tp-shell{height:calc(100vh - 190px);min-height:900px;}
-  .eval-tp-left{width:720px;}
+  .eval-tp-left{flex-basis:clamp(268px, 34%, 720px);}
   .assessment-layout{grid-template-columns:500px minmax(0,1fr);}
   .eli{min-height:78px;}
   .eli-name{font-size:15.5px;}
@@ -2667,7 +2784,6 @@ function _resetEdap() {
 }
 
 @media (max-width: 1440px) {
-  .eval-tp-left{width:430px;}
   .assessment-layout{grid-template-columns:300px minmax(0,1fr);}
 }
 
@@ -2675,7 +2791,6 @@ function _resetEdap() {
   .page-hd{grid-template-columns:1fr;}
   .page-hd-side{justify-content:flex-start;flex-wrap:wrap;}
   .domain-bar{overflow-x:auto;max-width:100%;}
-  .eval-tp-left{width:360px;}
   .assessment-layout{grid-template-columns:260px minmax(0,1fr);}
 }
 
@@ -2684,7 +2799,6 @@ function _resetEdap() {
   .domain-label{font-size:9.5px;}
   .eval-form-hd{align-items:flex-start;}
   .eval-form-hd-main{min-width:0;}
-  .eval-tp-left{width:280px;}
   .eli-name{font-size:12.5px;}
   .eli-meta{font-size:10.5px;}
   .assessment-layout{grid-template-columns:1fr;overflow:visible;}
@@ -2698,14 +2812,18 @@ function _resetEdap() {
   .eval-page{min-height:auto;}
   .content-card{overflow:visible;}
   .eval-tp-shell{flex-direction:column;height:auto;min-height:0;overflow:visible;}
-  .eval-tp-left{width:100%;max-height:none;border-right:0;border-bottom:1px solid #E2E8F0;overflow:visible;}
+  /* Shell is flex-direction:column here, so a flex-basis would be read as a
+     HEIGHT. Reset to auto so the panel sizes to its content when stacked. */
+  .eval-tp-left{flex:0 0 auto;width:100%;max-height:none;border-right:0;border-bottom:1px solid #E2E8F0;overflow:visible;}
   .eval-tp-right{max-height:none;overflow:visible;}
   .eli-list{flex:none;overflow:visible;}
   .assessment-layout{height:auto;min-height:0;overflow:visible;}
   .assessment-content{overflow:visible;}
   .assessment-content .modal-body-scroll{overflow:visible;}
   .conduct-preview{grid-template-columns:repeat(2,minmax(0,1fr));}
-  .indicator-row,.jf-row{align-items:stretch;flex-direction:column;}
+  /* .jf-row is flex so this works; .indicator-row is a GRID, where
+     flex-direction is inert - it is handled in the 640px block below. */
+  .jf-row{align-items:stretch;flex-direction:column;}
   .ind-rating{align-self:flex-end;}
 }
 
@@ -2718,6 +2836,28 @@ function _resetEdap() {
   .jf-row .ind-rating{grid-column:2;}
   .eval-form-footer{align-items:stretch;flex-direction:column;}
   .eval-footer-progress{margin-right:0;}
+}
+
+/* ── Mobile: keep the Submit Ratings button reachable ──
+   position:sticky needs a scrolling ancestor with a definite height. At <=980px
+   the shell, the right column and the scroll body are all set to height:auto /
+   overflow:visible, so sticky had nothing to stick to and the footer fell to the
+   very bottom of a very long document - a rater had to scroll past all 25
+   questions to find Submit. Pin it to the viewport instead. */
+@media (max-width: 980px) {
+  .eval-form-footer{
+    position:fixed;left:0;right:0;bottom:0;
+    z-index:60;border-top:1px solid #E2E8F0;
+    padding:10px 14px calc(10px + env(safe-area-inset-bottom));
+    background:rgba(255,255,255,.98);
+    box-shadow:0 -4px 18px rgba(15,23,42,.12);
+    flex-direction:row;align-items:center;gap:10px;
+  }
+  .eval-footer-progress{margin-right:auto;}
+  .eval-form-footer .btn{flex:1 1 auto;min-height:44px;justify-content:center;}
+  .eval-footer-count{white-space:nowrap;}
+  /* Clearance so the last question is not hidden behind the fixed bar. */
+  .assessment-content .modal-body-scroll{padding-bottom:88px;}
 }
 
 /* Fix All Assessments filters overflowing the left panel */
@@ -2745,11 +2885,17 @@ function _resetEdap() {
   min-width: 0;
 }
 
-/* Search and division filter row */
+/* Search and division filter row.
+   flex:0 0 auto is load-bearing: .filter-bar is a COLUMN here, so the base
+   rule's `flex:1 1 300px` would be read as a 300px height basis with grow -
+   which stretched this grid to 300px and pushed its two rows 153px apart.
+   align-content:start then keeps the rows packed at their natural height. */
 .eval-tp-left .filter-right {
   display: grid;
   grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
   align-items: center;
+  align-content: start;
+  flex: 0 0 auto;
   width: 100%;
   min-width: 0;
   gap: 8px;
@@ -2783,5 +2929,60 @@ function _resetEdap() {
   .eval-tp-left .filter-right {
     grid-template-columns: 1fr;
   }
+}
+
+/* ════════════════════════ PHONE ════════════════════════
+   Below 640px the four rating buttons cannot sit beside the question text -
+   they would leave roughly 150px for a two-line sentence. The row becomes a
+   two-line grid instead, with the buttons on their own full-width line and
+   sized to a 44px touch target. */
+@media (max-width: 640px) {
+  .content-card{padding:10px 8px;}
+  .eval-tp-shell{border-radius:12px;}
+
+  .assessment-content-header{padding:12px 14px;flex-wrap:wrap;gap:10px;}
+  .assessment-content-title h3{font-size:15px;}
+  .assessment-content-title p{font-size:11.5px;}
+  .assessment-content-actions{width:100%;justify-content:space-between;}
+
+  .score-summary-bar{padding:12px 12px;gap:6px;}
+  /* The bottom value is clearance for the fixed footer. It must be repeated here
+     because this shorthand comes later in the file than the <=980px rule and
+     would otherwise reset padding-bottom, letting the bar cover the last
+     question. */
+  .assessment-content .modal-body-scroll{padding:14px 12px 104px;}
+
+  /* Question number and text on line 1, ratings full-width on line 2. */
+  .indicator-row{
+    grid-template-columns:24px minmax(0,1fr);
+    grid-template-areas:"num text" "rating rating";
+    row-gap:12px;padding:14px 12px;
+  }
+  .ind-num{grid-area:num;}
+  .ind-text{grid-area:text;font-size:13px;}
+  .ind-rating{grid-area:rating;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;justify-content:stretch;width:100%;}
+  .rating-btn{width:100%;height:44px;font-size:15px;}
+
+  .jf-row{padding:14px 12px;}
+  .jf-row .ind-rating{width:100%;}
+
+  /* Manual FPO entry stacks; the input keeps a comfortable tap height. */
+  .fpo-manual-panel{padding:14px 12px;}
+  .fpo-manual-row{grid-template-columns:1fr;grid-template-areas:"label" "input" "help" "result" "status";}
+  .fpo-manual-result{justify-content:flex-start;}
+  .fpo-manual-status{justify-content:flex-start;}
+  .fpo-manual-field{font-size:18px;padding:11px 0;}
+  .fpo-panel{grid-template-columns:1fr;}
+
+  .rater-row{gap:10px;}
+  .rater-select{flex:1 1 100%;max-width:none;}
+  .has-sub-note{flex:1 1 100%;}
+
+  .theme-hd{flex-wrap:wrap;gap:8px;}
+  .view-tabs{padding:0 8px;gap:6px;}
+  .view-tab{height:38px;font-size:12px;}
+  .eli-list{padding:8px;gap:8px;}
+  .eval-tp-left .tasks-period-bar,
+  .eval-tp-left .filter-bar{padding:12px 10px;}
 }
 </style>

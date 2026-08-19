@@ -7,25 +7,54 @@ const Router = (() => {
     const sub = parts[2] || null   // could be an action word on top of a real id
     const subId = parts[3] || null
 
+    if (
+      typeof OfficeScopeService !== 'undefined' &&
+      OfficeScopeService.isAssessmentScopedResource(resource) &&
+      !params.__officeScopeApplied
+    ) {
+      const scopedParams = { ...params, __officeScopeApplied: true }
+      const scopedBody = body === params ? scopedParams : { ...body, __officeScopeApplied: true }
+      return OfficeScopeService.run(resource, params, user, () =>
+        dispatch(route, method, scopedParams, scopedBody, user)
+      )
+    }
+
     switch (resource) {
 
       // ─────────────────────────────────────────
-      // Auth — routes: auth/me, auth/log
+      // Auth - routes: auth/me, auth/log
       // id='me' or id='log' (no real object id)
       // ─────────────────────────────────────────
       case 'auth':
-        if (id === 'me') return AuthService.getProfile(user)
+        // touchLogin: this is the sign-in path, the one place lastLoginAt should
+        // be written. Every other caller reads the profile without writing.
+        if (id === 'me') return AuthService.getProfile(user, { touchLogin: true })
         if (id === 'whoami') return AuthService.whoami(user)
+        if (id === 'backend-info') return AuthService.backendInfo(user)
         if (id === 'register-options') return AuthService.registrationOptions()
         if (id === 'register' && method === 'POST') return UsersService.selfRegister(body, user)
         if (id === 'log') return AuditService.log(body.action, body.module, body.details, user)
         break
 
       // ─────────────────────────────────────────
-      // Dashboard — routes: dashboard/summary, /divisions, /status, /activity
+      // Dashboard - routes: dashboard/summary, /divisions, /status, /activity
       // id = action name
       // ─────────────────────────────────────────
+      // ─────────────────────────────────────────
+      // Portal - the assessment-only experience for participating offices.
+      // Office-scoped by OfficeScopeService; every caller sees only their own
+      // assignments in their own office spreadsheet.
+      // ─────────────────────────────────────────
+      case 'portal':
+        if (id === 'summary' && method === 'GET') return PortalService.summary(params, user)
+        if (id === 'my-tasks' && method === 'GET') return PortalService.myTasks(params, user)
+        if (id === 'my-results' && method === 'GET') return PortalService.myResults(params, user)
+        if (id === 'library' && method === 'GET') return PortalService.library(params, user)
+        if (id === 'office-summary' && method === 'GET') return PortalService.officeSummary(params, user)
+        break
+
       case 'dashboard':
+        if (id === 'all') return DashboardService.all(params, user)
         if (id === 'summary') return DashboardService.summary(params, user)
         if (id === 'divisions') return DashboardService.divisions(params, user)
         if (id === 'status') return DashboardService.statusBreakdown(params, user)
@@ -33,22 +62,62 @@ const Router = (() => {
         break
 
       // ─────────────────────────────────────────
-      // Users — routes: users, users/:id, users/:id/activate, etc.
+      // Users - routes: users, users/:id, users/:id/activate, etc.
       // ─────────────────────────────────────────
       case 'users':
         if (!id && method === 'GET') return UsersService.list(params, user)
         if (!id && method === 'POST') return UsersService.create(body, user)
         if (id && !sub && method === 'GET') return UsersService.get(id, user)
         if (id && !sub && method === 'PUT') return UsersService.update(id, body, user)
+        if (id && !sub && method === 'DELETE') return UsersService.remove(id, user)
         if (id && sub === 'deactivate') return UsersService.deactivate(id, user)
         if (id && sub === 'activate') return UsersService.activate(id, user)
         if (id && sub === 'decline') return UsersService.decline(id, user)
         if (id && sub === 'reset-password') return UsersService.resetPassword(id, body, user)
         break
 
+      // Read-only multi-office boundary report. Deliberately NOT in
+      // OfficeScopeService.SCOPED_RESOURCES - it must describe the central
+      // database, not be redirected into an office workbook.
+      case 'diagnostics':
+        if (id === 'office-boundary' && method === 'GET') return DiagnosticsService.officeBoundary(params, user)
+        break
+
+      // Central-admin-only reversible dummy data for dashboard testing.
+      // Not office-scoped: it intentionally seeds/cleans multiple registered
+      // office workbooks from the central boundary.
+      case 'test-data':
+        if (id === 'seed' && method === 'POST') return TestDataService.seed(body, user)
+        if (id === 'cleanup' && method === 'POST') return TestDataService.cleanup(body, user)
+        if (id === 'accounts' && method === 'POST') return TestDataService.seedAccounts(body, user)
+        if (id === 'accounts-cleanup' && method === 'POST') return TestDataService.cleanupAccounts(body, user)
+        break
+
       case 'system-settings':
         if (!id && method === 'GET') return SystemSettingsService.list(user)
         if (!id && method === 'PUT') return SystemSettingsService.update(body, user)
+        break
+
+      case 'office-registry':
+        if (!id && method === 'GET') return OfficeRegistryService.list(params, user)
+        if (!id && method === 'POST') return OfficeRegistryService.provision(body, user)
+        if (id === 'picker' && method === 'GET') return OfficeRegistryService.picker(params, user)
+        if (id === 'spec' && method === 'GET') return OfficeSchemaService.getSpec()
+        if (id === 'monitoring' && method === 'GET') return OfficeRegistryService.monitoring(params, user)
+        if (id && !sub && method === 'GET') return OfficeRegistryService.get(id, user)
+        if (id && sub === 'org-options' && method === 'GET') return OfficeRegistryService.orgOptions(id, user)
+        if (id && sub === 'org-options' && method === 'PUT') return OfficeRegistryService.saveOrgOptions(id, body, user)
+        if (id && sub === 'validate' && method === 'POST') return OfficeRegistryService.validate(id, user)
+        if (id && sub === 'repair' && method === 'POST') return OfficeRegistryService.repair(id, user)
+        if (id && sub === 'activate' && method === 'POST') return OfficeRegistryService.activate(id, user)
+        break
+
+      case 'office-personnel':
+        if (!id && method === 'GET') return OfficePersonnelService.list(params, user)
+        if (!id && method === 'POST') return OfficePersonnelService.create(body, user)
+        if (id && !sub && method === 'PUT') return OfficePersonnelService.update(id, body, user)
+        if (id && sub === 'deactivate') return OfficePersonnelService.deactivate(id, user)
+        if (id && sub === 'activate') return OfficePersonnelService.activate(id, user)
         break
 
       // ─────────────────────────────────────────
@@ -60,7 +129,7 @@ const Router = (() => {
         break
 
       case 'kras':
-        // Not implemented — the live KRA feature uses the 'kra-library' routes.
+        // Not implemented - the live KRA feature uses the 'kra-library' routes.
         // Guarded so a stray call returns a clean 501 instead of a 500 crash.
         throw HttpError('KRA endpoint is not available. Use kra-library.', 501)
 
@@ -99,6 +168,20 @@ const Router = (() => {
       // ─────────────────────────────────────────
       // Accomplishments
       // ─────────────────────────────────────────
+      // Per-office rater matrix - who rates whom. Office-scoped.
+      case 'rater-matrix':
+        if (!id && method === 'GET') return RaterMatrixService.list(params, user)
+        if (!id && method === 'PUT') return RaterMatrixService.save(body, user)
+        if (id === 'coverage' && method === 'GET') return RaterMatrixService.coverage(params, user)
+        if (id === 'seed-defaults' && method === 'POST') return RaterMatrixService.seedDefaults(body, user)
+        break
+
+      case 'assessment-rules':
+        if (!id && method === 'GET') return AssessmentRulesService.list(params, user)
+        if (!id && method === 'PUT') return AssessmentRulesService.update(body, user)
+        if (id === 'seed-defaults' && method === 'POST') return AssessmentRulesService.seedDefaults(user)
+        break
+
       case 'accomplishments':
         if (!id && method === 'GET') return AccomplishmentsService.list(params, user)
         if (!id && method === 'POST') return AccomplishmentsService.create(body, user)
@@ -113,20 +196,23 @@ const Router = (() => {
       // ─────────────────────────────────────────
       // MOV Files
       // ─────────────────────────────────────────
+      // MOV file uploads were removed by policy: personnel do not upload
+      // evidence files. Means of verification are recorded as pasted links or
+      // text in the IPCRF/CCEF `movReferences` field instead. Guarded so any
+      // stale client call returns a clean 410 rather than a routing 404.
       case 'mov':
-        if (!id && method === 'GET') return MovService.list(params, user)
-        if (id === 'upload') return MovService.upload(body, user)
-        if (id && !sub && method === 'GET') return MovService.get(id, user)
-        if (id && !sub && method === 'DELETE') return MovService.remove(id, user)
-        if (id && sub === 'preview') return MovService.preview(id, user)
-        break
+        throw HttpError('The MOV file module has been removed. Record means of verification as links or text in the IPCRF/CCEF form.', 410)
 
       // ─────────────────────────────────────────
       // Reports
       // ─────────────────────────────────────────
       case 'reports':
-        // Not implemented yet — guarded so calls return a clean 501, not a 500.
-        throw HttpError('Reports endpoint is not available yet.', 501)
+        if (!id && method === 'GET') return ReportsService.list(params, user)
+        if (id === 'options' && method === 'GET') return ReportsService.options(params, user)
+        if (id === 'preview' && method === 'POST') return ReportsService.preview(body, user)
+        if (id === 'generate' && method === 'POST') return ReportsService.generate(body, user)
+        if (id && sub === 'download' && method === 'GET') return ReportsService.download(id, user)
+        break
 
       // ─────────────────────────────────────────
       // Notifications
@@ -155,14 +241,34 @@ const Router = (() => {
         if (id === 'normalize-columns' && method === 'POST') return DatabaseMaintenanceService.normalizeColumnOrder(body, user)
         if (id === 'fresh-schema' && method === 'GET') return DatabaseMaintenanceService.previewFreshRebuild(user)
         if (id === 'fresh-schema' && method === 'POST') return DatabaseMaintenanceService.rebuildFreshDatabase(body, user)
+        if (id === 'normalize-staff-role' && method === 'GET') return RoleLabelMaintenanceService.preview(user)
+        if (id === 'normalize-staff-role' && method === 'POST') return RoleLabelMaintenanceService.normalizeStaffRoles(body, user)
         break
 
       // ─────────────────────────────────────────
       // Deadlines
       // ─────────────────────────────────────────
       case 'deadlines':
-        // Not implemented yet — guarded so calls return a clean 501, not a 500.
+        // Not implemented yet - guarded so calls return a clean 501, not a 500.
         throw HttpError('Deadlines endpoint is not available yet.', 501)
+
+      // ─────────────────────────────────────────────
+      // Reserved resources - a client exists in services/api.js but no backend
+      // was ever built. Previously these fell through to the default case and
+      // returned "Route not found", which reads like a routing bug rather than
+      // an unbuilt feature. Guarded so the distinction is unambiguous.
+      // Their sheets (Evaluations, AttendanceRecords, AttendanceRatings,
+      // PeerAssignments, JRBRatings) are also absent from the live database.
+      // See the known-issues register for the implement/remove decision.
+      // ─────────────────────────────────────────────
+      case 'evaluations':
+        throw HttpError('Evaluations endpoint is not available. IPAT scoring is under ipat/*.', 501)
+
+      case 'attendance':
+        throw HttpError('Attendance endpoint is not available yet.', 501)
+
+      case 'peer-assignments':
+        throw HttpError('Peer assignments endpoint is not available. Rater assignment is under ipat-assignments/*.', 501)
 
       // ─────────────────────────────────────────
       // IPCRF / CCEF Forms
@@ -210,8 +316,6 @@ const Router = (() => {
         if (id && sub === 'jf' && !subId && method === 'POST')   return IPATService.saveJFRatings(id, body, user)
         if (id && sub === 'jf' && subId === 'compute')           return IPATService.computeJF(id, user)
         if (id && sub === 'compute')                             return IPATService.computeOverall(id, user)
-        if (id && sub === 'edap' && method === 'GET')            return IPATService.getEdap(id, user)
-        if (id && sub === 'edap' && method === 'POST')           return IPATService.saveEdap(id, body, user)
         if (id === 'themes')        return IPATService.getThemes(params, user)
         if (id === 'jf-indicators') return IPATService.getJFIndicators(params, user)
         break
@@ -225,11 +329,21 @@ const Router = (() => {
         if (id && sub === 'ratee-assignments' && method === 'GET') return IPATRaterAssignmentService.getRateeAssignments(id, params, user)
         if (id && sub === 'submit-ratings' && method === 'POST') return IPATRaterAssignmentService.submitAssignmentRatings(id, body, user)
         if (id && sub === 'complete' && method === 'POST') return IPATRaterAssignmentService.markCompleted(id, user)
+        // Destructive: GET previews what would be removed, POST performs it.
+        // The service was implemented but unreachable until 2026-08-04.
+        if (id === 'reset-period' && method === 'GET')  return IPATRaterAssignmentService.previewDeleteForPeriod(params, user)
+        if (id === 'reset-period' && method === 'POST') {
+          const expected = 'RESET ' + String(body.semester || '') + ' ' + String(body.year || '')
+          if (String(body.confirmation || '') !== expected) {
+            throw HttpError('This action is permanent. Type the confirmation phrase exactly to proceed.', 400)
+          }
+          return IPATRaterAssignmentService.deleteForPeriod(body.semester, body.year, user)
+        }
         break
 
       // ─────────────────────────────────────────
-      // Generated documents — print/export
-      // docgen/{fileId}/print — id = the generated Drive file's id
+      // Generated documents - print/export
+      // docgen/{fileId}/print - id = the generated Drive file's id
       // ─────────────────────────────────────────
       case 'docgen':
         if (id && sub === 'print') return PmesDocGenService.exportPdf(id, params.tab, user)

@@ -192,11 +192,11 @@
           </div>
           <div class="maintenance-pill rebuild">
             <span>Rebuild sheets</span>
-            <strong>{{ maintenancePreview?.finalSheetOrder?.length || '—' }}</strong>
+            <strong>{{ maintenancePreview?.finalSheetOrder?.length || '-' }}</strong>
           </div>
           <div class="maintenance-pill remove">
             <span>Remove unused</span>
-            <strong>{{ maintenancePreview?.removeSheets?.length ?? '—' }}</strong>
+            <strong>{{ maintenancePreview?.removeSheets?.length ?? '-' }}</strong>
           </div>
         </div>
 
@@ -249,7 +249,7 @@
       <div class="card-hd user-card-hd">
         <div>
           <span class="card-title">Accounts</span>
-          <p class="card-subtitle">Showing {{ loading ? '...' : filteredUsers.length }} of {{ users.length }} users</p>
+          <p class="card-subtitle">{{ loading ? 'Showing ...' : paginationSummary }}</p>
         </div>
         <span class="badge badge-blue">{{ loading ? 'Loading...' : filteredUsers.length + ' shown' }}</span>
       </div>
@@ -265,7 +265,7 @@
               <th v-if="canManageUsers">Temp Password</th>
               <th>Status</th>
               <!-- <th>Last Login</th> -->
-              <th v-if="canManageUsers">Actions</th>
+              <th v-if="canAdministerUsers">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -289,14 +289,14 @@
                 <td v-if="canManageUsers"><div class="sk-line" style="width:80px"></div></td>
                 <td><div class="sk-pill" style="width:55px"></div></td>
                 <!-- <td><div class="sk-line" style="width:60px"></div></td> -->
-                <td v-if="canManageUsers"><div class="sk-actions"></div></td>
+                <td v-if="canAdministerUsers"><div class="sk-actions"></div></td>
               </tr>
             </template>
 
             <!-- ── Real data rows ── -->
             <template v-else>
-              <tr v-for="(u, i) in filteredUsers" :key="u.email" :class="i % 2 === 1 ? 'stripe' : ''">
-                <td v-if="canManageUsers">
+              <tr v-for="(u, i) in pagedUsers" :key="u.id || u.email" :class="i % 2 === 1 ? 'stripe' : ''">
+                <td>
                   <div class="user-cell">
                     <div class="av" :style="{ background: u.avatarColor }">{{ u.initials }}</div>
                     <div>
@@ -307,8 +307,8 @@
                 </td>
                 <td class="text-xs muted">{{ u.email }}</td>
                 <td><span :class="['role-badge', roleBadgeClass(u.role)]">{{ u.role }}</span></td>
-                <td class="text-xs muted">{{ u.division || '—' }}</td>
-                <td class="text-xs muted">{{ u.section || '—' }}</td>
+                <td class="text-xs muted">{{ u.division || '-' }}</td>
+                <td class="text-xs muted">{{ u.section || '-' }}</td>
                 <td v-if="canManageUsers">
                   <div class="flex-row gap-6" v-if="u.tempPassword">
                     <code class="temp-pw">{{ showPw[u.email] ? u.tempPassword : '••••••••' }}</code>
@@ -326,9 +326,9 @@
                     </button>
                     <span v-if="copied" class="copied-tag">Copied!</span>
                   </div>
-                  <span v-else class="text-xs muted">—</span>
+                  <span v-else class="text-xs muted">-</span>
                 </td>
-                <td>
+                <td v-if="canAdministerUsers">
                   <span :class="['status-badge', u.status === 'Active' ? 's-green' : u.status === 'Pending' ? 's-amber' : 's-red']">
                     {{ u.status === 'Pending' ? 'Pending' : u.status }}
                   </span>
@@ -344,21 +344,32 @@
                       </svg>
                     </button>
                     <template v-if="u.status === 'Pending'">
-                      <button class="btn btn-xs approve" @click="activateUser(u)">Approve</button>
-                      <button class="btn btn-xs deactivate" @click="declineUser(u)">Decline</button>
+                      <button class="btn btn-xs approve" :disabled="busyUserId === u.id" @click="activateUser(u)">
+                        <span v-if="busyUserId === u.id" class="spinner-xs"></span>{{ busyUserId === u.id ? 'Approving…' : 'Approve' }}
+                      </button>
+                      <button class="btn btn-xs deactivate" :disabled="busyUserId === u.id" @click="declineUser(u)">Decline</button>
                     </template>
-                    <button v-else-if="u.status === 'Inactive'" class="btn btn-xs activate" @click="activateUser(u)">Activate</button>
-                    <button v-else-if="u.status === 'Active'" class="btn btn-xs deactivate" @click="deactivateUser(u)">Deactivate</button>
-                    <button class="icon-btn-sm danger" @click="resetPassword(u)" title="Reset password">
+                    <button v-else-if="u.status === 'Inactive'" class="btn btn-xs activate" :disabled="busyUserId === u.id" @click="activateUser(u)">
+                      <span v-if="busyUserId === u.id" class="spinner-xs"></span>{{ busyUserId === u.id ? 'Activating…' : 'Activate' }}
+                    </button>
+                    <button v-else-if="u.status === 'Active'" class="btn btn-xs deactivate" :disabled="busyUserId === u.id" @click="deactivateUser(u)">
+                      <span v-if="busyUserId === u.id" class="spinner-xs"></span>{{ busyUserId === u.id ? 'Saving…' : 'Deactivate' }}
+                    </button>
+                    <button v-if="canManageUsers" class="icon-btn-sm danger" @click="resetPassword(u)" title="Reset password">
                       <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                         <path d="M2 6a4 4 0 017-2M10 6a4 4 0 01-7 2M10 4v3H7" stroke="#EF4444" stroke-width="1.2" stroke-linecap="round"/>
+                      </svg>
+                    </button>
+                    <button v-if="canManageUsers" class="icon-btn-sm danger" :disabled="busyUserId === u.id" title="Delete permanently" @click="deleteUser(u)">
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                        <path d="M2 3h8M5 3V2h2v1M3.5 3v6.5c0 .28.22.5.5.5h4c.28 0 .5-.22.5-.5V3" stroke="#EF4444" stroke-width="1.2" stroke-linecap="round"/>
                       </svg>
                     </button>
                   </div>
                 </td>
               </tr>
               <tr v-if="!loading && !filteredUsers.length">
-                <td :colspan="canManageUsers ? 8 : 6" class="empty-row">
+                <td :colspan="usersTableColspan" class="empty-row">
                   <svg width="32" height="32" viewBox="0 0 32 32" fill="none" style="margin:0 auto 8px;display:block">
                     <circle cx="16" cy="16" r="14" stroke="#E2E8F0" stroke-width="2"/>
                     <path d="M11 16h10M16 11v10" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round"/>
@@ -371,10 +382,46 @@
           </tbody>
         </table>
       </div>
+      <div v-if="!loading && filteredUsers.length" class="pagination-bar">
+        <div class="pagination-meta">
+          <span>{{ pageRangeLabel }}</span>
+          <label class="page-size-control">
+            <span>Rows</span>
+            <select v-model.number="pageSize" class="page-size-select">
+              <option v-for="size in pageSizeOptions" :key="size" :value="size">{{ size }}</option>
+            </select>
+          </label>
+        </div>
+        <div class="pagination-controls">
+          <button class="page-btn" :disabled="currentPage === 1" @click="goToPage(1)" title="First page">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+              <path d="M7.5 3L4 6.5L7.5 10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M10 3L6.5 6.5L10 10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <button class="page-btn" :disabled="currentPage === 1" @click="goToPage(currentPage - 1)" title="Previous page">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+              <path d="M8 3L4.5 6.5L8 10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <span class="page-indicator">Page {{ currentPage }} of {{ totalPages }}</span>
+          <button class="page-btn" :disabled="currentPage === totalPages" @click="goToPage(currentPage + 1)" title="Next page">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+              <path d="M5 3L8.5 6.5L5 10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <button class="page-btn" :disabled="currentPage === totalPages" @click="goToPage(totalPages)" title="Last page">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+              <path d="M5.5 3L9 6.5L5.5 10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M3 3L6.5 6.5L3 10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- ══════════════════════════════════════════
-         ADD / EDIT USER MODAL — redesigned
+         ADD / EDIT USER MODAL - redesigned
          ══════════════════════════════════════════ -->
     <transition name="modal-fade">
       <div v-if="showModal" class="modal-overlay" @click.self="closeModal">
@@ -434,37 +481,62 @@
                   <label class="field-label">Role <span class="req">*</span></label>
                   <select v-model="form.role" class="field-select">
                     <option value="">Select role…</option>
-                    <option>System Administrator</option>
-                    <option>Bureau Director</option>
-                    <option>Assistant Bureau Director</option>
-                    <option>Division Chief</option>
-                    <option>Section Head</option>
-                    <option>Staff</option>
+                    <option v-for="role in userFormRoleOptions" :key="role">{{ role }}</option>
                   </select>
                 </div>
                 <div class="field">
                   <label class="field-label">Division</label>
                   <select v-model="form.division" class="field-select">
                     <option value="">Select division…</option>
-                    <option>Admin Pool</option>
-                    <option>Design Formulation Division</option>
-                    <option>Pilot Implementation Division</option>
-                    <option>Social Technology Analysis and Evaluation Division</option>
+                    <option v-for="division in selectedOfficeDivisions" :key="division.id || division.name" :value="division.name">
+                      {{ division.name }}
+                    </option>
                   </select>
                 </div>
                 <div class="field full">
-                  <label class="field-label">Section</label>
-                  <select v-model="form.section" class="field-select">
-                    <option value="">Select section…</option>
-                    <option>Children and Youth Section</option>
-                    <option>Women, Older Persons and Persons with Disability Section</option>
-                    <option>Other Marginalized Groups Section</option>
+                  <label class="field-label">Section <span v-if="roleRequiresSection" class="req">*</span></label>
+                  <select v-model="form.section" class="field-select" :disabled="!form.division">
+                    <option value="">{{ form.division ? sectionSelectPlaceholder : 'Select division first…' }}</option>
+                    <option v-for="section in sectionsForSelectedDivision" :key="section.id" :value="section.name">
+                      {{ section.name }}
+                    </option>
                   </select>
+                  <p v-if="!roleRequiresSection && form.role" class="field-help">
+                    Optional for this role - it oversees the whole division or office rather than a single section.
+                  </p>
                 </div>
-                <div class="field full">
+                <div v-if="canManageUsers" class="field">
+                  <label class="field-label">System Scope</label>
+                  <select v-model="form.systemScope" class="field-select">
+                    <option v-for="opt in systemScopeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                  </select>
+                  <p class="field-help">{{ systemScopeDescription }}</p>
+                  <div v-if="form.systemScope === 'CLUSTER_ADMIN'" class="access-group-warning" style="margin-top:6px;">
+                    This scope alone grants no abilities - provisioning, monitoring, etc. still come from the
+                    <strong>Access Groups</strong> checked below (the Cluster / Central Administration section).
+                  </div>
+                </div>
+                <div v-if="canManageUsers" class="field">
+                  <label class="field-label">Office</label>
+                  <select v-model="form.officeId" class="field-select" :disabled="form.systemScope === 'STB_FULL' || !officeOptions.length">
+                    <option value="STB">Social Technology Bureau</option>
+                    <option v-for="office in officeOptions" :key="office.officeId" :value="office.officeId">
+                      {{ office.officeName }}
+                    </option>
+                  </select>
+                  <p class="field-help">{{ officeFieldHelp }}</p>
+                </div>
+                <div v-if="canManageUsers" class="field full">
                   <label class="field-label">Access Groups</label>
+                  <p class="field-help" style="margin-bottom:10px;">
+                    Groups add system permissions without changing the user's official role. Most accounts need none of these -
+                    only check a box if this specific person needs the extra ability it describes.
+                  </p>
+
+                  <div class="access-group-subhead">STB Bureau Access</div>
+                  <p class="access-group-subnote">Adds abilities within the Social Technology Bureau's own scope.</p>
                   <div class="access-group-grid">
-                    <label v-for="group in accessGroupOptions" :key="group.value" class="access-group-option">
+                    <label v-for="group in stbAccessGroupOptions" :key="group.value" class="access-group-option">
                       <input v-model="form.permissionGroups" type="checkbox" :value="group.value"/>
                       <span>
                         <strong>{{ group.label }}</strong>
@@ -472,7 +544,25 @@
                       </span>
                     </label>
                   </div>
-                  <p class="field-help">Groups add system permissions without changing the user's official role.</p>
+
+                  <details class="cluster-group-disclosure" :open="hasClusterGroupSelected">
+                    <summary class="access-group-subhead">Cluster / Central Administration</summary>
+                    <div class="access-group-warning">
+                      <strong>These are cross-office, not scoped to one office.</strong>
+                      To restrict an account to managing only its own office, use
+                      <strong>System Scope → Office Admin Portal</strong> above instead - do not check a box here for that.
+                      Checking any of these gives visibility or control across every participating office.
+                    </div>
+                    <div class="access-group-grid">
+                      <label v-for="group in clusterAccessGroupOptions" :key="group.value" class="access-group-option">
+                        <input v-model="form.permissionGroups" type="checkbox" :value="group.value"/>
+                        <span>
+                          <strong>{{ group.label }}</strong>
+                          <small>{{ group.description }}</small>
+                        </span>
+                      </label>
+                    </div>
+                  </details>
                 </div>
               </div>
             </div>
@@ -491,10 +581,12 @@
                 </div>
                 <div class="field">
                   <label class="field-label">Employment Type</label>
+                  <!-- Options come from the shared list so this screen cannot
+                       write a spelling registration does not use. A retired
+                       value already on the record is appended by
+                       employmentTypeOptions() so it stays visible. -->
                   <select v-model="form.type" class="field-select">
-                    <option value="Regular">Regular</option>
-                    <option value="Contract of Service (COS)">Contract of Service (COS)</option>
-                    <option value="Co-Term">Co-Term</option>
+                    <option v-for="t in employmentTypeOptions(form.type)" :key="t" :value="t">{{ t }}</option>
                   </select>
                 </div>
               </div>
@@ -576,10 +668,17 @@
                 <span v-if="copied" class="copied-tag">Copied!</span>
               </div>
             </div>
+            <div class="access-group-warning" style="margin-top:10px;">
+              Copy this now - the system never stores the plain-text password, only a hash.
+              Once you apply the reset, this is the only place it will ever be shown; the Temp
+              Password column reflects it only until this page is next refreshed.
+            </div>
           </div>
           <div class="modal-footer">
-            <button class="btn" @click="showResetModal = false">Cancel</button>
-            <button class="btn btn-primary" @click="confirmReset">Apply Reset</button>
+            <button class="btn" :disabled="resettingPw" @click="showResetModal = false">Cancel</button>
+            <button class="btn btn-primary" :disabled="resettingPw" @click="confirmReset">
+              {{ resettingPw ? 'Applying...' : 'Apply Reset' }}
+            </button>
           </div>
         </div>
       </div>
@@ -601,24 +700,22 @@
 
 <script setup>
 import { ref, computed, h, onMounted, watch } from 'vue'
-import { usersApi, focalAssignmentsApi, maintenanceApi, systemSettingsApi } from '@/services/api'
+import { usersApi, focalAssignmentsApi, maintenanceApi, systemSettingsApi, officeRegistryApi } from '@/services/api'
 import { useConfirm, CONFIRMS } from '@/composables/useConfirm'
 import { usePermissions } from '@/composables/usePermissions'
+import { useOrgOptions } from '@/composables/useOrgOptions'
 import { useAuthStore } from '@/stores/auth'
+import { employmentTypeOptions } from '@/utils/employmentTypes'
 
-// Must match the canonical Divisions seeded in InitSheets.gs exactly.
-// The division <select> binds to the display name only; this resolves it to
-// the id the backend actually scopes/filters by (divisionId was previously
-// never sent at all, so every newly-created user got an empty divisionId
-// regardless of role — silently breaking any division/section-scoped access).
-const DIVISION_IDS = {
-  'Admin Pool': 'admin-pool',
-  'Design Formulation Division': 'dfd',
-  'Pilot Implementation Division': 'pid',
-  'Social Technology Analysis and Evaluation Division': 'staed'
-}
-
-const accessGroupOptions = [
+// Split into two groups because they answer two different questions, and
+// mixing them in one flat grid is what made "10 checkboxes, no idea which one"
+// confusing. STB groups add abilities WITHIN the bureau's own scope - safe
+// defaults for STB staff. Cluster groups add abilities ACROSS every
+// participating office and are rarely what a new account needs; checking one
+// of these for someone who should only manage their own office is the most
+// common mistake this form invites; System Scope -> Office Admin Portal is
+// the correct tool for that instead.
+const stbAccessGroupOptions = [
   {
     value: 'system-admin',
     label: 'System Admin Group',
@@ -651,11 +748,73 @@ const accessGroupOptions = [
   }
 ]
 
+const clusterAccessGroupOptions = [
+  {
+    value: 'cluster-system-admin',
+    label: 'Cluster System Admin',
+    description: 'Can manage office registry, provisioning, validation, and cluster monitoring.'
+  },
+  {
+    value: 'cluster-technical-admin',
+    label: 'Cluster Technical Admin',
+    description: 'Can provision and validate office assessment spreadsheets.'
+  },
+  {
+    value: 'cluster-assessment-admin',
+    label: 'Cluster Assessment Admin',
+    description: 'Can manage assessment content and monitor participating offices.'
+  },
+  {
+    value: 'cluster-monitoring-admin',
+    label: 'Cluster Monitoring Admin',
+    description: 'Can monitor participating offices without provisioning access.'
+  }
+]
+
+const hasClusterGroupSelected = computed(() =>
+  clusterAccessGroupOptions.some(g => (form.value.permissionGroups || []).includes(g.value))
+)
+
+// Same fix as Access Groups: the difference between these four was only ever
+// explained in chat, not in the form itself, so it had to be re-explained
+// every time someone hit this screen. Putting the description at the point of
+// decision means it doesn't need to be remembered or asked about again.
+const systemScopeOptions = [
+  {
+    value: 'STB_FULL',
+    label: 'STB Full PMES',
+    description: 'The complete original PMES for Social Technology Bureau - Dashboard, KRA, IPCRF/CCEF, Accomplishments, Evaluation, Reports. Always uses the central STB spreadsheet, never an office one.'
+  },
+  {
+    value: 'CLUSTER_PORTAL',
+    label: 'Innovation Cluster Portal',
+    description: 'Restricted personnel screens only - My Dashboard, My Rating Tasks, My Results, Assessment Library. No KRA, no admin screens. This is what self-registration into a participating office sets automatically.'
+  },
+  {
+    value: 'OFFICE_ADMIN',
+    label: 'Office Admin Portal',
+    description: 'Everything Cluster Portal gets, plus office-scoped admin screens (Personnel Validation, Office Dashboard, Rater Tagging) - strictly limited to the Office selected on the right. Use this to make someone an administrator of one office only.'
+  },
+  {
+    value: 'CLUSTER_ADMIN',
+    label: 'Central Cluster Admin',
+    description: 'Opts out of the "STB is the only full scope" default so cross-office screens (Cluster Overview, Office Registry) become reachable - but grants no ability by itself. What this account can actually do still depends on which Access Groups are checked below.'
+  }
+]
+
+const systemScopeDescription = computed(() =>
+  systemScopeOptions.find(o => o.value === form.value.systemScope)?.description || ''
+)
+
 const search        = ref('')
 const roleFilter    = ref('')
 const statusFilter  = ref('')
+const currentPage   = ref(1)
+const pageSize      = ref(10)
+const pageSizeOptions = [10, 25, 50]
 const showModal     = ref(false)
 const showResetModal = ref(false)
+const resettingPw    = ref(false)
 const showFocalPanel = ref(false)
 const showMaintenancePanel = ref(false)
 const editingUser   = ref(null)
@@ -669,6 +828,16 @@ const copied        = ref(false)
 const showPw        = ref({})
 const toast         = ref({ show: false, msg: '', type: 'success' })
 const users         = ref([])
+const officeOptions = ref([])
+const officeOptionsError = ref(false)
+// Backend paginate() defaults to 50; this view shows the whole directory at once,
+// so ask for a ceiling well above any realistic office headcount. If the cluster
+// ever exceeds this, loadUsers() warns instead of truncating silently.
+const USERS_PAGE_SIZE = 2000
+// Which row is mid-write. Approving hits Apps Script AND the Firebase Admin API,
+// so it is measured in seconds - without this the admin clicked Approve and saw
+// nothing change, with no way to tell whether it had registered.
+const busyUserId = ref('')
 const focalUsers    = ref([])
 const divisionFocalRows = ref([])
 const bureauFocals = ref({ primaryUserId: '', alternateUserId: '' })
@@ -690,12 +859,41 @@ const systemAccessModes = ref([
     description: 'Users can access the modules allowed by their role and permissions.'
   }
 ])
-const { canManageUsers, canManageFocalAssignments, canManageDatabase } = usePermissions()
+const { canManageUsers, canManageOfficeUsers, canManageFocalAssignments, canManageDatabase } = usePermissions()
 const { confirm, confirmState } = useConfirm()
 const authStore = useAuthStore()
+const { loadOrgOptions, optionsForOffice } = useOrgOptions()
 const activeUsersCount = computed(() => users.value.filter(u => u.status === 'Active').length)
 const inactiveUsersCount = computed(() => users.value.filter(u => u.status === 'Inactive').length)
 const pendingUsersCount = computed(() => users.value.filter(u => u.status === 'Pending').length)
+const canAdministerUsers = computed(() => canManageUsers.value || canManageOfficeUsers.value)
+const usersTableColspan = computed(() => 6 + (canManageUsers.value ? 1 : 0) + (canAdministerUsers.value ? 1 : 0))
+/**
+ * Roles offered when editing an account.
+ *
+ * Drawn from the SELECTED OFFICE's own configuration, the same source the
+ * Division and Section selects beside it already use. This was a hardcoded
+ * Bureau ladder, so an administrator editing someone in a participating office
+ * was offered STB roles that office does not use - and could not assign the
+ * roles it does.
+ *
+ * The Bureau ladder remains the fallback for STB and for any office that has
+ * not configured its own roles yet.
+ */
+const userFormRoleOptions = computed(() => {
+  const STB_ROLES = ['Bureau Director', 'Assistant Bureau Director', 'Division Chief', 'Section Head', 'Technical Staff']
+  const configured = selectedOfficeOrgOptions.value.requestedRoles || []
+  const base = configured.length ? [...configured] : STB_ROLES
+  const roles = canManageUsers.value ? ['System Administrator', ...base] : base
+
+  // The role this person already holds, and the one they asked for at
+  // registration, must always be selectable. Otherwise a pending request for a
+  // role outside the configured list - 'Undersecretary', say - cannot be
+  // approved from this screen at all, and editing an existing account would
+  // silently blank a role that is not on the list.
+  const pinned = [form.value.role, form.value.requestedRole].filter(Boolean)
+  return [...new Set([...roles, ...pinned])]
+})
 const reviewerUsersCount = computed(() => users.value.filter(u =>
   ['System Administrator', 'Bureau Director', 'Assistant Bureau Director', 'Division Chief', 'Section Head'].includes(u.role)
 ).length)
@@ -737,7 +935,7 @@ const SearchSelect = {
         .slice(0, 40)
     })
 
-    // Closed-state text is just the name — full role/division shows in the
+    // Closed-state text is just the name - full role/division shows in the
     // tooltip and in the dropdown itself, so a long title never has to be
     // crammed into a ~200px box.
     watch(() => props.modelValue, () => {
@@ -787,7 +985,7 @@ const SearchSelect = {
         class: 'field-input search-select-input',
         type: 'text',
         placeholder: props.placeholder,
-        title: selected.value ? `${selected.value.fullName} — ${metaFor(selected.value)}` : '',
+        title: selected.value ? `${selected.value.fullName} - ${metaFor(selected.value)}` : '',
         onFocus: () => { open.value = true },
         onInput: event => {
           query.value = event.target.value
@@ -834,14 +1032,57 @@ const SearchSelect = {
 // ── Load users on mount ──
 onMounted(async () => {
   await loadUsers()
-  if (canManageUsers.value) await loadSystemSettings()
+  const loads = [loadOrgOptions()]
+  if (canManageUsers.value) loads.push(loadOfficeOptions(), loadSystemSettings())
+  await Promise.all(loads)
+})
+
+async function loadOfficeOptions() {
+  officeOptionsError.value = false
+  try {
+    // The full registry (officeRegistryApi.list) is central-admin-only and 403s
+    // for any admin who only has User Management access - this picker endpoint
+    // is authorized under manage_users instead, since assigning a user to an
+    // office is a user-management task, not a central-registry one.
+    const data = await officeRegistryApi.picker()
+    officeOptions.value = data.items || (Array.isArray(data) ? data : [])
+  } catch (e) {
+    console.warn('[PMES] Office registry unavailable for user form:', e?.message || e)
+    officeOptions.value = []
+    officeOptionsError.value = true
+  }
+}
+
+const officeFieldHelp = computed(() => {
+  if (form.value.systemScope === 'STB_FULL') {
+    return 'Locked to STB - STB Full PMES always uses the central STB spreadsheet.'
+  }
+  if (!officeOptions.value.length) {
+    return officeOptionsError.value
+      ? 'Could not load participating offices - the dropdown is disabled until this loads. Refresh the page and try again.'
+      : 'Disabled: no participating office is active yet. Provision and activate one in Office Registry first.'
+  }
+  return 'The one office this account is limited to for office-scoped screens and data.'
 })
 
 async function loadUsers() {
   loading.value = true
   try {
-    const result = await usersApi.list()
+    // SpreadsheetService.paginate() defaults to pageSize 50. Calling list() with
+    // no params silently returned only the first 50 rows - and because new
+    // accounts are appended to the bottom of the sheet, the rows that went
+    // missing were always the newest ones. That is why self-registered users
+    // never appeared under "Pending activation".
+    const result = await usersApi.list({ pageSize: USERS_PAGE_SIZE })
     users.value  = (result.items ?? result ?? []).map(mapUser)
+
+    // If the account count ever exceeds the page size, say so loudly rather than
+    // truncating in silence again.
+    const total = Number(result?.total)
+    if (Number.isFinite(total) && total > users.value.length) {
+      console.warn(`[Users] Truncated: showing ${users.value.length} of ${total}.`)
+      showToast(`Showing ${users.value.length} of ${total} accounts. Narrow the search to see the rest.`, 'error')
+    }
   } catch (e) {
     console.warn('[Users]', e.message)
     showToast('Could not load users from database.', 'error')
@@ -1091,7 +1332,7 @@ function mapUser(row) {
     initials:     name.split(/\s+/).filter(Boolean).map(n => n[0]).join('').toUpperCase(),
     name,
     email:        row.email        || '',
-    role:         row.role         || 'Staff',
+    role:         row.role         || 'Technical Staff',
     division:     row.divisionName || row.divisionId || '',
     divisionId:   row.divisionId   || '',
     section:      row.section      || '',
@@ -1104,6 +1345,12 @@ function mapUser(row) {
     pendingActivation: row.pendingActivation === true || String(row.pendingActivation).toLowerCase() === 'true',
     requestedRole: row.requestedRole || '',
     selfRegistered: row.selfRegistered === true || String(row.selfRegistered).toLowerCase() === 'true',
+    officeId: row.officeId || 'STB',
+    officeCode: row.officeCode || row.officeId || 'STB',
+    officeName: row.officeName || 'Social Technology Bureau',
+    systemScope: row.systemScope || 'STB_FULL',
+    officeRole: row.officeRole || 'STB_PERSONNEL',
+    centralRoles: parseList(row.centralRoles),
     permissionGroups: parseList(row.permissionGroups),
     permissions: parseList(row.permissions),
     lastLogin:    row.lastLoginAt ? formatDate(row.lastLoginAt) : 'Never',
@@ -1140,32 +1387,143 @@ function generatePassword() {
 }
 
 // ── Form ──
-const defaultForm = () => ({
-  fullName:'', email:'',
-  role:'', division:'', section:'', position:'',
-  employeeNo:'', type:'Regular',
-  permissionGroups: [],
-  tempPassword: generatePassword()
-})
+const defaultForm = () => {
+  const profile = authStore.profile || {}
+  const centralUserManager = canManageUsers.value
+  return {
+    fullName:'', email:'',
+    role:'', division:'', section:'', position:'',
+    employeeNo:'', type:'Regular',
+    officeId: centralUserManager ? 'STB' : (profile.officeId || 'STB'),
+    officeCode: centralUserManager ? 'STB' : (profile.officeCode || profile.officeId || 'STB'),
+    officeName: centralUserManager ? 'Social Technology Bureau' : (profile.officeName || 'Social Technology Bureau'),
+    systemScope: centralUserManager ? 'STB_FULL' : 'CLUSTER_PORTAL',
+    officeRole: centralUserManager ? 'STB_PERSONNEL' : 'OFFICE_PERSONNEL',
+    centralRoles: [],
+    permissionGroups: [],
+    tempPassword: generatePassword()
+  }
+}
 
 const form = ref(defaultForm())
 function regeneratePassword() { form.value.tempPassword = generatePassword() }
 
+const selectedOfficeOrgOptions = computed(() => optionsForOffice(form.value.officeId, form.value.officeCode))
+const selectedOfficeDivisions = computed(() => selectedOfficeOrgOptions.value.divisions || [])
+const selectedOfficeSections = computed(() => selectedOfficeOrgOptions.value.sections || [])
+const selectedDivisionOption = computed(() =>
+  selectedOfficeDivisions.value.find(division => division.name === form.value.division || division.id === form.value.division)
+)
+const sectionsForSelectedDivision = computed(() => {
+  const divisionId = selectedDivisionOption.value?.id || ''
+  return selectedOfficeSections.value.filter(section => String(section.divisionId || '') === String(divisionId))
+})
+const sectionSelectPlaceholder = computed(() =>
+  sectionsForSelectedDivision.value.length ? 'Select section…' : 'No sections available'
+)
+
+/**
+ * Only roles that actually sit inside a section need one. Section Heads and the
+ * staff under them belong to a single section; Assistant Division Chief and
+ * every rank above it oversees a whole division, office, program or bureau, so
+ * pinning them to one section is wrong - and the save used to be blocked until
+ * they picked one.
+ *
+ * Offices configure their own role ladders, so this matches on the section-level
+ * names rather than trying to enumerate everything above them. Anything not on
+ * this list is treated as division-level or higher and saves without a section.
+ */
+const SECTION_LEVEL_ROLES = ['section head', 'technical staff', 'admin staff']
+const roleRequiresSection = computed(() =>
+  SECTION_LEVEL_ROLES.includes(String(form.value.role || '').trim().toLowerCase())
+)
+
+watch(() => form.value.division, () => {
+  if (!form.value.section) return
+  const valid = sectionsForSelectedDivision.value.some(section => section.name === form.value.section)
+  if (!valid) form.value.section = ''
+})
+
+watch(() => form.value.systemScope, scope => {
+  if (scope === 'STB_FULL') {
+    form.value.officeId = 'STB'
+    form.value.officeCode = 'STB'
+    form.value.officeName = 'Social Technology Bureau'
+    form.value.officeRole = 'STB_PERSONNEL'
+  } else if (scope === 'OFFICE_ADMIN') {
+    form.value.officeRole = 'OFFICE_ADMIN'
+  } else if (scope === 'CLUSTER_ADMIN') {
+    form.value.officeRole = 'CENTRAL_ADMIN'
+  } else {
+    form.value.officeRole = 'OFFICE_PERSONNEL'
+  }
+})
+
+watch(() => form.value.officeId, officeId => {
+  if (officeId === 'STB') {
+    form.value.officeCode = 'STB'
+    form.value.officeName = 'Social Technology Bureau'
+    return
+  }
+  const office = officeOptions.value.find(item => item.officeId === officeId)
+  if (office) {
+    form.value.officeCode = office.officeCode
+    form.value.officeName = office.officeName
+  }
+  if (!form.value.division) return
+  const validDivision = selectedOfficeDivisions.value.some(division => division.name === form.value.division)
+  if (!validDivision) {
+    form.value.division = ''
+    form.value.section = ''
+  }
+})
+
 // ── Filter ──
+function searchable(value) {
+  return String(value ?? '').toLowerCase()
+}
+
 const filteredUsers = computed(() => {
-  const q = search.value.toLowerCase().trim()
+  const q = searchable(search.value).trim()
   return users.value.filter(u => {
+    const fields = [u.name, u.email, u.role, u.division, u.section, u.employeeNo]
     const matchesSearch = !q ||
-      u.name.toLowerCase().includes(q) ||
-      u.email.toLowerCase().includes(q) ||
-      u.role.toLowerCase().includes(q) ||
-      (u.division || '').toLowerCase().includes(q) ||
-      (u.section || '').toLowerCase().includes(q) ||
-      (u.employeeNo || '').toLowerCase().includes(q)
+      fields.some(field => searchable(field).includes(q))
     const matchesRole = !roleFilter.value || u.role === roleFilter.value
     const matchesStatus = !statusFilter.value || u.status === statusFilter.value
     return matchesSearch && matchesRole && matchesStatus
   })
+})
+
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredUsers.value.length / pageSize.value)))
+const pageStartIndex = computed(() => (currentPage.value - 1) * pageSize.value)
+const pagedUsers = computed(() =>
+  filteredUsers.value.slice(pageStartIndex.value, pageStartIndex.value + pageSize.value)
+)
+const pageRangeLabel = computed(() => {
+  if (!filteredUsers.value.length) return 'No users shown'
+  const start = pageStartIndex.value + 1
+  const end = Math.min(pageStartIndex.value + pageSize.value, filteredUsers.value.length)
+  return `Showing ${start}-${end} of ${filteredUsers.value.length}`
+})
+const paginationSummary = computed(() => {
+  const filteredCount = filteredUsers.value.length
+  const totalCount = users.value.length
+  return filteredCount === totalCount
+    ? `${pageRangeLabel.value} users`
+    : `${pageRangeLabel.value} matching users (${totalCount} total)`
+})
+
+function goToPage(page) {
+  currentPage.value = Math.min(Math.max(Number(page) || 1, 1), totalPages.value)
+}
+
+watch([search, roleFilter, statusFilter, pageSize], () => {
+  currentPage.value = 1
+})
+
+watch(totalPages, pages => {
+  if (currentPage.value > pages) currentPage.value = pages
 })
 
 // ── Modal ──
@@ -1183,6 +1541,12 @@ function openEditModal(user) {
     position:     user.position    || '',
     employeeNo:   user.employeeNo  || '',
     type:         user.type        || 'Regular',
+    officeId:     user.officeId    || 'STB',
+    officeCode:   user.officeCode  || user.officeId || 'STB',
+    officeName:   user.officeName  || 'Social Technology Bureau',
+    systemScope:  user.systemScope || 'STB_FULL',
+    officeRole:   user.officeRole  || 'STB_PERSONNEL',
+    centralRoles: [...(user.centralRoles || [])],
     permissionGroups: [...(user.permissionGroups || [])],
     tempPassword: ''
   }
@@ -1193,6 +1557,12 @@ function openEditModal(user) {
 async function saveUser() {
   if (!form.value.fullName || !form.value.email || !form.value.role) {
     showToast('Please fill in all required fields.', 'error'); return
+  }
+  if (roleRequiresSection.value && sectionsForSelectedDivision.value.length && !form.value.section) {
+    showToast('Please select a section for the chosen division.', 'error'); return
+  }
+  if (form.value.systemScope !== 'STB_FULL' && !form.value.officeId) {
+    showToast('Please select the assigned office for this portal user.', 'error'); return
   }
   const ok = await confirm(editingUser.value
     ? {
@@ -1211,12 +1581,18 @@ async function saveUser() {
       fullName:    form.value.fullName,
       email:       form.value.email,
       role:        form.value.role,
-      divisionId:   DIVISION_IDS[form.value.division] || '',
+      divisionId:   selectedDivisionOption.value?.id || '',
       divisionName: form.value.division,
       section:     form.value.section,
       position:    form.value.position,
       employeeNo:  form.value.employeeNo,
       type:        form.value.type,
+      officeId:    form.value.officeId || 'STB',
+      officeCode:  form.value.officeCode || form.value.officeId || 'STB',
+      officeName:  form.value.officeName || 'Social Technology Bureau',
+      systemScope: form.value.systemScope || 'STB_FULL',
+      officeRole:  form.value.officeRole || 'STB_PERSONNEL',
+      centralRoles: [...(form.value.centralRoles || [])],
       permissionGroups: [...(form.value.permissionGroups || [])]
     }
     if (editingUser.value) {
@@ -1224,14 +1600,20 @@ async function saveUser() {
       const idx = users.value.findIndex(u => u.id === editingUser.value.id)
       if (idx !== -1) users.value[idx] = mapUser(updated)
       showToast('User updated successfully.')
+      if (updated?.officePersonnelSync?.error) {
+        showToast(`Saved, but not yet added to the office roster: ${updated.officePersonnelSync.error}`, 'warning')
+      }
     } else {
       const newUser = await usersApi.create({ ...payload, tempPassword: form.value.tempPassword, mustChangePassword: true })
       users.value.unshift(mapUser(newUser))
       showToast(`User created! Temp password: ${form.value.tempPassword}`)
+      if (newUser?.officePersonnelSync?.error) {
+        showToast(`Account created, but not yet added to the office roster: ${newUser.officePersonnelSync.error}`, 'warning')
+      }
     }
     closeModal()
   } catch (e) {
-    console.error(e); showToast('Something went wrong. Please try again.', 'error')
+    console.error(e); showToast(e?.message || 'Something went wrong. Please try again.', 'error')
   } finally {
     saving.value = false
   }
@@ -1246,16 +1628,28 @@ async function activateUser(user) {
     message: `${user.name} will be granted access to PMES with the role "${user.role}". Edit their role or division first if it needs to change.`,
     details: [
       { label: 'Email', value: user.email },
-      { label: 'Requested role', value: user.requestedRole || '—' },
-      { label: 'Assigned role', value: user.role }
+      { label: 'Requested role', value: user.requestedRole || '-' },
+      { label: 'Assigned role', value: user.role },
+      { label: 'System scope', value: user.systemScope || 'STB_FULL' },
+      { label: 'Office', value: user.officeName || 'Social Technology Bureau' }
     ],
     note: 'The user will be able to sign in immediately after approval.',
     confirmLabel: 'Approve & Activate',
     cancelLabel: 'Not yet'
   } : CONFIRMS.activateUser(user.name))
   if (!ok) return
-  try   { await usersApi.activate(user.id); user.status = 'Active'; user.pendingActivation = false; showToast(`${user.name} ${isApproval ? 'approved' : 'activated'}.`) }
-  catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
+  busyUserId.value = user.id
+  try {
+    await usersApi.activate(user.id)
+    user.status = 'Active'
+    user.pendingActivation = false
+    showToast(`${user.name} ${isApproval ? 'approved' : 'activated'}.`)
+  } catch (e) {
+    console.error(e)
+    showToast(e?.message || 'Something went wrong. Please try again.', 'error')
+  } finally {
+    busyUserId.value = ''
+  }
 }
 
 async function declineUser(user) {
@@ -1268,11 +1662,17 @@ async function declineUser(user) {
     cancelLabel: 'Cancel'
   })
   if (!ok) return
+  busyUserId.value = user.id
   try {
     await usersApi.decline(user.id)
     users.value = users.value.filter(u => u.id !== user.id)
     showToast(`${user.name}'s registration declined.`, 'warning')
-  } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
+  } catch (e) {
+    console.error(e)
+    showToast(e?.message || 'Something went wrong. Please try again.', 'error')
+  } finally {
+    busyUserId.value = ''
+  }
 }
 async function deactivateUser(user) {
   const ok = await confirm(CONFIRMS.deactivateUser(user.name))
@@ -1281,17 +1681,34 @@ async function deactivateUser(user) {
   catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
 }
 
+async function deleteUser(user) {
+  const ok = await confirm(CONFIRMS.deleteUser(user.name, user.email))
+  if (!ok) return
+  busyUserId.value = user.id
+  try {
+    await usersApi.remove(user.id)
+    users.value = users.value.filter(u => u.id !== user.id)
+    showToast(`${user.name} permanently deleted.`, 'warning')
+  } catch (e) {
+    console.error(e)
+    showToast(e?.message || 'Something went wrong. Please try again.', 'error')
+  } finally {
+    busyUserId.value = ''
+  }
+}
+
 // ── Reset password ──
 function resetPassword(user) { resetTarget.value = user; resetTempPw.value = generatePassword(); showResetModal.value = true }
 async function confirmReset() {
   const ok = await confirm(CONFIRMS.resetPassword(resetTarget.value.name))
   if (!ok) return
+  resettingPw.value = true
   try {
     await usersApi.resetPassword(resetTarget.value.id, { tempPassword: resetTempPw.value })
     resetTarget.value.tempPassword = resetTempPw.value
     showToast(`Password reset for ${resetTarget.value.name}.`)
   } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
-  finally { showResetModal.value = false }
+  finally { resettingPw.value = false; showResetModal.value = false }
 }
 
 // ── Helpers ──
@@ -1307,6 +1724,7 @@ function roleBadgeClass(role) {
     'Assistant Bureau Director': 'role-director',
     'Division Chief': 'role-chief',
     'Staff': 'role-staff',
+    'Technical Staff': 'role-staff',
     'Contractor of Service': 'role-contractor'
   }
   return map[role] || 'role-staff'
@@ -1360,6 +1778,11 @@ function showToast(msg, type='success') {
 .btn:disabled{opacity:.55;cursor:not-allowed;}
 .btn-sm{padding:4px 9px;font-size:11px;}
 .btn-xs{padding:3px 8px;font-size:10px;border-radius:5px;}
+.btn-xs:disabled{opacity:.65;cursor:not-allowed;}
+/* Inline busy indicator for row actions - approving reaches both Apps Script and
+   the Firebase Admin API, so the wait is seconds, not milliseconds. */
+.spinner-xs{display:inline-block;width:9px;height:9px;margin-right:5px;vertical-align:-1px;
+  border:1.5px solid currentColor;border-top-color:transparent;border-radius:50%;animation:spin .6s linear infinite;}
 .activate{background:#F0FDF4;color:#15803D;border-color:#BBF7D0;}
 .activate:hover{background:#DCFCE7;}
 .deactivate{background:#FEF2F2;color:#B91C1C;border-color:#FECACA;}
@@ -1466,6 +1889,10 @@ function showToast(msg, type='success') {
   .summary-grid{grid-template-columns:1fr;}
   .page-heading h1{font-size:20px;}
   .top-actions .btn{width:100%;justify-content:center;}
+  .pagination-bar{align-items:stretch;flex-direction:column;}
+  .pagination-meta{justify-content:space-between;}
+  .pagination-controls{justify-content:space-between;}
+  .page-indicator{flex:1;}
   .form-grid,.access-group-grid{grid-template-columns:1fr;}
   .full{grid-column:span 1;}
 }
@@ -1482,6 +1909,16 @@ function showToast(msg, type='success') {
 .tbl tbody tr:hover td{background:#F8FBFF;}
 .stripe td{background:#FCFDFF;}
 .empty-row{text-align:center;color:#94A3B8;padding:40px !important;font-size:13px;}
+.pagination-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-top:1px solid #EFF3F8;background:#FBFCFE;}
+.pagination-meta,.pagination-controls,.page-size-control{display:flex;align-items:center;gap:8px;min-width:0;}
+.pagination-meta{color:#7183A3;font-size:12px;font-weight:600;}
+.page-size-control span{font-size:11px;color:#8BA0C0;text-transform:uppercase;letter-spacing:.05em;}
+.page-size-select{height:30px;border:1px solid #DDE7F3;background:#fff;border-radius:7px;padding:0 8px;color:#1A2332;font-size:12px;outline:none;}
+.page-size-select:focus{border-color:#2F80ED;box-shadow:0 0 0 3px rgba(47,128,237,.08);}
+.page-btn{width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;border:1px solid #DDE7F3;background:#fff;color:#64748B;border-radius:7px;cursor:pointer;transition:all .15s;}
+.page-btn:hover:not(:disabled){border-color:#BFDBFE;background:#EFF6FF;color:#1A56B0;}
+.page-btn:disabled{opacity:.45;cursor:not-allowed;}
+.page-indicator{min-width:86px;text-align:center;color:#475569;font-size:12px;font-weight:700;}
 .flex-row{display:flex;align-items:center;}
 .gap-4{gap:4px;} .gap-6{gap:6px;} .gap-8{gap:8px;}
 .fw-500{font-weight:500;font-size:13px;}
@@ -1568,6 +2005,26 @@ function showToast(msg, type='success') {
 .access-group-option input{margin-top:2px;accent-color:#0B4BB3;}
 .access-group-option strong{display:block;font-size:12px;color:#0F172A;line-height:1.2;}
 .access-group-option small{display:block;margin-top:3px;font-size:10.5px;color:#7183A3;line-height:1.35;}
+
+.access-group-subhead{
+  font-size:10px;font-weight:700;color:#475569;text-transform:uppercase;
+  letter-spacing:.5px;margin:14px 0 4px;cursor:default;list-style:none;
+}
+.access-group-subhead::-webkit-details-marker{display:none;}
+summary.access-group-subhead{cursor:pointer;display:flex;align-items:center;gap:6px;}
+summary.access-group-subhead::before{
+  content:'▸';display:inline-block;font-size:9px;color:#94A3B8;
+  transition:transform .15s;
+}
+.cluster-group-disclosure[open] summary.access-group-subhead::before{transform:rotate(90deg);}
+.access-group-subnote{margin:0 0 8px;font-size:10.5px;color:#94A3B8;line-height:1.3;}
+.cluster-group-disclosure{margin-top:2px;}
+.access-group-warning{
+  display:flex;flex-direction:column;gap:2px;margin:6px 0 10px;padding:9px 11px;
+  background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;
+  font-size:10.5px;line-height:1.4;color:#92400E;
+}
+.access-group-warning strong{color:#78350F;}
 
 .field-input,.field-select{
   padding:9px 12px;border:1.5px solid #E2E8F0;border-radius:9px;

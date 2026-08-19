@@ -1,11 +1,11 @@
 /*
- * Global system font — single source of truth for the app-wide font-family.
+ * Global system font - single source of truth for the app-wide font-family.
  * Loaded first in main.js so it reaches elements teleported to <body>
  * (modals, toasts) that live outside any view's scoped wrapper.
  *
  * SVG is excluded so inline font-family attributes (donut chart text, logos)
  * keep rendering with their intended fonts. Monospace fields and LoginView
- * keep their overrides — class selectors outrank these 0/low-specificity rules.
+ * keep their overrides - class selectors outrank these 0/low-specificity rules.
  */
 html,
 body,

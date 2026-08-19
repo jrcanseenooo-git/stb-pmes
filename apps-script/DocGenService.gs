@@ -1,12 +1,12 @@
 /**
  * Generates official DSWD IPCRF / CCEF "Targets" (Annex F.1) and "Ratings" (Annex F.2)
  * documents by cloning the official Google Sheets template files and filling them in
- * with data from the PMES IPCRF_FORMS / FORM_ENTRIES sheets — instead of recreating
+ * with data from the PMES IPCRF_FORMS / FORM_ENTRIES sheets - instead of recreating
  * the layout from scratch. This preserves the exact official formatting (merges,
  * borders, landscape page setup, auto-height wrapped rows) because the output IS a
  * real copy of the real template, not a re-implementation of it.
  *
- * ── CONFIG — VERIFY THESE AGAINST THE LIVE DRIVE FILES BEFORE TRUSTING IN PRODUCTION ──
+ * ── CONFIG - VERIFY THESE AGAINST THE LIVE DRIVE FILES BEFORE TRUSTING IN PRODUCTION ──
  * Tab names and column letters below were reverse-engineered from a flattened text
  * export of the templates, not a live cell-by-cell inspection. Generate ONE test
  * document for each docType and spot-check alignment before relying on this for
@@ -21,7 +21,7 @@ const PmesDocGenService = (() => {
   const CCEF_RATINGS_TEMPLATE_ID = '1zo_bsR3Jb3C-23i7HeIZ6ULfZ1aDS-eNFpaODjLqCwo'
 
   // Source tab to clone the STRUCTURE/FORMATTING from for each doc type.
-  // These are filled example tabs in the template files — we copy them, then
+  // These are filled example tabs in the template files - we copy them, then
   // wipe the data rows and refill with the actual staff member's data.
   const SOURCE_TAB = {
     IPCRF: {
@@ -34,7 +34,7 @@ const PmesDocGenService = (() => {
     }
   }
 
-  // Column letters for the indicator table — same layout in both IPCRF and CCEF.
+  // Column letters for the indicator table - same layout in both IPCRF and CCEF.
   const COL = {
     targets: { kra: 'B', si: 'C', period: 'D', effGuide: 'E', qualGuide: 'F', timeGuide: 'G', mov: 'H', remarks: 'I' },
     ratings: { kra: 'B', si: 'C', accomplishment: 'D', eff: 'E', qual: 'F', time: 'G', avg: 'H', mov: 'I', remarks: 'J' }
@@ -43,7 +43,7 @@ const PmesDocGenService = (() => {
   const OUTPUT_FOLDER_NAME = 'PMES Generated Forms'
 
   // ─────────────────────────────────────────────
-  // PUBLIC: generate Annex F.1 — Targets
+  // PUBLIC: generate Annex F.1 - Targets
   // ─────────────────────────────────────────────
   function generateTargetsDoc(formId, user) {
     const form  = _withOwnerProfileFields(IpcrfService.get(formId, user))
@@ -65,7 +65,7 @@ const PmesDocGenService = (() => {
   }
 
   // ─────────────────────────────────────────────
-  // PUBLIC: generate Annex F.2 — Ratings
+  // PUBLIC: generate Annex F.2 - Ratings
   // ─────────────────────────────────────────────
   function generateRatingsDoc(formId, user, semester) {
     const sem  = String(semester) === '2' ? '2' : '1'
@@ -125,7 +125,7 @@ const PmesDocGenService = (() => {
   }
 
   // ─────────────────────────────────────────────
-  // INTERNAL — one combined Drive file per form (Targets + Ratings as tabs)
+  // INTERNAL - one combined Drive file per form (Targets + Ratings as tabs)
   // ─────────────────────────────────────────────
   function _getOrCreateFormFile(form) {
     if (form.docFileId) {
@@ -260,11 +260,11 @@ const PmesDocGenService = (() => {
   }
 
   // ─────────────────────────────────────────────
-  // INTERNAL — anchor lookup (TextFinder, resilient to row insert/delete)
+  // INTERNAL - anchor lookup (TextFinder, resilient to row insert/delete)
   // ─────────────────────────────────────────────
   function _findRow(sheet, text) {
     const match = sheet.createTextFinder(text).matchEntireCell(false).findNext()
-    if (!match) throw HttpError(`Could not locate anchor text "${text}" in generated sheet — template layout may have changed`, 500)
+    if (!match) throw HttpError(`Could not locate anchor text "${text}" in generated sheet - template layout may have changed`, 500)
     return match.getRow()
   }
 
@@ -289,7 +289,7 @@ const PmesDocGenService = (() => {
   }
 
   // ─────────────────────────────────────────────
-  // INTERNAL — header fields (Targets)
+  // INTERNAL - header fields (Targets)
   // ─────────────────────────────────────────────
   function _fillTargetsHeader(sheet, form) {
     const rDept = _findRow(sheet, 'DEPARTMENT OF SOCIAL WELFARE AND DEVELOPMENT')
@@ -297,7 +297,7 @@ const PmesDocGenService = (() => {
     sheet.getRange(rDept + 5, 2).setValue(`SOCIAL TECHNOLOGY BUREAU - ${(form.divisionName || '').toUpperCase()}`)
 
     // Anchored close to the actual target cells instead of a long offset chain from
-    // a distant header label — that long chain is what let a stale template name
+    // a distant header label - that long chain is what let a stale template name
     // ("Girardo Badana") bleed through when CCEF's header block didn't line up
     // exactly with the row count the offsets were derived from on IPCRF.
     const rTable = _findRow(sheet, 'INDIVIDUAL COMMITMENTS AND ACCOMPLISHMENTS')
@@ -386,7 +386,7 @@ const PmesDocGenService = (() => {
   }
 
   // ─────────────────────────────────────────────
-  // INTERNAL — header fields (Ratings)
+  // INTERNAL - header fields (Ratings)
   // ─────────────────────────────────────────────
   function _fillRatingsHeader(sheet, form, sem) {
     const periodLabel = sem === '2' ? '2nd Semester' : '1st Semester'
@@ -396,7 +396,7 @@ const PmesDocGenService = (() => {
   }
 
   // ─────────────────────────────────────────────
-  // INTERNAL — Core / Support indicator table (shared by Targets + Ratings)
+  // INTERNAL - Core / Support indicator table (shared by Targets + Ratings)
   // ─────────────────────────────────────────────
   function _fillIndicatorSections(sheet, form, docType) {
     const col = COL[docType]
@@ -509,7 +509,7 @@ const PmesDocGenService = (() => {
   }
 
   // ─────────────────────────────────────────────
-  // INTERNAL — final rating + signatures (Ratings doc only)
+  // INTERNAL - final rating + signatures (Ratings doc only)
   // ─────────────────────────────────────────────
   function _fillFinalRating(sheet, form) {
     const rFinal = _findRow(sheet, 'FINAL NUMERICAL RATING')
@@ -560,7 +560,7 @@ const PmesDocGenService = (() => {
     return 'Poor'
   }
 
-  // PART II — Feedback. These fields exist on the IPCRF_FORMS sheet
+  // PART II - Feedback. These fields exist on the IPCRF_FORMS sheet
   // (feedbackStrengths, feedbackComments, feedbackRecommendations,
   // feedbackAreasForImprovement) but currently have no UI to fill them in,
   // so they will be blank until that UI exists. Left blank = fine, the rater
@@ -593,7 +593,7 @@ const PmesDocGenService = (() => {
       sheet.getRange(rFeedbackCert + 5, 2).setValue('Date Discussed: ')
       sheet.getRange(rFeedbackCert + 5, 7).setValue('Date Discussed: ')
     } catch (e) {
-      // PART II anchors are best-effort — don't fail the whole doc generation over them
+      // PART II anchors are best-effort - don't fail the whole doc generation over them
       Logger.log('[DocGen] PART II fill skipped: ' + e.message)
     }
   }

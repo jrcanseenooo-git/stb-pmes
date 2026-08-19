@@ -2,10 +2,10 @@
 const SHEET = {
   USERS:              'Users',
   DIVISIONS:          'Divisions',
+  SECTIONS:           'Sections',
   KRAS:               'KRAs',
   INDICATORS:         'SuccessIndicators',
   ACCOMPLISHMENTS:    'Accomplishments',
-  MOV:                'MOVFiles',
   EVALUATIONS:        'Evaluations',
   NOTIFICATIONS:      'Notifications',
   AUDIT:              'AuditLog',
@@ -15,7 +15,7 @@ const SHEET = {
   FOCAL_ASSIGNMENTS:  'FocalAssignments',
   REVIEW_COMMENTS:    'ReviewComments',
 
-  // ── Previously missing – now added ──
+  // ── Previously missing - now added ──
   IPCRF_FORMS:        'IPCRForms',
   FORM_ENTRIES:       'FormEntries',
   MASTER_KRA_LIBRARY: 'MasterKRALibrary',
@@ -25,11 +25,12 @@ const SHEET = {
   IPAT_RECORDS:      'IPATRecords',
   IPAT_CBC_RATINGS:  'IPATCBCRatings',
   IPAT_JF_RATINGS:   'IPATJFRatings',
-  IPAT_EDAP:         'IPATEdap',
   IPAT_ASSIGNMENTS:  'IPATRaterAssignments',
 
   ASSESSMENT_CONTENT:    'AssessmentContent',
-  ASSESSMENT_CATEGORIES: 'AssessmentCategories'
+  ASSESSMENT_CATEGORIES: 'AssessmentCategories',
+  OFFICE_REGISTRY:       'OfficeRegistry',
+  OFFICE_ORG_OPTIONS:    'OfficeOrgOptions'
 }
 
 // ── Entry point: HTTP GET ──
@@ -43,21 +44,41 @@ function doPost(e) {
 }
 
 // ── Rate limiter (per authenticated user, using CacheService) ──
+//
 // GAS does not expose client IP, so limiting is per user ID rather than per IP.
-// Limit: 60 requests per minute per user for general routes.
-function checkRateLimit(userId) {
+//
+// Two independent budgets per minute, because reads and writes cost very
+// different things. A dashboard legitimately fires a burst of reads on load, so
+// a single flat budget either throttles normal browsing or is too loose to stop
+// a write storm. Writes are the expensive, contended path - they take the
+// script lock and mutate sheets - so they get a much tighter budget.
+const RATE_LIMIT_READS_PER_MIN  = 120
+const RATE_LIMIT_WRITES_PER_MIN = 30
+
+function checkRateLimit(userId, httpMethod) {
+  const isWrite = String(httpMethod || 'GET').toUpperCase() !== 'GET'
+  const bucket  = isWrite ? 'w' : 'r'
+  const limit   = isWrite ? RATE_LIMIT_WRITES_PER_MIN : RATE_LIMIT_READS_PER_MIN
+
   let count = 0
   try {
     const cache = CacheService.getScriptCache()
-    const key   = 'rl_' + userId + '_' + Math.floor(Date.now() / 60000)
+    const key   = 'rl_' + bucket + '_' + userId + '_' + Math.floor(Date.now() / 60000)
     count = parseInt(cache.get(key) || '0', 10) + 1
     cache.put(key, String(count), 90) // TTL 90s so it survives the minute boundary
   } catch (e) {
-    // CacheService failure is non-fatal — allow the request through
+    // CacheService failure is non-fatal - allow the request through
     Logger.log('Rate limiter cache error: ' + e.message)
     return
   }
-  if (count > 60) throw HttpError('Too many requests. Please wait a moment.', 429)
+  if (count > limit) {
+    throw HttpError(
+      isWrite
+        ? 'Too many save requests in a short time. Please wait a moment and try again.'
+        : 'Too many requests. Please wait a moment.',
+      429
+    )
+  }
 }
 
 const RESERVED_KEYS = ['route', '_method', 'token']
@@ -65,7 +86,7 @@ const RESERVED_KEYS = ['route', '_method', 'token']
 // ── Main dispatcher ──
 function handleRequest(e, method) {
   try {
-    // Parse the JSON body first — route, method, token and payload now travel
+    // Parse the JSON body first - route, method, token and payload now travel
     // in the POST body so they never land in the URL (logs, history, Referer).
     // Query params are still honored as a fallback for backward compatibility.
     const body   = parseBody(e)
@@ -77,10 +98,10 @@ function handleRequest(e, method) {
 
     // 1. Authenticate every request (signature-verified inside verifyToken)
     const user = AuthService.verifyToken(token)
-    if (!user) return respond(401, false, null, 'Unauthorized – invalid or missing token')
+    if (!user) return respond(401, false, null, 'Unauthorized - invalid or missing token')
 
-    // 2. Rate limit per authenticated user
-    checkRateLimit(user.uid || user.email)
+    // 2. Rate limit per authenticated user, with separate read/write budgets
+    checkRateLimit(user.uid || user.email, httpMethod)
 
     // 3. Build the params/body handed to the router: query + body, minus the
     //    reserved routing keys. Router reads this for both GET filters and writes.
@@ -96,7 +117,18 @@ function handleRequest(e, method) {
   } catch (err) {
     Logger.log('PMES Error: ' + err.message + '\n' + err.stack)
     const code = err.statusCode || 500
-    const clientMsg = safeClientErrorMessage(code)
+    // Every HttpError(message, code) thrown across the services is written
+    // specifically for the end user - "An account for this email already
+    // exists", "This active question has already been used", and dozens
+    // more - so a code under 500 is always a deliberate, curated
+    // business-logic message and should reach the user as written. This
+    // used to discard err.message unconditionally and substitute a generic,
+    // status-code-keyed string regardless of what was actually thrown,
+    // which is how a duplicate-email 409 during user creation surfaced as
+    // "This record was already updated" instead of the real reason. Only an
+    // unexpected 500 falls back to the generic message, since an uncaught
+    // exception's message can contain raw internals never meant for users.
+    const clientMsg = (code < 500 && err.message) ? err.message : safeClientErrorMessage(code)
     return respond(code, false, null, clientMsg)
   }
 }
@@ -128,7 +160,17 @@ function parseBody(e) {
 }
 
 function respond(status, success, data, message) {
-  const payload = JSON.stringify({ success: success, data: data !== undefined ? data : null, message: message || null })
+  // `status` used to be accepted and then thrown away. Every response leaves here
+  // as HTTP 200 (an Apps Script constraint), so with no status in the body the
+  // client had no way to tell a 401 from a 400 - it fell back to a generic
+  // "check your input" message even when the real answer was "sign in again".
+  // Carrying the code in the envelope lets the frontend react correctly.
+  const payload = JSON.stringify({
+    success: success,
+    status: status || (success ? 200 : 400),
+    data: data !== undefined ? data : null,
+    message: message || null
+  })
   return ContentService
     .createTextOutput(payload)
     .setMimeType(ContentService.MimeType.JSON)

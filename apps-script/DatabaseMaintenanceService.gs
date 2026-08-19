@@ -117,15 +117,6 @@ const DatabaseMaintenanceService = (() => {
       headers: ['id', 'formId', 'entryId', 'reviewType', 'comment', 'reviewerId', 'reviewerName', 'createdAt', 'updatedAt']
     },
     {
-      name: SHEET.MOV,
-      headers: [
-        'id', 'driveFileId', 'driveUrl', 'fileName', 'mimeType', 'sizeBytes',
-        'description', 'accomplishmentId', 'kraId', 'siId', 'divisionId',
-        'uploadedBy', 'uploadedByName', 'uploadedAt',
-        'verified', 'verifiedBy', 'verifiedAt', 'deleted', 'deletedAt'
-      ]
-    },
-    {
       name: SHEET.NOTIFICATIONS,
       headers: ['id', 'recipientId', 'type', 'message', 'relatedId', 'module', 'read', 'readAt', 'createdAt']
     },
@@ -159,15 +150,6 @@ const DatabaseMaintenanceService = (() => {
         'id','ipatId','rateeId','raterId','raterName','raterType',
         'indicator','indicatorIdx','rating','evidence',
         'semester','year','createdAt','updatedAt'
-      ]
-    },
-    {
-      name: SHEET.IPAT_EDAP,
-      headers: [
-        'id','ipatId','rateeId','rateeName',
-        'rows',
-        'sem1Status','sem1Notes','sem2Status','sem2Notes',
-        'createdAt','updatedAt'
       ]
     },
     {

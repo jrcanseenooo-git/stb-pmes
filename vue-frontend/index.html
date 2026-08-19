@@ -10,9 +10,169 @@
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
   <link rel="manifest" href="/site.webmanifest" />
   <meta name="theme-color" content="#091326" />
-  <title>STB | PMES</title>
+  <title>DSWD | PMES</title>
+  <style>
+    :root {
+      --pmes-ink: #091326;
+      --pmes-panel: #0d2137;
+      --pmes-blue: #0b49b5;
+      --pmes-green: #16a34a;
+      --pmes-muted: #64748b;
+      --pmes-line: #dbe5f2;
+    }
+
+    body {
+      margin: 0;
+      background: #f6f9fd;
+    }
+
+    /* Set synchronously, before the splash markup below is parsed, by the
+       inline script at the top of <body> - so a refresh on /auth/* never
+       paints the splash at all rather than painting-then-hiding it. */
+    html.pmes-skip-splash #pmes-boot-splash {
+      display: none !important;
+    }
+
+    #pmes-boot-splash {
+      position: fixed;
+      inset: 0;
+      z-index: 2147483647;
+      display: grid;
+      place-items: center;
+      min-height: 100vh;
+      background:
+        linear-gradient(rgba(226, 232, 240, 0.48) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(226, 232, 240, 0.48) 1px, transparent 1px),
+        #f8fbff;
+      background-size: 34px 34px;
+      color: var(--pmes-ink);
+      font-family: Inter, Roboto, Arial, sans-serif;
+      opacity: 1;
+      transition: opacity 220ms ease, visibility 220ms ease;
+    }
+
+    #pmes-boot-splash.pmes-boot-splash-hide {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .pmes-boot-inner {
+      width: min(420px, calc(100vw - 48px));
+      display: grid;
+      justify-items: center;
+      gap: 18px;
+      text-align: center;
+    }
+
+    .pmes-boot-mark {
+      /* Sized to the logo file's actual 2048x740 proportions (not a fixed
+         height with mismatched padding) so object-fit: contain has nothing
+         to letterbox - the image fills the box edge to edge on every side,
+         which is what actually guarantees it looks centered. */
+      width: min(320px, 82vw);
+      aspect-ratio: 2048 / 740;
+      display: grid;
+      place-items: center;
+      padding: 14px;
+      border: 1px solid rgba(11, 73, 181, 0.14);
+      border-radius: 8px;
+      background: #ffffff;
+      box-shadow: 0 18px 44px rgba(15, 23, 42, 0.1);
+      box-sizing: border-box;
+    }
+
+    .pmes-boot-mark img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      object-position: center;
+    }
+
+    .pmes-boot-kicker {
+      margin: 0;
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 0;
+      color: var(--pmes-blue);
+      text-transform: uppercase;
+    }
+
+    .pmes-boot-title {
+      margin: 4px 0 0;
+      font-size: 22px;
+      line-height: 1.2;
+      font-weight: 900;
+      color: var(--pmes-ink);
+    }
+
+    .pmes-boot-copy {
+      margin: 8px 0 0;
+      font-size: 13px;
+      line-height: 1.55;
+      font-weight: 600;
+      color: var(--pmes-muted);
+    }
+
+    .pmes-boot-progress {
+      width: min(320px, 78vw);
+      height: 4px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #dbeafe;
+    }
+
+    .pmes-boot-progress::before {
+      content: "";
+      display: block;
+      width: 42%;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--pmes-blue), var(--pmes-green));
+      animation: pmes-boot-slide 1.05s ease-in-out infinite;
+    }
+
+    @keyframes pmes-boot-slide {
+      0% { transform: translateX(-105%); }
+      55% { transform: translateX(85%); }
+      100% { transform: translateX(245%); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #pmes-boot-splash,
+      .pmes-boot-progress::before {
+        transition: none;
+        animation: none;
+      }
+    }
+  </style>
 </head>
 <body>
+  <script>
+    // The splash exists to cover real work: checking a session, fetching a
+    // profile, resolving where a signed-in user belongs. None of that
+    // happens on the sign-in page itself - there is no session yet - so a
+    // refresh there should just show the login form, not a loading screen
+    // pretending to check for one. Runs before the splash markup below is
+    // parsed, so this is a skip, not a flash of splash then hide.
+    if (location.pathname.indexOf('/auth') === 0) {
+      document.documentElement.classList.add('pmes-skip-splash');
+    }
+  </script>
+  <div id="pmes-boot-splash" role="status" aria-live="polite" aria-label="Loading PMES">
+    <div class="pmes-boot-inner">
+      <div class="pmes-boot-mark" aria-hidden="true">
+        <img src="/dswd-logo.png" alt="" />
+      </div>
+      <div>
+        <p class="pmes-boot-kicker">DSWD Innovation Cluster</p>
+        <h1 class="pmes-boot-title">Performance Monitoring and Evaluation System</h1>
+        <p id="pmes-boot-copy" class="pmes-boot-copy">Loading your workspace and checking your session...</p>
+      </div>
+      <div class="pmes-boot-progress" aria-hidden="true"></div>
+    </div>
+  </div>
   <div id="app"></div>
   <script type="module" src="/src/main.js"></script>
 </body>

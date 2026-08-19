@@ -13,14 +13,14 @@
       </div>
       <div class="profile-info">
         <div class="profile-name">{{ fullName }}</div>
-        <div class="profile-role">{{ position !== '—' ? position : role }}</div>
+        <div class="profile-role">{{ position !== '-' ? position : role }}</div>
         <div class="profile-email">{{ userEmail }}</div>
+        <!-- Role and account status are deliberately not badged here: the role
+             already appears directly above as the subtitle and again in the
+             Role field below, and an account that can render this page is
+             self-evidently active. -->
         <div class="profile-tags">
-          <span class="tag" style="background:#EBF4FF;color:#2F80ED">{{ role }}</span>
-          <span class="tag" :style="isActive ? 'background:#E6F4EA;color:#27AE60' : 'background:#FEF2F2;color:#EB5757'">
-            {{ isActive ? 'Active' : 'Inactive' }}
-          </span>
-          <span v-if="divisionName !== '—'" class="tag" style="background:#F5F3FF;color:#7C3AED">
+          <span v-if="divisionName !== '-'" class="tag" style="background:#F5F3FF;color:#7C3AED">
             {{ divisionName }}
           </span>
         </div>
@@ -60,7 +60,7 @@
               <!-- Full Name -->
                <div class="info-item">
                 <label class="info-label">Full Name</label>
-                <div v-if="!editMode" class="info-val">{{ form.fullName || '—' }}</div>
+                <div v-if="!editMode" class="info-val">{{ form.fullName || '-' }}</div>
                 <input v-else v-model="form.fullName" class="field-input" placeholder="Full name"/>
               </div>
 
@@ -73,7 +73,7 @@
               <!-- Employee No. -->
               <div class="info-item">
                 <label class="info-label">Employee No.</label>
-                <div v-if="!editMode" class="info-val">{{ form.employeeNo || '—' }}</div>
+                <div v-if="!editMode" class="info-val">{{ form.employeeNo || '-' }}</div>
                 <input v-else v-model="form.employeeNo" class="field-input" placeholder="e.g. 24-0247"/>
               </div>
 
@@ -88,9 +88,7 @@
                 <label class="info-label">Employment Type</label>
                 <div v-if="!editMode" class="info-val">{{ employmentTypeLabel(form.employmentType) }}</div>
                 <select v-else v-model="form.employmentType" class="field-input">
-                  <option value="Regular">Regular</option>
-                  <option value="COS">Contract of Service (COS)</option>
-                  <option value="Co-Term">Co-Term</option>
+                  <option v-for="t in employmentTypeOptions(form.employmentType)" :key="t" :value="t">{{ t }}</option>
                 </select>
               </div>
 
@@ -114,7 +112,7 @@
         </div>
 
         <!-- ── Performance Summary ── -->
-        <div class="card mb-10">
+        <div v-if="isStbOfficeProfile" class="card mb-10">
           <div class="card-hd">
             <span class="card-title">Performance Summary</span>
             <span class="sem-tag">{{ currentPeriodLabel }}</span>
@@ -136,7 +134,7 @@
         </div>
 
         <!-- ── Recent Activity ── -->
-        <div class="card">
+        <div v-if="isStbOfficeProfile" class="card">
           <div class="card-hd">
             <span class="card-title">Recent Activity</span>
           </div>
@@ -165,27 +163,6 @@
       <!-- Right col -->
       <div class="right-col">
 
-        <!-- ── Account Settings ── -->
-        <div class="card mb-10">
-          <div class="card-hd"><span class="card-title">Account Settings</span></div>
-          <div class="card-body">
-            <div class="setting-list">
-              <div v-for="s in settings" :key="s.label" class="setting-item">
-                <div class="setting-icon" :style="{ background: s.iconBg, color: s.iconColor }">
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                    <path :d="s.icon" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
-                  </svg>
-                </div>
-                <div class="setting-info">
-                  <div class="setting-label">{{ s.label }}</div>
-                  <div class="setting-sub">{{ s.sub }}</div>
-                </div>
-                <span class="setting-action">{{ s.action }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
         <!-- ── Current Period ── -->
         <div class="card mb-10">
           <div class="card-hd"><span class="card-title">Current Period</span></div>
@@ -212,19 +189,19 @@
           <div class="card-hd"><span class="card-title">Quick Actions</span></div>
           <div class="card-body pd-0">
             <div class="quick-actions">
-              <button class="quick-btn" @click="$router.push('/accomplishments')">
+              <button v-if="isStbOfficeProfile" class="quick-btn" @click="$router.push('/accomplishments')">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="1.5" width="13" height="13" rx="2" stroke="#2F80ED" stroke-width="1.4"/><path d="M5 8l2 2 4-4" stroke="#2F80ED" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 View Accomplishments
-              </button>
-              <button class="quick-btn" @click="$router.push('/mov')">
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 2h7l3 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="#27AE60" stroke-width="1.4"/><path d="M10 2v3h3" stroke="#27AE60" stroke-width="1.4" stroke-linecap="round"/></svg>
-                Upload MOV
               </button>
               <button class="quick-btn" @click="$router.push('/evaluation')">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1.5l1.8 3.6 3.7.5-2.75 2.7.65 3.8L8 10.3l-3.4 1.8.65-3.8L2.5 5.6l3.7-.5L8 1.5z" stroke="#E9A840" stroke-width="1.4" stroke-linejoin="round"/></svg>
                 View Ratings
               </button>
-              <button class="quick-btn" @click="$router.push('/kra')">
+              <button v-if="canViewOfficePersonnel" class="quick-btn" @click="$router.push('/office-management?tab=personnel')">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="5.5" cy="5" r="2.5" stroke="#2F80ED" stroke-width="1.4"/><circle cx="11.5" cy="6" r="1.8" stroke="#2F80ED" stroke-width="1.3"/><path d="M1.8 14c.4-2.8 2.2-4.4 3.7-4.4s3.3 1.6 3.7 4.4M9.5 13.8c.25-1.7 1.25-2.7 2-2.7s1.75 1 2 2.7" stroke="#2F80ED" stroke-width="1.4" stroke-linecap="round"/></svg>
+                Office Personnel
+              </button>
+              <button v-if="isStbOfficeProfile" class="quick-btn" @click="$router.push('/kra')">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="3.5" width="13" height="2" rx="1" fill="#7C3AED"/><rect x="1.5" y="7.5" width="9" height="2" rx="1" fill="#7C3AED"/><rect x="1.5" y="11.5" width="11" height="2" rx="1" fill="#7C3AED"/></svg>
                 My IPCRF/CCEF
               </button>
@@ -251,11 +228,14 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { usePermissions } from '@/composables/usePermissions'
 import { usersApi, dashboardApi, auditApi } from '@/services/api'
+import { normalizeEmploymentType, employmentTypeOptions } from '@/utils/employmentTypes'
 import LogoutConfirmModal from '@/components/common/LogoutConfirmModal.vue'
 
 const authStore = useAuthStore()
 const router    = useRouter()
+const { canViewOfficePersonnel, isStbFullScope } = usePermissions()
 
 // ── State ──
 const editMode      = ref(false)
@@ -269,12 +249,22 @@ const activity      = ref([])
 
 // ── Computed from store ──
 const fullName    = computed(() => authStore.fullName)
-const role        = computed(() => authStore.role || 'Staff')
-const userEmail   = computed(() => authStore.user?.email || '—')
+const role        = computed(() => authStore.role || 'Profile not loaded')
+const userEmail   = computed(() => authStore.user?.email || '-')
 const initials    = computed(() => authStore.initials)
 const divisionName = computed(() => authStore.divisionName)
-const isActive    = computed(() => authStore.isActive)
 const position    = computed(() => authStore.position)
+/**
+ * Whether to show the Bureau-only modules - Accomplishments, KRA, IPCRF/CCEF
+ * and the IPCRF-derived Performance Summary.
+ *
+ * Gated on system scope, the same field the router uses for STB_ONLY_PATHS, so
+ * the profile screen and the routes agree. This previously inferred it from the
+ * office name AND treated an EMPTY office key as STB - so any profile whose
+ * office fields were not populated, cluster accounts included, was offered
+ * Bureau modules it cannot open and an IPCRF summary that is always zero.
+ */
+const isStbOfficeProfile = computed(() => isStbFullScope.value)
 
 // ── Editable form (mirrors DB fields) ──
 const form = ref({
@@ -286,10 +276,10 @@ const form = ref({
 
 // ── Performance stats (live from dashboard API) ──
 const perfStats = ref([
-  { label: 'Targets',   value: '—', color: '#2F80ED' },
-  { label: 'Completed', value: '—', color: '#27AE60' },
-  { label: 'Pending',   value: '—', color: '#E9A840' },
-  { label: 'Rating',    value: '—', color: '#27AE60' }
+  { label: 'Targets',   value: '-', color: '#2F80ED' },
+  { label: 'Completed', value: '-', color: '#27AE60' },
+  { label: 'Pending',   value: '-', color: '#E9A840' },
+  { label: 'Rating',    value: '-', color: '#27AE60' }
 ])
 
 // ── Semester period ──
@@ -297,8 +287,8 @@ const now = new Date()
 const isS1 = now.getMonth() < 6
 const currentPeriodLabel = computed(() => isS1 ? 'Semester 1, ' + now.getFullYear() : 'Semester 2, ' + now.getFullYear())
 const currentPeriodDates = computed(() => isS1
-  ? `Jan 1 – Jun 30, ${now.getFullYear()}`
-  : `Jul 1 – Dec 31, ${now.getFullYear()}`
+  ? `Jan 1 - Jun 30, ${now.getFullYear()}`
+  : `Jul 1 - Dec 31, ${now.getFullYear()}`
 )
 const semesterEnd  = new Date(isS1 ? `${now.getFullYear()}-06-30` : `${now.getFullYear()}-12-31`)
 const semesterStart = new Date(isS1 ? `${now.getFullYear()}-01-01` : `${now.getFullYear()}-07-01`)
@@ -312,42 +302,35 @@ const daysLeft = computed(() => {
   return Math.max(0, Math.ceil(diff / 86400000))
 })
 
-// ── Account settings ──
-const settings = [
-  { label:'Change Password',     sub:'Coming soon', action:'Planned', icon:'M1 7s2-5 6-5 6 5 6 5-2 5-6 5-6-5-6-5zM8 7a2 2 0 01-2 2 2 2 0 01-2-2 2 2 0 012-2 2 2 0 012 2z', iconBg:'#EBF4FF', iconColor:'#2F80ED' },
-  { label:'Email Notifications', sub:'Coming soon', action:'Planned', icon:'M1 4a1 1 0 011-1h10a1 1 0 011 1v6a1 1 0 01-1 1H2a1 1 0 01-1-1V4zM1 5l6 4 6-4', iconBg:'#E6F4EA', iconColor:'#27AE60' },
-  { label:'Two-Factor Auth',     sub:'Coming soon', action:'Planned', icon:'M7 1L1 3.5v4c0 3 2.5 5 6 5.5 3.5-.5 6-2.5 6-5.5v-4L7 1z', iconBg:'#FEF3E2', iconColor:'#C8882A' }
-]
-
 // ── Lifecycle ──
 onMounted(async () => {
   try { await authStore.fetchProfile() } catch (e) { console.warn("[Profile] fetchProfile retry:", e.message) }
   populateForm()
-  await Promise.all([fetchPerfStats(), fetchActivity()])
+  if (isStbOfficeProfile.value) {
+    await Promise.all([fetchPerfStats(), fetchActivity()])
+  }
 })
 
 // Re-populate form whenever profile updates (fetchProfile may complete after mount)
 watch(() => authStore.profile, () => { populateForm() }, { deep: true })
 
-function normalizeEmploymentType(raw) {
-  if (!raw) return 'Regular'
-  const r = raw.toString().toLowerCase()
-  if (r === 'cos' || r.includes('contractor') || r.includes('contract of service')) return 'COS'
-  if (r === 'co-term' || r === 'coterm') return 'Co-Term'
-  return 'Regular'
-}
+// normalizeEmploymentType and employmentTypeOptions are imported from
+// utils/employmentTypes.js. The previous local version mapped everything it did
+// not recognise - including 'Co-Terminus' and 'Contractual' - to 'Regular', and
+// because the form writes its value back on save, merely opening and saving a
+// profile overwrote that person's real employment type.
 
+// The stored value IS the label now, so there is nothing to translate. Keeping
+// a mapping here is what allowed the display and the stored value to disagree.
 function employmentTypeLabel(val) {
-  if (val === 'COS') return 'Contract of Service (COS)'
-  if (val === 'Co-Term') return 'Co-Term'
-  return 'Regular'
+  return normalizeEmploymentType(val)
 }
 
 function populateForm() {
   form.value = {
     fullName:       authStore.fullName       || '',
-    employeeNo:     authStore.employeeNo     !== '—' ? authStore.employeeNo : '',
-    position:       authStore.position       !== '—' ? authStore.position   : '',
+    employeeNo:     authStore.employeeNo     !== '-' ? authStore.employeeNo : '',
+    position:       authStore.position       !== '-' ? authStore.position   : '',
     employmentType: normalizeEmploymentType(authStore.employmentType)
   }
 }
@@ -358,10 +341,10 @@ async function fetchPerfStats() {
     const semester = isS1 ? 'S1' : 'S2'
     const summary  = await dashboardApi.summary({ semester, year: now.getFullYear() })
     perfStats.value = [
-      { label: 'Targets',   value: String(summary.totalTargets  ?? '—'), color: '#2F80ED' },
-      { label: 'Completed', value: String(summary.completed     ?? '—'), color: '#27AE60' },
-      { label: 'Pending',   value: String(summary.pending       ?? '—'), color: '#E9A840' },
-      { label: 'Rating',    value: '—',                                   color: '#27AE60' }
+      { label: 'Targets',   value: String(summary.totalTargets  ?? '-'), color: '#2F80ED' },
+      { label: 'Completed', value: String(summary.completed     ?? '-'), color: '#27AE60' },
+      { label: 'Pending',   value: String(summary.pending       ?? '-'), color: '#E9A840' },
+      { label: 'Rating',    value: '-',                                   color: '#27AE60' }
     ]
     // Try fetching the user's evaluation rating
     try {
@@ -411,9 +394,9 @@ async function saveProfile() {
   try {
     const fullName  = form.value.fullName.trim()
 
-    // Map display value back to what the DB stores in the `type` column
-    const typeMap = { Regular: 'Regular', COS: 'Contract of Service (COS)', 'Co-Term': 'Co-Term' }
-    const typeVal  = typeMap[form.value.employmentType] || form.value.employmentType
+    // The select already holds the exact string the `type` column stores, so
+    // there is no display-to-storage mapping left to get wrong.
+    const typeVal = form.value.employmentType
 
     await usersApi.update(authStore.profileId, {
       fullName,
@@ -450,10 +433,10 @@ async function confirmLogout() {
 
 // ── Helpers ──
 function formatDate(iso) {
-  if (!iso) return '—'
+  if (!iso) return '-'
   try {
     return new Date(iso).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })
-  } catch { return '—' }
+  } catch { return '-' }
 }
 
 function formatDateTime(iso) {

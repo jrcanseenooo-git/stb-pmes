@@ -173,6 +173,20 @@ export const CONFIRMS = {
     cancelLabel:  'Cancel'
   }),
 
+  // Permanently deleting a user (not deactivate - the row itself is removed)
+  deleteUser: (name, email) => ({
+    type:         'danger',
+    title:        'Permanently Delete Account',
+    message:      `${name} (${email}) will be permanently removed - this is not the same as deactivating. Use this only for accounts that should never have existed (a duplicate, a mistaken create) - for a real employee who has left, deactivate instead so their history is kept.`,
+    details: [
+      { label: 'User',  value: name },
+      { label: 'Email', value: email }
+    ],
+    note:         'This cannot be undone. Their account history and any records tied to this login are not recoverable through the app after this.',
+    confirmLabel: 'Yes, Delete Permanently',
+    cancelLabel:  'Cancel'
+  }),
+
   // Activating a user
   activateUser: (name) => ({
     type:         'approve',

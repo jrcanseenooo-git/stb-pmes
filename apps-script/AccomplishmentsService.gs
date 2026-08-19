@@ -82,9 +82,10 @@ const AccomplishmentsService = (() => {
     const sheet = SpreadsheetService.getSheet(SHEET.ACCOMPLISHMENTS)
     _ensureColumns(sheet, RATING_FIELDS)
 
-    // Staff can only create for themselves
-    if (profile.role === 'Staff' && body.userId && body.userId !== profile.id) {
-      throw HttpError('Staff can only create entries for themselves', 403)
+    // Technical Staff can only create for themselves. Keep legacy "Staff"
+    // compatible for older rows that have not been migrated yet.
+    if (['Staff', 'Technical Staff'].includes(profile.role) && body.userId && body.userId !== profile.id) {
+      throw HttpError('Technical Staff can only create entries for themselves', 403)
     }
 
     const now  = new Date().toISOString()

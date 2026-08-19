@@ -8,7 +8,7 @@ export function useRatings() {
    * Timeliness score based on days relative to deadline.
    * @param {string} submittedAt ISO date string
    * @param {string} deadline    ISO date string
-   * @returns {number} 1–5
+   * @returns {number} 1-5
    */
   function timelinessScore(submittedAt, deadline) {
     if (!submittedAt || !deadline) return 1
@@ -16,16 +16,16 @@ export function useRatings() {
       (new Date(deadline) - new Date(submittedAt)) / (1000 * 60 * 60 * 24)
     )
     if (diff >= 3)  return 5  // Outstanding: 3+ days early
-    if (diff >= 1)  return 4  // Very Satisfactory: 1–2 days early
+    if (diff >= 1)  return 4  // Very Satisfactory: 1-2 days early
     if (diff === 0) return 3  // Satisfactory: on deadline day
-    if (diff >= -3) return 2  // Unsatisfactory: 1–3 days late
+    if (diff >= -3) return 2  // Unsatisfactory: 1-3 days late
     return 1                  // Poor: 4+ days late
   }
 
   /**
    * Quality score based on number of revision requests.
    * @param {number} revisions
-   * @returns {number} 1–5
+   * @returns {number} 1-5
    */
   function qualityScore(revisions) {
     if (revisions === 0) return 5
@@ -39,7 +39,7 @@ export function useRatings() {
    * Efficiency score based on accomplishment percentage vs target.
    * @param {number} accomplished
    * @param {number} target
-   * @returns {number} 1–5
+   * @returns {number} 1-5
    */
   function efficiencyScore(accomplished, target) {
     if (!target) return 1

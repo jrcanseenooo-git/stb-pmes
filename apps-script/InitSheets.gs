@@ -9,13 +9,39 @@ function initializeSheets() {
       'type', 'positionLevel', 'sgLevel',
       'tempPassword', 'tempPasswordHash', 'mustChangePassword',
       'permissionGroups', 'permissions',
-      'active', 'createdAt', 'updatedAt', 'lastLoginAt'
+      'officeId', 'officeCode', 'officeName', 'systemScope', 'officeRole', 'centralRoles',
+      'active', 'createdAt', 'updatedAt', 'lastLoginAt',
+      // Self-registration and name-part columns. These were added directly to the
+      // production sheet and were missing from this definition until 2026-08-04.
+      // They are load-bearing: AuthService.whoami reads pendingActivation, and the
+      // self-registration flow writes all seven. Without them a fresh rebuild would
+      // produce a Users tab that looks correct while updateRow silently discarded
+      // those fields (updateRow logs unknown columns but does not fail).
+      'pendingActivation', 'requestedRole', 'selfRegistered',
+      'firstName', 'middleName', 'lastName', 'suffix'
     ],
     Divisions: [
       'id', 'name', 'code', 'chiefId', 'chiefName', 'parentId', 'color', 'active', 'createdAt'
     ],
+    // Reference list for the Section field. Section was free text, which produced
+    // ~3 real sections per division written 8-9 different ways ("Promotion
+    // Section" vs "Promotions Section", four spellings of the evaluation
+    // section). That matters beyond tidiness: the IPAT rater engine matches peers
+    // and supervisors on an EXACT section string, so a spelling variant silently
+    // removes someone from their own section's rater pool.
+    Sections: [
+      'id', 'divisionId', 'name', 'code', 'active', 'sequence', 'createdAt', 'updatedAt'
+    ],
+    OfficeOrgOptions: [
+      'id', 'officeId', 'optionType', 'parentId', 'name', 'code',
+      'active', 'sequence', 'createdAt', 'updatedAt', 'updatedBy'
+    ],
     SystemSettings: [
       'id', 'key', 'value', 'description', 'updatedBy', 'updatedByName', 'updatedAt'
+    ],
+    AssessmentRules: [
+      'id', 'officeId', 'ruleType', 'ruleKey', 'label', 'value',
+      'active', 'description', 'createdAt', 'updatedAt', 'updatedBy'
     ],
     KRAs: [
       'id', 'title', 'description', 'functionType', 'applicableTo',
@@ -52,12 +78,6 @@ function initializeSheets() {
       'id', 'formId', 'entryId', 'reviewType',
       'comment', 'reviewerId', 'reviewerName',
       'createdAt', 'updatedAt'
-    ],
-    MOVFiles: [
-      'id', 'driveFileId', 'driveUrl', 'fileName', 'mimeType', 'sizeBytes',
-      'description', 'accomplishmentId', 'kraId', 'siId', 'divisionId',
-      'uploadedBy', 'uploadedByName', 'uploadedAt',
-      'verified', 'verifiedBy', 'verifiedAt', 'deleted', 'deletedAt'
     ],
     Evaluations: [
       'id', 'userId', 'employeeName', 'divisionId', 'semester', 'year',
@@ -147,7 +167,9 @@ function initializeSheets() {
   }
 
   Object.entries(SHEETS).forEach(([name, headers]) => {
-    let sheet = ss.getSheetByName(name)
+    // Alias-aware: a tab already renamed (e.g. AuditLog -> AuditLogs) must not
+    // be re-created here as an empty duplicate under its old name.
+    let sheet = SpreadsheetService.findSheet(name)
     if (!sheet) {
       sheet = ss.insertSheet(name)
       Logger.log('Created sheet: ' + name)
@@ -157,7 +179,7 @@ function initializeSheets() {
 
     // Add any missing columns to existing sheets without wiping data
     if (sheet.getLastRow() === 0) {
-      // Brand new sheet – write headers fresh
+      // Brand new sheet - write headers fresh
       const headerRange = sheet.getRange(1, 1, 1, headers.length)
       headerRange.setValues([headers])
       headerRange
@@ -168,7 +190,7 @@ function initializeSheets() {
       sheet.setFrozenRows(1)
       sheet.autoResizeColumns(1, headers.length)
     } else {
-      // Existing sheet – only append NEW columns (don't touch existing data)
+      // Existing sheet - only append NEW columns (don't touch existing data)
       const existingHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
       const existingSet = new Set(existingHeaders.map(h => String(h).trim()))
       const missingCols = headers.filter(h => !existingSet.has(h))
@@ -187,17 +209,18 @@ function initializeSheets() {
 
   // ── Seed Divisions (only if empty) ──
   seedDivisions(ss)
+  seedSections(ss)
 
   Logger.log('✅ PMES sheets initialized successfully.')
   // getUi() only works when triggered from the Apps Script editor menu,
-  // not from the Run button or a web-app context — so we guard it.
+  // not from the Run button or a web-app context - so we guard it.
   try {
     SpreadsheetApp.getUi().alert(
       '✅ PMES sheets initialized successfully!\n\n' +
       'Sheets managed: ' + Object.keys(SHEETS).join(', ')
     )
   } catch (e) {
-    Logger.log('(Alert skipped – not running in UI context)')
+    Logger.log('(Alert skipped - not running in UI context)')
   }
 }
 
@@ -216,6 +239,48 @@ function seedDivisions(ss) {
   Logger.log('Seeded Divisions.')
 }
 
+/**
+ * Seeds the canonical section list (only if the sheet is empty).
+ *
+ * These names were derived on 2026-08-04 by grouping the 39 populated free-text
+ * `Users.section` values by meaning. Each division was found to have three real
+ * sections recorded 8-9 different ways.
+ *
+ * ⚠️ THE NAMES BELOW ARE A PROPOSAL, NOT AN AUTHORITY.
+ * The division chiefs must confirm the official wording before this is used for
+ * a live assessment cycle - "Other Marginalized Group" and "Other Marginalized
+ * Groups" may genuinely be one section or two, and only they can say. Edit the
+ * rows in the sheet directly; nothing in the code depends on these exact strings.
+ *
+ * This does NOT touch existing Users rows. Re-pointing personnel at canonical
+ * sections is a separate, deliberate migration - see PMES_DATA_QUALITY_FINDINGS
+ * D-03. Seeding here only gives new registrations a controlled vocabulary.
+ */
+function seedSections(ss) {
+  const sheet = ss.getSheetByName('Sections')
+  if (!sheet || sheet.getLastRow() > 1) return  // already seeded or missing
+
+  const now = new Date().toISOString()
+  const rows = [
+    // Admin Pool
+    ['SEC-admin-office', 'admin-pool', 'Office Admin Personnel', 'OAP', true, 1, now, now],
+    // Design Formulation Division
+    ['SEC-dfd-cy',   'dfd',   'Children and Youth Section',                                  'CY',  true, 1, now, now],
+    ['SEC-dfd-omg',  'dfd',   'Other Marginalized Groups Section',                           'OMG', true, 2, now, now],
+    ['SEC-dfd-wpo',  'dfd',   'Women, Persons with Disability and Older Persons Section',    'WPO', true, 3, now, now],
+    // Pilot Implementation Division
+    ['SEC-pid-cy',   'pid',   'Children and Youth Section',                                  'CY',  true, 1, now, now],
+    ['SEC-pid-omg',  'pid',   'Other Marginalized Groups Section',                           'OMG', true, 2, now, now],
+    ['SEC-pid-wpo',  'pid',   'Women, Persons with Disability and Older Persons Section',    'WPO', true, 3, now, now],
+    // Social Technology Analysis and Evaluation Division
+    ['SEC-staed-ev', 'staed', 'Social Technology Evaluation Section',                        'STE', true, 1, now, now],
+    ['SEC-staed-pm', 'staed', 'Social Technology Portfolio Management Section',              'STPM',true, 2, now, now],
+    ['SEC-staed-pr', 'staed', 'Social Technology Promotion Section',                         'STPR',true, 3, now, now]
+  ]
+  sheet.getRange(2, 1, rows.length, rows[0].length).setValues(rows)
+  Logger.log('Seeded Sections with ' + rows.length + ' proposed canonical rows (confirm names with division chiefs).')
+}
+
 // ── Utility: delete ALL sheets and rebuild from all init functions ──
 function nukeAndRebuildSheets_DANGER() {
   Logger.log('nukeAndRebuildSheets_DANGER is disabled. Use clearTransactionalData_KEEP_USERS_DIVISIONS_KRAS instead.')
@@ -232,7 +297,7 @@ function nukeAndRebuildSheets_DANGER() {
   try {
     const ui = SpreadsheetApp.getUi()
     const result = ui.alert(
-      '⚠️ IRREVERSIBLE — DELETE EVERYTHING',
+      '⚠️ IRREVERSIBLE - DELETE EVERYTHING',
       'This will permanently DELETE ALL SHEETS AND ALL DATA, then rebuild empty sheets from scratch.\n\nAre you absolutely sure?',
       ui.ButtonSet.YES_NO
     )
@@ -245,7 +310,7 @@ function nukeAndRebuildSheets_DANGER() {
 
   const ss = SpreadsheetApp.getActiveSpreadsheet()
 
-  // Google Sheets requires at least one sheet at all times — insert a placeholder
+  // Google Sheets requires at least one sheet at all times - insert a placeholder
   const temp = ss.insertSheet('__rebuilding__')
 
   // Delete every other sheet
@@ -269,7 +334,7 @@ function nukeAndRebuildSheets_DANGER() {
   } catch (e) {}
 }
 
-// ── Utility: clear all data rows (keep headers) – use with caution ──
+// ── Utility: clear all data rows (keep headers) - use with caution ──
 function clearAllData_DANGER() {
   Logger.log('clearAllData_DANGER is disabled. Use clearTransactionalData_KEEP_USERS_DIVISIONS_KRAS instead.')
   try {
@@ -292,7 +357,7 @@ function clearAllData_DANGER() {
     )
     confirmed = (result === ui.Button.YES)
   } catch (e) {
-    // Running from Run button — log warning and abort for safety
+    // Running from Run button - log warning and abort for safety
     Logger.log('⚠️ clearAllData_DANGER must be run from the Apps Script menu, not the Run button. Aborting.')
     return
   }

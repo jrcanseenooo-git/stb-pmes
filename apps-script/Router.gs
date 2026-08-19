@@ -33,7 +33,16 @@ const Router = (() => {
         if (id === 'backend-info') return AuthService.backendInfo(user)
         if (id === 'register-options') return AuthService.registrationOptions()
         if (id === 'register' && method === 'POST') return UsersService.selfRegister(body, user)
-        if (id === 'log') return AuditService.log(body.action, body.module, body.details, user)
+        // 'auth/log' is deliberately absent. It let any signed-in caller append
+        // an audit row with an arbitrary action, module and details - so the
+        // log could be padded with plausible-looking entries to bury a real
+        // one during an investigation. The identity columns were always
+        // server-derived, so this was never impersonation, but an audit trail
+        // anyone can write to is worth less than one only the server writes.
+        // Nothing called it: authApi.logAction was defined in services/api.js
+        // and never invoked. Every genuine audit entry comes from
+        // AuditService.log inside the service that performed the action, which
+        // is unchanged.
         break
 
       // ─────────────────────────────────────────

@@ -242,8 +242,11 @@ export const authApi = {
   whoami:    ()                        => gasGet('auth/whoami'),
   backendInfo: ()                      => gasGet('auth/backend-info'),
   registerOptions: ()                  => gasGet('auth/register-options'),
-  register:  (data)                    => gasWriteBody('POST', 'auth/register', data),
-  logAction: (action, module, details) => gasGet('auth/log', { action, module, details })
+  register:  (data)                    => gasWriteBody('POST', 'auth/register', data)
+  // logAction removed with the auth/log route it called. It was never invoked,
+  // and a client-writable audit endpoint let any signed-in user append entries
+  // of their own wording. Audit rows are written server-side by the service
+  // performing the action.
 }
 
 // ── Dashboard ──────────────────────────────────

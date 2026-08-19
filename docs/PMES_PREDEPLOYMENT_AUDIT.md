@@ -326,6 +326,82 @@ or PIA, and Phases 10–14 and 18 have not been performed.
 
 ---
 
+## G2. Phases 10–16 sweep results
+
+Measured, not assumed. Where a check disproved a suspicion, that is recorded too.
+
+### Phase 16 — audit log integrity
+
+**Fixed.** The `auth/log` route let any signed-in caller append an audit row with an arbitrary
+action, module and details — so the log could be padded with plausible entries to bury a real
+one. Identity columns were always server-derived, so this was never impersonation. **Nothing
+called it**: `authApi.logAction` was defined in `services/api.js` and never invoked. Route and
+client method both removed.
+
+Otherwise sound: no update or delete path to `AuditLog` outside admin-guarded database
+maintenance, and `list` refuses non-admins reading other users' entries.
+
+### Phase 11 — static assets
+
+**Fixed:** `public/stb-seal.png` (169.6 KB) was shipped in every deploy and referenced
+**nowhere** in the repo. Removed.
+
+**Open — needs a decision.** `dswd-logo.png` is **2048×740, 293.8 KB**, and it is the largest
+file served. It renders in the boot splash on *every* page load, at `min(320px, 82vw)` — so at
+most 320 CSS px wide. Even allowing 3× for high-density screens, 960px would suffice; 2048px is
+roughly 6× the pixels needed.
+
+Not resized here for two reasons: no image tooling is installed (no `sharp`), and it is official
+branding, which the audit brief says not to degrade. Resizing to 960px wide would be visually
+identical at every realistic display density and would cut ~250 KB from first paint. **Worth
+doing — but with your sign-off on touching a branding asset.**
+
+### Phase 12 — caching
+
+**Fixed.** Content-hashed assets were served `public, max-age=0, must-revalidate` — verified on
+the live site. Every one of the 68 files in `/assets/` revalidated on every page load despite
+having a content hash in its filename, which makes them immutable by construction.
+
+Now `public, max-age=31536000, immutable`, scoped to `/assets/` only. Verified first that every
+file there carries a hash and that unhashed files (`index.html`, favicons, the logo) live at the
+root and are unaffected — `index.html` keeps `must-revalidate`, which is correct.
+
+### Phase 13 — responsive
+
+Checked at 320, 360 and 768 px on the login route.
+
+**No defect found.** A 1 px `scrollWidth` excess appears at 320 and 360, but the page **cannot
+actually be scrolled horizontally** — `window.scrollTo(50, 0)` leaves `scrollX` at 0, and no
+element extends past the right edge. It is a sub-pixel rounding artifact, not a user-visible
+problem. Recorded rather than "fixed" so nobody chases it later.
+
+### Phase 14 — accessibility
+
+**Fixed:** two targets under the 24×24 minimum (WCAG 2.5.8, AA) — the "Forgot password?" link
+(103×15) and the show-password toggle (23×23). Both now 24 px, and the fix uses padding with a
+cancelling negative margin so the label row is unchanged: measured before and after, the label
+stays 16 px with the same 6 px gap to the input.
+
+**Verified clean:** every input has a label, no icon-only button lacks an accessible name, all
+images carry `alt`, `lang` and `title` are set, and heading order is sane (H1 → H2).
+
+**A false positive, corrected:** an initial probe reported four focusable elements with no
+visible focus indicator. That was wrong — programmatic `.focus()` does not trigger
+`:focus-visible`, and the probe showed the element was not focused at all. Inspecting the
+stylesheets directly: inputs suppress the outline but replace it with a `box-shadow` focus ring,
+and buttons and links have no outline-suppressing rule, so the browser default survives. **Focus
+visibility is fine.**
+
+### Coverage limit on 13 and 14
+
+Both were tested on the **login route only**. Every authenticated view — dashboards, tables, the
+assessment rating interface, modals, the monitoring screens — requires a Google sign-in this
+environment cannot perform. The breakpoints the brief lists (390, 412, tablet landscape, 1366,
+1920) are only meaningful against those views. **This is the largest remaining gap in the audit
+and needs a human with a test account.**
+
+---
+
 ## G1. Formula injection — one assumption to confirm on a live sheet
 
 The guard prefixes a dangerous string with an apostrophe, which is Sheets' own

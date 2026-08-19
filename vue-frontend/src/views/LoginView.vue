@@ -768,6 +768,15 @@ async function handleGoogleLogin() {
   color: #0038A8;
   text-decoration: none;
   transition: color .12s;
+  /* Was 103x15, under the 24x24 minimum target size (WCAG 2.5.8). The padding
+     grows the hit area and the negative margin cancels its effect on the flex
+     row, so the label sits exactly where it did - the target gets bigger
+     without the layout moving. */
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 4px;
+  margin: -4px;
 }
 .forgot-link:hover { color: #002d8a; text-decoration: underline; }
 
@@ -822,6 +831,12 @@ async function handleGoogleLogin() {
   color: #94A3B8;
   display: flex;
   align-items: center;
+  /* Was 23x23 - a pixel under the 24x24 minimum target size (WCAG 2.5.8).
+     The button is absolutely positioned inside the input, so growing the hit
+     box centres the same icon without moving anything. */
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
   border-radius: 5px;
   transition: color .13s;
 }

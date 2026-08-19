@@ -18,7 +18,7 @@ The matrix below records the audit **as found**. Fixes applied since:
 | H-1 — proxy retries writes | **Fixed** | `7977f34` | Not until Vercel redeploys |
 | H-2 — missing write locks | **Fixed** | this commit | Not until Apps Script is redeployed |
 | M-1 — formula injection | Open | — | — |
-| M-2 — security headers | Open | — | — |
+| M-2 — security headers | **Fixed (CSP staged)** | this commit | Not until Vercel redeploys |
 
 Two additional defects were found while fixing the above, and are fixed in the same commits:
 
@@ -229,6 +229,71 @@ rather than confidentiality.
 
 This verdict is **interim** — it reflects Phase 1 only. It is not a substitute for a formal VA
 or PIA, and Phases 10–14 and 18 have not been performed.
+
+---
+
+## G0. Content Security Policy — how to finish the job
+
+The headers in `vercel.json` are split deliberately:
+
+**Enforcing now** (cannot break Google sign-in):
+`Strict-Transport-Security`, `X-Content-Type-Options`, `Referrer-Policy`,
+`Permissions-Policy`, `X-Frame-Options: DENY`, and a minimal CSP of
+`frame-ancestors 'none'; base-uri 'self'; object-src 'none'`.
+That closes the clickjacking gap immediately — it is the part of M-2 with real
+security value and no compatibility risk.
+
+**Report-Only** (`Content-Security-Policy-Report-Only`): the full resource policy —
+`script-src`, `style-src`, `font-src`, `img-src`, `connect-src`, `frame-src`, `form-action`.
+It is *not* enforced. Violations are logged to the browser console and nothing is blocked.
+
+### Why it is not enforced yet
+
+A resource CSP can break Google sign-in, and sign-in cannot be exercised from a local
+static build — it needs the real deployed origin and Firebase's authorised domains.
+Enforcing an unvalidated policy risks locking every user out of a system whose only
+entry point is Google sign-in.
+
+That caution was justified: the first version of this policy carried a **wrong**
+`script-src` hash. The HTML parser normalises CRLF to LF before hashing an inline
+script, and this repo's checkout has CRLF, so a hash of the file's bytes did not match
+what the browser computed. Report-Only surfaced it as a console warning; enforcing
+would have blocked the boot splash script in production.
+
+### What was verified locally
+
+The production build was served with these exact headers and loaded in a browser:
+the login page rendered completely, and after the hash correction there were **zero**
+CSP violations. That covers the app shell and login route only.
+
+### To promote Report-Only to enforcing
+
+1. Deploy with the headers as they are.
+2. Exercise the real app in a browser with the console open — **especially Google
+   sign-in (popup and the redirect fallback)**, plus reports, document generation and
+   PDF download, and any view using the `@import` Google Fonts (`ConfirmModal`,
+   `LogoutConfirmModal`, `PasswordChangePrompt`). The login page alone does not
+   exercise `font-src`, `connect-src`, or `frame-src`.
+3. Collect every `Content-Security-Policy-Report-Only` violation and widen the policy
+   to cover the legitimate ones. Expect at least the Firebase `authDomain` under
+   `frame-src` — it is env-driven, and the policy currently allows
+   `https://*.firebaseapp.com`, which will not match a custom auth domain.
+4. Only when a full session produces no violations, rename the header
+   `Content-Security-Policy-Report-Only` → `Content-Security-Policy` and merge it with
+   the minimal enforcing policy.
+
+### Maintenance trap
+
+`script-src` pins a sha256 of the inline boot script in `vue-frontend/index.html`.
+**Any edit to that script changes the hash.** After changing it, run:
+
+```bash
+node tools/csp-hash.mjs
+```
+
+It rebuilds the hash the way the browser computes it (CRLF normalised) and fails if
+`vercel.json` is stale. While the policy is Report-Only a stale hash only logs a
+warning; once enforced it blocks the script.
 
 ---
 

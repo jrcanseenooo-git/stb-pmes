@@ -1,6 +1,6 @@
 # PMES Operating Rules
 
-## Typography — Font Family
+## Typography - Font Family
 
 The system font is set **once** in `vue-frontend/src/assets/fonts.css` (imported in `main.js`) using two rules:
 
@@ -10,8 +10,8 @@ html, body, #app {
   font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
 }
 
-/* Forces ALL elements — including button/input/select and content
-   teleported to <body> (modals, toasts) — to inherit it.
+/* Forces ALL elements - including button/input/select and content
+   teleported to <body> (modals, toasts) - to inherit it.
    html/body are excluded so this rule cannot out-rank the stack above;
    svg is excluded so inline font-family attributes keep working. */
 *:not(html):not(body):not(svg):not(svg *) {
@@ -21,13 +21,13 @@ html, body, #app {
 
 These two rules together mean every element in the entire system automatically uses the correct font, including form elements that browsers normally do not inherit font on, and modals rendered via `<teleport to="body">`.
 
-> Note: `src/assets/main.css` is **not** imported by the app (it never was). Do not import it wholesale without a full visual audit — it carries Tailwind preflight and component styles the current UI was never built against. `fonts.css` is the only global stylesheet.
+> Note: `src/assets/main.css` is **not** imported by the app (it never was). Do not import it wholesale without a full visual audit - it carries Tailwind preflight and component styles the current UI was never built against. `fonts.css` is the only global stylesheet.
 
-**Rules — apply to every new module, view, component, or feature:**
+**Rules - apply to every new module, view, component, or feature:**
 
 - **Never add `font-family` to any new CSS.** Not to page wrappers, modals, buttons, inputs, or anything. The global `* { font-family: inherit }` handles it automatically.
-- **Monospace exception** — password fields, code snippets, and formula text may use `font-family: 'DM Mono', monospace` or `'SF Mono', 'Fira Mono', monospace`. These are intentional overrides.
-- **Login module** (`LoginView.vue`) is exempt — it uses its own font design intentionally.
+- **Monospace exception** - password fields, code snippets, and formula text may use `font-family: 'DM Mono', monospace` or `'SF Mono', 'Fira Mono', monospace`. These are intentional overrides.
+- **Login module** (`LoginView.vue`) is exempt - it uses its own font design intentionally.
 - **SVG `<text>` attributes** may keep a short inline stack (e.g. `font-family="Inter,system-ui,sans-serif"`) since SVG attributes bypass CSS cascade.
 
 If you find yourself typing `-apple-system` or `BlinkMacSystemFont` anywhere outside `fonts.css`, **stop and delete it**.

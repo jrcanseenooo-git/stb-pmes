@@ -21,3 +21,6 @@ secrets*.json
 # scratch and generated output
 tmp/
 output/
+
+# Claude Code local machine settings (not shared)
+.claude/settings.local.json

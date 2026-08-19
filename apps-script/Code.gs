@@ -83,8 +83,28 @@ function checkRateLimit(userId, httpMethod) {
 
 const RESERVED_KEYS = ['route', '_method', 'token']
 
+// ── Request timing ──
+//
+// Logs route, method, status and duration so a slow screen can be traced to
+// the call responsible without guessing. Deliberately records nothing else:
+// no payload, no assessment content, no names, no token, no user id - the
+// route and the clock answer "which call is slow" on their own, and anything
+// more would put personal data into the execution log.
+//
+// Read these in the Apps Script editor under Executions.
+function logTiming_(route, httpMethod, status, startedAt) {
+  try {
+    Logger.log('[PMES] ' + httpMethod + ' ' + (route || '(none)') +
+      ' -> ' + status + ' in ' + (Date.now() - startedAt) + 'ms')
+  } catch (err) {
+    // Diagnostics must never be the reason a request fails.
+  }
+}
+
 // ── Main dispatcher ──
 function handleRequest(e, method) {
+  const startedAt = Date.now()
+  let routeForLog = ''
   try {
     // Parse the JSON body first - route, method, token and payload now travel
     // in the POST body so they never land in the URL (logs, history, Referer).
@@ -95,10 +115,14 @@ function handleRequest(e, method) {
     const token      = q.token   || body.token   || ''
     const route      = String(q.route || body.route || '').replace(/^\/|\/$/g, '')
     const httpMethod = String(q._method || body._method || method).toUpperCase()
+    routeForLog = route
 
     // 1. Authenticate every request (signature-verified inside verifyToken)
     const user = AuthService.verifyToken(token)
-    if (!user) return respond(401, false, null, 'Unauthorized - invalid or missing token')
+    if (!user) {
+      logTiming_(route, httpMethod, 401, startedAt)
+      return respond(401, false, null, 'Unauthorized - invalid or missing token')
+    }
 
     // 2. Rate limit per authenticated user, with separate read/write budgets
     checkRateLimit(user.uid || user.email, httpMethod)
@@ -112,11 +136,13 @@ function handleRequest(e, method) {
 
     // 4. Route
     const result = Router.dispatch(route, httpMethod, params, params, user)
+    logTiming_(route, httpMethod, 200, startedAt)
     return respond(200, true, result)
 
   } catch (err) {
     Logger.log('PMES Error: ' + err.message + '\n' + err.stack)
     const code = err.statusCode || 500
+    logTiming_(routeForLog, method, code, startedAt)
     // Every HttpError(message, code) thrown across the services is written
     // specifically for the end user - "An account for this email already
     // exists", "This active question has already been used", and dozens

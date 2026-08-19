@@ -392,6 +392,38 @@ stylesheets directly: inputs suppress the outline but replace it with a `box-sha
 and buttons and links have no outline-suppressing rule, so the browser default survives. **Focus
 visibility is fine.**
 
+### Phase 10 — frontend performance
+
+**No change made — the work is already done.** Route-level lazy loading is in place: the build
+emits a separate chunk per view, so a user loading the login page does not download Reports,
+IPCRF or Users. The dashboard's four API calls were already collapsed into one backend execution
+(`dashboard/all`), and in-flight GET de-duplication is already in `api.js`.
+
+Two observations, neither worth acting on yet:
+
+- `ReportsView` is the largest chunk at 183 KB (65 KB gzipped). It loads only when Reports is
+  opened. Splitting it further would trade one download for several round trips.
+- `INEFFECTIVE_DYNAMIC_IMPORT` on `stores/auth.js` — it is dynamically imported by `main.js` but
+  statically imported by six other modules, so it cannot move into its own chunk. Harmless; the
+  fix would be to import it statically everywhere and drop the dynamic import.
+
+The brief says not to split bundles unnecessarily. Neither of these justifies it.
+
+### Phase 21 — performance diagnostics
+
+**Added.** `handleRequest` now records route, method, status and duration to the execution log
+for every request, including the 401 and error paths.
+
+Deliberately narrow: **no payload, no assessment content, no names, no token, no user id.** The
+route and the clock are enough to tell which call is slow, and anything more would put personal
+data into the execution log — which Phase 20 is specifically trying to avoid.
+
+One thing to be aware of: a route can embed a record id (`ipcrf/FORM-123/rate`,
+`users/USR-456`). Those are pseudonymous identifiers, not names, and logging the route is what
+the brief asks for — but it is worth knowing they are there when deciding log retention.
+
+Read them in the Apps Script editor under **Executions**.
+
 ### Coverage limit on 13 and 14
 
 Both were tested on the **login route only**. Every authenticated view — dashboards, tables, the

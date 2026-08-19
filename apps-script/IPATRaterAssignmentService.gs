@@ -663,7 +663,13 @@ const IPATRaterAssignmentService = (() => {
     if (!AuthService.hasPermission(profile, 'view_bureau_monitoring') && AuthService.hasPermission(profile, 'view_division_monitoring')) {
       rows = rows.filter(r => r.rateeDivisionId === profile.divisionId)
     }
-    return rows
+    // Sibling list() endpoints (Accomplishments, IPCRF, Users) all paginate;
+    // this one returned the full, unbounded array. IPATRaterAssignments grows
+    // every semester x every ratee x every rater, forever, with no natural
+    // ceiling the way a per-office personnel roster has. No caller passes
+    // page/pageSize today, so this has no live effect yet - it only stops the
+    // response from becoming unbounded if this route is ever wired up.
+    return SpreadsheetService.paginate(rows, params.page, params.pageSize)
   }
 
   // ── MARK ASSIGNMENT COMPLETED ─────────────────────────────────────────────

@@ -1031,8 +1031,11 @@ const SearchSelect = {
 
 // ── Load users on mount ──
 onMounted(async () => {
-  await loadUsers()
-  const loads = [loadOrgOptions()]
+  // loadUsers was awaited alone before this batch even started, paying a
+  // full extra round trip up front, though none of these reads depend on
+  // each other - loadOrgOptions/loadOfficeOptions/loadSystemSettings never
+  // read users.value.
+  const loads = [loadUsers(), loadOrgOptions()]
   if (canManageUsers.value) loads.push(loadOfficeOptions(), loadSystemSettings())
   await Promise.all(loads)
 })

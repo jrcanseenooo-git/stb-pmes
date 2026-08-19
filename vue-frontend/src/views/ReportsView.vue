@@ -485,25 +485,34 @@ function fmtDateTime(iso) { return iso ? new Date(iso).toLocaleString('en-PH', {
 function fmtScore(value) { return Number(value || 0) ? Number(value).toFixed(2) : '-' }
 function showToast(msg, type = 'success') { toast.value = { show: true, msg, type }; setTimeout(() => { toast.value.show = false }, 3500) }
 
-onMounted(async () => {
-  try {
-    const opts = await reportsApi.options()
-    divisions.value             = opts?.divisions || []
-    canSelectAllDivisions.value = !!opts?.canSelectAllDivisions
-    if (opts?.types?.length) reportTypes.value = opts.types
-    if (!canSelectAllDivisions.value && divisions.value.length) {
-      form.value.divisionId = divisions.value[0].id
+onMounted(() => {
+  // Independent reads with independent loading/error states (optionsLoading
+  // only gates the options section; recentReports only feeds the separate
+  // history list) - they were awaited strictly in sequence for no reason.
+  // Each keeps its own try/catch so error isolation is unchanged; they just
+  // no longer block each other.
+  ;(async () => {
+    try {
+      const opts = await reportsApi.options()
+      divisions.value             = opts?.divisions || []
+      canSelectAllDivisions.value = !!opts?.canSelectAllDivisions
+      if (opts?.types?.length) reportTypes.value = opts.types
+      if (!canSelectAllDivisions.value && divisions.value.length) {
+        form.value.divisionId = divisions.value[0].id
+      }
+    } catch (e) {
+      showToast('Report options could not be loaded. Some reports may be unavailable.', 'error')
+    } finally {
+      optionsLoading.value = false
     }
-  } catch (e) {
-    showToast('Report options could not be loaded. Some reports may be unavailable.', 'error')
-  } finally {
-    optionsLoading.value = false
-  }
+  })()
 
-  try {
-    const r = await reportsApi.list()
-    recentReports.value = r?.items || (Array.isArray(r) ? r : [])
-  } catch (e) { /* recent reports is non-critical */ }
+  ;(async () => {
+    try {
+      const r = await reportsApi.list()
+      recentReports.value = r?.items || (Array.isArray(r) ? r : [])
+    } catch (e) { /* recent reports is non-critical */ }
+  })()
 })
 
 async function loadPreview() {

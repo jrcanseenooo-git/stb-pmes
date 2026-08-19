@@ -101,6 +101,19 @@ const PmesDocGenService = (() => {
   // PUBLIC: export a previously generated file as PDF (for the in-app Print button)
   // ─────────────────────────────────────────────
   function exportPdf(fileId, tabName, user) {
+    // The caller supplies a raw Drive file id, and the export below runs with
+    // the script's own OAuth token - which can read every spreadsheet the
+    // script owner can, including the central PMES database and every office
+    // workbook. Without this check any authenticated user could print any of
+    // them by passing its id, which defeats office isolation entirely.
+    //
+    // A file id is only printable if it is the generated document of an IPCRF
+    // form the caller is allowed to open. IpcrfService.get applies the same
+    // _guardAccess used everywhere else (owner, division chief, section head,
+    // focal, director), so print rights track form rights automatically
+    // instead of being a second rule that can drift out of step.
+    _assertMayExport(fileId, user)
+
     const ss    = SpreadsheetApp.openById(fileId)
     const sheet = (tabName && ss.getSheetByName(tabName)) || ss.getSheets()[0]
     if (sheet.getName() === 'Targets') _refreshTargetsSignedDate(sheet)
@@ -122,6 +135,25 @@ const PmesDocGenService = (() => {
       pdfBase64: Utilities.base64Encode(resp.getBlob().getBytes()),
       fileName:  ss.getName() + ' - ' + sheet.getName() + '.pdf'
     }
+  }
+
+  // Resolve a Drive file id back to the IPCRF/CCEF form that owns it, then let
+  // IpcrfService.get decide whether this user may open that form.
+  function _assertMayExport(fileId, user) {
+    const id = String(fileId || '').trim()
+    if (!id) throw HttpError('No document was specified to print.', 400)
+
+    const forms  = SpreadsheetService.getAllRows(SpreadsheetService.getSheet(SHEET.IPCRF_FORMS))
+    const owning = forms.find(f => String(f.docFileId || '').trim() === id)
+
+    // Deliberately 404 rather than 403, and the same message either way: a file
+    // that is not a generated PMES document and one this user simply may not
+    // see should be indistinguishable, so a caller cannot probe ids to learn
+    // which spreadsheets exist.
+    if (!owning || !owning.id) throw HttpError('The requested document could not be found.', 404)
+
+    // Throws 403 (or 404) unless this user is allowed to open the form.
+    IpcrfService.get(owning.id, user)
   }
 
   // ─────────────────────────────────────────────

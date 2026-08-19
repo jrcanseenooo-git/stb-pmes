@@ -1,7 +1,7 @@
 /**
  * FirebaseAuthService.gs
  * Manages Firebase Auth users from Apps Script using a Service Account JWT.
- * No GCP project linking required — works with any Firebase project.
+ * No GCP project linking required - works with any Firebase project.
  *
  * Setup required:
  *   1. Firebase Console → Project Settings → Service Accounts
@@ -19,7 +19,7 @@ const FirebaseAuthService = (() => {
   const PROJECT_ID   = PROPS.getProperty('FIREBASE_PROJECT_ID')   || 'pmes-1cb6d'
   const CLIENT_EMAIL = PROPS.getProperty('FIREBASE_CLIENT_EMAIL') || ''
   const PRIVATE_KEY  = (PROPS.getProperty('FIREBASE_PRIVATE_KEY') || '').replace(/\\n/g, '\n')
-  // Public Firebase Web API key (NOT a secret — it is already shipped in the
+  // Public Firebase Web API key (NOT a secret - it is already shipped in the
   // frontend bundle). Prefer a Script Property; fall back to the known value so
   // token verification cannot silently fail-open if the property is unset.
   const WEB_API_KEY  = PROPS.getProperty('FIREBASE_WEB_API_KEY') || 'AIzaSyDf-fc_WBHb45Env4XJ5Gsw6lRfHORptnQ'
@@ -64,7 +64,7 @@ const FirebaseAuthService = (() => {
 
   // ── Build a signed JWT and exchange it for an access token ──
   // Service-account access tokens are valid for an hour, but this signed a fresh
-  // RSA-SHA256 JWT and did a full OAuth exchange on EVERY call — two extra
+  // RSA-SHA256 JWT and did a full OAuth exchange on EVERY call - two extra
   // network round trips plus a signing operation before the real request could
   // start. That is the bulk of the wait when approving a user. Cache it in
   // CacheService (shared across executions) and re-use it until it nearly
@@ -79,7 +79,7 @@ const FirebaseAuthService = (() => {
     try {
       const cached = CacheService.getScriptCache().get(ADMIN_TOKEN_CACHE_KEY)
       if (cached) return cached
-    } catch (e) { /* cache unavailable — mint a fresh token below */ }
+    } catch (e) { /* cache unavailable - mint a fresh token below */ }
 
     const now     = Math.floor(Date.now() / 1000)
     const header  = Utilities.base64EncodeWebSafe(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))
@@ -148,14 +148,14 @@ const FirebaseAuthService = (() => {
         Logger.log('✅ Firebase user created: ' + email + ' UID: ' + result.localId)
         return { success: true, uid: result.localId, email: result.email }
       } else if (result.error?.message === 'EMAIL_EXISTS') {
-        // A Firebase Auth account for this email already existed — common for
+        // A Firebase Auth account for this email already existed - common for
         // dswd.gov.ph addresses that ever touched Google Sign-In, or a retried
         // creation. This branch used to just report success without touching
         // the account, so the temp password shown in the creation modal was
         // never actually set on the real credential: the account kept
         // whatever password it already had (often none), first login failed,
-        // and the admin had to use Reset Password — which calls
-        // updatePassword() on the existing uid — to make the account usable.
+        // and the admin had to use Reset Password - which calls
+        // updatePassword() on the existing uid - to make the account usable.
         // Setting the password here means the temp password from creation
         // works the first time, matching what the admin was told happened.
         Logger.log('ℹ️ Firebase user already exists: ' + email)
@@ -256,7 +256,7 @@ const FirebaseAuthService = (() => {
     }
   }
 
-  // ── DELETE a Firebase user (irreversible — unlike disableUser) ──
+  // ── DELETE a Firebase user (irreversible - unlike disableUser) ──
   // Used only by UsersService.remove(), which hard-deletes the PMES account
   // row. Deleting rather than disabling frees the email address so a
   // corrected re-creation isn't blocked by a stale, disabled account still
@@ -353,7 +353,7 @@ const FirebaseAuthService = (() => {
         Logger.log('✅ Firebase Admin API working! Found user: ' + admin.email)
         Logger.log('   UID: ' + admin.localId)
       } else {
-        Logger.log('⚠️ API works but user not found — check the email address')
+        Logger.log('⚠️ API works but user not found - check the email address')
       }
     } catch (e) {
       Logger.log('❌ Error: ' + e.message)

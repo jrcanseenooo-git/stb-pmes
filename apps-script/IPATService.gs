@@ -2,18 +2,18 @@
  * IPATService.gs
  * ─────────────────────────────────────────────────────────────────────────────
  * Innovations Performance Assessment Tool (IPAT)
- * Per AO No. 11 s. 2025 — DSWD DSPMS / Innovations Cluster
+ * Per AO No. 11 s. 2025 - DSWD DSPMS / Innovations Cluster
  *
  * THREE DOMAINS:
- *   A. Core Behavioral Competencies (CBC) — 30%
- *      5 HEARTWORK values · 5 indicators each · 1–4 Likert
+ *   A. Core Behavioral Competencies (CBC) - 30%
+ *      5 HEARTWORK values · 5 indicators each · 1-4 Likert
  *      Multi-rater: Self(15%) + Peer(15%) + Sub(15%) + Supervisor(30%) + Skip(25%)
  *      If no subordinate: Peer becomes 30%
  *
- *   B. Functional Performance Output (FPO) — 55%
- *      IPCRF/DPCR final numerical rating (1–5 scale, converted to 1–4)
+ *   B. Functional Performance Output (FPO) - 55%
+ *      IPCRF/DPCR final numerical rating (1-5 scale, converted to 1-4)
  *
- *   C. Job Fitness (JF) — 15%
+ *   C. Job Fitness (JF) - 15%
  *      5 indicators - Self + Immediate Supervisor / 2
  *
  * FORMULA: Overall = (CBCI × 0.30) + (FPOI × 0.55) + (JFI × 0.15)
@@ -77,6 +77,7 @@ const IPATService = (() => {
   // migration it performs rather than for one feature, since it now also
   // carries the FPO position-differential fields.
   const AUTO_MIGRATED_RECORD_HEADERS = [
+    'jfVarianceNotifiedAt',
     'cbcBaseScore',
     'cbcNteLevel',
     'cbcNteDeductionPct',
@@ -86,7 +87,7 @@ const IPATService = (() => {
     'cbcDeductionBy',
     'cbcDeductionByName',
     'cbcDeductionAt',
-    // Protocol V.B.1 position weight differential — recorded so a synced score
+    // Protocol V.B.1 position weight differential - recorded so a synced score
     // is auditable: which category was matched and what factor was applied.
     'fpoPositionCategory',
     'fpoWeightFactor'
@@ -235,6 +236,50 @@ const IPATService = (() => {
       : CBC_RATER_WEIGHTS
   }
 
+  // Gap between the ratee's self-rating and the immediate supervisor's at which
+  // the record is referred to the skip supervisor. Configurable per office;
+  // 1.00 on the 1-4 scale unless an office has recorded a different basis.
+  const JF_VARIANCE_DEFAULT = 1.00
+  function jfVarianceThreshold() {
+    return typeof AssessmentRulesService !== 'undefined'
+      ? AssessmentRulesService.getJfVarianceThreshold()
+      : JF_VARIANCE_DEFAULT
+  }
+
+  // Set of ratee ids this user is an assigned rater for, in any period and any
+  // rater type. Returned as a lookup object rather than an array because it is
+  // used inside a filter over every record.
+  function assignedRateeIdsFor_(userId) {
+    const ids = {}
+    if (!userId) return ids
+    try {
+      const sheet = SpreadsheetService.getSheet(SHEET.IPAT_ASSIGNMENTS)
+      SpreadsheetService.getAllRows(sheet).forEach(r => {
+        if (String(r.raterId) === String(userId)) ids[String(r.rateeId)] = true
+      })
+    } catch (e) {
+      Logger.log('[PMES] assigned ratee lookup failed: ' + (e && e.message || e))
+    }
+    return ids
+  }
+
+  // Resolves the skip supervisor assigned to this ratee for the record's period.
+  function skipSupervisorFor_(record) {
+    try {
+      const sheet = SpreadsheetService.getSheet(SHEET.IPAT_ASSIGNMENTS)
+      const hit = SpreadsheetService.getAllRows(sheet).find(r =>
+        String(r.rateeId) === String(record.rateeId) &&
+        String(r.raterType) === 'SkipSupervisor' &&
+        String(r.semester) === String(record.semester) &&
+        String(r.year) === String(record.year)
+      )
+      return hit ? String(hit.raterId || '') : ''
+    } catch (e) {
+      Logger.log('[PMES] skip supervisor lookup failed: ' + (e && e.message || e))
+      return ''
+    }
+  }
+
   function calculateOverall(record, fpoScoreOverride) {
     const weights = domainWeights()
     const rawCbc = record.cbcScore !== '' && record.cbcScore !== null && record.cbcScore !== undefined ? Number(record.cbcScore) : null
@@ -250,7 +295,7 @@ const IPATService = (() => {
     // Missing components are excluded and the weights of the components actually
     // present are renormalised, so the formula always sums to 1.0. Note that this
     // means a score computed without FPO (55%) is driven entirely by CBC and JF
-    // scaled up — appliedWeights below records what the score was actually built
+    // scaled up - appliedWeights below records what the score was actually built
     // from, so a renormalised score is never mistaken for a complete one.
     let weightedSum = 0
     let totalWeight = 0
@@ -269,7 +314,7 @@ const IPATService = (() => {
       jfScore: rawJf !== null ? rawJf : 0,
       overallScore,
       descriptor: qualitativeDescriptor(overallScore),
-      // Diagnostics — which components contributed, and how much weight was
+      // Diagnostics - which components contributed, and how much weight was
       // actually present before renormalisation.
       appliedComponents: appliedWeights,
       missingComponents: ['CBC', 'FPO', 'JF'].filter(c => appliedWeights.indexOf(c) < 0),
@@ -371,11 +416,11 @@ const IPATService = (() => {
     'Commitment to Organizational Objectives: demonstrates alignment with program goals through consistent work engagement and support for organizational priorities.',
     // The previous wording claimed this was "scored based on DTR records using
     // the threshold table". No attendance data is ingested by this system and
-    // none is planned — attendance is tracked outside it — so that sentence
+    // none is planned - attendance is tracked outside it - so that sentence
     // described behaviour that does not exist. It is rated by the supervisor
     // like every other Job Fitness indicator; the protocol's bands are restated
     // here so the rater applies them consistently rather than by impression.
-    'Attendance and Punctuality Compliance: maintains regular attendance and adheres to prescribed work schedules, with minimal unexcused absences or tardiness. Rate against the monthly attendance record — 4: 0–2 late, full attendance (excluding filed VL/PL/SL); 3: 3–5 late or 1–2 days unplanned absence; 2: 6–9 late or 3–5 days unplanned absence; 1: 10 or more late, or frequent emergency leaves.'
+    'Attendance and Punctuality Compliance: maintains regular attendance and adheres to prescribed work schedules, with minimal unexcused absences or tardiness. Rate against the monthly attendance record - 4: 0-2 late, full attendance (excluding filed VL/PL/SL); 3: 3-5 late or 1-2 days unplanned absence; 2: 6-9 late or 3-5 days unplanned absence; 1: 10 or more late, or frequent emergency leaves.'
   ]
 
   // ── Qualitative Descriptors ──────────────────────────────────────────────
@@ -390,10 +435,10 @@ const IPATService = (() => {
 
   function round2(v) { return Math.round(v * 100) / 100 }
 
-  // CBC and JF are both 1–4 Likert (see the header block). Values arrive over the
+  // CBC and JF are both 1-4 Likert (see the header block). Values arrive over the
   // API as strings, and `Number(x) || 1` alone would silently accept 99 or -5 and
   // carry it straight into the weighted score. Reject out-of-range input instead:
-  // the rating UI can only emit 1–4, so anything else is a client fault or tampering.
+  // the rating UI can only emit 1-4, so anything else is a client fault or tampering.
   const RATING_MIN = 1
   const RATING_MAX = 4
 
@@ -435,12 +480,12 @@ const IPATService = (() => {
   }
 
   // IPAT_ASSIGNMENTS is deliberately excluded from DataCacheService's
-  // cross-execution tier everywhere else — a stale read there could hand out a
+  // cross-execution tier everywhere else - a stale read there could hand out a
   // rating task that was already completed, or hide one that wasn't. This one
   // caller only uses assignments to break ties between legacy duplicate
   // IPATRecords rows for the same ratee/period (new duplicates are blocked at
   // creation; this exists for the ones that predate that guard), so a short,
-  // narrowly-scoped cache here can never affect a live score or rating — the
+  // narrowly-scoped cache here can never affect a live score or rating - the
   // only thing that can lag by the TTL is which duplicate record wins the
   // tie-break display.
   const CANONICAL_TIEBREAK_CACHE_TTL_SECONDS = 20
@@ -491,7 +536,7 @@ const IPATService = (() => {
   }
 
   // ─────────────────────────────────────────────
-  // IPAT RECORDS — CRUD
+  // IPAT RECORDS - CRUD
   // ─────────────────────────────────────────────
 
   function list(params, user) {
@@ -506,13 +551,21 @@ const IPATService = (() => {
       if (profile.role === 'Division Chief') {
         rows = rows.filter(r => r.divisionId === profile.divisionId)
       } else {
-        rows = rows.filter(r => r.rateeId === profile.id || r.raterId === profile.id)
+        // IPATRecords has no `raterId` column - the old check against it was
+        // always false, so an assigned rater could not open the record they
+        // were asked to act on. A skip supervisor referred a Job Fitness
+        // variance therefore had nowhere to go. Resolve the ratees this user is
+        // actually assigned to instead.
+        const rateeIds = assignedRateeIdsFor_(profile.id)
+        rows = rows.filter(r =>
+          r.rateeId === profile.id || rateeIds[String(r.rateeId)] === true
+        )
       }
     }
 
     if (params.rateeId)    rows = rows.filter(r => r.rateeId    === params.rateeId)
     // Sheets returns a numeric cell as a Number, while the API always sends the
-    // period as a String — so `1 === '1'` was false and this filter silently
+    // period as a String - so `1 === '1'` was false and this filter silently
     // dropped every row. `year` was already coerced; `semester` was not.
     if (params.semester)   rows = rows.filter(r => String(r.semester) === String(params.semester))
     if (params.year)       rows = rows.filter(r => String(r.year) === String(params.year))
@@ -541,7 +594,7 @@ const IPATService = (() => {
       if (selfJF.length && supJF.length) {
         const avg = (arr) => arr.reduce((s, r) => s + Number(r.rating || 0), 0) / arr.length
         const gap = Math.abs(avg(selfJF) - avg(supJF))
-        row.jfVarianceFlagged = gap >= 1.0
+        row.jfVarianceFlagged = gap >= jfVarianceThreshold()
         row.jfVarianceGap     = Math.round(gap * 100) / 100
       } else {
         row.jfVarianceFlagged = false
@@ -573,7 +626,7 @@ const IPATService = (() => {
     const semester = body.semester || ''
     const year     = body.year     || new Date().getFullYear()
 
-    // FPO is never taken from client input — it always comes from the
+    // FPO is never taken from client input - it always comes from the
     // ratee's own IPCRF/CCEF Final Numerical Rating for this same period.
     const sourceForm = IpcrfService.getFinalRatingForUser(rateeId, semester, year)
 
@@ -640,7 +693,7 @@ const IPATService = (() => {
     const record  = _getRecord(ipatId)
     const sheet   = SpreadsheetService.getSheet(SHEET.IPAT_CBC_RATINGS)
     const now     = new Date().toISOString()
-    // gasWrite sends body as flattened params — ratings may arrive as JSON string
+    // gasWrite sends body as flattened params - ratings may arrive as JSON string
     let ratings = body.ratings || []
     if (typeof ratings === 'string') { try { ratings = JSON.parse(ratings) } catch(e) { ratings = [] } }
     if (!Array.isArray(ratings)) ratings = []
@@ -741,18 +794,39 @@ const IPATService = (() => {
         if (sup  !== null) { score += sup  * raterWeights.supervisor; totalWeight += raterWeights.supervisor }
         if (skip !== null) { score += skip * raterWeights.skipSupervisor; totalWeight += raterWeights.skipSupervisor }
 
+        // Peer ratings reach this point under one of three rater-type labels,
+        // depending on how the office's rater matrix is configured: a single
+        // 'Peer', or the protocol's numbered pair 'Peer1'/'Peer2'. The branches
+        // below must therefore accept a peer rating under ANY of those labels.
+        // Reading only the label the branch expects silently discards a rating
+        // that a colleague actually submitted - no error, no warning, and the
+        // score renormalises over the reduced weight as though the rater had
+        // never been assigned.
         if (!hasSubordinate) {
-          // Technical Staff: Peer1 15% + Peer2 15%
-          // Legacy single-Peer path: redistributed to 30%
+          // No subordinate: the subordinate's 15% is reassigned to a second peer,
+          // so two peer slots carry 15% each (30% combined, per protocol).
           if (peer1 !== null || peer2 !== null) {
-            if (peer1 !== null) { score += peer1 * raterWeights.peerStaffPrimary; totalWeight += raterWeights.peerStaffPrimary }
-            if (peer2 !== null) { score += peer2 * raterWeights.peerStaffSecondary; totalWeight += raterWeights.peerStaffSecondary }
+            // Fall back to a stray plain-'Peer' rating to fill whichever numbered
+            // slot is empty, rather than dropping it.
+            const primary   = peer1 !== null ? peer1 : peer
+            const secondary = peer2 !== null ? peer2 : (peer1 !== null ? peer : null)
+            if (primary   !== null) { score += primary   * raterWeights.peerStaffPrimary;   totalWeight += raterWeights.peerStaffPrimary }
+            if (secondary !== null) { score += secondary * raterWeights.peerStaffSecondary; totalWeight += raterWeights.peerStaffSecondary }
           } else if (peer !== null) {
             score += peer * raterWeights.peerLegacy; totalWeight += raterWeights.peerLegacy
           }
         } else {
-          if (peer !== null) { score += peer * raterWeights.peerWithSubordinate; totalWeight += raterWeights.peerWithSubordinate }
-          if (sub  !== null) { score += sub  * raterWeights.subordinate; totalWeight += raterWeights.subordinate }
+          // Has a subordinate: one peer slot at 15% alongside the subordinate's
+          // 15%. Accept the peer rating under any label - an office whose matrix
+          // still emits Peer1/Peer2 while also assigning a Subordinate would
+          // otherwise lose both peer ratings entirely.
+          const peerValues = [peer, peer1, peer2].filter(v => v !== null)
+          if (peerValues.length) {
+            const peerAvg = peerValues.reduce((s, v) => s + v, 0) / peerValues.length
+            score += peerAvg * raterWeights.peerWithSubordinate
+            totalWeight += raterWeights.peerWithSubordinate
+          }
+          if (sub !== null) { score += sub * raterWeights.subordinate; totalWeight += raterWeights.subordinate }
         }
 
         return totalWeight > 0 ? score / totalWeight : 0
@@ -956,12 +1030,36 @@ const IPATService = (() => {
     if (selfRatings.length && supRatings.length) {
       const avg = (arr) => arr.reduce((s, r) => s + Number(r.rating || 0), 0) / arr.length
       const gap = Math.abs(avg(selfRatings) - avg(supRatings))
-      jfVarianceFlagged = gap >= 1.0
+      jfVarianceFlagged = gap >= jfVarianceThreshold()
       jfVarianceGap     = Math.round(gap * 100) / 100
     }
 
-    const recSheet = SpreadsheetService.getSheet(SHEET.IPAT_RECORDS)
+    // ensureRecordSchema() rather than getSheet(): the referral stamp below
+    // lives in an auto-migrated column, and updateRow silently no-ops on a
+    // column that does not exist yet. Without the migration the stamp would
+    // never persist and the skip supervisor would be re-notified on every
+    // single rating save.
+    const recSheet = ensureRecordSchema()
     const updatedRecord = SpreadsheetService.updateRow(recSheet, ipatId, { jfScore, updatedAt: new Date().toISOString() })
+
+    // Refer a flagged record to the skip supervisor. `jfVarianceNotifiedAt`
+    // makes this idempotent - computeJF runs again on every rating save, and
+    // without it the skip supervisor would be notified repeatedly for the same
+    // record. Referral failure must never block the score from being saved.
+    if (jfVarianceFlagged && updatedRecord && !updatedRecord.jfVarianceNotifiedAt) {
+      try {
+        const skipId = skipSupervisorFor_(updatedRecord)
+        if (skipId && NotificationsService.createForJfVariance(updatedRecord, skipId, jfVarianceGap)) {
+          SpreadsheetService.updateRow(recSheet, ipatId, { jfVarianceNotifiedAt: new Date().toISOString() })
+          AuditService.log('JF_VARIANCE_REFERRED', 'IPAT',
+            `Gap=${jfVarianceGap} referred to skip supervisor ${skipId} for ${ipatId}`, user)
+        } else if (!skipId) {
+          Logger.log('[PMES] JF variance flagged for ' + ipatId + ' but no skip supervisor is assigned.')
+        }
+      } catch (e) {
+        Logger.log('[PMES] JF variance referral failed for ' + ipatId + ': ' + (e && e.message || e))
+      }
+    }
     const overall = recomputeOverallForRecord(recSheet, ipatId, updatedRecord)
 
     AuditService.log('COMPUTE_JF', 'IPAT', `JF=${jfScore} for ${ipatId}`, user)
@@ -989,11 +1087,11 @@ const IPATService = (() => {
    * The configured factors default to 1.00, so this is a no-op until somebody
    * deliberately sets them. That default is intentional: the protocol's 22% and
    * 34% differentials describe how a position's TARGETS are weighted when
-   * commitments are set, which happens inside the IPCR computation — the value
-   * arriving here is an already-normalised 1–5 final rating. Multiplying it by
+   * commitments are set, which happens inside the IPCR computation - the value
+   * arriving here is an already-normalised 1-5 final rating. Multiplying it by
    * 1.22 would push results past the top of the scale.
    *
-   * The result is clamped to the 1–5 scale regardless, so a mis-set factor
+   * The result is clamped to the 1-5 scale regardless, so a mis-set factor
    * cannot produce an out-of-range score that would corrupt the overall
    * computation.
    */
@@ -1017,7 +1115,7 @@ const IPATService = (() => {
       const adjusted = Math.min(5, Math.max(1, raw * factor))
       return { fpoScore: round2(adjusted), category: category, factor: factor }
     } catch (e) {
-      // A misconfigured rule must never block a sync — fall back to the raw
+      // A misconfigured rule must never block a sync - fall back to the raw
       // IPCRF rating, which is the pre-differential behaviour.
       Logger.log('[IPAT] FPO position differential skipped: ' + e.message)
       return fallback
@@ -1064,7 +1162,7 @@ const IPATService = (() => {
     const ctx = getRowContext(recSheet, ipatId)
     if (!ctx) throw HttpError('IPAT record not found', 404)
 
-    // Position weight differential (protocol V.B.1) applies ONLY on this path —
+    // Position weight differential (protocol V.B.1) applies ONLY on this path -
     // a score pulled from the IPCRF/CCEF. A manually entered FPO figure has
     // already had the office's own weighting applied before it was typed in, so
     // setFPO deliberately does not call this; applying it there would
@@ -1222,7 +1320,11 @@ const IPATService = (() => {
     computeOverall,
     getThemes, getJFIndicators,
     getCBCRatings, getJFRatings,
-    ensureRecordSchema
+    ensureRecordSchema,
+    // Exported so other services classify scores through the protocol's bands
+    // instead of maintaining their own. PortalService previously carried a
+    // divergent copy (3.51/3.01/2.51, and no intervention band at all).
+    qualitativeDescriptor
   }
 
 })()

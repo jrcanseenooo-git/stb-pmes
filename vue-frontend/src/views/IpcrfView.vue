@@ -332,7 +332,7 @@
                 </div>
               </div>
               <div v-else-if="activeForm?.status === 'Approved' && activeForm?.userId === authStore.profileId" class="wf-bar">
-                <span class="wf-info">Targets approved — complete your accomplishments, then submit ratings for Division Chief review.</span>
+                <span class="wf-info">Targets approved - complete your accomplishments, then submit ratings for Division Chief review.</span>
                 <button class="btn btn-primary btn-sm" :disabled="ratingBusy" @click="doSubmitRatings">
                   {{ ratingBusy ? 'Submitting...' : 'Submit Ratings for Review' }}
                 </button>
@@ -917,6 +917,7 @@ import { ipcrf as ipcrfApi, kraLibrary as kraLibraryApi, docGenApi } from '@/ser
 import { usePermissions } from '@/composables/usePermissions'
 import { useAuthStore } from '@/stores/auth'
 import { useConfirm, CONFIRMS } from '@/composables/useConfirm'
+import { normalizeEmploymentType } from '@/utils/employmentTypes'
 
 const router    = useRouter()
 const authStore = useAuthStore()
@@ -1210,9 +1211,17 @@ const canReviewActiveForm = computed(() =>
   (activeForm.value.canReview === true || activeForm.value.canReview === 'true' || canApprove.value) &&
   String(activeForm.value.userId || '') !== String(authStore.profileId || '')
 )
+/**
+ * Only Contract of Service personnel are assessed with the CCEF. Everyone else
+ * - Regular, Co-Terminus and Contractual - uses the IPCRF.
+ *
+ * This matched on the substring 'contract', which also caught 'Contractual'.
+ * That is a different appointment status and belongs on the IPCRF, so the test
+ * is exact rather than a substring. Normalising first means the legacy
+ * spellings ('COS', 'cos', 'Contract of Service') still resolve correctly.
+ */
 function isCosEmploymentType(value) {
-  const type = String(value || '').toLowerCase()
-  return type.includes('contract') || type.includes('cos')
+  return normalizeEmploymentType(value) === 'Contract of Service (COS)'
 }
 
 const myFormType   = computed(() => isCosEmploymentType(authStore.employmentType) ? 'CCEF' : 'IPCRF')

@@ -22,7 +22,7 @@ const Router = (() => {
     switch (resource) {
 
       // ─────────────────────────────────────────
-      // Auth — routes: auth/me, auth/log
+      // Auth - routes: auth/me, auth/log
       // id='me' or id='log' (no real object id)
       // ─────────────────────────────────────────
       case 'auth':
@@ -37,11 +37,11 @@ const Router = (() => {
         break
 
       // ─────────────────────────────────────────
-      // Dashboard — routes: dashboard/summary, /divisions, /status, /activity
+      // Dashboard - routes: dashboard/summary, /divisions, /status, /activity
       // id = action name
       // ─────────────────────────────────────────
       // ─────────────────────────────────────────
-      // Portal — the assessment-only experience for participating offices.
+      // Portal - the assessment-only experience for participating offices.
       // Office-scoped by OfficeScopeService; every caller sees only their own
       // assignments in their own office spreadsheet.
       // ─────────────────────────────────────────
@@ -62,7 +62,7 @@ const Router = (() => {
         break
 
       // ─────────────────────────────────────────
-      // Users — routes: users, users/:id, users/:id/activate, etc.
+      // Users - routes: users, users/:id, users/:id/activate, etc.
       // ─────────────────────────────────────────
       case 'users':
         if (!id && method === 'GET') return UsersService.list(params, user)
@@ -77,10 +77,20 @@ const Router = (() => {
         break
 
       // Read-only multi-office boundary report. Deliberately NOT in
-      // OfficeScopeService.SCOPED_RESOURCES — it must describe the central
+      // OfficeScopeService.SCOPED_RESOURCES - it must describe the central
       // database, not be redirected into an office workbook.
       case 'diagnostics':
         if (id === 'office-boundary' && method === 'GET') return DiagnosticsService.officeBoundary(params, user)
+        break
+
+      // Central-admin-only reversible dummy data for dashboard testing.
+      // Not office-scoped: it intentionally seeds/cleans multiple registered
+      // office workbooks from the central boundary.
+      case 'test-data':
+        if (id === 'seed' && method === 'POST') return TestDataService.seed(body, user)
+        if (id === 'cleanup' && method === 'POST') return TestDataService.cleanup(body, user)
+        if (id === 'accounts' && method === 'POST') return TestDataService.seedAccounts(body, user)
+        if (id === 'accounts-cleanup' && method === 'POST') return TestDataService.cleanupAccounts(body, user)
         break
 
       case 'system-settings':
@@ -119,7 +129,7 @@ const Router = (() => {
         break
 
       case 'kras':
-        // Not implemented — the live KRA feature uses the 'kra-library' routes.
+        // Not implemented - the live KRA feature uses the 'kra-library' routes.
         // Guarded so a stray call returns a clean 501 instead of a 500 crash.
         throw HttpError('KRA endpoint is not available. Use kra-library.', 501)
 
@@ -158,7 +168,7 @@ const Router = (() => {
       // ─────────────────────────────────────────
       // Accomplishments
       // ─────────────────────────────────────────
-      // Per-office rater matrix — who rates whom. Office-scoped.
+      // Per-office rater matrix - who rates whom. Office-scoped.
       case 'rater-matrix':
         if (!id && method === 'GET') return RaterMatrixService.list(params, user)
         if (!id && method === 'PUT') return RaterMatrixService.save(body, user)
@@ -231,17 +241,19 @@ const Router = (() => {
         if (id === 'normalize-columns' && method === 'POST') return DatabaseMaintenanceService.normalizeColumnOrder(body, user)
         if (id === 'fresh-schema' && method === 'GET') return DatabaseMaintenanceService.previewFreshRebuild(user)
         if (id === 'fresh-schema' && method === 'POST') return DatabaseMaintenanceService.rebuildFreshDatabase(body, user)
+        if (id === 'normalize-staff-role' && method === 'GET') return RoleLabelMaintenanceService.preview(user)
+        if (id === 'normalize-staff-role' && method === 'POST') return RoleLabelMaintenanceService.normalizeStaffRoles(body, user)
         break
 
       // ─────────────────────────────────────────
       // Deadlines
       // ─────────────────────────────────────────
       case 'deadlines':
-        // Not implemented yet — guarded so calls return a clean 501, not a 500.
+        // Not implemented yet - guarded so calls return a clean 501, not a 500.
         throw HttpError('Deadlines endpoint is not available yet.', 501)
 
       // ─────────────────────────────────────────────
-      // Reserved resources — a client exists in services/api.js but no backend
+      // Reserved resources - a client exists in services/api.js but no backend
       // was ever built. Previously these fell through to the default case and
       // returned "Route not found", which reads like a routing bug rather than
       // an unbuilt feature. Guarded so the distinction is unambiguous.
@@ -330,8 +342,8 @@ const Router = (() => {
         break
 
       // ─────────────────────────────────────────
-      // Generated documents — print/export
-      // docgen/{fileId}/print — id = the generated Drive file's id
+      // Generated documents - print/export
+      // docgen/{fileId}/print - id = the generated Drive file's id
       // ─────────────────────────────────────────
       case 'docgen':
         if (id && sub === 'print') return PmesDocGenService.exportPdf(id, params.tab, user)

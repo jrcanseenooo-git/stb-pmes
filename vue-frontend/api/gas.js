@@ -1,5 +1,5 @@
 const SCRIPT_URL_RE = /^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/
-const CANONICAL_GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxz1GwhQ2x6UzIbkQ8mVVCn3Mb-NhsVWy2YKgD9Kpx32Esn9B_mmnpVmF6IntBAexwqfQ/exec'
+const CANONICAL_GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzxh0LikZfR2unxODM3cQ1VVppwSHdRfHUrPSz9zGS_qSUR3FfNnWTc3jgD1OVoy2OR7A/exec'
 
 function configuredScriptUrls() {
   const raw = (
@@ -155,15 +155,15 @@ export default async function handler(req, res) {
     // script.googleusercontent.com/macros/echo?user_content_key=...
     // That echo URL is short-lived and single-use, and intermittently answers
     // 404 with a Google HTML page. 404 was missing from the retryable set, so a
-    // failed fetch was forwarded verbatim — HTML body, status 404, labelled
+    // failed fetch was forwarded verbatim - HTML body, status 404, labelled
     // Content-Type: application/json. The browser then reported
     // "POST /api/gas 404" and the client threw "unexpected response".
     // Apps Script serialises executions, so retries add queueing pressure as well
     // as latency. Two attempts recovers the common single-shot echo-URL 404
-    // without letting a burst of concurrent calls pile up into timeouts — three
+    // without letting a burst of concurrent calls pile up into timeouts - three
     // attempts with backoff pushed 12 concurrent requests past 25s.
     // 404 only ever shows up on the post-redirect echo-URL fetch, which means
-    // the /exec call itself already ran on Apps Script's side — retrying that
+    // the /exec call itself already ran on Apps Script's side - retrying that
     // for a write risks double-applying a mutation, so it's excluded there.
     // The other codes mean Apps Script refused or failed to execute the
     // request at all (rate limit, cold start, transient outage), which is
@@ -188,7 +188,7 @@ export default async function handler(req, res) {
         lastText = text
 
         // A 200 carrying HTML is the same failure wearing a different status,
-        // so treat the body — not just the code — as the success signal.
+        // so treat the body - not just the code - as the success signal.
         const ok = upstream.ok && looksJson(text)
         if (ok) {
           res.status(200)
@@ -213,7 +213,7 @@ export default async function handler(req, res) {
 
     console.error('[PMES API] All Apps Script attempts failed for route', routeForLog || '(unknown)', 'last status', lastStatus)
 
-    // Never forward an HTML error page as JSON — the client cannot parse it and
+    // Never forward an HTML error page as JSON - the client cannot parse it and
     // reports a confusing generic error. Return a real envelope instead.
     if (looksJson(lastText)) {
       res.status(200)

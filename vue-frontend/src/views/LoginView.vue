@@ -176,6 +176,7 @@ const googleRedirectPending = ref(sessionStorage.getItem(GOOGLE_REDIRECT_PENDING
 const googleSigningIn = computed(() =>
   googleRedirectPending.value || (loading.value && loginMethod.value === 'google')
 )
+const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms))
 
 const ALLOWED_REDIRECT_PATHS = new Set([
   '/dashboard',
@@ -187,6 +188,9 @@ const ALLOWED_REDIRECT_PATHS = new Set([
   '/audit',
   '/users',
   '/office-registry',
+  '/office-management',
+  '/office-personnel',
+  '/office-dashboard',
   '/profile',
   '/kra'
 ])
@@ -208,7 +212,12 @@ onMounted(async () => {
     loginMethod.value = 'google'
   }
   if (!authStore.initialised) await authStore.init()
-  const routed = await routeSignedInUser()
+  let routed = await routeSignedInUser()
+  if (!routed && googleRedirectPending.value) {
+    await wait(900)
+    if (!authStore.initialised) await authStore.init()
+    routed = await routeSignedInUser()
+  }
   if (!routed && googleRedirectPending.value) {
     clearGoogleRedirectPending()
   }
@@ -257,15 +266,21 @@ async function handleGoogleLogin() {
   error.value       = ''
   loading.value     = true
   loginMethod.value = 'google'
+  googleRedirectPending.value = true
+  sessionStorage.setItem(GOOGLE_REDIRECT_PENDING_KEY, '1')
   try {
     const result = await authStore.loginWithGoogle()
     if (result?.redirected) {
-      googleRedirectPending.value = true
-      sessionStorage.setItem(GOOGLE_REDIRECT_PENDING_KEY, '1')
       return
     }
     await routeSignedInUser()
   } catch (e) {
+    if (e?.redirected) {
+      googleRedirectPending.value = true
+      sessionStorage.setItem(GOOGLE_REDIRECT_PENDING_KEY, '1')
+      return
+    }
+    console.warn('[PMES] Google sign-in failed:', e?.code || e?.message)
     clearGoogleRedirectPending()
     const message = e?.message || ''
     error.value = message || 'Google sign-in failed. Please try again.'
@@ -289,7 +304,7 @@ async function handleGoogleLogin() {
   height: 100%;
 }
 
-/* ══ ROOT — fullscreen single column, colored backdrop ══ */
+/* ══ ROOT - fullscreen single column, colored backdrop ══ */
 .login-root {
   position: fixed;
   inset: 0;
@@ -305,7 +320,7 @@ async function handleGoogleLogin() {
     linear-gradient(162deg, #040c1c 0%, #081830 35%, #0c2040 65%, #0e2850 100%);
 }
 
-/* Dot-grid texture overlay (kept — this is the colored-side texture, not the white grid) */
+/* Dot-grid texture overlay (kept - this is the colored-side texture, not the white grid) */
 .bg-texture {
   position: absolute;
   inset: 0;

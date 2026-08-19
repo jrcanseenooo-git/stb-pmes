@@ -14,6 +14,23 @@ const OfficeRegistryService = (() => {
     'active', 'sequence', 'createdAt', 'updatedAt', 'updatedBy'
   ]
   const DEFAULT_REQUESTED_ROLES = ['Technical Staff', 'Section Head', 'Division Chief', 'Assistant Bureau Director', 'Bureau Director']
+  // Version suffix: bump whenever the monitoring payload SHAPE changes, so a
+  // cached copy of the old shape cannot be served to a frontend expecting the
+  // new fields. v2 added assessments.descriptors and assignments.pendingPersonnel.
+  const MONITORING_CACHE_KEY = 'OfficeRegistryService.monitoring.default.v2'
+  // Building this payload opens every participating office's spreadsheet and
+  // reads three tabs from each - roughly 32 spreadsheet operations for 8
+  // offices, which is seconds of wall time. At the old 120s TTL almost every
+  // page load paid that cost. Ten minutes is well inside how fast assessment
+  // progress actually moves, and the Refresh button bypasses the cache when a
+  // user genuinely needs current numbers.
+  const MONITORING_CACHE_TTL_SECONDS = 600
+
+  // Each office is also cached on its own, for longer. The whole-cluster entry
+  // above is all-or-nothing: one expiry re-read every office. With per-office
+  // entries, an expired cluster payload is usually rebuilt from cached office
+  // summaries instead - no spreadsheet opens at all.
+  const OFFICE_SUMMARY_TTL_SECONDS = 1800
 
   function list(params, user) {
     requireCentralAdmin_(user)
@@ -33,7 +50,7 @@ const OfficeRegistryService = (() => {
 
   // A minimal office picker for the Add/Edit User form. That form needs a
   // simple id/name list of active offices to assign an office-scoped account
-  // to — it does not need the full registry (admin emails, spreadsheet/schema
+  // to - it does not need the full registry (admin emails, spreadsheet/schema
   // status, provisioning history) that requireCentralAdmin_ exists to gate.
   // Without this, any admin with User Management access but not a central
   // Access Group (the common case for an office-level super admin editing
@@ -57,6 +74,26 @@ const OfficeRegistryService = (() => {
 
   function monitoring(params, user) {
     requireCentralAdmin_(user)
+    return computeMonitoring_(params || {})
+  }
+
+  /**
+   * The monitoring build itself, with no permission check.
+   *
+   * Split out so a scheduled warmer can rebuild the cache without a user in
+   * context - the expensive cold path is then paid by the trigger rather than
+   * by whoever happens to open the dashboard first.
+   */
+  function computeMonitoring_(params) {
+    const canUseDefaultCache = !params.status && !params.search
+    const forceRefresh = String(params.refresh || params.forceRefresh || '').toLowerCase() === 'true' ||
+      String(params.refresh || params.forceRefresh || '') === '1'
+
+    if (canUseDefaultCache && !forceRefresh) {
+      const cached = getMonitoringCache_()
+      if (cached) return cached
+    }
+
     let rows = includeBuiltInStb_(SpreadsheetService.getAllRows(registrySheet_()))
     if (params.status) rows = rows.filter(r => r.officeStatus === params.status)
     if (params.search) {
@@ -70,7 +107,7 @@ const OfficeRegistryService = (() => {
 
     const summaries = rows
       .sort((a, b) => String(a.officeCode).localeCompare(String(b.officeCode)))
-      .map(row => summarizeOffice_(row))
+      .map(row => summarizeOfficeCached_(row, forceRefresh))
 
     const totals = summaries.reduce((all, item) => {
       all.offices += 1
@@ -81,6 +118,13 @@ const OfficeRegistryService = (() => {
       all.assessmentRecords += item.assessments.total
       all.completedAssignments += item.assignments.completed
       all.pendingAssignments += item.assignments.pending
+      all.pendingPersonnel += (item.assignments.pendingPersonnel || 0)
+      const d = item.assessments.descriptors || EMPTY_DESCRIPTORS
+      all.outstanding += (d.outstanding || 0)
+      all.verySatisfactory += (d.verySatisfactory || 0)
+      all.satisfactory += (d.satisfactory || 0)
+      all.needsImprovement += (d.needsImprovement || 0)
+      all.requiresIntervention += (d.requiresIntervention || 0)
       return all
     }, {
       offices: 0,
@@ -90,14 +134,65 @@ const OfficeRegistryService = (() => {
       personnel: 0,
       assessmentRecords: 0,
       completedAssignments: 0,
-      pendingAssignments: 0
+      pendingAssignments: 0,
+      // Cluster dashboard: people still to rate, and how those already rated landed.
+      pendingPersonnel: 0,
+      outstanding: 0,
+      verySatisfactory: 0,
+      satisfactory: 0,
+      needsImprovement: 0,
+      requiresIntervention: 0
     })
 
-    return {
+    const result = {
       items: summaries,
       total: summaries.length,
-      totals
+      totals,
+      cached: false,
+      generatedAt: new Date().toISOString()
     }
+
+    if (canUseDefaultCache) putMonitoringCache_(result)
+    return result
+  }
+
+  function monitoringCache_() {
+    try { return CacheService.getScriptCache() } catch (e) { return null }
+  }
+
+  function getMonitoringCache_() {
+    const cache = monitoringCache_()
+    if (!cache) return null
+    try {
+      const raw = cache.get(MONITORING_CACHE_KEY)
+      if (!raw) return null
+      const parsed = JSON.parse(raw)
+      parsed.cached = true
+      parsed.cacheServedAt = new Date().toISOString()
+      return parsed
+    } catch (e) {
+      Logger.log('[OfficeRegistry] monitoring cache read failed: ' + (e && e.message || e))
+      return null
+    }
+  }
+
+  function putMonitoringCache_(result) {
+    const cache = monitoringCache_()
+    if (!cache) return
+    try {
+      const payload = JSON.stringify(result)
+      if (payload.length <= 90000) {
+        cache.put(MONITORING_CACHE_KEY, payload, MONITORING_CACHE_TTL_SECONDS)
+      }
+    } catch (e) {
+      Logger.log('[OfficeRegistry] monitoring cache write failed: ' + (e && e.message || e))
+    }
+  }
+
+  function clearMonitoringCache_() {
+    const cache = monitoringCache_()
+    if (!cache) return
+    try { cache.remove(MONITORING_CACHE_KEY) } catch (e) { /* best effort */ }
   }
 
   function registrationOptions() {
@@ -200,6 +295,7 @@ const OfficeRegistryService = (() => {
     }))
 
     replaceOrgOptionRows_(officeId, savedRows)
+    clearMonitoringCache_()
 
     auditCentral_('SAVE_OFFICE_ORG_OPTIONS', 'Office', officeId, '', 'SUCCESS', 'Updated registration options for ' + row.officeCode, user)
     return {
@@ -277,6 +373,7 @@ const OfficeRegistryService = (() => {
     }
 
     SpreadsheetService.appendRow(sheet, row)
+    clearMonitoringCache_()
     try {
       const result = OfficeProvisioningService.provisionEvaluationSpreadsheet({
         ...row,
@@ -292,6 +389,7 @@ const OfficeRegistryService = (() => {
         updatedAt: new Date().toISOString(),
         updatedBy: profile.email || user.email || ''
       })
+      clearMonitoringCache_()
       auditCentral_('PROVISION_OFFICE', 'Office', row.officeId, transactionId, 'SUCCESS', 'Provisioned office spreadsheet for ' + row.officeCode, user)
       return {
         office: safeRegistryRow_(updated),
@@ -306,6 +404,7 @@ const OfficeRegistryService = (() => {
         updatedAt: new Date().toISOString(),
         updatedBy: profile.email || user.email || ''
       })
+      clearMonitoringCache_()
       auditCentral_('PROVISION_OFFICE', 'Office', row.officeId, transactionId, 'FAILED', 'Provisioning failed for ' + row.officeCode, user)
       throw HttpError('Office provisioning failed. Review the central registry log and try again.', 500)
     }
@@ -325,11 +424,12 @@ const OfficeRegistryService = (() => {
       updatedAt: new Date().toISOString(),
       updatedBy: profile.email || user.email || ''
     })
+    clearMonitoringCache_()
     auditCentral_('VALIDATE_OFFICE_SCHEMA', 'Office', row.officeId, '', validation.valid ? 'SUCCESS' : 'FAILED', 'Validated office schema for ' + row.officeCode, user)
     return { office: safeRegistryRow_(findByIdOrCode_(id)), validation }
   }
 
-  // Adds headers the spec has grown since this office was provisioned —
+  // Adds headers the spec has grown since this office was provisioned -
   // e.g. an office activated before fpoPositionCategory/fpoWeightFactor were
   // added to AssessmentRecords. Only ever appends new columns to an existing
   // sheet; a missing sheet or a duplicate-header error still needs a human,
@@ -351,6 +451,7 @@ const OfficeRegistryService = (() => {
       updatedAt: new Date().toISOString(),
       updatedBy: profile.email || user.email || ''
     })
+    clearMonitoringCache_()
     auditCentral_('REPAIR_OFFICE_SCHEMA', 'Office', row.officeId, '', validation.valid ? 'SUCCESS' : 'PARTIAL',
       'Repaired office schema for ' + row.officeCode + (repaired.length ? ': ' + repaired.join(' | ') : ' (nothing to add)'), user)
     return { office: safeRegistryRow_(findByIdOrCode_(id)), repaired, validation }
@@ -370,6 +471,7 @@ const OfficeRegistryService = (() => {
         updatedAt: new Date().toISOString(),
         updatedBy: profile.email || user.email || ''
       })
+      clearMonitoringCache_()
       throw HttpError('Office cannot be activated until schema validation passes.', 409)
     }
     const updated = SpreadsheetService.updateRow(registrySheet_(), row.id, {
@@ -380,6 +482,7 @@ const OfficeRegistryService = (() => {
       updatedAt: new Date().toISOString(),
       updatedBy: profile.email || user.email || ''
     })
+    clearMonitoringCache_()
     auditCentral_('ACTIVATE_OFFICE', 'Office', row.officeId, '', 'SUCCESS', 'Activated office ' + row.officeCode, user)
     return { office: safeRegistryRow_(updated), validation }
   }
@@ -419,6 +522,96 @@ const OfficeRegistryService = (() => {
     return SpreadsheetApp.openById(row.spreadsheetId)
   }
 
+  // ── Cluster dashboard inputs ──────────────────────────────────────────────
+  //
+  // Monitoring previously counted records and tasks but never how those records
+  // were RATED, so a cluster-level view had no way to show how many people were
+  // rated Outstanding or need coaching. These two helpers add that, computed
+  // inside the per-office loop that already has the rows loaded - so they cost
+  // no extra spreadsheet reads and ride the existing monitoring cache.
+
+  function descriptorBreakdown_(records) {
+    // Prefer the stored descriptor; fall back to deriving it from the score via
+    // the protocol's own bands rather than a second local copy of them.
+    const bandOf = (row) => {
+      const stored = String(row.descriptor || '').trim()
+      if (stored) return stored
+      const score = Number(row.overallScore)
+      if (!isFinite(score) || score <= 0) return ''
+      return typeof IPATService !== 'undefined' ? IPATService.qualitativeDescriptor(score) : ''
+    }
+    const counts = {
+      outstanding: 0,
+      verySatisfactory: 0,
+      satisfactory: 0,
+      needsImprovement: 0,
+      requiresIntervention: 0
+    }
+    records.forEach(row => {
+      switch (bandOf(row)) {
+        case 'Outstanding': counts.outstanding += 1; break
+        case 'Very Satisfactory': counts.verySatisfactory += 1; break
+        case 'Satisfactory': counts.satisfactory += 1; break
+        case 'Needs Improvement': counts.needsImprovement += 1; break
+        case 'Requires Immediate Intervention': counts.requiresIntervention += 1; break
+      }
+    })
+    return counts
+  }
+
+  // Distinct PEOPLE still carrying an unsubmitted rating task. Counting tasks
+  // instead would overstate this several-fold - one person routinely holds five.
+  function pendingPersonnelCount_(assignments) {
+    const seen = {}
+    assignments.forEach(row => {
+      if (String(row.status || 'Pending') === 'Completed') return
+      const key = String(row.rateeId || '').trim()
+      if (key) seen[key] = true
+    })
+    return Object.keys(seen).length
+  }
+
+  const EMPTY_DESCRIPTORS = {
+    outstanding: 0, verySatisfactory: 0, satisfactory: 0,
+    needsImprovement: 0, requiresIntervention: 0
+  }
+
+  /**
+   * summarizeOffice_ with its own cache entry.
+   *
+   * Summarising one office costs a spreadsheet open plus three full tab reads,
+   * so this is where the wall time actually goes. Caching per office means a
+   * cold cluster payload usually costs nothing extra: each office is served
+   * from its own entry unless that entry has aged out or a refresh was asked
+   * for. Version the key alongside the payload shape - a cached summary from
+   * before descriptors existed would render the dashboard as zeros.
+   */
+  function summarizeOfficeCached_(row, forceRefresh) {
+    const cache = monitoringCache_()
+    const key = 'ORS.officeSummary.v2.' + String(row && (row.officeId || row.officeCode) || '')
+
+    if (cache && !forceRefresh) {
+      try {
+        const raw = cache.get(key)
+        if (raw) return JSON.parse(raw)
+      } catch (e) {
+        // A malformed entry must never break the dashboard - recompute instead.
+        Logger.log('[OfficeRegistry] office summary cache read failed: ' + (e && e.message || e))
+      }
+    }
+
+    const summary = summarizeOffice_(row)
+    if (cache) {
+      try {
+        const payload = JSON.stringify(summary)
+        if (payload.length <= 90000) cache.put(key, payload, OFFICE_SUMMARY_TTL_SECONDS)
+      } catch (e) {
+        Logger.log('[OfficeRegistry] office summary cache write failed: ' + (e && e.message || e))
+      }
+    }
+    return summary
+  }
+
   function summarizeOffice_(row) {
     if (isStbRow_(row)) return summarizeStb_(row)
 
@@ -428,8 +621,8 @@ const OfficeRegistryService = (() => {
       health: 'Not ready',
       healthNote: '',
       personnel: { total: 0, active: 0, pending: 0 },
-      assessments: { total: 0, computed: 0, final: 0, averageOverall: null },
-      assignments: { total: 0, completed: 0, pending: 0 },
+      assessments: { total: 0, computed: 0, final: 0, averageOverall: null, descriptors: { ...EMPTY_DESCRIPTORS } },
+      assignments: { total: 0, completed: 0, pending: 0, pendingPersonnel: 0 },
       lastActivityAt: row.lastSyncAt || row.lastValidatedAt || ''
     }
 
@@ -469,12 +662,14 @@ const OfficeRegistryService = (() => {
             final: records.filter(r => String(r.status || '') === 'Final').length,
             averageOverall: scoreRows.length
               ? Math.round((scoreRows.reduce((sum, r) => sum + Number(r.overallScore || 0), 0) / scoreRows.length) * 100) / 100
-              : null
+              : null,
+            descriptors: descriptorBreakdown_(records)
           },
           assignments: {
             total: assignments.length,
             completed: assignments.filter(r => String(r.status || '') === 'Completed').length,
-            pending: assignments.filter(r => String(r.status || 'Pending') !== 'Completed').length
+            pending: assignments.filter(r => String(r.status || 'Pending') !== 'Completed').length,
+            pendingPersonnel: pendingPersonnelCount_(assignments)
           },
           lastActivityAt: latestDates.length ? latestDates[latestDates.length - 1] : ''
         }
@@ -529,12 +724,14 @@ const OfficeRegistryService = (() => {
         final: records.filter(r => String(r.status || '') === 'Final').length,
         averageOverall: scoreRows.length
           ? Math.round((scoreRows.reduce((sum, r) => sum + Number(r.overallScore || 0), 0) / scoreRows.length) * 100) / 100
-          : null
+          : null,
+        descriptors: descriptorBreakdown_(records)
       },
       assignments: {
         total: assignments.length,
         completed: assignments.filter(r => String(r.status || '') === 'Completed').length,
-        pending: assignments.filter(r => String(r.status || 'Pending') !== 'Completed').length
+        pending: assignments.filter(r => String(r.status || 'Pending') !== 'Completed').length,
+        pendingPersonnel: pendingPersonnelCount_(assignments)
       },
       lastActivityAt: latestDates.length ? latestDates[latestDates.length - 1] : ''
     }
@@ -566,13 +763,13 @@ const OfficeRegistryService = (() => {
   // Status to record after a validate/repair run.
   //
   // A passing check used to always write FOR_VALIDATION, including for an
-  // office that was already ACTIVE — which silently took a live office
+  // office that was already ACTIVE - which silently took a live office
   // offline, because getSpreadsheetForOffice requires spreadsheetStatus
   // ACTIVE. Re-checking a healthy office is a read; it must not be able to
   // revoke access as a side effect. So a passing check now leaves an ACTIVE
   // office ACTIVE, and only promotes a not-yet-active office to "Ready to
   // Activate". A FAILING check still marks INVALID_SCHEMA even if the office
-  // was active — a genuinely broken workbook should stop being served.
+  // was active - a genuinely broken workbook should stop being served.
   function passingStatusFor_(row, validation) {
     if (!validation.valid) return 'INVALID_SCHEMA'
     return String(row.spreadsheetStatus || '') === 'ACTIVE' ? 'ACTIVE' : 'FOR_VALIDATION'
@@ -708,8 +905,8 @@ const OfficeRegistryService = (() => {
   }
 
   function safeRegistryRow_(row) {
-    // spreadsheetId is credential-like — it can open the office's spreadsheet
-    // directly — so that alone is stripped. provisioningError is diagnostic
+    // spreadsheetId is credential-like - it can open the office's spreadsheet
+    // directly - so that alone is stripped. provisioningError is diagnostic
     // text only, and every caller of this function already sits behind
     // requireCentralAdmin_; stripping it just hid the reason a "Needs Repair"
     // office needs repair from the only people allowed to see this screen,
@@ -841,7 +1038,9 @@ const OfficeRegistryService = (() => {
         optionType,
         parentId: String(item.parentId || item.divisionId || '').trim(),
         divisionName: String(item.divisionName || item.parentName || '').trim(),
-        name: String(item.name || item.label || item.value || item).trim(),
+        name: optionType === 'role' && typeof RoleLabelService !== 'undefined'
+          ? RoleLabelService.canonicalRole(item.name || item.label || item.value || item)
+          : String(item.name || item.label || item.value || item).trim(),
         code: String(item.code || '').trim(),
         sequence: Number(item.sequence || index + 1)
       }))
@@ -871,6 +1070,9 @@ const OfficeRegistryService = (() => {
     get,
     repair,
     monitoring,
+    // Exposed for the scheduled cache warmer only - it has no user in context,
+    // so it cannot go through monitoring()'s permission check.
+    computeMonitoring_,
     registrationOptions,
     registrationOrgOptions,
     orgOptions,

@@ -32,6 +32,6 @@ const TONES = {
   bad: 'pui-stat-value-bad'
 }
 
-const displayValue = computed(() => (props.loading ? '—' : props.value))
+const displayValue = computed(() => (props.loading ? '-' : props.value))
 const toneClass = computed(() => (props.loading ? 'pui-stat-value-loading' : TONES[props.tone] || ''))
 </script>

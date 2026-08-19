@@ -35,12 +35,13 @@
 const IPATRaterAssignmentService = (() => {
 
   // ── Position level helpers ────────────────────────────────────────────────
-  const isStaff         = (r) => ['Staff', 'Technical Staff', 'Administrative Staff'].includes(r)
-  const isSectionHead   = (r) => r === 'Section Head'
-  const isDivisionChief = (r) => r === 'Division Chief'
-  const isABD           = (r) => r === 'Assistant Bureau Director'
-  const isDirector      = (r) => r === 'Bureau Director'
-  const isEvaluatable   = (r) => r !== 'System Administrator' && !!r
+  const roleOf          = (r) => typeof RoleLabelService !== 'undefined' ? RoleLabelService.canonicalRole(r) : String(r || '').trim()
+  const isStaff         = (r) => ['Technical Staff', 'Administrative Staff'].includes(roleOf(r))
+  const isSectionHead   = (r) => roleOf(r) === 'Section Head'
+  const isDivisionChief = (r) => roleOf(r) === 'Division Chief'
+  const isABD           = (r) => roleOf(r) === 'Assistant Bureau Director'
+  const isDirector      = (r) => roleOf(r) === 'Bureau Director'
+  const isEvaluatable   = (r) => roleOf(r) !== 'System Administrator' && !!roleOf(r)
   const isObsoleteAssignment = (r) => ['JFPeer', 'JobFitnessPeer'].includes(String(r && r.raterType || ''))
   const activeProtocolAssignments = (rows) => rows.filter(r => !isObsoleteAssignment(r))
 
@@ -107,15 +108,15 @@ const IPATRaterAssignmentService = (() => {
   //
   // Apps Script only offers a script-wide lock (there is no per-record lock), so
   // every submission cluster-wide queues here. That is acceptable because the
-  // critical section is short, but it means a submission burst — a deadline
-  // afternoon, say — can pile up.
+  // critical section is short, but it means a submission burst - a deadline
+  // afternoon, say - can pile up.
   //
   // Two things make that survivable:
   //   1. A longer total wait, taken in staggered attempts rather than one block.
   //      Jitter spreads the retry storm out instead of having every waiter wake
   //      up and collide at the same instant.
   //   2. Even when the wait is exhausted the caller gets a 429, which the client
-  //      surfaces as "try again" — never a partial write.
+  //      surfaces as "try again" - never a partial write.
   const LOCK_ATTEMPTS   = 3
   const LOCK_WAIT_MS    = 15000   // per attempt; ~45s total worst case
   const LOCK_JITTER_MS  = 400
@@ -243,7 +244,7 @@ const IPATRaterAssignmentService = (() => {
       u.id !== ratee.id && isStaff(u.role) && (u.divisionId || '') === div
     )
 
-    // Same-section pool — if ratee has no section set, treat whole division as the section
+    // Same-section pool - if ratee has no section set, treat whole division as the section
     const sectionPeers = sec
       ? divStaff.filter(u => (u.section || '').trim() === sec)
       : divStaff
@@ -285,20 +286,20 @@ const IPATRaterAssignmentService = (() => {
     const div = ratee.divisionId || ''
     const sec = (ratee.section  || '').trim()
 
-    // Peer — co-Section Head in same division
+    // Peer - co-Section Head in same division
     const shPeers = allUsers.filter(u => u.id !== ratee.id && isSectionHead(u.role) && (u.divisionId || '') === div)
     const peer = _selectRandom(shPeers, [ratee.id], _prevRaterId(prevAssign, ratee.id, 'Peer'))
 
-    // Subordinate — Technical Staff in same section; fallback to any staff in division
+    // Subordinate - Technical Staff in same section; fallback to any staff in division
     const subordinates = sec
       ? allUsers.filter(u => isStaff(u.role) && (u.divisionId || '') === div && (u.section || '').trim() === sec)
       : allUsers.filter(u => isStaff(u.role) && (u.divisionId || '') === div)
     const subordinate = _selectRandom(subordinates, [], _prevRaterId(prevAssign, ratee.id, 'Subordinate'))
 
-    // Supervisor — Division Chief of same division
+    // Supervisor - Division Chief of same division
     const supervisor = allUsers.find(u => isDivisionChief(u.role) && u.divisionId === div)
 
-    // Skip Supervisor — any ABD
+    // Skip Supervisor - any ABD
     const skipSupervisor = allUsers.find(u => isABD(u.role))
 
     const result = [{ raterId: ratee.id, raterName: ratee.fullName, raterType: 'Self' }]
@@ -312,18 +313,18 @@ const IPATRaterAssignmentService = (() => {
   function _assignForDivisionChief(ratee, allUsers, prevAssign) {
     const div = ratee.divisionId || ''
 
-    // Peer — other Division Chiefs
+    // Peer - other Division Chiefs
     const dcPeers = allUsers.filter(u => u.id !== ratee.id && isDivisionChief(u.role))
     const peer = _selectRandom(dcPeers, [ratee.id], _prevRaterId(prevAssign, ratee.id, 'Peer'))
 
-    // Subordinate — random Section Head in same division
+    // Subordinate - random Section Head in same division
     const subordinates = allUsers.filter(u => isSectionHead(u.role) && u.divisionId === div)
     const subordinate = _selectRandom(subordinates, [], _prevRaterId(prevAssign, ratee.id, 'Subordinate'))
 
-    // Supervisor — any ABD
+    // Supervisor - any ABD
     const supervisor = allUsers.find(u => isABD(u.role))
 
-    // Skip Supervisor — Bureau Director
+    // Skip Supervisor - Bureau Director
     const skipSupervisor = allUsers.find(u => isDirector(u.role))
 
     const result = [{ raterId: ratee.id, raterName: ratee.fullName, raterType: 'Self' }]
@@ -335,15 +336,15 @@ const IPATRaterAssignmentService = (() => {
   }
 
   function _assignForABD(ratee, allUsers, prevAssign) {
-    // Peer — other ABDs
+    // Peer - other ABDs
     const abdPeers = allUsers.filter(u => u.id !== ratee.id && isABD(u.role))
     const peer = _selectRandom(abdPeers, [ratee.id], _prevRaterId(prevAssign, ratee.id, 'Peer'))
 
-    // Subordinate — random Division Chief
+    // Subordinate - random Division Chief
     const subordinates = allUsers.filter(u => isDivisionChief(u.role))
     const subordinate = _selectRandom(subordinates, [], _prevRaterId(prevAssign, ratee.id, 'Subordinate'))
 
-    // Supervisor — Bureau Director
+    // Supervisor - Bureau Director
     const supervisor = allUsers.find(u => isDirector(u.role))
 
     const result = [{ raterId: ratee.id, raterName: ratee.fullName, raterType: 'Self' }]
@@ -354,7 +355,7 @@ const IPATRaterAssignmentService = (() => {
   }
 
   function _assignForDirector(ratee, allUsers, prevAssign) {
-    // Subordinate — random ABD
+    // Subordinate - random ABD
     const subordinates = allUsers.filter(u => isABD(u.role))
     const subordinate = _selectRandom(subordinates, [], _prevRaterId(prevAssign, ratee.id, 'Subordinate'))
 
@@ -382,8 +383,8 @@ const IPATRaterAssignmentService = (() => {
 
   function generateAssignments(body, user) {
     const profile = AuthService.getProfile(user)
-    if (!AuthService.hasPermission(profile, 'generate_ipat_assignments')) {
-      throw HttpError('Only administrators can generate evaluation assignments', 403)
+    if (profile.role !== 'System Administrator') {
+      throw HttpError('Only the System Administrator can generate evaluation assignments', 403)
     }
 
     const semester = String(body.semester || '')
@@ -433,24 +434,24 @@ const IPATRaterAssignmentService = (() => {
     const incompleteRatees = []
 
     evaluatable.forEach(ratee => {
-      const role = ratee.role || ''
+      const role = roleOf(ratee.role)
       const resolution = RaterMatrixService.resolveRatersFor(
         ratee, allUsers, prevAssign, matrixRows, matrixHelpers
       )
 
       if (resolution.unmappedRole) {
-        const role = String(ratee.role || '(no role)')
+        const role = roleOf(ratee.role) || '(no role)'
         unmappedRoles[role] = (unmappedRoles[role] || 0) + 1
         return
       }
 
       const raterList = resolution.raters
       if (!raterList.length) {
-        incompleteRatees.push({ rateeName: ratee.fullName, role: ratee.role, missing: resolution.missing })
+        incompleteRatees.push({ rateeName: ratee.fullName, role: role, missing: resolution.missing })
         return
       }
       if (resolution.missing.length) {
-        incompleteRatees.push({ rateeName: ratee.fullName, role: ratee.role, missing: resolution.missing })
+        incompleteRatees.push({ rateeName: ratee.fullName, role: role, missing: resolution.missing })
       }
 
       // Auto-create IPAT record if not yet existing for this period
@@ -458,7 +459,7 @@ const IPATRaterAssignmentService = (() => {
 
       if (!ipatRecord) {
         // Derived from the matrix, not from the STB role names. This flag drives
-        // the CBC weight split — with a subordinate the weights are Self/Peer/
+        // the CBC weight split - with a subordinate the weights are Self/Peer/
         // Subordinate 15 each; without one the subordinate's 15% moves to a
         // second peer. Reading it from the resolved rater set means an office
         // with its own hierarchy gets the correct split automatically.
@@ -578,7 +579,7 @@ const IPATRaterAssignmentService = (() => {
       semester,
       year,
       // Exceptions the previous implementation discarded silently. `unmapped`
-      // means the role has no matrix entry at all — nobody in it will be rated.
+      // means the role has no matrix entry at all - nobody in it will be rated.
       // `incomplete` means the role is mapped but a configured rater could not
       // be found on the roster, so that person is rated by fewer raters than
       // intended.
@@ -821,7 +822,7 @@ const IPATRaterAssignmentService = (() => {
   function previewDeleteForPeriod(params, user) {
     const profile = AuthService.getProfile(user)
     if (profile.role !== 'System Administrator') {
-      throw HttpError('Unauthorized — System Administrator required', 403)
+      throw HttpError('Unauthorized - System Administrator required', 403)
     }
 
     const sem = String(params.semester || '')
@@ -860,7 +861,7 @@ const IPATRaterAssignmentService = (() => {
 
   function deleteForPeriod(semester, year, user) {
     const profile = AuthService.getProfile(user)
-    if (!['System Administrator'].includes(profile.role)) throw HttpError('Unauthorized — System Administrator required', 403)
+    if (!['System Administrator'].includes(profile.role)) throw HttpError('Unauthorized - System Administrator required', 403)
 
     const sem = String(semester)
     const yr  = String(year)

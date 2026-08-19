@@ -214,7 +214,7 @@ const currentSemester = computed(() => {
 
 // ── Stat cards (dashboard/summary) ──
 const stats = computed(() => dashStore.summary || {
-  totalPersonnel: '—', totalTargets: 0, completionRate: 0, delayed: 0, pending: 0, completed: 0
+  totalPersonnel: '-', totalTargets: 0, completionRate: 0, delayed: 0, pending: 0, completed: 0
 })
 
 const canSeePersonnelSummary = computed(() =>

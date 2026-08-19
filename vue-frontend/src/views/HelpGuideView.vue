@@ -27,7 +27,7 @@
 
     <section class="pui-card" style="overflow:hidden;">
       <div class="pui-card-header">
-        <h2 class="pui-card-title">Rating Scale</h2>
+        <h2 class="pui-card-title">Rating Scale (1-4)</h2>
         <span v-if="scaleSource" style="font-size:11px; font-weight:700; color:#94a3b8;">{{ scaleSource }}</span>
       </div>
       <div class="pui-table-wrap">
@@ -49,7 +49,40 @@
         </table>
       </div>
       <p style="padding:12px 16px; font-size:12px; color:#64748b; border-top:1px solid #eef2f7; line-height:1.5; margin:0;">
-        Ratings accept one decimal place. Any value outside 1 to 5 is rejected by the form.
+        You are judging how often the behaviour is demonstrated, not forming an overall
+        opinion of the person. Select one of the four values - there are no half
+        points, and no score above 4.
+      </p>
+    </section>
+
+    <!-- Kept separate from the scale above on purpose: these name the CONSOLIDATED
+         result, not an individual answer. Merging the two is what made the old
+         guide tell raters to score indicators "Outstanding" on a 1-5 scale. -->
+    <section class="pui-card" style="overflow:hidden;">
+      <div class="pui-card-header">
+        <h2 class="pui-card-title">How your overall result is described</h2>
+      </div>
+      <div class="pui-table-wrap">
+        <table class="pui-table">
+          <thead>
+            <tr>
+              <th scope="col" style="width:110px;">Final Numerical Rating</th>
+              <th scope="col" style="width:170px;">Qualitative Descriptor</th>
+              <th scope="col">General Interpretation</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="band in DESCRIPTOR_BANDS" :key="band.descriptor">
+              <td><strong>{{ band.range }}</strong></td>
+              <td style="font-weight:700; color:#334155;">{{ band.descriptor }}</td>
+              <td>{{ band.meaning }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="padding:12px 16px; font-size:12px; color:#64748b; border-top:1px solid #eef2f7; line-height:1.5; margin:0;">
+        These describe your final consolidated score across all domains and all raters.
+        They are not choices you make while rating.
       </p>
     </section>
 
@@ -97,15 +130,36 @@ import { portalApi } from '@/services/api'
 import PageHeader from '@/components/ui/PageHeader.vue'
 
 // The scale is the approved protocol's, restated in plain language. The
-// indicator text itself is never duplicated here — that lives in the Assessment
+// indicator text itself is never duplicated here - that lives in the Assessment
 // Library and is loaded from the same published content, so there is one source
 // of truth to maintain.
+//
+// This MUST stay in step with the buttons EvaluationView actually renders
+// (`v-for="n in [1,2,3,4]"`, titled Never/Rarely/Frequently/Always) and with
+// IPATService's RATING_MIN/RATING_MAX, which reject anything outside 1-4.
+// It previously described a 1-5 scale with decimals - that is the IPCRF
+// Efficiency/Quality/Timeliness scale, a different instrument. Raters who read
+// it anchored 3 as "meets expectations" when 3 on this scale means "Frequently",
+// scoring a point low across every indicator.
 const SCALE = [
-  { value: '5', descriptor: 'Outstanding', meaning: 'Consistently exceeds what the indicator describes, with clear and repeated evidence.' },
-  { value: '4', descriptor: 'Very Satisfactory', meaning: 'Frequently exceeds what the indicator describes.' },
-  { value: '3', descriptor: 'Satisfactory', meaning: 'Meets what the indicator describes.' },
-  { value: '2', descriptor: 'Fair', meaning: 'Partially meets what the indicator describes; improvement is needed.' },
-  { value: '1', descriptor: 'Needs Improvement', meaning: 'Does not yet meet what the indicator describes.' }
+  { value: '4', descriptor: 'Always', meaning: 'The behaviour is consistently demonstrated, with clear and repeated evidence.' },
+  { value: '3', descriptor: 'Frequently', meaning: 'The behaviour is demonstrated more often than not.' },
+  { value: '2', descriptor: 'Rarely', meaning: 'The behaviour is demonstrated only occasionally.' },
+  { value: '1', descriptor: 'Never', meaning: 'The behaviour is not demonstrated.' }
+]
+
+// Score bands for the consolidated result - a different thing from the
+// per-indicator scale above, and the source of the earlier confusion.
+// Ranges and interpretations are the protocol's own wording; the arithmetic
+// behind them is IPATService.qualitativeDescriptor(). The top band is a flat
+// 4.00 because the overall score cannot exceed 4.00: every domain is 1-4, and
+// a 1-5 FPO is rescaled before it is weighted in.
+const DESCRIPTOR_BANDS = [
+  { range: '4.00', descriptor: 'Outstanding', meaning: 'Perfect score across all KPIs and competencies.' },
+  { range: '3.50 - 3.99', descriptor: 'Very Satisfactory', meaning: 'Exceeds expected standards and primary goals.' },
+  { range: '2.75 - 3.49', descriptor: 'Satisfactory', meaning: 'Consistently meets job expectations and targets.' },
+  { range: '2.00 - 2.74', descriptor: 'Needs Improvement', meaning: 'Inconsistent performance; meets some targets, requires coaching.' },
+  { range: '1.00 - 1.99', descriptor: 'Requires Immediate Intervention', meaning: 'Fails key criteria; performance improvement plan required.' }
 ]
 
 const RATER_TYPES = [
@@ -127,7 +181,7 @@ const STEPS = [
 const FAQS = [
   {
     question: 'Can I change a rating after I submit it?',
-    answer: 'No. A submitted rating is locked. If a correction is genuinely needed, ask your office administrator to reopen the task — reopening is recorded in the audit log.'
+    answer: 'No. A submitted rating is locked. If a correction is genuinely needed, ask your office administrator to reopen the task - reopening is recorded in the audit log.'
   },
   {
     question: 'What happens if I lose connection while rating?',

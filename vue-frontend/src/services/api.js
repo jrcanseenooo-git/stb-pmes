@@ -51,7 +51,7 @@ function enqueueRequest(run) {
 
 // ── Core transport ─────────────────────────────
 
-// Marker for "this session is no longer valid" — distinct from a transient
+// Marker for "this session is no longer valid" - distinct from a transient
 // transport hiccup. Callers surface it as a sign-in prompt rather than a generic
 // failure, and it is never retried.
 const AUTH_EXPIRED = Symbol('authExpired')
@@ -79,7 +79,7 @@ async function getToken({ forceRefresh = false } = {}) {
   try {
     return await user.getIdToken(forceRefresh)
   } catch (e) {
-    // A 400 from identitytoolkit here means the refresh token was rejected —
+    // A 400 from identitytoolkit here means the refresh token was rejected -
     // the session is genuinely dead. Previously this was swallowed and null was
     // returned, so every subsequent call went out with an empty token and came
     // back 401. One expired session became a wall of "Unauthorized" errors with
@@ -89,7 +89,7 @@ async function getToken({ forceRefresh = false } = {}) {
   }
 }
 
-// Marker for "the response was not JSON at all" — an Apps Script HTML error page
+// Marker for "the response was not JSON at all" - an Apps Script HTML error page
 // or a 404 from the googleusercontent echo URL. These are transient and safe to
 // retry for reads, unlike a well-formed {success:false} rejection.
 const TRANSIENT = Symbol('transient')
@@ -159,7 +159,7 @@ async function gasSend(method, route, data = {}) {
   if (method === 'GET') {
     const key = readKey(route, data)
     if (inFlightReads.has(key)) return inFlightReads.get(key)
-    // NOTE THE TRAILING () — this must be invoked immediately.
+    // NOTE THE TRAILING () - this must be invoked immediately.
     // Without it, `promise` held the async function itself rather than the
     // promise it returns. The function was then cached and returned, and
     // `await`ing a plain function yields the function, so EVERY GET resolved to
@@ -191,7 +191,7 @@ async function gasSend(method, route, data = {}) {
     return await send()
   } catch (first) {
     // A cached ID token can expire between page load and request. Force one
-    // refresh and try again before declaring the session dead — this is safe for
+    // refresh and try again before declaring the session dead - this is safe for
     // any verb because the first attempt was rejected at the auth gate, before
     // the router ran, so nothing was applied.
     if (first?.[AUTH_REJECTED] && auth.currentUser) {
@@ -248,7 +248,7 @@ export const authApi = {
 
 // ── Dashboard ──────────────────────────────────
 
-// Innovation Cluster Personnel Assessment Portal — server-aggregated summaries.
+// Innovation Cluster Personnel Assessment Portal - server-aggregated summaries.
 // These return counters, never rating rows.
 export const portalApi = {
   summary:   (p = {}) => gasGet('portal/summary', p),
@@ -256,6 +256,18 @@ export const portalApi = {
   myResults: (p = {}) => gasGet('portal/my-results', p),
   library:   (p = {}) => gasGet('portal/library', p),
   officeSummary: (p = {}) => gasGet('portal/office-summary', p)
+}
+
+export const testDataApi = {
+  seed:    (data = {}) => gasWrite('POST', 'test-data/seed', data),
+  cleanup: (data = {}) => gasWrite('POST', 'test-data/cleanup', data)
+}
+
+if (typeof window !== 'undefined') {
+  window.__pmesTestData = {
+    seedAll: () => testDataApi.seed({ officeIds: 'all', semester: 2, year: 2026 }),
+    cleanupAll: () => testDataApi.cleanup({ officeIds: 'all', confirm: 'DELETE_TEST_DATA' })
+  }
 }
 
 export const dashboardApi = {
@@ -375,7 +387,7 @@ export const assessmentRulesApi = {
   seedDefaults: ()            => gasWrite('POST', 'assessment-rules/seed-defaults')
 }
 
-// ── Rater Matrix — who rates whom, per office, per role ──
+// ── Rater Matrix - who rates whom, per office, per role ──
 export const raterMatrixApi = {
   list:         (p = {})      => gasGet('rater-matrix', p),
   coverage:     (p = {})      => gasGet('rater-matrix/coverage', p),
@@ -385,7 +397,7 @@ export const raterMatrixApi = {
 
 // ── Diagnostics (read-only multi-office boundary report) ───────────────
 // Reachable from the browser console while signed in via
-// `window.pmesDiagnostics()` — see main.js. Temporary verification aid.
+// `window.pmesDiagnostics()` - see main.js. Temporary verification aid.
 
 export const diagnosticsApi = {
   officeBoundary: (p = {}) => gasGet('diagnostics/office-boundary', p)
@@ -425,7 +437,7 @@ export const ipatApi = {
   create:       (data)          => gasWrite('POST',  'ipat', data),
   updateStatus: (id, status)    => gasWrite('PATCH', `ipat/${id}/status`, { status }),
 
-  // Functional Performance Output — pulled from the ratee's own IPCRF/CCEF
+  // Functional Performance Output - pulled from the ratee's own IPCRF/CCEF
   syncFPO:      (id)            => gasWrite('POST',  `ipat/${id}/sync-fpo`),
   setFPO:       (id, fpoScore)  => gasWrite('POST',  `ipat/${id}/set-fpo`, { fpoScore }),
 

@@ -410,11 +410,11 @@
           <div class="modal-body" v-if="viewItem">
             <div class="view-section">
               <div class="view-label">Performance Indicator</div>
-              <div class="view-text">{{ viewItem.performanceIndicator || '—' }}</div>
+              <div class="view-text">{{ viewItem.performanceIndicator || '-' }}</div>
             </div>
             <div class="view-section">
               <div class="view-label">Means of Verification</div>
-              <div class="view-text">{{ viewItem.meansOfVerification || '—' }}</div>
+              <div class="view-text">{{ viewItem.meansOfVerification || '-' }}</div>
             </div>
             <div class="view-2col">
               <div class="view-section">
@@ -949,10 +949,10 @@ const paginatedKRAs = computed(() => {
 })
 
 const pageRangeLabel = computed(() => {
-  if (!filteredKRAs.value.length) return '0–0 of 0'
+  if (!filteredKRAs.value.length) return '0-0 of 0'
   const start = (currentPage.value - 1) * pageSize.value + 1
   const end   = Math.min(currentPage.value * pageSize.value, filteredKRAs.value.length)
-  return `${start}–${end} of ${filteredKRAs.value.length}`
+  return `${start}-${end} of ${filteredKRAs.value.length}`
 })
 
 const pageNumbers = computed(() => {

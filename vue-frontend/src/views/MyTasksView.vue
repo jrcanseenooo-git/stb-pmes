@@ -64,9 +64,9 @@
           <tr v-for="task in filteredItems" :key="task.id">
             <td>
               <strong>{{ task.rateeName }}</strong>
-              <small>{{ task.rateePosition || '—' }}</small>
+              <small>{{ task.rateePosition || '-' }}</small>
             </td>
-            <td>{{ task.organizationalUnit || '—' }}</td>
+            <td>{{ task.organizationalUnit || '-' }}</td>
             <td>{{ raterTypeLabel(task.raterType) }}</td>
             <td><StatusPill :status="task.status" /></td>
             <td style="white-space:nowrap;">{{ formatDateTime(task.submittedAt || task.lastSavedAt) }}</td>
@@ -87,14 +87,14 @@
           <div class="pui-row-between">
             <div style="min-width:0;">
               <strong style="display:block; font-size:14px; color:#0f172a;">{{ task.rateeName }}</strong>
-              <span style="display:block; font-size:12px; color:#64748b; margin-top:2px;">{{ task.rateePosition || '—' }}</span>
+              <span style="display:block; font-size:12px; color:#64748b; margin-top:2px;">{{ task.rateePosition || '-' }}</span>
             </div>
             <StatusPill :status="task.status" />
           </div>
           <dl style="margin:10px 0 0; display:grid; grid-template-columns:1fr 1fr; gap:8px;">
             <div>
               <dt style="font-size:10px; font-weight:800; text-transform:uppercase; color:#94a3b8;">Unit</dt>
-              <dd style="margin:2px 0 0; font-size:12px; font-weight:700; color:#334155;">{{ task.organizationalUnit || '—' }}</dd>
+              <dd style="margin:2px 0 0; font-size:12px; font-weight:700; color:#334155;">{{ task.organizationalUnit || '-' }}</dd>
             </div>
             <div>
               <dt style="font-size:10px; font-weight:800; text-transform:uppercase; color:#94a3b8;">Your Role</dt>
@@ -182,7 +182,7 @@ const lastUpdatedLabel = computed(() =>
 )
 
 function raterTypeLabel(value) {
-  return RATER_TYPE_LABELS[value] || value || '—'
+  return RATER_TYPE_LABELS[value] || value || '-'
 }
 
 function actionLabel(status) {
@@ -192,9 +192,9 @@ function actionLabel(status) {
 }
 
 function formatDateTime(value) {
-  if (!value) return '—'
+  if (!value) return '-'
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
+  if (Number.isNaN(date.getTime())) return '-'
   return date.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ', ' +
     date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }

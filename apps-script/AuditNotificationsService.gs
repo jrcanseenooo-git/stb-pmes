@@ -24,7 +24,7 @@ const AuditService = (() => {
 
   function list(params, user) {
     const profile = AuthService.getProfile(user)
-    const isAdmin = AuthService.hasPermission(profile, 'view_audit')
+    const isAdmin = isSystemAdmin_(profile)
 
     // FIX: Staff can read their OWN records (needed for Profile → Recent Activity).
     // Admins can read everything (with optional filters).
@@ -52,7 +52,8 @@ const AuditService = (() => {
   }
 
   function export_(params, user) {
-    AuthService.requirePermission(user, 'view_audit')
+    const profile = AuthService.getProfile(user)
+    if (!isSystemAdmin_(profile)) throw HttpError('STB System Administrator access required.', 403)
     const { items } = list({ ...params, pageSize: 9999 }, user)
     const headers = ['timestamp','userEmail','userName','role','action','module','details']
     const lines   = [headers.join(',')]
@@ -66,6 +67,16 @@ const AuditService = (() => {
       lines.push(headers.map(h => csvCell(r[h])).join(','))
     })
     return { csv: lines.join('\n') }
+  }
+
+  function isSystemAdmin_(profile) {
+    if (String(profile && profile.role || '') !== 'System Administrator') return false
+    if (String(profile && profile.systemScope || 'STB_FULL') !== 'STB_FULL') return false
+    const officeKey = String(
+      (profile && (profile.officeId || profile.officeCode || profile.officeName)) ||
+      'STB'
+    ).trim().toUpperCase()
+    return !officeKey || officeKey === 'STB' || officeKey === 'SOCIAL TECHNOLOGY BUREAU'
   }
 
   return { log, list, export_ }
@@ -151,5 +162,31 @@ const NotificationsService = (() => {
     })
   }
 
-  return { list, markRead, markAllRead, createForStatusChange, createDeadlineReminders }
+  /**
+   * Refers a Job Fitness record to the skip supervisor.
+   *
+   * The protocol treats a significant gap between the ratee's self-assessment
+   * and the immediate supervisor's as "a concern requiring further review,
+   * clarification, or appropriate action by the skip supervisor". Detecting the
+   * gap is not enough on its own - without this the flag was only ever visible
+   * to whoever happened to open the record, which is not the skip supervisor.
+   */
+  function createForJfVariance(record, skipSupervisorId, gap) {
+    if (!skipSupervisorId) return false
+    const sheet = SpreadsheetService.getSheet(SHEET.NOTIFICATIONS)
+    SpreadsheetService.appendRow(sheet, {
+      id:          SpreadsheetService.generateId('NOT-'),
+      recipientId: skipSupervisorId,
+      type:        'alert',
+      message:     `Job Fitness review needed for ${record.rateeName || 'a staff member'}: ` +
+                   `the self-rating and supervisor rating differ by ${gap} points.`,
+      relatedId:   record.id,
+      module:      'IPAT',
+      read:        false,
+      createdAt:   new Date().toISOString()
+    })
+    return true
+  }
+
+  return { list, markRead, markAllRead, createForStatusChange, createDeadlineReminders, createForJfVariance }
 })()

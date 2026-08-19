@@ -13,18 +13,18 @@
  * Users tab half a dozen times. That is the dominant cause of slow page loads,
  * not the size of the database.
  *
- * TIER 1 — per-execution memo (always on, zero staleness risk)
+ * TIER 1 - per-execution memo (always on, zero staleness risk)
  *   A plain object living for the life of one Apps Script execution. The second
  *   and subsequent reads of the same tab in the same request are free. Because
  *   an execution is single-threaded and the memo dies with it, this can never
  *   serve data older than the current request. Any write through
  *   SpreadsheetService busts the entry immediately.
  *
- * TIER 2 — cross-execution CacheService (opt-in, reference tables only)
+ * TIER 2 - cross-execution CacheService (opt-in, reference tables only)
  *   Shared between users and executions, so one person's read warms it for
  *   everyone. Restricted to an explicit allowlist of slow-moving reference
  *   tables (assessment content, categories, rules, org units, registry).
- *   Transactional tables — ratings, assignments, assessment records, users —
+ *   Transactional tables - ratings, assignments, assessment records, users -
  *   are deliberately NOT cross-execution cached: serving a stale rating or a
  *   stale assignment would be a correctness bug, and no amount of speed is
  *   worth that.
@@ -35,7 +35,7 @@
  */
 const DataCacheService = (() => {
 
-  // Tier 2 allowlist. Reference data only — changed by administrators, read by
+  // Tier 2 allowlist. Reference data only - changed by administrators, read by
   // everyone, and harmless if a few minutes stale.
   const REFERENCE_SHEETS = [
     'AssessmentContent',
@@ -46,7 +46,6 @@ const DataCacheService = (() => {
     'Sections',
     'Positions',
     'OfficeRegistry',
-    'OfficeOrgOptions',
     'SystemSettings',
     'MasterKRALibrary',
     'AssessmentPeriods'
@@ -82,7 +81,7 @@ const DataCacheService = (() => {
   /**
    * Read-through cache around a producer that returns an array of row objects.
    *
-   * @param {string} spreadsheetId  Owning spreadsheet — required for isolation.
+   * @param {string} spreadsheetId  Owning spreadsheet - required for isolation.
    * @param {string} sheetName      Tab name.
    * @param {function} producer     Called only on a miss; must return an array.
    */
@@ -96,7 +95,7 @@ const DataCacheService = (() => {
     }
     memoMisses++
 
-    // Tier 2 — reference tables only
+    // Tier 2 - reference tables only
     if (isReferenceSheet(sheetName)) {
       const cache = scriptCache_()
       if (cache) {

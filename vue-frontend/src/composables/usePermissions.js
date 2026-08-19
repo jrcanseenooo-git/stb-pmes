@@ -9,12 +9,16 @@ export function usePermissions() {
     systemScope.value === 'OFFICE_ADMIN' ||
     authStore.profile?.officeRole === 'OFFICE_ADMIN'
   )
+  const isExplicitOfficeAdmin = computed(() =>
+    authStore.profile?.officeRole === 'OFFICE_ADMIN' ||
+    authStore.profile?.permissionGroups?.includes('office-assessment-admin') ||
+    authStore.profile?.permissions?.includes('manage_office_users')
+  )
   const permissions = computed(() => {
     const base = authStore.profile?.permissions || []
-    if (!isOfficeAdminScope.value) return base
+    if (!isExplicitOfficeAdmin.value) return base
     return Array.from(new Set(base.concat([
       'manage_office_users',
-      'generate_ipat_assignments',
       'manage_ipat_scores',
       'view_bureau_monitoring',
       'view_division_monitoring'
@@ -22,7 +26,7 @@ export function usePermissions() {
   })
   const permissionGroups = computed(() => {
     const base = authStore.profile?.permissionGroups || []
-    if (!isOfficeAdminScope.value) return base
+    if (!isExplicitOfficeAdmin.value) return base
     return Array.from(new Set(base.concat(['office-assessment-admin'])))
   })
   const isStbFullScope = computed(() => systemScope.value === 'STB_FULL')
@@ -33,11 +37,26 @@ export function usePermissions() {
   )
 
   const isAdmin       = computed(() => role.value === 'System Administrator')
+  const isStbSystemAdmin = computed(() => {
+    if (!isAdmin.value || systemScope.value !== 'STB_FULL') return false
+    const officeKey = String(
+      authStore.profile?.officeId ||
+      authStore.profile?.officeCode ||
+      authStore.profile?.officeName ||
+      'STB'
+    ).trim().toUpperCase()
+    return !officeKey || officeKey === 'STB' || officeKey === 'SOCIAL TECHNOLOGY BUREAU'
+  })
   const isDirector    = computed(() => role.value === 'Bureau Director')
   const isAsstDir     = computed(() => role.value === 'Assistant Bureau Director')
   const isDivChief    = computed(() => role.value === 'Division Chief')
   const isSectionHead = computed(() => role.value === 'Section Head')
   const isStaff       = computed(() => ['Staff', 'Technical Staff'].includes(role.value))
+  // Cluster oversight. Deliberately given a deliberately small menu: the
+  // Undersecretary monitors the cluster and does not administer offices, and a
+  // sidebar full of modules they never use makes the one they do need harder
+  // to find.
+  const isUndersecretary = computed(() => role.value === 'Undersecretary')
 
   const canViewAllDivisions = computed(() =>
     permissions.value.includes('view_bureau_monitoring') ||
@@ -49,18 +68,18 @@ export function usePermissions() {
   const canManageUsers = computed(() => permissions.value.includes('manage_users') || isAdmin.value)
   const canManageOfficeUsers = computed(() =>
     permissions.value.includes('manage_office_users') ||
-    authStore.profile?.systemScope === 'OFFICE_ADMIN' ||
-    authStore.profile?.officeRole === 'OFFICE_ADMIN'
+    isExplicitOfficeAdmin.value
   )
   const canManageLibraries = computed(() =>
     permissions.value.includes('manage_libraries') ||
     permissions.value.includes('manage_assessment_content') ||
     isAdmin.value
   )
+  const canViewAssessmentLibrary = computed(() => isAdmin.value)
   const canManageFocalAssignments = computed(() => permissions.value.includes('manage_focal_assignments') || isAdmin.value)
-  const canViewAudit = computed(() => permissions.value.includes('view_audit') || isAdmin.value || isDirector.value)
+  const canViewAudit = computed(() => isStbSystemAdmin.value)
   const canGenerateReports = computed(() =>
-    isAdmin.value ||
+    isStbSystemAdmin.value ||
     isDirector.value ||
     isAsstDir.value ||
     isDivChief.value ||
@@ -75,6 +94,10 @@ export function usePermissions() {
     permissions.value.includes('provision_office_spreadsheets') ||
     permissions.value.includes('validate_office_spreadsheets')
   )
+  const canConfigureOfficeStructure = computed(() =>
+    canManageOfficeRegistry.value ||
+    canManageOfficeUsers.value
+  )
   const canViewClusterMonitoring = computed(() =>
     permissions.value.includes('view_cluster_monitoring')
   )
@@ -85,10 +108,23 @@ export function usePermissions() {
     permissions.value.includes('manage_office_registry')
   )
   const canManageOfficePersonnel = computed(() =>
-    authStore.profile?.systemScope === 'OFFICE_ADMIN' ||
-    authStore.profile?.officeRole === 'OFFICE_ADMIN' ||
+    isExplicitOfficeAdmin.value ||
     permissions.value.includes('manage_cluster_office_admins') ||
     permissions.value.includes('manage_office_registry')
+  )
+  const canViewOfficeDashboard = computed(() =>
+    canManageOfficePersonnel.value ||
+    isDivChief.value ||
+    isSectionHead.value ||
+    permissions.value.includes('view_division_monitoring') ||
+    permissions.value.includes('view_bureau_monitoring')
+  )
+  const canViewOfficePersonnel = computed(() =>
+    canManageOfficePersonnel.value ||
+    isDivChief.value ||
+    isSectionHead.value ||
+    permissions.value.includes('view_division_monitoring') ||
+    permissions.value.includes('view_bureau_monitoring')
   )
   const evaluationOnlyRollout = computed(() => {
     const mode = authStore.profile?.systemAccessMode
@@ -106,7 +142,6 @@ export function usePermissions() {
     permissions.value.includes('manage_office_registry') ||
     permissions.value.includes('provision_office_spreadsheets') ||
     permissions.value.includes('view_cluster_monitoring') ||
-    permissions.value.includes('view_audit') ||
     permissionGroups.value.includes('system-admin') ||
     permissionGroups.value.includes('user-manager') ||
     permissionGroups.value.includes('library-manager') ||
@@ -120,11 +155,12 @@ export function usePermissions() {
 
   return {
     role, permissions, permissionGroups, hasPermission,
-    systemScope, isStbFullScope, isClusterPortalScope, isOfficeAdminScope,
-    isAdmin, isDirector, isAsstDir, isDivChief, isSectionHead, isStaff,
-    canViewAllDivisions, canApprove, canManageUsers, canManageLibraries,
+    systemScope, isStbFullScope, isClusterPortalScope, isOfficeAdminScope, isExplicitOfficeAdmin,
+    isAdmin, isStbSystemAdmin, isDirector, isAsstDir, isDivChief, isSectionHead, isStaff, isUndersecretary,
+    canViewAllDivisions, canApprove, canManageUsers, canManageLibraries, canViewAssessmentLibrary,
     canManageFocalAssignments, canViewAudit, canGenerateReports,
-    canManageDatabase, canManageOfficeRegistry, canViewClusterMonitoring, canGenerateAssignments, canManageOfficePersonnel, canManageOfficeUsers,
+    canManageDatabase, canManageOfficeRegistry, canConfigureOfficeStructure, canViewClusterMonitoring, canGenerateAssignments, canManageOfficePersonnel, canManageOfficeUsers,
+    canViewOfficeDashboard, canViewOfficePersonnel,
     evaluationOnlyRollout, canAccessFullSystem, divisionScope
   }
 }

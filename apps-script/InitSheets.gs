@@ -179,7 +179,7 @@ function initializeSheets() {
 
     // Add any missing columns to existing sheets without wiping data
     if (sheet.getLastRow() === 0) {
-      // Brand new sheet – write headers fresh
+      // Brand new sheet - write headers fresh
       const headerRange = sheet.getRange(1, 1, 1, headers.length)
       headerRange.setValues([headers])
       headerRange
@@ -190,7 +190,7 @@ function initializeSheets() {
       sheet.setFrozenRows(1)
       sheet.autoResizeColumns(1, headers.length)
     } else {
-      // Existing sheet – only append NEW columns (don't touch existing data)
+      // Existing sheet - only append NEW columns (don't touch existing data)
       const existingHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
       const existingSet = new Set(existingHeaders.map(h => String(h).trim()))
       const missingCols = headers.filter(h => !existingSet.has(h))
@@ -213,14 +213,14 @@ function initializeSheets() {
 
   Logger.log('✅ PMES sheets initialized successfully.')
   // getUi() only works when triggered from the Apps Script editor menu,
-  // not from the Run button or a web-app context — so we guard it.
+  // not from the Run button or a web-app context - so we guard it.
   try {
     SpreadsheetApp.getUi().alert(
       '✅ PMES sheets initialized successfully!\n\n' +
       'Sheets managed: ' + Object.keys(SHEETS).join(', ')
     )
   } catch (e) {
-    Logger.log('(Alert skipped – not running in UI context)')
+    Logger.log('(Alert skipped - not running in UI context)')
   }
 }
 
@@ -248,12 +248,12 @@ function seedDivisions(ss) {
  *
  * ⚠️ THE NAMES BELOW ARE A PROPOSAL, NOT AN AUTHORITY.
  * The division chiefs must confirm the official wording before this is used for
- * a live assessment cycle — "Other Marginalized Group" and "Other Marginalized
+ * a live assessment cycle - "Other Marginalized Group" and "Other Marginalized
  * Groups" may genuinely be one section or two, and only they can say. Edit the
  * rows in the sheet directly; nothing in the code depends on these exact strings.
  *
  * This does NOT touch existing Users rows. Re-pointing personnel at canonical
- * sections is a separate, deliberate migration — see PMES_DATA_QUALITY_FINDINGS
+ * sections is a separate, deliberate migration - see PMES_DATA_QUALITY_FINDINGS
  * D-03. Seeding here only gives new registrations a controlled vocabulary.
  */
 function seedSections(ss) {
@@ -297,7 +297,7 @@ function nukeAndRebuildSheets_DANGER() {
   try {
     const ui = SpreadsheetApp.getUi()
     const result = ui.alert(
-      '⚠️ IRREVERSIBLE — DELETE EVERYTHING',
+      '⚠️ IRREVERSIBLE - DELETE EVERYTHING',
       'This will permanently DELETE ALL SHEETS AND ALL DATA, then rebuild empty sheets from scratch.\n\nAre you absolutely sure?',
       ui.ButtonSet.YES_NO
     )
@@ -310,7 +310,7 @@ function nukeAndRebuildSheets_DANGER() {
 
   const ss = SpreadsheetApp.getActiveSpreadsheet()
 
-  // Google Sheets requires at least one sheet at all times — insert a placeholder
+  // Google Sheets requires at least one sheet at all times - insert a placeholder
   const temp = ss.insertSheet('__rebuilding__')
 
   // Delete every other sheet
@@ -334,7 +334,7 @@ function nukeAndRebuildSheets_DANGER() {
   } catch (e) {}
 }
 
-// ── Utility: clear all data rows (keep headers) – use with caution ──
+// ── Utility: clear all data rows (keep headers) - use with caution ──
 function clearAllData_DANGER() {
   Logger.log('clearAllData_DANGER is disabled. Use clearTransactionalData_KEEP_USERS_DIVISIONS_KRAS instead.')
   try {
@@ -357,7 +357,7 @@ function clearAllData_DANGER() {
     )
     confirmed = (result === ui.Button.YES)
   } catch (e) {
-    // Running from Run button — log warning and abort for safety
+    // Running from Run button - log warning and abort for safety
     Logger.log('⚠️ clearAllData_DANGER must be run from the Apps Script menu, not the Run button. Aborting.')
     return
   }

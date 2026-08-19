@@ -154,21 +154,21 @@
               <div class="det-rating-item">
                 <div class="det-label">Efficiency</div>
                 <input v-model.number="draft.ratingEfficiency" type="number" min="1" max="5" step="0.01"
-                  :class="['det-score-input', isDirty('ratingEfficiency') && 'inline-dirty']" placeholder="—"
+                  :class="['det-score-input', isDirty('ratingEfficiency') && 'inline-dirty']" placeholder="-"
                   @input="onFieldInput($event)" @blur="onRatingBlur('ratingEfficiency')"
                   @keydown.esc="revertField('ratingEfficiency', $event)"/>
               </div>
               <div class="det-rating-item">
                 <div class="det-label">Quality</div>
                 <input v-model.number="draft.ratingQuality" type="number" min="1" max="5" step="0.01"
-                  :class="['det-score-input', isDirty('ratingQuality') && 'inline-dirty']" placeholder="—"
+                  :class="['det-score-input', isDirty('ratingQuality') && 'inline-dirty']" placeholder="-"
                   @input="onFieldInput($event)" @blur="onRatingBlur('ratingQuality')"
                   @keydown.esc="revertField('ratingQuality', $event)"/>
               </div>
               <div class="det-rating-item">
                 <div class="det-label">Timeliness</div>
                 <input v-model.number="draft.ratingTimeliness" type="number" min="1" max="5" step="0.01"
-                  :class="['det-score-input', isDirty('ratingTimeliness') && 'inline-dirty']" placeholder="—"
+                  :class="['det-score-input', isDirty('ratingTimeliness') && 'inline-dirty']" placeholder="-"
                   @input="onFieldInput($event)" @blur="onRatingBlur('ratingTimeliness')"
                   @keydown.esc="revertField('ratingTimeliness', $event)"/>
               </div>
@@ -224,10 +224,10 @@
               <p v-if="editingItem?.formId" class="linked-note">Linked to your IPCRF/CCEF form. KRA and indicator text come from there and cannot be edited here.</p>
               <div class="field full"><label class="field-label">Accomplishment</label><textarea v-model="form.accomplishment" class="field-input" rows="3" placeholder="What was actually accomplished..."></textarea></div>
               <div class="field full"><label class="field-label">Means of Verification</label><textarea v-model="form.movReferences" class="field-input" rows="2" placeholder="Documents, report names, links, or MOV references..."></textarea></div>
-              <div class="field"><label class="field-label">Efficiency (E) <span class="eqt-hint">1 – 5</span></label><input v-model.number="form.ratingEfficiency" type="number" min="1" max="5" step="0.01" class="field-input" placeholder="1 – 5" @blur="clampRating('ratingEfficiency')"/></div>
-              <div class="field"><label class="field-label">Quality (Q) <span class="eqt-hint">1 – 5</span></label><input v-model.number="form.ratingQuality" type="number" min="1" max="5" step="0.01" class="field-input" placeholder="1 – 5" @blur="clampRating('ratingQuality')"/></div>
-              <div class="field"><label class="field-label">Timeliness (T) <span class="eqt-hint">1 – 5</span></label><input v-model.number="form.ratingTimeliness" type="number" min="1" max="5" step="0.01" class="field-input" placeholder="1 – 5" @blur="clampRating('ratingTimeliness')"/></div>
-              <div class="field"><label class="field-label">Average <span class="eqt-hint">auto-computed</span></label><input :value="computedAverage || ''" type="text" class="field-input readonly-input" readonly placeholder="—"/></div>
+              <div class="field"><label class="field-label">Efficiency (E) <span class="eqt-hint">1 - 5</span></label><input v-model.number="form.ratingEfficiency" type="number" min="1" max="5" step="0.01" class="field-input" placeholder="1 - 5" @blur="clampRating('ratingEfficiency')"/></div>
+              <div class="field"><label class="field-label">Quality (Q) <span class="eqt-hint">1 - 5</span></label><input v-model.number="form.ratingQuality" type="number" min="1" max="5" step="0.01" class="field-input" placeholder="1 - 5" @blur="clampRating('ratingQuality')"/></div>
+              <div class="field"><label class="field-label">Timeliness (T) <span class="eqt-hint">1 - 5</span></label><input v-model.number="form.ratingTimeliness" type="number" min="1" max="5" step="0.01" class="field-input" placeholder="1 - 5" @blur="clampRating('ratingTimeliness')"/></div>
+              <div class="field"><label class="field-label">Average <span class="eqt-hint">auto-computed</span></label><input :value="computedAverage || ''" type="text" class="field-input readonly-input" readonly placeholder="-"/></div>
               <div class="field full"><label class="field-label">Remarks</label><input v-model="form.remarks" type="text" class="field-input" placeholder="Optional notes..."/></div>
             </div>
           </div>
@@ -332,7 +332,7 @@ const draftAverage = computed(() => calculateAverage(draft.value))
 const saveChipText = computed(() => {
   if (saveState.value === 'saving') return 'Saving…'
   if (saveState.value === 'dirty') return 'Unsaved changes'
-  if (saveState.value === 'error') return 'Save failed — click to retry'
+  if (saveState.value === 'error') return 'Save failed - click to retry'
   if (saveState.value === 'saved' && savedAt.value) {
     return `Saved ${savedAt.value.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })}`
   }

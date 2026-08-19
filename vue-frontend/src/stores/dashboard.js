@@ -17,7 +17,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
     // Parallelizing these as four separate requests (summary/divisions/
     // status/activity) still meant four separate Apps Script executions,
     // each independently re-reading the same Accomplishments/Users sheets
-    // from scratch and competing for Apps Script's limited concurrency —
+    // from scratch and competing for Apps Script's limited concurrency -
     // exactly the kind of load that was tipping requests into a Vercel
     // Hobby-plan 504. dashboard/all reads each sheet once on the backend
     // and returns everything from a single execution.

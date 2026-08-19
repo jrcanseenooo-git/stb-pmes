@@ -25,7 +25,7 @@ const AssessmentRulesService = (() => {
   // The protocol states a 22% weight differential between Salary Grade II and
   // III positions and 34% between III and IV, with ITO I categorised under
   // Position III. Those differentials govern how much each position's TARGETS
-  // are weighted when performance commitments are set — they are applied inside
+  // are weighted when performance commitments are set - they are applied inside
   // the IPCR/DPCR computation, not as a multiplier on the final numerical
   // rating that reaches this system.
   //
@@ -33,13 +33,22 @@ const AssessmentRulesService = (() => {
   // is wired into the IPCRF sync path (and only that path) so it is ready when
   // the IPCRF/CCEF module is rolled out, but the exact formula has to be
   // confirmed before any non-1.00 value is set: multiplying an already
-  // normalised 1–5 rating by 1.22 would push scores past the top of the scale
+  // normalised 1-5 rating by 1.22 would push scores past the top of the scale
   // and silently corrupt every STB result.
   const DEFAULT_FPO_POSITION_WEIGHTS = {
     positionII: 1.00,
     positionIII: 1.00,
     positionIV: 1.00
   }
+
+  // The protocol refers the record to the skip supervisor where there is
+  // "extremely differing responses or significant variance" between the ratee's
+  // self-assessment and the immediate supervisor's, but sets no number. 1.00 on
+  // the 1-4 scale is the Department-wide default; an office may adopt a
+  // different figure and record its basis, exactly as it may for weights.
+  const DEFAULT_JF_VARIANCE = { gap: 1.00 }
+  // A gap is a distance on the 1-4 scale, so its ceiling is 3, not 1 like a weight.
+  const JF_VARIANCE_MAX = 3
 
   const DEFAULT_CBC_RATER_WEIGHTS = {
     self: 0.15,
@@ -91,7 +100,7 @@ const AssessmentRulesService = (() => {
 
     // Validate the whole batch against the state it would produce BEFORE
     // writing anything. Validating row-by-row mid-write could leave an office
-    // with, say, CBC updated and FPO not — weights summing to 0.75 and every
+    // with, say, CBC updated and FPO not - weights summing to 0.75 and every
     // subsequent score silently wrong until the next edit.
     validateDomainWeightBatch_(rows, updates)
 
@@ -101,7 +110,13 @@ const AssessmentRulesService = (() => {
       const ruleKey = String(item.ruleKey || '').trim()
       const value = Number(item.value)
       if (!ruleType || !ruleKey) throw HttpError('Rule type and key are required.', 400)
-      if (!isFinite(value) || value < 0 || value > 1) throw HttpError('Rule value must be between 0 and 1.', 400)
+      // Weights are proportions capped at 1. The Job Fitness variance threshold
+      // is a distance on the 1-4 rating scale, so capping it at 1 would make any
+      // office wanting a looser referral trigger unable to save one.
+      const maxValue = ruleType === 'jfVarianceThreshold' ? JF_VARIANCE_MAX : 1
+      if (!isFinite(value) || value < 0 || value > maxValue) {
+        throw HttpError('Rule value must be between 0 and ' + maxValue + '.', 400)
+      }
       const existing = rows.find(r => String(r.ruleType) === ruleType && String(r.ruleKey) === ruleKey)
       if (existing) {
         changed.push(SpreadsheetService.updateRow(sheet, existing.id, {
@@ -142,7 +157,7 @@ const AssessmentRulesService = (() => {
    * range, not total 1.0, or deviate from the protocol default without a
    * documented basis.
    *
-   * Only runs when the batch actually touches domainWeight rows — editing rater
+   * Only runs when the batch actually touches domainWeight rows - editing rater
    * weights alone should not require restating the domain split.
    */
   function validateDomainWeightBatch_(existingRows, updates) {
@@ -231,6 +246,14 @@ const AssessmentRulesService = (() => {
     return resolveWeights_('domainWeight', DEFAULT_DOMAIN_WEIGHTS)
   }
 
+  function getJfVarianceThreshold() {
+    const resolved = resolveWeights_('jfVarianceThreshold', DEFAULT_JF_VARIANCE)
+    const gap = Number(resolved.gap)
+    // A zero threshold would refer every single record, which is never the
+    // intent and would bury the genuine cases. Fall back to the default.
+    return isFinite(gap) && gap > 0 ? gap : DEFAULT_JF_VARIANCE.gap
+  }
+
   function getCbcRaterWeights() {
     return resolveWeights_('cbcRaterWeight', DEFAULT_CBC_RATER_WEIGHTS)
   }
@@ -251,8 +274,8 @@ const AssessmentRulesService = (() => {
     // ITO I is explicitly categorised under Position III. Matched before the
     // generic numeral rules, and accepts both the abbreviation and the spelled
     // out title because rosters use either. `\b(I|1)\b` cannot match the "I" in
-    // "III" — the following character is a word character, so the boundary
-    // fails — which keeps ITO III out of this branch.
+    // "III" - the following character is a word character, so the boundary
+    // fails - which keeps ITO III out of this branch.
     if (/\b(ITO|INFORMATION\s+TECHNOLOGY\s+OFFICER)\s*(I|1)\b/.test(text)) return 'positionIII'
 
     if (/\b(IV|4)\b/.test(text)) return 'positionIV'
@@ -352,6 +375,21 @@ const AssessmentRulesService = (() => {
       updatedAt: now,
       updatedBy: user && user.email || ''
     }))
+    Object.keys(DEFAULT_JF_VARIANCE).forEach(key => rows.push({
+      id: 'RULE-jf-variance-' + key,
+      officeId,
+      ruleType: 'jfVarianceThreshold',
+      ruleKey: key,
+      label: 'Job Fitness variance review threshold',
+      value: DEFAULT_JF_VARIANCE[key],
+      active: true,
+      description: 'Gap between the ratee self-rating and the immediate supervisor rating, on the 1-4 scale, at which the record is referred to the skip supervisor.',
+      basis: 'Innovations Unified Performance Assessment Tool, section on Job Fitness - "extremely differing responses or significant variance" is not given a number, so this is the office\'s documented interpretation.',
+      approvedBy: '',
+      createdAt: now,
+      updatedAt: now,
+      updatedBy: user && user.email || ''
+    }))
     return rows
   }
 
@@ -383,6 +421,7 @@ const AssessmentRulesService = (() => {
     update,
     getDomainWeights,
     getCbcRaterWeights,
+    getJfVarianceThreshold,
     ensureDefaultsForSpreadsheet
   }
 })()

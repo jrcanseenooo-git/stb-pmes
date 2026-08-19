@@ -3,7 +3,7 @@
     <PageHeader
       kicker="Assessment Administration"
       title="Rater Tagging"
-      subtitle="Who rates whom, per role. The automated assignment generator reads these rules — it does not have its own built-in hierarchy."
+      subtitle="Who rates whom, per role. The automated assignment generator reads these rules - it does not have its own built-in hierarchy."
     >
       <template #actions>
         <button class="pui-btn" type="button" :disabled="loading || saving" @click="reload">
@@ -21,6 +21,11 @@
     <div v-if="error" class="pui-alert pui-alert-error" role="alert">
       <p class="pui-alert-title">{{ errorTitle }}</p>
       <p>{{ error }}</p>
+    </div>
+
+    <div v-if="actionNotice.show" :class="['pui-alert', actionNoticeClass]" role="status" aria-live="polite">
+      <p class="pui-alert-title" :style="{ color: actionNoticeTitleColor }">{{ actionNotice.title }}</p>
+      <p>{{ actionNotice.message }}</p>
     </div>
 
     <!-- Coverage is the whole point of this screen: it surfaces roles whose
@@ -48,11 +53,11 @@
       </p>
       <p>
         These roles exist on the roster but have no rater rules. Assignment generation skips them
-        entirely — they receive no rating tasks and nobody is asked to rate them.
+        entirely - they receive no rating tasks and nobody is asked to rate them.
       </p>
       <ul style="margin:8px 0 0; padding-left:18px;">
         <li v-for="item in unmappedItems" :key="item.role">
-          <b>{{ item.role }}</b> — {{ item.personnel }} personnel
+          <b>{{ item.role }}</b> - {{ item.personnel }} personnel
           <button type="button" class="pui-btn pui-btn-sm" style="margin-left:8px;" @click="addRoleBlock(item.role)">
             Configure
           </button>
@@ -133,7 +138,7 @@
                   <option value="">Leave unassigned</option>
                   <option v-for="s in fallbackScopes" :key="s" :value="s">{{ scopeLabel(s) }}</option>
                 </select>
-                <span v-else class="pui-muted" style="font-size:12px;">—</span>
+                <span v-else class="pui-muted" style="font-size:12px;">-</span>
               </td>
               <td style="text-align:right;">
                 <button class="pui-btn pui-btn-sm pui-btn-danger" type="button" @click="removeRow(block.role, index)">
@@ -170,6 +175,7 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import { useToast } from 'vue-toastification'
 import { raterMatrixApi } from '@/services/api'
 import { useConfirm } from '@/composables/useConfirm'
 import PageHeader from '@/components/ui/PageHeader.vue'
@@ -178,6 +184,7 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import SkeletonRows from '@/components/ui/SkeletonRows.vue'
 
 const { confirm } = useConfirm()
+const toast = useToast()
 
 const RATER_TYPE_LABELS = {
   Self: 'Self',
@@ -205,15 +212,26 @@ const dirty = ref(false)
 const newRoleName = ref('')
 const roleBlocks = ref([])
 const coverage = ref({})
+const actionNotice = ref({ show: false, type: 'info', title: '', message: '' })
 const scopes = ref(['self', 'same-section', 'same-division', 'office-wide', 'same-section-preferred'])
 const raterTypes = ref(['Self', 'Peer', 'Peer1', 'Peer2', 'Subordinate', 'Supervisor', 'SkipSupervisor'])
 
-// A fallback of 'self' makes no sense — self is not a pool to search.
+// A fallback of 'self' makes no sense - self is not a pool to search.
 const fallbackScopes = computed(() => scopes.value.filter(s => s !== 'self'))
 
 const coverageItems = computed(() => coverage.value.items || [])
 const unmappedItems = computed(() => coverageItems.value.filter(i => !i.configured))
 const configuredRoleCount = computed(() => coverageItems.value.filter(i => i.configured).length)
+const actionNoticeClass = computed(() => {
+  if (actionNotice.value.type === 'error') return 'pui-alert-error'
+  if (actionNotice.value.type === 'success') return 'pui-alert-info'
+  return 'pui-alert-warn'
+})
+const actionNoticeTitleColor = computed(() => {
+  if (actionNotice.value.type === 'error') return '#991b1b'
+  if (actionNotice.value.type === 'success') return '#047857'
+  return '#92400e'
+})
 
 onMounted(reload)
 
@@ -226,6 +244,14 @@ function personnelCountFor(role) {
 }
 
 function markDirty() { dirty.value = true }
+
+function setActionNotice(type, title, message) {
+  actionNotice.value = { show: true, type, title, message }
+}
+
+function clearActionNotice() {
+  actionNotice.value = { show: false, type: 'info', title: '', message: '' }
+}
 
 // The backend stores a flat row list; the screen groups by role because that is
 // how an administrator thinks about it ("who rates a Technical Staff?").
@@ -264,6 +290,7 @@ function flattenBlocks() {
 async function reload() {
   loading.value = true
   error.value = ''
+  if (!saving.value) clearActionNotice()
   try {
     const [matrix, cov] = await Promise.all([
       raterMatrixApi.list(),
@@ -323,19 +350,26 @@ function removeRow(role, index) {
 async function save() {
   const ok = await confirm({
     title: 'Save Rater Matrix',
-    message: 'This replaces the current rater rules for this office. Existing assignments and submitted ratings are not affected — the change applies the next time assignments are generated.',
+    message: 'This replaces the current rater rules for this office. Existing assignments and submitted ratings are not affected - the change applies the next time assignments are generated.',
     confirmLabel: 'Save'
   })
   if (!ok) return
 
   saving.value = true
   error.value = ''
+  setActionNotice('info', 'Saving rater matrix', 'Writing the rater rules to the database. Please keep this page open.')
+  toast.info('Saving rater matrix...')
   try {
     await raterMatrixApi.save(flattenBlocks())
+    setActionNotice('info', 'Refreshing rater matrix', 'Save completed. Reloading the latest rules and coverage counts.')
     await reload()
+    setActionNotice('success', 'Rater matrix saved', 'The latest rules are now stored in the database.')
+    toast.success('Rater matrix saved.')
   } catch (e) {
     errorTitle.value = 'The rater matrix could not be saved'
     error.value = e?.message || 'Please review the rules and try again.'
+    setActionNotice('error', 'Save failed', error.value)
+    toast.error(error.value)
   } finally {
     saving.value = false
   }
@@ -352,12 +386,19 @@ async function restoreDefaults() {
 
   saving.value = true
   error.value = ''
+  setActionNotice('info', 'Applying standard hierarchy', 'Building rater rules from this office structure and saving them to the database.')
+  toast.info('Applying standard hierarchy...')
   try {
     await raterMatrixApi.seedDefaults()
+    setActionNotice('info', 'Refreshing rater matrix', 'The standard hierarchy was saved. Reloading the latest rules.')
     await reload()
+    setActionNotice('success', 'Standard hierarchy applied', 'The rater matrix now follows this office structure.')
+    toast.success('Standard hierarchy applied.')
   } catch (e) {
     errorTitle.value = 'The standard hierarchy could not be applied'
     error.value = e?.message || 'Please try again.'
+    setActionNotice('error', 'Reset failed', error.value)
+    toast.error(error.value)
   } finally {
     saving.value = false
   }

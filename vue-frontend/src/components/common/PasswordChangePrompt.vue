@@ -102,7 +102,7 @@
           <!--
             This modal is force-blocking (no Skip) when a password change is
             required, and its own recent-login error tells the user to sign out
-            and back in — but with Skip hidden and no other control, there was
+            and back in - but with Skip hidden and no other control, there was
             no way to actually do that. A user who hit that specific error was
             simply stuck behind an overlay with no path forward short of
             leaving the app by typing a URL directly. Sign Out is always a safe

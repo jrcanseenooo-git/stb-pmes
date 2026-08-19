@@ -15,6 +15,13 @@ const AuthService = (() => {
   }
   const ROLE_GROUPS = {
     'System Administrator': ['system-admin'],
+    // Cluster-level oversight. The Undersecretary reads assessment progress
+    // across every participating office but does not administer any of them -
+    // no provisioning, no registry edits, no rater generation. Without this
+    // entry the role resolved to no groups and therefore no permissions, so the
+    // account landed on the personal rating dashboard with the Cluster
+    // Assessment Overview hidden from it entirely.
+    'Undersecretary': ['cluster-monitoring-admin'],
     'Bureau Director': ['bureau-monitor', 'library-manager', 'evaluation-manager'],
     'Assistant Bureau Director': ['bureau-monitor', 'library-manager', 'evaluation-manager'],
     'Division Chief': ['division-monitor'],
@@ -37,8 +44,7 @@ const AuthService = (() => {
     ],
     'bureau-monitor': [
       'view_bureau_monitoring',
-      'view_division_monitoring',
-      'view_audit'
+      'view_division_monitoring'
     ],
     'division-monitor': [
       'view_division_monitoring'
@@ -53,7 +59,7 @@ const AuthService = (() => {
     ],
     // Generating rater assignments is reserved to the System Administrator.
     // `generate_ipat_assignments` was previously granted here and was doing double
-    // duty as "is an evaluation administrator" — it also gated manual FPO encoding
+    // duty as "is an evaluation administrator" - it also gated manual FPO encoding
     // and the entire All Assessments view. Removing it alone would have stripped
     // those from the Bureau Director and Assistant Bureau Director, so the
     // administer-scores capability is now its own permission.
@@ -97,6 +103,7 @@ const AuthService = (() => {
   }
 
   function canonicalRole_(value) {
+    if (typeof RoleLabelService !== 'undefined') return RoleLabelService.canonicalRole(value)
     const raw = String(value || '').replace(/[\u200B-\u200D\uFEFF]/g, '').trim()
     const key = raw.toLowerCase().replace(/[\s_-]+/g, ' ')
     const aliases = {
@@ -158,17 +165,17 @@ const AuthService = (() => {
       if (payload.iat && payload.iat > nowSec + 300) return null   // 5-min skew
       // Nightly forced logout: a session last *authenticated* before the
       // midnight cutoff is rejected, even though Firebase itself still
-      // considers the token valid — this is what actually logs out a
+      // considers the token valid - this is what actually logs out a
       // session left open overnight.
       //
       // This compares auth_time, not iat. iat is when THIS token was
       // minted, and the client already force-refreshes and retries once on
-      // any 401 (see gasSend in api.js) — that refresh mints a brand-new
+      // any 401 (see gasSend in api.js) - that refresh mints a brand-new
       // token with iat = right now, which is always after any past cutoff,
       // so an iat-based check silently defeats itself on the very first
       // retry. auth_time is when the user last actually signed in with
       // credentials; a silent token refresh never changes it, only a real
-      // interactive sign-in does — which is exactly the case that should
+      // interactive sign-in does - which is exactly the case that should
       // stay exempt.
       if (typeof SystemSettingsService !== 'undefined') {
         const cutoff = SystemSettingsService.getLogoutCutoffAt()
@@ -226,7 +233,7 @@ const AuthService = (() => {
   // Per-execution profile cache. A single request calls getProfile several times
   // (the service method, then AuditService.log, then any nested compute), and
   // each call re-read the whole Users sheet. Apps Script gives every request a
-  // fresh script context, so this map lives exactly as long as one request —
+  // fresh script context, so this map lives exactly as long as one request -
   // there is no cross-user or stale-read risk.
   const _profileCache = {}
 
@@ -267,16 +274,16 @@ const AuthService = (() => {
 
     // Stamp lastLoginAt ONLY when the caller is the sign-in path (auth/me).
     // This used to run on every getProfile call, which means every authenticated
-    // request performed a sheet write before doing any of its real work — a
+    // request performed a sheet write before doing any of its real work - a
     // round trip added to every single API call, for a field that only needs to
     // change at sign-in.
     //
-    // This write is unlocked and bypasses the read cache — updateRow() re-reads
+    // This write is unlocked and bypasses the read cache - updateRow() re-reads
     // the whole sheet itself rather than going through
     // SpreadsheetService.getAllRows(), so it's a full sheet round trip on the
     // Apps Script side for every login, synchronously, before the profile is
     // returned. Firebase Authentication itself scales fine under concurrent
-    // sign-ins; this is the layer that doesn't — Apps Script has a real ceiling
+    // sign-ins; this is the layer that doesn't - Apps Script has a real ceiling
     // on simultaneous executions, so a login burst (everyone signing in at
     // once) queues here, not at Google's auth servers.
     //
@@ -284,7 +291,7 @@ const AuthService = (() => {
     // logic reads, so skip the write when it was already stamped within the
     // last few minutes. This is the common case of someone reloading the page
     // or reopening a tab rather than a fresh sign-in, and it's exactly the
-    // write volume a login burst multiplies — cutting it here helps the actual
+    // write volume a login burst multiplies - cutting it here helps the actual
     // concurrent-login scenario, not just casual refreshes.
     const LOGIN_STAMP_MIN_INTERVAL_MS = 5 * 60 * 1000
     const previousLoginAt = row.lastLoginAt ? new Date(row.lastLoginAt).getTime() : 0
@@ -340,7 +347,7 @@ const AuthService = (() => {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // ONBOARDING STATE — never throws for the unregistered case, so the
+  // ONBOARDING STATE - never throws for the unregistered case, so the
   // frontend can route a signed-in-but-unprovisioned user to registration
   // instead of silently granting a fallback Staff profile.
   //   registered=false        → no PMES account yet (show registration)
@@ -361,6 +368,24 @@ const AuthService = (() => {
         }
       }
       throw e
+    }
+  }
+
+  const FALLBACK_REQUESTED_ROLES = ['Technical Staff', 'Section Head', 'Division Chief', 'Assistant Bureau Director', 'Bureau Director']
+
+  // STB's configured role list, read from the same Office Registry tagging the
+  // participating offices use. Falls back to the fixed Bureau ladder when the
+  // registry is unavailable or STB has no roles tagged yet.
+  function stbRequestedRoles_() {
+    try {
+      if (typeof OfficeRegistryService === 'undefined') return FALLBACK_REQUESTED_ROLES
+      const options = OfficeRegistryService.registrationOrgOptions() || {}
+      const stb = options['STB'] || options['stb'] || {}
+      const roles = (stb.requestedRoles || []).filter(Boolean)
+      return roles.length ? roles : FALLBACK_REQUESTED_ROLES
+    } catch (e) {
+      Logger.log('[Auth] stbRequestedRoles_ error: ' + (e && e.message))
+      return FALLBACK_REQUESTED_ROLES
     }
   }
 
@@ -418,8 +443,17 @@ const AuthService = (() => {
       officeOptions: typeof OfficeRegistryService !== 'undefined'
         ? OfficeRegistryService.registrationOrgOptions()
         : {},
-      employmentTypes: ['Regular', 'Contract of Service (COS)', 'Casual', 'Job Order'],
-      requestedRoles: ['Technical Staff', 'Section Head', 'Division Chief', 'Assistant Bureau Director', 'Bureau Director']
+      // Must stay in step with EMPLOYMENT_TYPES in RegisterView.vue - this list
+      // is what the form actually renders, and the frontend constant is only a
+      // fallback for when this endpoint is unreachable. A value present in one
+      // list but not the other leaves existing records showing a blank select.
+      employmentTypes: ['Regular', 'Co-Terminus', 'Contractual', 'Contract of Service (COS)'],
+      // STB keeps its own roles in the Office Registry tagging, the same place
+      // every participating office keeps them. This was a fixed ladder, so a
+      // role an administrator added for STB - 'Admin Staff' - never reached the
+      // registration form or the Role select in Users. The fixed list stays as
+      // the fallback for a database with no tagging saved yet.
+      requestedRoles: stbRequestedRoles_()
     }
   }
 
@@ -526,7 +560,7 @@ const AuthService = (() => {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // DIAGNOSTIC — run manually from Apps Script editor to test
+  // DIAGNOSTIC - run manually from Apps Script editor to test
   // token decoding without a live request
   // ─────────────────────────────────────────────────────────────
   function debugDecodeToken(tokenString) {

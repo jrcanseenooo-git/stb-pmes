@@ -1,5 +1,5 @@
 /**
- * UsersService.gs — Updated with Firebase Auth integration
+ * UsersService.gs - Updated with Firebase Auth integration
  * When a user is created → Firebase Auth account is also created
  * When activated/deactivated → Firebase account is enabled/disabled
  * When password is reset → Firebase password is updated
@@ -17,7 +17,7 @@ const UsersService = (() => {
   // ── SELF-REGISTER (Google-authenticated user with no PMES account yet) ──
   // Identity (uid/email) is taken from the verified token, never the form.
   // Role is forced to Technical Staff and the account is created inactive + pending, so
-  // a self-registering user can never grant themselves elevated access — an
+  // a self-registering user can never grant themselves elevated access - an
   // admin reviews and sets the real role on approval.
   function selfRegister(body, user) {
     const sheet = _usersSheet()
@@ -52,8 +52,10 @@ const UsersService = (() => {
       middleName:         body.middleName || '',
       lastName:           body.lastName   || '',
       suffix:             body.suffix     || '',
-      role:               'Technical Staff',                         // forced — admin sets real role on approval
-      requestedRole:      body.role || '',                          // what the user asked for (hint only)
+      role:               'Technical Staff',                         // forced - admin sets real role on approval
+      requestedRole:      typeof RoleLabelService !== 'undefined'
+        ? RoleLabelService.canonicalRole(body.role || '')
+        : (String(body.role || '').trim() === 'Staff' ? 'Technical Staff' : (body.role || '')), // what the user asked for (hint only)
       positionLevel:      resolvePositionLevel(body.position || ''),
       divisionId:         body.divisionId   || '',
       divisionName:       body.division || body.divisionName || '',
@@ -69,7 +71,7 @@ const UsersService = (() => {
       centralRoles:       '',
       tempPassword:       '',
       tempPasswordHash:   '',
-      mustChangePassword: false,                                    // Google-authenticated — no temp password
+      mustChangePassword: false,                                    // Google-authenticated - no temp password
       active:             false,
       pendingActivation:  true,
       selfRegistered:     true,
@@ -105,7 +107,7 @@ const UsersService = (() => {
     let rows      = SpreadsheetService.getAllRows(sheet).filter(r => !r.deleted)
     const profile = AuthService.getProfile(user)
 
-    // Scope by role — staff only see their division
+    // Scope by role - staff only see their division
     const canManageUsers = AuthService.hasPermission(profile, 'manage_users')
     const canManageOfficeUsers = hasOfficeUserAdministration_(profile)
     const canViewBureau = AuthService.hasPermission(profile, 'view_bureau_monitoring')
@@ -156,7 +158,7 @@ const UsersService = (() => {
     return _safeUser(row)
   }
 
-  // ── CREATE user — also creates Firebase Auth account ──
+  // ── CREATE user - also creates Firebase Auth account ──
   function create(body, user) {
     AuthService.requirePermission(user, 'manage_users')
 
@@ -165,12 +167,15 @@ const UsersService = (() => {
     const id    = SpreadsheetService.generateId('USR-')
 
     // 1. Create in Sheets first
+    const role = typeof RoleLabelService !== 'undefined'
+      ? RoleLabelService.canonicalRole(body.role || 'Technical Staff')
+      : (String(body.role || '').trim() === 'Staff' ? 'Technical Staff' : (body.role || 'Technical Staff'))
     const newUser = {
       id,
       uid:                '',   // will be set after Firebase creation
       email:              body.email        || '',
       fullName:           body.fullName     || '',
-      role:               body.role         || 'Technical Staff',
+      role:               role,
       permissionGroups:   _normaliseList(body.permissionGroups),
       permissions:        _normaliseList(body.permissions),
       positionLevel:      body.positionLevel || resolvePositionLevel(body.position || ''),
@@ -230,7 +235,7 @@ const UsersService = (() => {
       user
     )
 
-    // Admin-created accounts are active immediately — there is no separate
+    // Admin-created accounts are active immediately - there is no separate
     // approval step for activate() to catch, so this is the only place that
     // can push a directly-created office account into its office roster.
     // Without this, an account created here with officeId/systemScope set to a
@@ -240,7 +245,7 @@ const UsersService = (() => {
     let officePersonnelSync = { synced: false, skipped: true }
     if (shouldSyncOfficePersonnel_(newUser) && typeof OfficePersonnelService !== 'undefined') {
       // The account row and Firebase login above are already created and
-      // durable by this point — a roster-sync problem (most commonly: the
+      // durable by this point - a roster-sync problem (most commonly: the
       // office isn't ACTIVE yet) must not be reported as account creation
       // having failed. An uncaught throw here used to abort the whole
       // response even though the user account genuinely existed, which is
@@ -288,13 +293,13 @@ const UsersService = (() => {
     }
     // Editing your own row while also holding office-admin permissions took
     // the canEditOfficeUser branch above (sameOffice_ trivially matches your
-    // own row), not the canEditOwn branch — so stripOfficeAdminForbiddenFields_
+    // own row), not the canEditOwn branch - so stripOfficeAdminForbiddenFields_
     // ran instead of stripSelfForbiddenFields_ and deleted mustChangePassword
     // regardless of the allowlist fix there. That denylist exists to stop an
     // office admin forcing the flag on SOMEONE ELSE's account; it should never
     // have applied to clearing your own. Restoring it here, after whichever
     // strip ran, means the self-service password-change confirmation works for
-    // every account tier — ordinary staff, office admin, or central admin —
+    // every account tier - ordinary staff, office admin, or central admin -
     // without weakening what an office admin can do to any other user's row.
     if (canEditOwn && Object.prototype.hasOwnProperty.call(body, 'mustChangePassword')) {
       updateBody.mustChangePassword = body.mustChangePassword === true || body.mustChangePassword === 'true'
@@ -308,17 +313,26 @@ const UsersService = (() => {
     if (Object.prototype.hasOwnProperty.call(updateBody, 'centralRoles')) {
       updateBody.centralRoles = _normaliseList(updateBody.centralRoles)
     }
+    if (Object.prototype.hasOwnProperty.call(updateBody, 'role') && typeof RoleLabelService !== 'undefined') {
+      updateBody.role = RoleLabelService.canonicalRole(updateBody.role)
+    }
+    if (Object.prototype.hasOwnProperty.call(updateBody, 'requestedRole') && typeof RoleLabelService !== 'undefined') {
+      updateBody.requestedRole = RoleLabelService.canonicalRole(updateBody.requestedRole)
+    }
+    if (Object.prototype.hasOwnProperty.call(updateBody, 'positionLevel') && typeof RoleLabelService !== 'undefined') {
+      updateBody.positionLevel = RoleLabelService.canonicalRole(updateBody.positionLevel)
+    }
 
     // A tempPassword in the update body means this is a password reset.
-    // Previously this only ever changed what's displayed in the Sheet —
+    // Previously this only ever changed what's displayed in the Sheet -
     // the real Firebase Auth credential was never touched, so the admin
     // would hand someone a "new" password that didn't actually work.
-    // Do this FIRST and let it throw before touching the Sheet at all —
+    // Do this FIRST and let it throw before touching the Sheet at all -
     // otherwise a failed Firebase update would still leave the Sheet
     // showing a password that was never actually set.
     if (body.tempPassword) {
       if (!existing.uid) {
-        throw HttpError('No Firebase account linked to this user (uid is empty) — password was not changed.', 400)
+        throw HttpError('No Firebase account linked to this user (uid is empty) - password was not changed.', 400)
       }
       try {
         FirebaseAuthService.updatePassword(existing.uid, body.tempPassword)
@@ -348,7 +362,7 @@ const UsersService = (() => {
     }
 
     // Re-sync to the office roster if this edit touches office-scoped fields
-    // and the account is active — e.g. a corrected division/section, or an
+    // and the account is active - e.g. a corrected division/section, or an
     // account moved to a different participating office after creation.
     // Skipped for inactive/pending accounts: activate() performs the initial
     // sync when they are approved, and syncing an unapproved account would
@@ -359,7 +373,7 @@ const UsersService = (() => {
       .some(field => Object.prototype.hasOwnProperty.call(updateBody, field))
     if (touchesOfficeFields && updated.active !== false && String(updated.active).toLowerCase() !== 'false' &&
         shouldSyncOfficePersonnel_(updated) && typeof OfficePersonnelService !== 'undefined') {
-      // The account edit itself already succeeded above — a roster-sync
+      // The account edit itself already succeeded above - a roster-sync
       // problem (e.g. the office isn't ACTIVE yet) must not be reported as
       // the whole update having failed. Matches the same never-fail-the-
       // primary-action pattern already used for the Firebase display-name
@@ -447,10 +461,10 @@ const UsersService = (() => {
     return { success: true }
   }
 
-  // ── DELETE user (permanent — unlike deactivate) ──
+  // ── DELETE user (permanent - unlike deactivate) ──
   // Exists specifically for accounts that should never have existed at all
   // (duplicate/broken rows from a failed create, a typo'd email) rather than
-  // as a replacement for deactivate — deactivate is still the right call for
+  // as a replacement for deactivate - deactivate is still the right call for
   // a real employee who's left, since it keeps their history intact.
   function remove(id, user) {
     const profile = AuthService.getProfile(user)
@@ -497,7 +511,7 @@ const UsersService = (() => {
         throw HttpError('Password change failed, nothing was updated: ' + e.message, 502)
       }
     } else if (!row.uid && newTempPassword) {
-      // User has no Firebase account yet — try to create one
+      // User has no Firebase account yet - try to create one
       try {
         const created = FirebaseAuthService.createUser(row.email, newTempPassword, row.fullName)
         if (created.success && created.uid) {
@@ -526,7 +540,7 @@ const UsersService = (() => {
       tempPassword:    newTempPassword,
       note:            firebaseResult.success
         ? 'Password updated in Firebase Auth. PMES Database stores only the temporary password hash.'
-        : 'Password updated in PMES Database. Firebase update failed — update manually in Firebase Console.'
+        : 'Password updated in PMES Database. Firebase update failed - update manually in Firebase Console.'
     }
   }
 
@@ -661,7 +675,6 @@ const UsersService = (() => {
 
   function hasOfficeUserAdministration_(profile) {
     return AuthService.hasPermission(profile, 'manage_office_users') ||
-      String(profile.systemScope || '') === 'OFFICE_ADMIN' ||
       String(profile.officeRole || '') === 'OFFICE_ADMIN'
   }
 
@@ -692,7 +705,7 @@ const UsersService = (() => {
   }
 
   function stripSelfForbiddenFields_(body) {
-    // mustChangePassword is a boolean UI flag, not a permission — letting a
+    // mustChangePassword is a boolean UI flag, not a permission - letting a
     // user clear it on themselves is how PasswordChangePrompt.vue confirms a
     // completed password change. Without it here, that write was silently
     // dropped: the sheet kept mustChangePassword=true forever, so the prompt

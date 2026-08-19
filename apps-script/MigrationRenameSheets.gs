@@ -5,7 +5,7 @@
  *
  * SAFE TO RUN because SpreadsheetService.getSheet() already resolves BOTH the
  * old and the new name (see SHEET_NAME_FALLBACKS). The deployed application
- * keeps working before, during and after this migration — there is no window in
+ * keeps working before, during and after this migration - there is no window in
  * which the app is broken.
  *
  * HOW TO RUN
@@ -21,7 +21,7 @@
  *   4. Verifies every rename and logs a summary.
  *
  * ROLLBACK
- *   Run `rollbackSheetRename()` — it reverses the map. The backup copy created
+ *   Run `rollbackSheetRename()` - it reverses the map. The backup copy created
  *   in step 2 is the belt-and-braces fallback.
  */
 
@@ -43,7 +43,7 @@ function previewSheetRename() {
     '1lCJaa2ywDjlRHrltCDgpY-I_kCR5WxfBXwvIUVSRqrU'
   )
   const existing = ss.getSheets().map(s => s.getName())
-  const lines = ['── PREVIEW — nothing has been changed ──', 'Tabs currently in the file: ' + existing.length, '']
+  const lines = ['── PREVIEW - nothing has been changed ──', 'Tabs currently in the file: ' + existing.length, '']
 
   let toRename = 0, alreadyDone = 0, missing = 0, blocked = 0
 
@@ -53,7 +53,7 @@ function previewSheetRename() {
     const hasNew = existing.indexOf(newName) >= 0
 
     if (hasOld && hasNew) {
-      lines.push('BLOCKED  ' + oldName + ' -> ' + newName + '   (BOTH exist — resolve manually)')
+      lines.push('BLOCKED  ' + oldName + ' -> ' + newName + '   (BOTH exist - resolve manually)')
       blocked++
     } else if (hasOld) {
       const rows = Math.max(ss.getSheetByName(oldName).getLastRow() - 1, 0)
@@ -63,7 +63,7 @@ function previewSheetRename() {
       lines.push('SKIP     ' + newName + '   (already renamed)')
       alreadyDone++
     } else {
-      lines.push('MISSING  ' + oldName + '   (tab not in this file — nothing to do)')
+      lines.push('MISSING  ' + oldName + '   (tab not in this file - nothing to do)')
       missing++
     }
   })
@@ -100,7 +100,7 @@ function _applySheetRename(map, mode) {
   const existing = nameOf()
   const collisions = Object.keys(map).filter(o => existing.indexOf(o) >= 0 && existing.indexOf(map[o]) >= 0)
   if (collisions.length) {
-    const msg = 'ABORTED — both old and new tabs exist for: ' + collisions.join(', ') +
+    const msg = 'ABORTED - both old and new tabs exist for: ' + collisions.join(', ') +
                 '. Resolve manually (the data is in one of each pair) before running this.'
     Logger.log(msg)
     try { SpreadsheetApp.getUi().alert('Rename aborted', msg, SpreadsheetApp.getUi().ButtonSet.OK) } catch (e) {}
@@ -115,7 +115,7 @@ function _applySheetRename(map, mode) {
     backupUrl = backup.getUrl()
     Logger.log('Backup created: ' + backup.getName())
   } catch (e) {
-    const msg = 'ABORTED — could not create a backup copy: ' + e.message +
+    const msg = 'ABORTED - could not create a backup copy: ' + e.message +
                 '. Refusing to rename production tabs without one.'
     Logger.log(msg)
     try { SpreadsheetApp.getUi().alert('Rename aborted', msg, SpreadsheetApp.getUi().ButtonSet.OK) } catch (e2) {}
@@ -156,7 +156,7 @@ function _applySheetRename(map, mode) {
     'Failed  (' + failed.length + '): ' + (failed.join('; ') || 'none'),
     unverified.length ? '⚠ NOT VERIFIED: ' + unverified.join(', ') : 'All renames verified in the live file.',
     '',
-    'The app keeps working either way — SpreadsheetService resolves both names.'
+    'The app keeps working either way - SpreadsheetService resolves both names.'
   ].join('\n')
 
   Logger.log(summary)

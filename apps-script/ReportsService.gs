@@ -16,7 +16,7 @@
  *   bureau-analytics     Cluster/bureau-wide aggregate incl. IPAT scores
  *
  * Formats:
- *   csv    built in memory and returned to the browser — no file is persisted
+ *   csv    built in memory and returned to the browser - no file is persisted
  *   excel  written to a Google Sheet in the PMES/Reports Drive folder
  *   pdf    same, exported to PDF; the intermediate sheet is trashed
  *
@@ -71,7 +71,7 @@ const ReportsService = (() => {
       return sheet
     }
 
-    // Existing tab — append any missing columns without touching data, the same
+    // Existing tab - append any missing columns without touching data, the same
     // additive contract initializeSheets() uses.
     const lastCol  = Math.max(sheet.getLastColumn(), 1)
     const existing = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => String(h).trim())
@@ -105,8 +105,8 @@ const ReportsService = (() => {
   }
 
   function _isOfficeAdminProfile(profile) {
-    return String(profile.systemScope || '') === 'OFFICE_ADMIN' ||
-      String(profile.officeRole || '') === 'OFFICE_ADMIN'
+    return String(profile.officeRole || '') === 'OFFICE_ADMIN' ||
+      AuthService.hasPermission(profile, 'manage_office_users')
   }
 
   /**
@@ -679,7 +679,7 @@ const ReportsService = (() => {
 
   /**
    * Writes the dataset to a Drive file and returns { driveFileId, driveUrl }.
-   * The file inherits the folder's permissions — no link sharing is applied, so
+   * The file inherits the folder's permissions - no link sharing is applied, so
    * exported personnel data is not made accessible by URL alone.
    */
   function _writeDriveFile(name, dataset, format) {
@@ -708,14 +708,14 @@ const ReportsService = (() => {
       return { driveFileId: out.getId(), driveUrl: out.getUrl() }
     }
 
-    // excel — keep it as a Google Sheet in the Reports folder
+    // excel - keep it as a Google Sheet in the Reports folder
     tempFile.moveTo(folder)
     return { driveFileId: tempFile.getId(), driveUrl: tempFile.getUrl() }
   }
 
   // ── Public API ────────────────────────────────────────────────────────────
 
-  /** GET reports — recent report metadata, scoped to what the caller may see. */
+  /** GET reports - recent report metadata, scoped to what the caller may see. */
   function list(params, user) {
     const { profile, canBureau, canCluster } = _requireReportAccess(user)
     const sheet = ensureReportsSheet()
@@ -743,7 +743,7 @@ const ReportsService = (() => {
     return { items, total: items.length }
   }
 
-  /** POST reports/generate — build the dataset and return csv or a Drive URL. */
+  /** POST reports/generate - build the dataset and return csv or a Drive URL. */
   function generate(body, user) {
     const { profile, canBureau, canCluster } = _requireReportAccess(user)
 
@@ -923,7 +923,7 @@ const ReportsService = (() => {
     }
   }
 
-  /** GET reports/:id/download — resolve a previously generated report. */
+  /** GET reports/:id/download - resolve a previously generated report. */
   function download(id, user) {
     const { profile, canBureau, canCluster } = _requireReportAccess(user)
     const sheet = ensureReportsSheet()
@@ -944,7 +944,7 @@ const ReportsService = (() => {
       return { id: row.id, name: row.name, downloadUrl: row.driveUrl, format: row.format }
     }
 
-    // CSV reports are not persisted as files — rebuild from the stored filters.
+    // CSV reports are not persisted as files - rebuild from the stored filters.
     const dataset = BUILDERS[row.type]({
       divisionId: String(row.divisionId || ''),
       officeId:   String(row.officeId || ''),
@@ -961,17 +961,26 @@ const ReportsService = (() => {
     }
   }
 
-  /** Reference data for the report form — replaces the hard-coded division list. */
+  /** Reference data for the report form - replaces the hard-coded division list. */
   function options(params, user) {
-    const { profile, canBureau } = _requireReportAccess(user)
-    let divisions = SpreadsheetService.getAllRows(SpreadsheetService.getSheet(SHEET.DIVISIONS))
-      .filter(d => d.active !== false)
-    if (!canBureau) {
+    const { profile, canBureau, canCluster, canOffice } = _requireReportAccess(user)
+    let divisions = []
+    if (canOffice && !canCluster && String(profile.officeId || '').toUpperCase() !== 'STB') {
+      const orgOptions = OfficeRegistryService.registrationOrgOptions()
+      const row = _findOfficeRegistryRow(profile.officeId || profile.officeCode)
+      const officeOptions = orgOptions[profile.officeId] || orgOptions[profile.officeCode] || orgOptions[row && row.officeId] || {}
+      divisions = officeOptions.divisions || []
+    } else {
+      divisions = SpreadsheetService.getAllRows(SpreadsheetService.getSheet(SHEET.DIVISIONS))
+        .filter(d => d.active !== false)
+    }
+    if (!canBureau && !(canOffice && !canCluster)) {
       divisions = divisions.filter(d => String(d.id) === String(profile.divisionId || ''))
     }
     return {
       divisions: divisions
-        .map(d => ({ id: d.id, name: d.name, code: d.code }))
+        .map(d => ({ id: d.id || d.divisionId, name: d.name || d.divisionName, code: d.code || '' }))
+        .filter(d => d.id && d.name)
         .sort((a, b) => String(a.name).localeCompare(String(b.name))),
       types: Object.keys(REPORT_TYPES)
         .filter(t => BUREAU_ONLY_TYPES.indexOf(t) < 0 || canBureau)

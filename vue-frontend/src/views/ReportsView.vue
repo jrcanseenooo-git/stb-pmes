@@ -14,64 +14,74 @@
 
     <!-- CATALOG -->
     <template v-if="!selectedType">
-      <section v-for="group in catalog" :key="group.category" style="display:grid; gap:14px;">
-        <div style="display:flex; align-items:center; gap:10px; padding:0 2px;">
-          <span
-            class="pui-icon-chip pui-icon-chip-sm"
-            :style="{ background: group.meta.bg, color: group.meta.accent }"
-            aria-hidden="true"
-          >
-            <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
-              <path :d="group.meta.icon" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
-          </span>
-          <div>
-            <h2 style="margin:0; font-size:14px; font-weight:800; color:#0f172a;">{{ group.category }}</h2>
-            <p style="margin:1px 0 0; font-size:12px; color:#64748b;">{{ group.blurb }}</p>
-          </div>
+      <div v-if="optionsLoading" class="pui-card reports-loading-card" aria-live="polite">
+        <div class="reports-loading-icon" aria-hidden="true"></div>
+        <div>
+          <h2>Loading reports</h2>
+          <p>Checking your available report tools...</p>
         </div>
+      </div>
 
-        <div class="pui-catalog-grid">
-          <button
-            v-for="report in group.reports"
-            :key="report.value"
-            type="button"
-            class="pui-card pui-catalog-card"
-            @click="selectReport(report.value)"
-          >
+      <template v-else>
+        <section v-for="group in catalog" :key="group.category" style="display:grid; gap:14px;">
+          <div style="display:flex; align-items:center; gap:10px; padding:0 2px;">
             <span
-              class="pui-icon-chip"
+              class="pui-icon-chip pui-icon-chip-sm"
               :style="{ background: group.meta.bg, color: group.meta.accent }"
               aria-hidden="true"
             >
-              <svg width="18" height="18" viewBox="0 0 16 16" fill="none">
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
                 <path :d="group.meta.icon" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
               </svg>
             </span>
+            <div>
+              <h2 style="margin:0; font-size:14px; font-weight:800; color:#0f172a;">{{ group.category }}</h2>
+              <p style="margin:1px 0 0; font-size:12px; color:#64748b;">{{ group.blurb }}</p>
+            </div>
+          </div>
 
-            <div style="flex:1; min-width:0;">
-              <h3 style="margin:0; font-size:13.5px; font-weight:800; color:#0f172a; line-height:1.4;">{{ report.label }}</h3>
-              <p style="margin:5px 0 0; font-size:12px; color:#475569; line-height:1.5;">{{ report.description }}</p>
+          <div class="pui-catalog-grid">
+            <button
+              v-for="report in group.reports"
+              :key="report.value"
+              type="button"
+              class="pui-card pui-catalog-card"
+              @click="selectReport(report.value)"
+            >
+              <span
+                class="pui-icon-chip"
+                :style="{ background: group.meta.bg, color: group.meta.accent }"
+                aria-hidden="true"
+              >
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="none">
+                  <path :d="group.meta.icon" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </span>
 
-              <div style="margin-top:12px; display:flex; align-items:center; justify-content:space-between; gap:8px;">
-                <div style="display:flex; flex-wrap:wrap; gap:6px;">
-                  <span v-for="format in formatsFor(report.value)" :key="format" :class="['pui-badge', formatTone(format)]">
-                    {{ format.toUpperCase() }}
+              <div style="flex:1; min-width:0;">
+                <h3 style="margin:0; font-size:13.5px; font-weight:800; color:#0f172a; line-height:1.4;">{{ report.label }}</h3>
+                <p style="margin:5px 0 0; font-size:12px; color:#475569; line-height:1.5;">{{ report.description }}</p>
+
+                <div style="margin-top:12px; display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                  <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                    <span v-for="format in formatsFor(report.value)" :key="format" :class="['pui-badge', formatTone(format)]">
+                      {{ format.toUpperCase() }}
+                    </span>
+                  </div>
+                  <span class="pui-catalog-cta">
+                    Configure
+                    <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                      <path d="M2.5 6h7M6 2.5L9.5 6 6 9.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
                   </span>
                 </div>
-                <span class="pui-catalog-cta">
-                  Configure
-                  <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                    <path d="M2.5 6h7M6 2.5L9.5 6 6 9.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
-                  </svg>
-                </span>
               </div>
-            </div>
-          </button>
-        </div>
-      </section>
+            </button>
+          </div>
+        </section>
+      </template>
 
-      <div v-if="!reportTypes.length" class="pui-card">
+      <div v-if="!optionsLoading && !reportTypes.length" class="pui-card">
         <EmptyState
           title="No reports available for your access level"
           description="Report availability follows your role and office. Contact a central administrator if you expect to see reports here."
@@ -261,6 +271,7 @@ const { confirm } = useConfirm()
 
 const generating    = ref(false)
 const previewing    = ref(false)
+const optionsLoading = ref(true)
 const recentReports = ref([])
 const preview       = ref(null)
 const toast         = ref({ show: false, msg: '', type: 'success' })
@@ -471,7 +482,7 @@ const doughnutOptions = {
 
 function fmtDate(iso) { return iso ? new Date(iso).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) : '' }
 function fmtDateTime(iso) { return iso ? new Date(iso).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '' }
-function fmtScore(value) { return Number(value || 0) ? Number(value).toFixed(2) : '—' }
+function fmtScore(value) { return Number(value || 0) ? Number(value).toFixed(2) : '-' }
 function showToast(msg, type = 'success') { toast.value = { show: true, msg, type }; setTimeout(() => { toast.value.show = false }, 3500) }
 
 onMounted(async () => {
@@ -485,6 +496,8 @@ onMounted(async () => {
     }
   } catch (e) {
     showToast('Report options could not be loaded. Some reports may be unavailable.', 'error')
+  } finally {
+    optionsLoading.value = false
   }
 
   try {
@@ -529,11 +542,11 @@ async function generate() {
       a.href = url; a.download = `${result.name || 'report-' + Date.now()}.csv`; a.click()
       URL.revokeObjectURL(url)
     }
-    showToast(`Report generated — ${result?.rowCount ?? 0} row(s)`)
+    showToast(`Report generated - ${result?.rowCount ?? 0} row(s)`)
     if (result?.id) recentReports.value.unshift(result)
   } catch (e) {
     console.error(e)
-    // Backend messages below 500 are written for end users — show them.
+    // Backend messages below 500 are written for end users - show them.
     showToast(e?.message || 'Something went wrong. Please try again.', 'error')
   } finally {
     generating.value = false
@@ -553,6 +566,40 @@ function downloadReport(r) {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
+}
+
+.reports-loading-card {
+  min-height: 156px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #475569;
+}
+
+.reports-loading-card h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.reports-loading-card p {
+  margin: 3px 0 0;
+  font-size: 12px;
+}
+
+.reports-loading-icon {
+  width: 34px;
+  height: 34px;
+  border: 3px solid #dbeafe;
+  border-top-color: #2563eb;
+  border-radius: 999px;
+  animation: reports-spin .8s linear infinite;
+}
+
+@keyframes reports-spin {
+  to { transform: rotate(360deg); }
 }
 
 @media (max-width: 960px) {

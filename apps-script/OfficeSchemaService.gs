@@ -248,12 +248,12 @@ const OfficeSchemaService = (() => {
   }
 
   // Appends headers the current spec requires but an already-provisioned
-  // office spreadsheet predates — e.g. fpoPositionCategory/fpoWeightFactor,
+  // office spreadsheet predates - e.g. fpoPositionCategory/fpoWeightFactor,
   // added to AssessmentRecords after some offices were already provisioned.
   // Only ever adds new columns at the end via getRange(...).setValues(); it
   // never touches setHeaders_'s sheet.clear() path, so existing rows and
   // columns are untouched. A sheet that's missing entirely, or a duplicate
-  // header, is a different class of problem this does not attempt to fix —
+  // header, is a different class of problem this does not attempt to fix -
   // those still surface through validateSpreadsheet as before.
   function repairMissingHeaders_(ss) {
     const repaired = []

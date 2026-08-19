@@ -121,9 +121,9 @@ watch(items, (rows) => {
 })
 
 function formatScore(value) {
-  if (value === null || value === undefined || value === '') return '—'
+  if (value === null || value === undefined || value === '') return '-'
   const number = Number(value)
-  if (Number.isNaN(number)) return '—'
+  if (Number.isNaN(number)) return '-'
   return number.toFixed(2)
 }
 

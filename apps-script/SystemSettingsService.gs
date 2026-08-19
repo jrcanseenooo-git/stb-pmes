@@ -104,7 +104,7 @@ const SystemSettingsService = (() => {
   // Stores the cutoff as a Unix-seconds timestamp (matching a Firebase ID
   // token's `iat` claim, which is what AuthService.verifyToken compares it
   // against). A session whose token was issued before this cutoff is
-  // rejected on its next request, forcing re-login — a session that logs in
+  // rejected on its next request, forcing re-login - a session that logs in
   // *after* the cutoff is unaffected, since its token's iat is newer.
   const LOGOUT_CUTOFF_KEY = 'globalLogoutCutoffAt'
 
@@ -120,7 +120,7 @@ const SystemSettingsService = (() => {
     }
   }
 
-  // Not exposed via list()/update() or any Router route — only the
+  // Not exposed via list()/update() or any Router route - only the
   // time-driven trigger (MidnightLogoutService.runMidnightLogout) calls
   // this, so there is no path for a regular admin request to force-logout
   // everyone by accident.

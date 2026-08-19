@@ -2,7 +2,7 @@ const KraLibraryService = (() => {
 
   const SHEET_NAME = 'MasterKRALibrary'
 
-  // ── LIST – returns all active KRAs, optional filters ──
+  // ── LIST - returns all active KRAs, optional filters ──
   function list(params, user) {
     // Everyone can read the library
     const sheet = _getSheet()
@@ -86,7 +86,7 @@ const KraLibraryService = (() => {
       return SpreadsheetService.getSheet(SHEET_NAME)
     } catch (e) {
       // Sheet may not exist yet; return empty-ish wrapper so reads degrade gracefully
-      throw HttpError(`Sheet "${SHEET_NAME}" not found – run InitSheets to create it`, 500)
+      throw HttpError(`Sheet "${SHEET_NAME}" not found - run InitSheets to create it`, 500)
     }
   }
 

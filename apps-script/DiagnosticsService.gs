@@ -6,7 +6,7 @@
  * WHY THIS EXISTS
  * ---------------
  * When Rater Tagging or Office Structure looks empty for one office but not
- * another, the cause is almost never the screen — it is a mismatch between
+ * another, the cause is almost never the screen - it is a mismatch between
  * three separate things that all have to agree:
  *
  *   1. which spreadsheet the request is actually bound to,
@@ -23,7 +23,7 @@
 const DiagnosticsService = (() => {
 
   function officeBoundary(params, user) {
-    // Central config only — bind explicitly so the report describes the real
+    // Central config only - bind explicitly so the report describes the real
     // central tables even if this request arrived inside an office scope.
     return SpreadsheetService.withCentralSpreadsheet(() => {
       const profile = AuthService.getProfile(user)
@@ -41,7 +41,7 @@ const DiagnosticsService = (() => {
 
       // An office admin only ever sees their own office; a central admin sees
       // every registered office so one call covers the whole cluster.
-      // STB is not a registry row — it is the built-in central office — so it
+      // STB is not a registry row - it is the built-in central office - so it
       // has to be added explicitly or the report silently covers only 6 of 7.
       const stbOffice = {
         officeId: 'STB',

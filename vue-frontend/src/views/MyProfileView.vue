@@ -17,12 +17,11 @@
         <div style="width:52px; height:52px; border-radius:14px; background:#0b3b75; color:#fff; display:grid; place-items:center; font-size:17px; font-weight:800; flex-shrink:0;">
           {{ authStore.initials || 'U' }}
         </div>
+        <!-- No account-status pill: a person reading their own record has
+             plainly signed in, so the badge only ever says "Active". -->
         <div style="min-width:0;">
-          <h2 style="margin:0; font-size:17px; font-weight:800; color:#0f172a;">{{ authStore.fullName || '—' }}</h2>
+          <h2 style="margin:0; font-size:17px; font-weight:800; color:#0f172a;">{{ authStore.fullName || '-' }}</h2>
           <p style="margin:2px 0 0; font-size:12px; color:#64748b;">{{ authStore.position }}</p>
-        </div>
-        <div style="margin-left:auto; flex-shrink:0;">
-          <StatusPill :status="authStore.isActive ? 'ACTIVE' : 'INACTIVE'" />
         </div>
       </div>
     </section>
@@ -38,7 +37,7 @@
           style="padding:11px 16px; border-top:1px solid #eef2f7; display:grid; grid-template-columns:1fr 2fr; gap:6px 16px;"
         >
           <dt style="font-size:11.5px; font-weight:800; color:#64748b; margin:0;">{{ field.label }}</dt>
-          <dd style="font-size:13px; color:#334155; margin:0; word-break:break-word;">{{ field.value || '—' }}</dd>
+          <dd style="font-size:13px; color:#334155; margin:0; word-break:break-word;">{{ field.value || '-' }}</dd>
         </div>
       </dl>
     </section>
@@ -47,7 +46,7 @@
       <p style="line-height:1.55; margin:0;">
         <b style="color:#1e3a8a;">Need a correction?</b>
         Personnel details, organizational assignment and supervisor information are validated by your
-        office administrator. Contact them to request a change — these fields cannot be edited here.
+        office administrator. Contact them to request a change - these fields cannot be edited here.
       </p>
     </section>
   </div>
@@ -58,7 +57,6 @@ import { computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useBranding } from '@/composables/useBranding'
 import PageHeader from '@/components/ui/PageHeader.vue'
-import StatusPill from '@/components/ui/StatusPill.vue'
 
 const authStore = useAuthStore()
 const { officeName } = useBranding()
@@ -78,7 +76,6 @@ const fields = computed(() => [
   { label: 'Section', value: authStore.profile?.section },
   { label: 'Position', value: authStore.position },
   { label: 'Immediate Supervisor', value: authStore.profile?.supervisorName },
-  { label: 'Account Status', value: authStore.isActive ? 'Active' : 'Inactive' },
   { label: 'Current Assessment Period', value: currentPeriod.value }
 ])
 </script>

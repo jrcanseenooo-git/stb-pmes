@@ -107,11 +107,11 @@ const DashboardService = (() => {
   // The frontend used to call summary/divisions/status/activity as four
   // separate requests. Each one is its own Apps Script execution, and each
   // independently re-read the full Accomplishments (and Users/Divisions)
-  // sheet from scratch — the per-execution memo in DataCacheService only
+  // sheet from scratch - the per-execution memo in DataCacheService only
   // helps repeated reads *within* one execution, not across four separate
   // ones. Four full-table reads per dashboard load, and once the frontend
   // started firing them concurrently instead of one-after-another, four
-  // executions competing for Apps Script's limited concurrency at once —
+  // executions competing for Apps Script's limited concurrency at once -
   // a direct contributor to requests timing out under Vercel's Hobby-plan
   // function limit. This reads each sheet exactly once and computes all
   // four results from that single pass.
@@ -160,7 +160,7 @@ const DashboardService = (() => {
       }).length
     }))
 
-    // divisions — permission-gated like the standalone endpoint, but
+    // divisions - permission-gated like the standalone endpoint, but
     // returns an empty array here instead of throwing 403, since a combined
     // endpoint can't fail the whole dashboard load over one section a given
     // user isn't permitted to see.

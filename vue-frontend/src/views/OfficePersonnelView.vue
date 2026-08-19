@@ -1,6 +1,7 @@
 <template>
   <div class="pui-page">
     <PageHeader
+      v-if="!props.embedded"
       kicker="Office Administration"
       title="Personnel Validation"
       :subtitle="`Validate and maintain the ${officeName || 'office'} roster used for assessment assignments.`"
@@ -67,15 +68,15 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="row in filteredRows" :key="row.id">
+          <tr v-for="row in pagedRows" :key="row.id">
             <td>
               <strong>{{ row.fullName }}</strong>
               <small>{{ row.employeeNo || 'No employee no.' }}</small>
             </td>
             <td style="white-space:nowrap;">{{ row.email }}</td>
             <td>{{ row.role || 'Technical Staff' }}</td>
-            <td>{{ row.divisionName || row.organizationalUnitName || '—' }}</td>
-            <td>{{ row.section || '—' }}</td>
+            <td>{{ row.divisionName || row.organizationalUnitName || '-' }}</td>
+            <td>{{ row.section || '-' }}</td>
             <td><StatusPill :status="row.status" /></td>
             <td>
               <div style="display:flex; justify-content:flex-end; gap:6px;">
@@ -105,6 +106,29 @@
           </tr>
         </tbody>
       </table>
+
+      <template #footer>
+        <div class="personnel-pagination" aria-label="Personnel table pagination">
+          <div class="personnel-pagination-range">
+            Showing {{ pageStart }}-{{ pageEnd }} of {{ filteredRows.length }}
+          </div>
+          <div class="personnel-pagination-controls">
+            <label class="personnel-page-size">
+              <span>Rows</span>
+              <select v-model.number="pageSize" class="pui-select">
+                <option v-for="option in PAGE_SIZE_OPTIONS" :key="option" :value="option">{{ option }}</option>
+              </select>
+            </label>
+            <button class="pui-btn pui-btn-sm" type="button" :disabled="page <= 1" @click="page -= 1">
+              Previous
+            </button>
+            <span class="personnel-page-count">Page {{ page }} of {{ totalPages }}</span>
+            <button class="pui-btn pui-btn-sm" type="button" :disabled="page >= totalPages" @click="page += 1">
+              Next
+            </button>
+          </div>
+        </div>
+      </template>
     </DataPanel>
 
     <AppModal
@@ -140,11 +164,23 @@
         </label>
         <label>
           <span class="pui-label">Unit / Division</span>
-          <input v-model="form.divisionName" class="pui-input" type="text" />
+          <select v-if="currentDivisions.length" v-model="form.divisionName" class="pui-select">
+            <option value="">Select division…</option>
+            <option v-for="division in currentDivisions" :key="division.id || division.name" :value="division.name">
+              {{ division.name }}
+            </option>
+          </select>
+          <input v-else v-model="form.divisionName" class="pui-input" type="text" />
         </label>
         <label>
           <span class="pui-label">Section</span>
-          <input v-model="form.section" class="pui-input" type="text" />
+          <select v-if="sectionsForDivision.length" v-model="form.section" class="pui-select">
+            <option value="">Select section…</option>
+            <option v-for="section in sectionsForDivision" :key="section.id || section.name" :value="section.name">
+              {{ section.name }}
+            </option>
+          </select>
+          <input v-else v-model="form.section" class="pui-input" type="text" />
         </label>
         <label class="pui-span-2">
           <span class="pui-label">Position / Title</span>
@@ -167,20 +203,26 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { officePersonnelApi } from '@/services/api'
 import { usePermissions } from '@/composables/usePermissions'
 import { useBranding } from '@/composables/useBranding'
 import { useConfirm } from '@/composables/useConfirm'
+import { useOrgOptions } from '@/composables/useOrgOptions'
 import PageHeader from '@/components/ui/PageHeader.vue'
 import DataPanel from '@/components/ui/DataPanel.vue'
 import StatTile from '@/components/ui/StatTile.vue'
 import StatusPill from '@/components/ui/StatusPill.vue'
 import AppModal from '@/components/ui/AppModal.vue'
 
+const props = defineProps({
+  embedded: { type: Boolean, default: false }
+})
+
 const { canManageOfficePersonnel } = usePermissions()
 const { officeName } = useBranding()
 const { confirm } = useConfirm()
+const { loadOrgOptions, currentOrgOptions, currentDivisions, currentSections } = useOrgOptions()
 
 const STATUS_TABS = [
   { value: 'all', label: 'All' },
@@ -188,10 +230,9 @@ const STATUS_TABS = [
   { value: 'Active', label: 'Active' },
   { value: 'Inactive', label: 'Inactive' }
 ]
+const PAGE_SIZE_OPTIONS = [10, 25, 50]
 
-// Office rosters carry the office's own titles. These are the request options
-// the registry seeds; an office administrator still validates the final role.
-const roleOptions = [
+const FALLBACK_ROLE_OPTIONS = [
   'Technical Staff',
   'Section Head',
   'Division Chief',
@@ -207,23 +248,52 @@ const error = ref('')
 const modalError = ref('')
 const search = ref('')
 const statusTab = ref('all')
+const page = ref(1)
+const pageSize = ref(10)
 const showModal = ref(false)
 const editingId = ref('')
 const lastUpdatedAt = ref(null)
 const form = ref(defaultForm())
 
-onMounted(loadRows)
+// Office rosters carry the office's own titles. Use the same requested-role
+// options configured in Office Registry, while preserving the currently edited
+// role if an older roster row no longer appears in the registry list.
+const roleOptions = computed(() => {
+  const options = normalizeRoleOptions(currentOrgOptions.value?.requestedRoles)
+  const current = normalizeRole(form.value?.role)
+  return current && !options.includes(current) ? [...options, current] : options
+})
+
+onMounted(async () => {
+  await Promise.all([loadRows(), loadOrgOptions()])
+})
 
 function defaultForm() {
   return {
     fullName: '',
     email: '',
-    role: 'Technical Staff',
+    role: normalizeRoleOptions(currentOrgOptions.value?.requestedRoles)[0],
     employeeNo: '',
     divisionName: '',
     section: '',
     position: ''
   }
+}
+
+function normalizeRole(value) {
+  const role = String(value || '').trim()
+  return role === 'Staff' ? 'Technical Staff' : role
+}
+
+function normalizeRoleOptions(roles = []) {
+  const source = Array.isArray(roles) && roles.length ? roles : FALLBACK_ROLE_OPTIONS
+  const seen = new Set()
+  return source.map(normalizeRole).filter(role => {
+    const key = role.toLowerCase()
+    if (!role || seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 }
 
 const counts = computed(() => ({
@@ -232,6 +302,20 @@ const counts = computed(() => ({
   pending: rows.value.filter(r => r.status === 'Pending').length,
   inactive: rows.value.filter(r => r.status === 'Inactive').length
 }))
+
+const selectedDivision = computed(() =>
+  currentDivisions.value.find(division => division.name === form.value.divisionName || division.id === form.value.divisionName)
+)
+const sectionsForDivision = computed(() => {
+  const divisionId = selectedDivision.value?.id || ''
+  return currentSections.value.filter(section => String(section.divisionId || '') === String(divisionId))
+})
+
+watch(() => form.value.divisionName, () => {
+  if (!form.value.section) return
+  const valid = sectionsForDivision.value.some(section => section.name === form.value.section)
+  if (!valid) form.value.section = ''
+})
 
 // Filtering runs client-side over an already office-scoped roster, so switching
 // tabs or refining a search costs no extra backend round trip.
@@ -243,6 +327,19 @@ const filteredRows = computed(() => {
     return [row.fullName, row.email, row.role, row.divisionName, row.organizationalUnitName, row.section, row.position]
       .some(field => String(field || '').toLowerCase().includes(term))
   })
+})
+
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredRows.value.length / pageSize.value)))
+const pageStart = computed(() => filteredRows.value.length ? (page.value - 1) * pageSize.value + 1 : 0)
+const pageEnd = computed(() => Math.min(filteredRows.value.length, page.value * pageSize.value))
+const pagedRows = computed(() => filteredRows.value.slice(pageStart.value ? pageStart.value - 1 : 0, pageEnd.value))
+
+watch([search, statusTab, pageSize], () => {
+  page.value = 1
+})
+
+watch(totalPages, value => {
+  if (page.value > value) page.value = value
 })
 
 const lastUpdatedLabel = computed(() =>
@@ -352,3 +449,40 @@ async function runRowAction(row, action, fallbackMessage) {
   }
 }
 </script>
+
+<style scoped>
+.personnel-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: #475569;
+}
+
+.personnel-pagination-range,
+.personnel-page-count {
+  font-weight: 700;
+}
+
+.personnel-pagination-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.personnel-page-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+}
+
+.personnel-page-size .pui-select {
+  width: 76px;
+  height: 32px;
+}
+</style>

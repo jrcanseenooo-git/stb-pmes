@@ -4,12 +4,12 @@
       Simplified Dashboard for participating-office personnel.
       Deliberately excluded per the cluster specification: Account Settings,
       Quick Actions, Recent Activity, Performance Summary, and anything KRA.
-      Everything here answers one question — what do I still have to rate?
+      Everything here answers one question - what do I still have to rate?
     -->
     <section class="pui-card" style="padding:20px;">
       <p class="pui-header-kicker">{{ portalSubtitle }}</p>
       <h1 style="margin:4px 0 0; font-size:24px; font-weight:800; color:#0f172a; line-height:1.2;">
-        {{ loading ? '—' : (person.fullName || 'Welcome') }}
+        {{ loading ? '-' : (person.fullName || 'Welcome') }}
       </h1>
       <dl style="margin:14px 0 0; display:flex; flex-wrap:wrap; gap:8px 28px; padding:0;">
         <div v-for="item in identityItems" :key="item.label" style="min-width:0;">
@@ -68,7 +68,7 @@
 
       <p v-if="!loading && !tasks.total" class="pui-muted" style="font-size:12px; line-height:1.5;">
         You have no rating tasks for this assessment period yet. Your office administrator assigns
-        them once the period opens — nothing is required from you until then.
+        them once the period opens - nothing is required from you until then.
       </p>
       <p v-else-if="!loading && !tasks.pending && !tasks.draft" style="font-size:12px; font-weight:700; color:#047857;">
         All of your rating tasks for this period have been submitted.
@@ -106,12 +106,12 @@ onMounted(load)
 const identityItems = computed(() => {
   const p = person.value
   return [
-    { label: 'Position', value: p.position || p.positionLevel || '—' },
-    { label: 'Office', value: p.officeName || '—' },
-    { label: 'Division / Unit', value: p.divisionName || '—' },
-    { label: 'Section', value: p.section || '—' },
-    { label: 'Assessment Period', value: period.value.label || '—' }
-  ].filter(item => item.value !== '—' || item.label === 'Assessment Period')
+    { label: 'Position', value: p.position || p.positionLevel || '-' },
+    { label: 'Office', value: p.officeName || '-' },
+    { label: 'Division / Unit', value: p.divisionName || '-' },
+    { label: 'Section', value: p.section || '-' },
+    { label: 'Assessment Period', value: period.value.label || '-' }
+  ].filter(item => item.value !== '-' || item.label === 'Assessment Period')
 })
 
 const lastUpdatedLabel = computed(() =>

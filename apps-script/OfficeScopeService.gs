@@ -1,6 +1,6 @@
 const OfficeScopeService = (() => {
   // Resources whose WORKING DATA lives in the per-office workbook. Listing a
-  // resource here redirects its entire request — every sheet read and write —
+  // resource here redirects its entire request - every sheet read and write -
   // into that office's spreadsheet.
   //
   // Shared system configuration is deliberately NOT listed: OfficeRegistry,

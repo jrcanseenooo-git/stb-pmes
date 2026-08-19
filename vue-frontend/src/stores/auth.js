@@ -111,9 +111,9 @@ export const useAuthStore = defineStore('auth', () => {
   })
 
   // ── FIX: expose individual profile fields that views need ──
-  const employeeNo      = computed(() => profile.value?.employeeNo     || '—')
-  const position        = computed(() => profile.value?.position       || '—')
-  const divisionName    = computed(() => profile.value?.divisionName   || '—')
+  const employeeNo      = computed(() => profile.value?.employeeNo     || '-')
+  const position        = computed(() => profile.value?.position       || '-')
+  const divisionName    = computed(() => profile.value?.divisionName   || '-')
   const divisionId      = computed(() => profile.value?.divisionId     || '')
   const positionLevel   = computed(() => profile.value?.positionLevel  || '')
   const sgLevel         = computed(() => profile.value?.sgLevel        || '')
@@ -192,11 +192,11 @@ export const useAuthStore = defineStore('auth', () => {
 
       // A missing or malformed response is a TRANSPORT failure, not an answer.
       // Treating it as "not registered" showed an existing, active employee the
-      // self-registration form — which is both alarming and wrong (the backend
+      // self-registration form - which is both alarming and wrong (the backend
       // would reject the submission with 409 anyway). Only an explicit
       // registered === false means the account genuinely does not exist.
       if (!res || typeof res !== 'object' || typeof res.registered === 'undefined') {
-        console.warn('[PMES] whoami returned no usable payload — leaving account state unresolved.')
+        console.warn('[PMES] whoami returned no usable payload - leaving account state unresolved.')
         if (useBootstrapAdminProfile('whoami returned no usable payload')) return
         if (!profile.value) profile.value = null
         needsRegistration.value = false
@@ -218,7 +218,7 @@ export const useAuthStore = defineStore('auth', () => {
         needsActivation.value = false
       }
     } catch (e) {
-      // Transient error (network/server). Don't misroute to registration —
+      // Transient error (network/server). Don't misroute to registration -
       // leave a new user unresolved, but preserve an already-loaded profile so
       // a background refresh cannot collapse the sidebar to low-access modules.
       console.warn('[PMES] Could not resolve account status:', e.message)
@@ -300,7 +300,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   // accounts.google.com sets its own Cross-Origin-Opener-Policy on the popup it
   // opens, stricter than the "same-origin-allow-popups" this app serves. That
-  // blocks Firebase's internal popup.closed heartbeat — the mechanism it uses
+  // blocks Firebase's internal popup.closed heartbeat - the mechanism it uses
   // to detect someone closing the Google popup without finishing sign-in and
   // reject with auth/popup-closed-by-user, which is what triggers the redirect
   // fallback below. When that detection is blocked, signInWithPopup's promise
@@ -372,7 +372,7 @@ export const useAuthStore = defineStore('auth', () => {
   // ── Dead session cleanup ──
   // Firebase restores a persisted user on load even when its refresh token has
   // been revoked. isAuthenticated is just !!user, so the guard would admit that
-  // user, every API call would come back 401, and nothing ever cleared it —
+  // user, every API call would come back 401, and nothing ever cleared it -
   // leaving the app in a state where signing in again was the only escape and
   // even that started from a poisoned baseline. Clear it properly instead.
   // Returns false (and does nothing) if a sign-in is currently in flight, so it
@@ -420,10 +420,10 @@ export const useAuthStore = defineStore('auth', () => {
     // State
     user, profile, initialised, loading, error,
     needsRegistration, needsActivation,
-    // Computed – auth
+    // Computed - auth
     isAuthenticated, hasAccess, role, fullName, initials, identity,
     officeId, officeName, systemScope, isStbFullScope, isClusterPortal,
-    // Computed – profile fields (FIX: previously missing)
+    // Computed - profile fields (FIX: previously missing)
     profileId, employeeNo,
     position, divisionName, divisionId,
     positionLevel, sgLevel, employmentType,

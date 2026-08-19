@@ -38,7 +38,7 @@ const routes = [
         path: "dashboard",
         component: () => import("@/views/DashboardView.vue"),
       },
-      // Innovation Cluster Personnel Assessment Portal — the restricted
+      // Innovation Cluster Personnel Assessment Portal - the restricted
       // assessment-only experience. Data is office-scoped in the backend; these
       // routes carry no office identifier of their own.
       {
@@ -82,7 +82,11 @@ const routes = [
         component: () => import("@/views/EvaluationView.vue"),
       },
       { path: "unauthorized", component: () => import("@/views/UnauthorizedView.vue") },
-      { path: "audit", component: () => import("@/views/AuditView.vue") },
+      {
+        path: "audit",
+        component: () => import("@/views/AuditView.vue"),
+        meta: { systemAdminOnly: true },
+      },
       {
         path: "users",
         component: () => import("@/views/UsersView.vue"),
@@ -91,17 +95,22 @@ const routes = [
       {
         path: "office-registry",
         component: () => import("@/views/OfficeRegistryView.vue"),
-        meta: { anyPermission: ['manage_office_registry', 'provision_office_spreadsheets', 'validate_office_spreadsheets', 'view_cluster_monitoring'] },
+        meta: { anyPermission: ['manage_office_registry', 'provision_office_spreadsheets', 'validate_office_spreadsheets', 'view_cluster_monitoring', 'manage_office_users'] },
+      },
+      {
+        path: "office-management",
+        component: () => import("@/views/OfficeManagementView.vue"),
+        meta: { officeManagementAllowed: true },
       },
       {
         path: "office-personnel",
         component: () => import("@/views/OfficePersonnelView.vue"),
-        meta: { officeAdminAllowed: true },
+        meta: { officePersonnelAllowed: true },
       },
       {
         path: "office-dashboard",
         component: () => import("@/views/OfficeDashboardView.vue"),
-        meta: { officeAdminAllowed: true },
+        meta: { officeDashboardAllowed: true },
       },
       {
         path: "rater-matrix",
@@ -128,11 +137,13 @@ const router = createRouter({
 });
 
 const EVALUATION_ROLLOUT_ALLOWED_PATHS = new Set([
-  '/my-dashboard', '/my-tasks', '/my-results', '/library',
+  '/my-dashboard', '/my-tasks', '/my-results',
   '/my-notifications', '/my-profile', '/help',
-  '/evaluation', '/profile', '/office-personnel', '/office-dashboard',
+  '/evaluation', '/profile', '/office-management', '/office-personnel', '/office-dashboard',
   '/rater-matrix', '/users', '/reports', '/unauthorized'
 ])
+
+const STB_ONLY_PATHS = new Set(['/ipcrf', '/review', '/kra', '/accomplishments'])
 
 // Restricted-scope users land on the Simplified Dashboard rather than being
 // dropped straight into the rating form with no orientation.
@@ -161,7 +172,7 @@ function hasFullSystemAccess(profile) {
   const permissions = profile?.permissions || []
   const groups = profile?.permissionGroups || []
   return !isEvaluationOnlyRollout(profile) ||
-    profile?.role === 'System Administrator' ||
+    isStbSystemAdmin(profile) ||
     permissions.includes('manage_users') ||
     permissions.includes('manage_focal_assignments') ||
     permissions.includes('manage_database') ||
@@ -172,11 +183,65 @@ function hasFullSystemAccess(profile) {
     permissions.includes('validate_office_spreadsheets') ||
     permissions.includes('view_cluster_monitoring') ||
     permissions.includes('view_bureau_monitoring') ||
-    permissions.includes('view_audit') ||
     groups.includes('system-admin') ||
     groups.includes('user-manager') ||
     groups.includes('library-manager') ||
     groups.includes('database-manager')
+}
+
+function isStbSystemAdmin(profile) {
+  if (profile?.role !== 'System Administrator') return false
+  if ((profile?.systemScope || 'STB_FULL') !== 'STB_FULL') return false
+  const officeKey = String(profile?.officeId || profile?.officeCode || profile?.officeName || 'STB').trim().toUpperCase()
+  return !officeKey || officeKey === 'STB' || officeKey === 'SOCIAL TECHNOLOGY BUREAU'
+}
+
+function canViewAssessmentLibrary(profile) {
+  return profile?.role === 'System Administrator'
+}
+
+function isExplicitOfficeAdmin(profile) {
+  const permissions = profile?.permissions || []
+  const groups = profile?.permissionGroups || []
+  return profile?.officeRole === 'OFFICE_ADMIN' ||
+    permissions.includes('manage_office_users') ||
+    groups.includes('office-assessment-admin')
+}
+
+function canViewOfficeScope(profile) {
+  const permissions = profile?.permissions || []
+  return isExplicitOfficeAdmin(profile) ||
+    profile?.role === 'Division Chief' ||
+    profile?.role === 'Section Head' ||
+    permissions.includes('view_division_monitoring') ||
+    permissions.includes('view_bureau_monitoring') ||
+    permissions.includes('manage_cluster_office_admins') ||
+    permissions.includes('manage_office_registry')
+}
+
+function canViewCentralRegistry(profile) {
+  const permissions = profile?.permissions || []
+  return permissions.includes('manage_office_registry') ||
+    permissions.includes('provision_office_spreadsheets') ||
+    permissions.includes('validate_office_spreadsheets') ||
+    permissions.includes('view_cluster_monitoring')
+}
+
+function preferredDashboardPath(profile) {
+  // ONLY the Undersecretary lands on the cluster view. This was keyed off the
+  // `view_cluster_monitoring` permission, which also caught the System
+  // Administrator - that account is granted cluster groups per-user so it can
+  // reach Cluster Overview and Office Registry at all, but its home is still
+  // the STB dashboard. The role is the thing that actually distinguishes
+  // cluster oversight from an administrator who merely has access to it.
+  //
+  // Checked before scope because the Undersecretary sits in an office of their
+  // own (OUSI); that office is where their record lives, not the boundary of
+  // what they monitor.
+  if (profile?.role === 'Undersecretary') return '/cluster-overview'
+  const scope = profile?.systemScope || 'STB_FULL'
+  if (scope === 'STB_FULL') return '/dashboard'
+  return canViewOfficeScope(profile) ? '/office-dashboard' : RESTRICTED_SCOPE_HOME
 }
 
 // ── Auth guard ──
@@ -198,10 +263,10 @@ router.beforeEach(async (to) => {
     if (!auth.isAuthenticated) return { path: "/auth/login" };
     if (to.name === "Register") await auth.fetchProfile();
     if (to.name === "Register" && !auth.needsRegistration) {
-      return auth.needsActivation ? { path: "/auth/pending" } : { path: "/dashboard" };
+      return auth.needsActivation ? { path: "/auth/pending" } : { path: preferredDashboardPath(auth.profile) };
     }
     if (to.name === "Pending" && !auth.needsActivation) {
-      return auth.needsRegistration ? { path: "/auth/register" } : { path: "/dashboard" };
+      return auth.needsRegistration ? { path: "/auth/register" } : { path: preferredDashboardPath(auth.profile) };
     }
     return true;
   }
@@ -212,19 +277,33 @@ router.beforeEach(async (to) => {
   // Signed in but not yet provisioned / approved in PMES
   if (auth.needsRegistration) return { path: "/auth/register" };
   if (auth.needsActivation)   return { path: "/auth/pending" };
+  if (to.path === '/office-personnel') {
+    return { path: '/office-management', query: { ...to.query, tab: 'personnel' } }
+  }
+  if (to.path === '/office-registry' && !canViewCentralRegistry(auth.profile)) {
+    return { path: '/office-management', query: { ...to.query, tab: 'structure' } }
+  }
+  if ((auth.profile?.systemScope || 'STB_FULL') !== 'STB_FULL' && STB_ONLY_PATHS.has(to.path)) {
+    return { path: preferredDashboardPath(auth.profile) }
+  }
+  if (to.path === '/library' && !canViewAssessmentLibrary(auth.profile)) {
+    return { path: preferredDashboardPath(auth.profile) }
+  }
+  if (to.path === '/dashboard') {
+    const preferred = preferredDashboardPath(auth.profile)
+    if (preferred !== '/dashboard') return { path: preferred }
+  }
   if (Array.isArray(to.meta.anyPermission) && to.meta.anyPermission.length) {
     const permissions = auth.profile?.permissions || []
     if (!to.meta.anyPermission.some(permission => permissions.includes(permission))) {
       return { path: "/unauthorized" };
     }
   }
-  if (to.meta.officeAdminAllowed) {
-    const permissions = auth.profile?.permissions || []
-    const isOfficeAdmin = auth.profile?.systemScope === 'OFFICE_ADMIN' ||
-      auth.profile?.officeRole === 'OFFICE_ADMIN' ||
-      permissions.includes('manage_cluster_office_admins') ||
-      permissions.includes('manage_office_registry')
-    if (!isOfficeAdmin) return { path: "/unauthorized" };
+  if (to.meta.systemAdminOnly && !isStbSystemAdmin(auth.profile)) {
+    return { path: "/unauthorized" };
+  }
+  if (to.meta.officeManagementAllowed || to.meta.officePersonnelAllowed || to.meta.officeDashboardAllowed) {
+    if (!canViewOfficeScope(auth.profile)) return { path: "/unauthorized" };
   }
   // Ordinary portal personnel are sent to the read-only equivalent rather than
   // the editable Profile & Settings screen.
@@ -249,7 +328,7 @@ router.afterEach(() => {
 });
 
 // Every route/layout is its own lazy chunk with a hash tied to the build. A
-// tab left open across a deploy — or a refresh that lands mid-deploy — asks
+// tab left open across a deploy - or a refresh that lands mid-deploy - asks
 // for a chunk hash the CDN no longer has once a newer build replaces it. Vite
 // rejects that dynamic import instead of throwing a catchable render error,
 // so nothing appears: no console output (prod silences it), no fallback UI,

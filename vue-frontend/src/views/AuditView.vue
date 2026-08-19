@@ -65,7 +65,7 @@
       </div>
       <div v-for="row in filteredRows" :key="row.id" class="table-row">
         <div class="td td-time mono">{{ fmtDateTime(row.timestamp || row.createdAt) }}</div>
-        <div class="td td-user">{{ row.userEmail || row.userId || '—' }}</div>
+        <div class="td td-user">{{ row.userEmail || row.userId || '-' }}</div>
         <div class="td td-action"><span :class="['action-badge', actionClass(row.action)]">{{ row.action }}</span></div>
         <div class="td td-module text-muted">{{ row.module }}</div>
         <div class="td td-details text-muted">{{ row.details }}</div>
@@ -108,7 +108,7 @@ const filteredRows = computed(() => {
   return r
 })
 
-function fmtDateTime(iso) { return iso ? new Date(iso).toLocaleString('en-PH', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—' }
+function fmtDateTime(iso) { return iso ? new Date(iso).toLocaleString('en-PH', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '-' }
 function showToast(msg, type = 'success') { toast.value = { show: true, msg, type }; setTimeout(() => { toast.value.show = false }, 3500) }
 function actionClass(a) {
   const m = { LOGIN: 'a-blue', CREATE: 'a-green', UPDATE: 'a-orange', DELETE: 'a-red', SUBMIT: 'a-blue', APPROVE: 'a-green', UPLOAD: 'a-green', RETURN: 'a-orange' }

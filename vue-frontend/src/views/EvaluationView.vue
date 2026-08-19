@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="eval-page">
 
     <!-- Content card -->
@@ -32,8 +32,8 @@
         <div v-if="activeView !== 'all'" class="tasks-period-bar">
           <label class="tasks-period-label">Period:</label>
           <select v-model="tasksSemester" class="filter-select" style="width:175px">
-            <option value="1">1st Semester (Jan&#8211;Jun)</option>
-            <option value="2">2nd Semester (Jul&#8211;Dec)</option>
+            <option value="1">1st Semester (Jan-Jun)</option>
+            <option value="2">2nd Semester (Jul-Dec)</option>
           </select>
           <select v-model="tasksYear" class="filter-select" style="width:80px">
             <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}</option>
@@ -66,11 +66,11 @@
               <option v-for="d in availableDivisions" :key="d.key" :value="d.key">{{ d.name }}</option>
             </select>
             <!-- loadRecords() filters by tasksSemester/tasksYear, but this bar had no
-                 period control — so on All Assessments an administrator was locked to
+                 period control - so on All Assessments an administrator was locked to
                  the current period and could not reach an earlier one. -->
             <select v-model="tasksSemester" class="filter-select filter-select-period">
-              <option value="1">1st Semester (Jan–Jun)</option>
-              <option value="2">2nd Semester (Jul–Dec)</option>
+              <option value="1">1st Semester (Jan-Jun)</option>
+              <option value="2">2nd Semester (Jul-Dec)</option>
             </select>
             <select v-model="tasksYear" class="filter-select filter-select-year">
               <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}</option>
@@ -114,7 +114,7 @@
           <div v-else-if="!myTasks.length" class="eval-lp-empty">
             <svg width="36" height="36" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="18" stroke="#E2E8F0" stroke-width="2"/><path d="M16 24h16M24 16v16" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round"/></svg>
             <p>No rating tasks found</p>
-            <span>{{ canAdmin ? 'Use Generate Assignments to create rater assignments.' : 'You have no assigned evaluations for this period.' }}</span>
+            <span>{{ canGenerate ? 'Use Generate Assignments to create rater assignments.' : 'You have no assigned evaluations for this period.' }}</span>
           </div>
           <div v-else class="eli-list">
             <div v-for="task in myTasks" :key="task.id"
@@ -193,7 +193,7 @@
           <div v-else-if="!filteredRecords.length" class="eval-lp-empty">
             <svg width="36" height="36" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="18" stroke="#E2E8F0" stroke-width="2"/><path d="M24 14v10l6 4" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round"/></svg>
             <p>{{ records.length === 0 ? 'No assessments yet' : 'No matches' }}</p>
-            <span>{{ records.length === 0 ? 'Generate assignments to start.' : 'Try adjusting your filters.' }}</span>
+            <span>{{ records.length === 0 ? (canGenerate ? 'Generate assignments to start.' : 'No assessments for this period yet.') : 'Try adjusting your filters.' }}</span>
             <small v-if="recordsLoadState.message" class="load-state-note">{{ recordsLoadState.message }}</small>
           </div>
           <div v-else class="eli-list all-records-list">
@@ -204,7 +204,7 @@
                 <div class="eli-av eli-av-rec">{{ initials(rec.rateeName) }}</div>
                 <div class="eli-info">
                   <div class="eli-name">{{ rec.rateeName }}</div>
-                  <div class="eli-meta">{{ rec.divisionName || '—' }}</div>
+                  <div class="eli-meta">{{ rec.divisionName || '-' }}</div>
                 </div>
                 <span :class="['status-badge', statusClass(rec.status)]">{{ statusLabel(rec.status) }}</span>
               </div>
@@ -265,7 +265,7 @@
                     <div class="sidebar-employee-name">{{ (activeRecord || selectedTask || selectedRecord).rateeName }}</div>
                     <div class="sidebar-employee-desc" v-if="activeAssignment">{{ raterRoleDesc(activeAssignment.raterType) }}</div>
                     <div class="sidebar-employee-desc" v-else>
-                      {{ activeRecord?.divisionName || selectedRecord?.divisionName || '—' }}
+                      {{ activeRecord?.divisionName || selectedRecord?.divisionName || '-' }}
                       <template v-if="activeRecord?.position"> · {{ activeRecord.position }}</template>
                     </div>
                     <div class="sidebar-badges">
@@ -364,7 +364,7 @@
                      number is the weighted contribution; the equivalent is derived from
                      the RAW domain score (score ÷ 4), which is why each uses a different
                      source. FPO passes the isFpo flag because it is normalised from the
-                     IPCRF 1–5 scale before conversion. -->
+                     IPCRF 1-5 scale before conversion. -->
                 <div class="sscore">
                   <div class="sscore-lbl">CBC (30%)</div>
                   <div :class="['sscore-val', activeRecord?.cbcScore ? 'has-val' : '']">{{ cbcWeighted }}</div>
@@ -386,7 +386,7 @@
                 <div class="sscore sscore-overall">
                   <div class="sscore-lbl">Overall</div>
                   <div v-if="displayOverallScore(activeRecord)" :class="['sscore-val', descriptorClass(displayDescriptor(activeRecord))]" style="font-size:22px;font-weight:800">{{ displayOverallScore(activeRecord) }}</div>
-                  <div v-else class="sscore-val">—</div>
+                  <div v-else class="sscore-val">-</div>
                   <div v-if="displayOverallScore(activeRecord)" class="sscore-eq sscore-eq-strong">{{ scoreEquivalentPct(displayOverallScore(activeRecord)) }} equivalent</div>
                   <div v-if="displayDescriptor(activeRecord)" :class="['sscore-desc', descriptorClass(displayDescriptor(activeRecord))]">{{ displayDescriptor(activeRecord) }}</div>
                 </div>
@@ -411,7 +411,7 @@
                       <span class="scale-hint">1 = Never · 2 = Rarely · 3 = Frequently · 4 = Always</span>
                     </template>
                     <template v-else>
-                      Rate each behavioral indicator using the <strong>1–4 Likert scale</strong>:
+                      Rate each behavioral indicator using the <strong>1-4 Likert scale</strong>:
                       <span class="scale-hint">1 = Never · 2 = Rarely · 3 = Frequently · 4 = Always</span>
                     </template>
                   </div>
@@ -440,7 +440,7 @@
                         <rect x="2.5" y="5.5" width="7" height="5" rx="1" stroke="currentColor" stroke-width="1.1"/>
                         <path d="M4.2 5.5V4a1.8 1.8 0 0 1 3.6 0v1.5" stroke="currentColor" stroke-width="1.1"/>
                       </svg>
-                      Read-only — submitted by the rater
+                      Read-only - submitted by the rater
                     </div>
                   </div>
                 </template>
@@ -489,10 +489,10 @@
                 -->
                 <div class="tab-intro">
                   <template v-if="usesIpcrfForFpo">
-                    The <strong>Functional Performance Output</strong> domain uses the employee's <strong>IPCRF/DPCR Final Numerical Rating</strong> (1–5 scale) as the basis. It constitutes <strong>55%</strong> of the overall IPAT score.
+                    The <strong>Functional Performance Output</strong> domain uses the employee's <strong>IPCRF/DPCR Final Numerical Rating</strong> (1-5 scale) as the basis. It constitutes <strong>55%</strong> of the overall IPAT score.
                   </template>
                   <template v-else>
-                    The <strong>Functional Performance Output</strong> domain uses this office's own approved performance instrument, as provided for in the assessment protocol. Enter the resulting rating (1–5 scale) below. It constitutes <strong>55%</strong> of the overall assessment score.
+                    The <strong>Functional Performance Output</strong> domain uses this office's own approved performance instrument, as provided for in the assessment protocol. Enter the resulting rating (1-5 scale) below. It constitutes <strong>55%</strong> of the overall assessment score.
                   </template>
                 </div>
                 <div class="fpo-panel">
@@ -508,7 +508,7 @@
                     <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
                       <button class="btn btn-primary" :disabled="syncingFPO" @click="syncFPOScore"><span v-if="syncingFPO" class="spinner-sm"></span>{{ syncingFPO ? 'Syncing…' : (activeRecord?.fpoScore ? 'Re-sync Score' : 'Sync Score') }}</button>
                     </div>
-                    <span v-if="fpoSource" style="font-size:10px;color:#16A34A;margin-top:6px;display:block">Pulled from {{ fpoSource.type }} ({{ fpoSource.status }}) — S{{ fpoSource.semester }} {{ fpoSource.year }}{{ fpoSource.adjectivalRating ? ' · ' + fpoSource.adjectivalRating : '' }}</span>
+                    <span v-if="fpoSource" style="font-size:10px;color:#16A34A;margin-top:6px;display:block">Pulled from {{ fpoSource.type }} ({{ fpoSource.status }}) - S{{ fpoSource.semester }} {{ fpoSource.year }}{{ fpoSource.adjectivalRating ? ' · ' + fpoSource.adjectivalRating : '' }}</span>
                     <span v-else style="font-size:10px;color:#94A3B8;margin-top:4px;display:block">Pulls automatically from the employee's IPCRF/CCEF for this period.</span>
                   </div>
                 </div>
@@ -523,7 +523,7 @@
                     <div class="fpo-manual-input-group">
                       <label class="fpo-manual-label" for="fpoManualInput">
                         {{ usesIpcrfForFpo ? 'IPCRF Final Rating' : 'FPO Rating' }}
-                        <span class="fpo-manual-range">1.00 – 5.00</span>
+                        <span class="fpo-manual-range">1.00 - 5.00</span>
                       </label>
                       <div class="fpo-input-shell">
                         <input id="fpoManualInput" v-model="fpoManualInput" type="number" step="0.01" min="1" max="5"
@@ -579,7 +579,7 @@
                 </template>
                 <div v-if="!activeAssignment && loadedRec?.jfVarianceFlagged" class="variance-banner">
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1L1 14h14L8 1z" fill="#FEF9C3" stroke="#CA8A04" stroke-width="1.2"/><path d="M8 6v4M8 11.5v.5" stroke="#CA8A04" stroke-width="1.4" stroke-linecap="round"/></svg>
-                  <div><strong>Significant variance detected</strong> — the Self-rating and Supervisor rating differ by {{ loadedRec.jfVarianceGap }} points. This record is flagged for Skip Supervisor review per Section 11 of the evaluation guidelines.</div>
+                  <div><strong>Significant variance detected</strong> - the Self-rating and Supervisor rating differ by {{ loadedRec.jfVarianceGap }} points. This record is flagged for Skip Supervisor review per Section 11 of the evaluation guidelines.</div>
                 </div>
                 <div class="jf-list">
                   <div v-for="(ind, idx) in JF_INDICATORS" :key="idx" :class="['jf-row', showValidation && getJFRating(idx) === null ? 'unanswered' : '']">
@@ -608,7 +608,7 @@
             <!-- Sticky footer actions.
                  Every branch below requires either an active rating assignment or
                  a non-admin viewer, so for an administrator the bar rendered with
-                 nothing in it — an empty strip pinned to the bottom of the screen.
+                 nothing in it - an empty strip pinned to the bottom of the screen.
                  Render it only when it actually has an action. -->
             <div v-if="hasFooterActions" class="eval-form-footer">
               <template v-if="activeAssignment">
@@ -661,7 +661,7 @@
             </div>
             <template v-else>
               <div :class="['rp-score-hero', descriptorClass(displayDescriptor(selectedResult))]">
-                <div class="rp-score-big">{{ displayOverallScore(selectedResult) ?? '—' }}</div>
+                <div class="rp-score-big">{{ displayOverallScore(selectedResult) ?? '-' }}</div>
                 <div v-if="displayOverallScore(selectedResult)" class="rp-score-equivalent">{{ scoreEquivalentPct(displayOverallScore(selectedResult)) }} equivalent</div>
                 <div v-if="displayDescriptor(selectedResult)" class="rp-score-desc">{{ displayDescriptor(selectedResult) }}</div>
               </div>
@@ -735,8 +735,8 @@
               <div class="field">
                 <label class="field-label">Semester <span class="req">*</span></label>
                 <select v-model="createForm.semester" class="field-input">
-                  <option value="1">1st Semester (Jan–Jun)</option>
-                  <option value="2">2nd Semester (Jul–Dec)</option>
+                  <option value="1">1st Semester (Jan-Jun)</option>
+                  <option value="2">2nd Semester (Jul-Dec)</option>
                 </select>
               </div>
               <div class="field">
@@ -744,17 +744,17 @@
                 <input v-model.number="createForm.year" type="number" class="field-input"/>
               </div>
               <div class="field full">
-                <label class="field-label">FPO Score — IPCRF Final Numerical Rating</label>
+                <label class="field-label">FPO Score - IPCRF Final Numerical Rating</label>
                 <div class="fpo-auto-note">
-                  Pulled automatically from the ratee's own rated IPCRF/CCEF for this same period — no manual entry needed.
+                  Pulled automatically from the ratee's own rated IPCRF/CCEF for this same period - no manual entry needed.
                   If their IPCRF/CCEF isn't rated yet, you can sync it later from the assessment detail view.
                 </div>
               </div>
               <div class="field full">
                 <label class="field-label">Does the ratee have subordinates?</label>
                 <div class="toggle-row">
-                  <button :class="['toggle-btn', createForm.hasSubordinate === true && 'active']" @click="createForm.hasSubordinate = true">Yes — Peer weight: 15%</button>
-                  <button :class="['toggle-btn', createForm.hasSubordinate === false && 'active']" @click="createForm.hasSubordinate = false">No — Peer weight: 30%</button>
+                  <button :class="['toggle-btn', createForm.hasSubordinate === true && 'active']" @click="createForm.hasSubordinate = true">Yes - Peer weight: 15%</button>
+                  <button :class="['toggle-btn', createForm.hasSubordinate === false && 'active']" @click="createForm.hasSubordinate = false">No - Peer weight: 30%</button>
                 </div>
               </div>
             </div>
@@ -804,8 +804,8 @@
               <div class="field">
                 <label class="field-label">Semester <span class="req">*</span></label>
                 <select v-model="generateForm.semester" class="field-input">
-                  <option value="1">1st Semester (Jan–Jun)</option>
-                  <option value="2">2nd Semester (Jul–Dec)</option>
+                  <option value="1">1st Semester (Jan-Jun)</option>
+                  <option value="2">2nd Semester (Jul-Dec)</option>
                 </select>
               </div>
               <div class="field">
@@ -883,7 +883,7 @@
             <div class="conduct-preview">
               <div>
                 <span>CBC percentage raw score</span>
-                <strong>{{ cbcDeductionPreview.basePct !== null ? `${cbcDeductionPreview.basePct}%` : '—' }}</strong>
+                <strong>{{ cbcDeductionPreview.basePct !== null ? `${cbcDeductionPreview.basePct}%` : '-' }}</strong>
               </div>
               <div>
                 <span>NTE deduction</span>
@@ -895,7 +895,7 @@
               </div>
               <div class="conduct-preview-final">
                 <span>CBC contribution to overall</span>
-                <strong>{{ cbcDeductionPreview.cbcWeightedScore ?? '—' }}</strong>
+                <strong>{{ cbcDeductionPreview.cbcWeightedScore ?? '-' }}</strong>
               </div>
             </div>
           </div>
@@ -924,10 +924,11 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { dashboardApi, ipatApi, ipatAssignmentsApi, usersApi, assessmentContentApi, assessmentCategoryApi } from '@/services/api'
+import { ipatApi, ipatAssignmentsApi, usersApi, assessmentContentApi, assessmentCategoryApi } from '@/services/api'
 import { usePermissions } from '@/composables/usePermissions'
 import { useBranding } from '@/composables/useBranding'
 import { useConfirm } from '@/composables/useConfirm'
+import { useOrgOptions } from '@/composables/useOrgOptions'
 
 const { confirm } = useConfirm()
 const route = useRoute()
@@ -935,6 +936,7 @@ const { hasPermission, isAdmin } = usePermissions()
 const { isClusterPortal } = useBranding()
 const canViewBureauMonitoring = hasPermission('view_bureau_monitoring')
 const canViewDivisionMonitoring = hasPermission('view_division_monitoring')
+const { loadOrgOptions, currentDivisions } = useOrgOptions()
 
 // Only STB's Functional Performance Output instrument (the DSPMS IPCRF/DPCR)
 // exists in this system. Participating offices adopted their own instruments
@@ -1005,24 +1007,17 @@ const search       = ref('')
 const filterDiv    = ref('')
 const divisionOptions = ref([])
 const recordsLoadState = ref({ status: 'idle', message: '' })
-const FALLBACK_DIVISIONS = [
-  { id: 'dfd', name: 'Design Formulation Division' },
-  { id: 'pid', name: 'Pilot Implementation Division' },
-  { id: 'staed', name: 'Social Technology Analysis and Evaluation Division' },
-  { id: 'ap', name: 'Admin Pool' }
-]
 
 function divisionKey(name) {
   return String(name || '').trim().toLowerCase().replace(/\s+/g, ' ')
 }
 
 // View toggle
-// "Can administer assessments" — gates the All Assessments view and the
+// "Can administer assessments" - gates the All Assessments view and the
 // administrative detail panel. Distinct from being able to GENERATE assignments,
 // which is System Administrator-only. Both the System Administrator and the
 // Bureau Director / Assistant Bureau Director hold manage_ipat_scores.
 const canAdmin = hasPermission('manage_ipat_scores')
-const canGenerateAssignments = hasPermission('generate_ipat_assignments')
 
 // A pure System Administrator maintains the system but is not assessed by it, so
 // "My Rating Tasks" and "My Results" are always empty for them and only take up
@@ -1030,11 +1025,11 @@ const canGenerateAssignments = hasPermission('generate_ipat_assignments')
 //
 // Division Chief / Assistant Bureau Director / Bureau Director are themselves
 // ratees even when they hold evaluation-admin functions, so they keep both
-// personal tabs — and generating assignments is reserved to the System
+// personal tabs - and generating assignments is reserved to the System
 // Administrator, so they do not get that button.
 const isSystemAdmin  = isAdmin
 const showPersonalTabs = computed(() => !isSystemAdmin.value)
-const canGenerate      = computed(() => canGenerateAssignments.value && canAdmin.value)
+const canGenerate      = computed(() => isSystemAdmin.value)
 // A System Administrator has no personal tabs, so landing on 'my-tasks' would
 // strand them on a permanently empty view with no control to leave it.
 const activeView  = ref(isSystemAdmin.value ? 'all' : 'my-tasks')
@@ -1070,7 +1065,7 @@ const showCreateModal = ref(false)
 const activeRecord    = ref(null)
 const activeTab       = ref('cbc')
 
-const loadedRec     = ref(null)   // full record from get() — carries cbcRatings + jfRatings
+const loadedRec     = ref(null)   // full record from get() - carries cbcRatings + jfRatings
 const loadingDetail = ref(false)
 const allUsers      = ref([])
 const loadingUsers  = ref(false)
@@ -1098,13 +1093,13 @@ const cbcWeighted = computed(() => {
 })
 const fpoWeighted = computed(() => {
   let s = Number(activeRecord.value?.fpoScore)
-  if (!s) return '—'
+  if (!s) return '-'
   if (s > 4) s = Math.round(((s - 1) / 4 * 3 + 1) * 100) / 100
   return (Math.round(s * 0.55 * 100) / 100).toFixed(2)
 })
 const jfWeighted = computed(() => {
   const s = Number(activeRecord.value?.jfScore)
-  if (!s) return '—'
+  if (!s) return '-'
   return (Math.round(s * 0.15 * 100) / 100).toFixed(2)
 })
 const fpoManualWeighted = computed(() => {
@@ -1123,20 +1118,20 @@ function normalizedFourPointScore(value, isFpo = false) {
 
 function weightedDomainScore(value, weight, isFpo = false) {
   const score = normalizedFourPointScore(value, isFpo)
-  if (score === null) return '—'
+  if (score === null) return '-'
   return (Math.round(score * weight * 100) / 100).toFixed(2)
 }
 
 function cbcWeightedScore(record) {
   const score = normalizedFourPointScore(record?.cbcScore)
-  if (score === null) return '—'
+  if (score === null) return '-'
   const weighted = score * 0.30
   return (Math.round(weighted * 100) / 100).toFixed(2)
 }
 
 function scoreEquivalentPct(value, isFpo = false) {
   const score = normalizedFourPointScore(value, isFpo)
-  if (score === null) return '—'
+  if (score === null) return '-'
   const pct = Math.max(0, Math.min(100, (score / 4) * 100))
   return `${Number(pct.toFixed(1)).toLocaleString()}%`
 }
@@ -1181,7 +1176,7 @@ const cbcDeductionPreview = computed(() =>
 )
 
 function canEditCbcDeduction(record) {
-  // canAdmin is a ComputedRef — without .value this expression was always truthy,
+  // canAdmin is a ComputedRef - without .value this expression was always truthy,
   // so the Conduct Deduction control (NTE / administrative-offence data) rendered
   // for every user. The backend already refused the write with a 403; this makes
   // the UI agree with it.
@@ -1297,7 +1292,7 @@ const createForm = ref({
   hasSubordinate: false
 })
 
-// The stored status value stays 'Draft' — renaming it in the sheet would break
+// The stored status value stays 'Draft' - renaming it in the sheet would break
 // every existing record and the backend's own transitions. Only the label the
 // user reads changes. 'Final' is no longer offered as a filter; those records
 // remain visible under 'All'.
@@ -1353,7 +1348,6 @@ const availableDivisions = computed(() => {
 
   divisionOptions.value.forEach(d => addDivision(d))
   records.value.forEach(r => addDivision({ id: r.divisionId, name: r.divisionName || r.divisionId }))
-  FALLBACK_DIVISIONS.forEach(d => addDivision(d))
 
   return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name))
 })
@@ -1435,8 +1429,8 @@ function taskDivisionLabel(task) {
   return divisionNames[normalized.toLowerCase()] || normalized.toUpperCase()
 }
 function statusClass(s) { return { Draft: 'st-draft', Computed: 'st-blue', Final: 'st-green' }[s] || 'st-draft' }
-// Display-only mapping. 'Draft' remains the stored value everywhere — in the
-// sheet, in the API and in IPCRFService's status transitions — so this changes
+// Display-only mapping. 'Draft' remains the stored value everywhere - in the
+// sheet, in the API and in IPCRFService's status transitions - so this changes
 // what the user reads without touching a single record.
 function statusLabel(s) { return s === 'Draft' ? 'Pending' : (s || '') }
 function descriptorClass(d) {
@@ -1543,7 +1537,7 @@ async function loadMyTasks() {
       return
     }
     // Auto-open the first pending task so the rating form is front-and-center
-    // on arrival instead of an empty panel — rating is the module's main job.
+    // on arrival instead of an empty panel - rating is the module's main job.
     if (activeView.value === 'my-tasks' && !selectedTask.value && myTasks.value.length) {
       selectTask(myTasks.value.find(t => t.status !== 'Completed') || myTasks.value[0])
     }
@@ -1617,13 +1611,12 @@ async function switchToAll() {
 
 async function loadDivisionOptions() {
   if (!canAdmin.value && !canViewBureauMonitoring.value && !canViewDivisionMonitoring.value) {
-    divisionOptions.value = FALLBACK_DIVISIONS
+    divisionOptions.value = []
     return
   }
   try {
-    const data = await dashboardApi.divisions({ pageSize: 200 })
-    const rows = Array.isArray(data) ? data : (data?.items || [])
-    divisionOptions.value = rows
+    await loadOrgOptions()
+    divisionOptions.value = currentDivisions.value
       .map(d => ({
         id: d.id || d.divisionId,
         name: d.name || d.divisionName
@@ -1646,7 +1639,7 @@ function selectRecord(rec) {
   selectedTask.value   = null
   selectedResult.value = null
   selectedRecord.value = rec
-  activeAssignment.value = null   // admin view — not a rater assignment
+  activeAssignment.value = null   // admin view - not a rater assignment
   openDetailModal(rec)
 }
 
@@ -1810,7 +1803,7 @@ function rterTypeCls(type) {
   return cls[type] || ''
 }
 
-// Strong accent color per rater type — drives the colored spine on each task card
+// Strong accent color per rater type - drives the colored spine on each task card
 function raterAccent(type) {
   const map = {
     Self:          '#3B82F6',
@@ -2022,7 +2015,7 @@ async function syncFPOScore() {
 // ── JF ──
 async function saveJFRatings() {
   const ratings = JF_INDICATORS.value.map((_, idx) => ({
-    // Only send minimal fields — full indicator text causes URL to exceed GAS limits
+    // Only send minimal fields - full indicator text causes URL to exceed GAS limits
     indicatorIdx: idx,
     rating: getJFRating(idx) || 1,
     evidence: jfEvidence.value[idx] || '',
@@ -2060,7 +2053,7 @@ async function computeOverall() {
   try {
     const r = await ipatApi.computeOverall(activeRecord.value.id)
     _syncRecord({ overallScore: r.overallScore, descriptor: r.descriptor, cbcScore: r.cbcScore, fpoScore: r.fpoScore, jfScore: r.jfScore, status: 'Computed' })
-    showToast(`Overall: ${r.overallScore} — ${r.descriptor}`)
+    showToast(`Overall: ${r.overallScore} - ${r.descriptor}`)
   } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
   finally { computingOverall.value = false }
 }
@@ -2218,11 +2211,11 @@ async function finalizeRecord() {
 /* Filters */
 /* The left panel is narrow, so every control here must be able to shrink and
    wrap rather than overflow. Fixed pixel widths previously forced the period
-   selects onto their own row and truncated "1st Semester (Jan–Jun)". */
+   selects onto their own row and truncated "1st Semester (Jan-Jun)". */
 .filter-bar{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
 .status-tabs{display:flex;flex-wrap:nowrap;gap:6px;flex:1 1 auto;}
 /* flex:1 1 0 makes the three tabs share the row evenly and consume the full
-   width — previously they were content-sized and left dead space to the right. */
+   width - previously they were content-sized and left dead space to the right. */
 .status-tab{flex:1 1 0;min-width:0;text-align:center;padding:6px 10px;border-radius:20px;font-size:12px;font-weight:500;border:1px solid #E2E8F0;background:#fff;color:#64748B;cursor:pointer;transition:all .15s;white-space:nowrap;}
 .status-tab.active{background:#0D2137;color:#fff;border-color:#0D2137;}
 .filter-right{display:flex;flex-wrap:wrap;gap:8px;align-items:center;flex:1 1 300px;justify-content:flex-end;min-width:0;}
@@ -2308,7 +2301,7 @@ async function finalizeRecord() {
 /* Score summary bar */
 /* align-items:stretch keeps the cards the same height once the equivalent
    percentages and the descriptor made their content uneven.
-   Always one horizontal row — CBC + FPO + JF = Overall reads as a formula, and
+   Always one horizontal row - CBC + FPO + JF = Overall reads as a formula, and
    stacking it vertically breaks that. flex-wrap:nowrap holds the line at every
    zoom level; the cards shrink instead, and if the pane is genuinely too narrow
    the bar scrolls sideways rather than reflowing into a column. */
@@ -2316,7 +2309,7 @@ async function finalizeRecord() {
 /* flex:1 1 0 shares the row proportionally; min-width is the floor that stops
    the cards collapsing to unreadable slivers (they hit 19px without it). Once
    the four cards plus the button no longer fit at that floor, the bar scrolls
-   sideways — it never reflows into a column. */
+   sideways - it never reflows into a column. */
 .sscore{text-align:center;flex:1 1 0;min-width:82px;padding:9px 7px;border-radius:10px;background:#FFFFFF;border:1px solid #EAF0F7;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;}
 .sscore-lbl{font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px;}
 .sscore-val{font-size:20px;font-weight:800;color:#CBD5E1;line-height:1.15;}
@@ -2336,7 +2329,7 @@ async function finalizeRecord() {
 
 /* Progressive compaction, keyed on the bar's OWN width (it sits in a split pane,
    so a viewport media query would be wrong). The aim is that the four cards
-   always fit — the bar never scrolls and never stacks. */
+   always fit - the bar never scrolls and never stacks. */
 @container (max-width: 620px) {
   .score-summary-bar{gap:6px;padding:12px 12px;}
   .sscore-op{display:none;}          /* decorative once space is tight */
@@ -2352,7 +2345,7 @@ async function finalizeRecord() {
   .sscore{min-width:62px;padding:7px 4px;}
   .sscore-val{font-size:15px;}
   .sscore-lbl{font-size:8.5px;}
-  /* Below this the caption costs more than it explains — the weighted value and
+  /* Below this the caption costs more than it explains - the weighted value and
      the descriptor still carry the meaning. */
   .sscore-eq:not(.sscore-eq-strong){display:none;}
 }
@@ -2389,7 +2382,7 @@ async function finalizeRecord() {
 .tab-intro-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px 14px;}
 .tab-intro-text{flex:1 1 260px;min-width:0;}
 /* justify-content was space-between, which stranded the subordinates badge
-   against the far right edge — several hundred pixels from the select whose
+   against the far right edge - several hundred pixels from the select whose
    weighting it explains. Grouping them reads as one statement, and the badge
    still drops to its own line when the pane is too narrow. */
 .rater-row{display:flex;align-items:center;justify-content:flex-start;gap:10px 12px;margin-bottom:16px;flex-wrap:wrap;}
@@ -2461,35 +2454,32 @@ async function finalizeRecord() {
 .fpo-manual-panel{container-type:inline-size;background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:16px;margin-bottom:16px;}
 .fpo-manual-title{font-size:13px;font-weight:700;color:#92400E;margin-bottom:4px;}
 .fpo-manual-hint{font-size:11px;color:#A16207;line-height:1.5;margin-bottom:12px;}
-/* The input and its calculation are one thought, so they sit together as a pair.
-   Previously `margin-right:auto` on the input and `margin-right:40px` on the
-   result pushed them to opposite ends with dead space between. */
-.fpo-manual-row{display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px;}
-.fpo-manual-input-group{flex:0 0 200px;display:flex;flex-direction:column;gap:5px;}
-.fpo-manual-label{display:flex;align-items:baseline;gap:8px;font-size:11.5px;font-weight:700;color:#92400E;}
+.fpo-manual-row{display:grid;grid-template-columns:minmax(180px,.8fr) minmax(240px,1fr);grid-template-areas:"label label" "input result" "help status";align-items:start;column-gap:14px;row-gap:5px;}
+.fpo-manual-input-group{display:contents;}
+.fpo-manual-label{grid-area:label;display:flex;align-items:baseline;gap:8px;font-size:11.5px;font-weight:700;color:#92400E;}
 .fpo-manual-range{font-size:10px;font-weight:600;color:#A16207;background:#FEF3C7;border-radius:999px;padding:1px 7px;}
 /* The bare number input read as static text. A white shell with a clear border,
    a visible focus ring and a "/ 5" affix makes it obviously editable. */
-.fpo-input-shell{display:flex;align-items:center;gap:6px;background:#FFFFFF;border:1.5px solid #FCD34D;border-radius:9px;padding:0 12px;transition:border-color .15s,box-shadow .15s;}
+.fpo-input-shell{grid-area:input;display:flex;align-items:center;gap:6px;min-height:45px;background:#FFFFFF;border:1.5px solid #FCD34D;border-radius:9px;padding:0 12px;transition:border-color .15s,box-shadow .15s;}
 .fpo-input-shell:focus-within{border-color:#F59E0B;box-shadow:0 0 0 3px rgba(245,158,11,.18);}
 .fpo-manual-field{flex:1 1 auto;width:100%;min-width:0;box-sizing:border-box;font-size:20px;font-weight:800;color:#0F172A;text-align:left;padding:9px 0;border:0;outline:none;background:transparent;}
 .fpo-input-affix{font-size:13px;font-weight:700;color:#A16207;flex-shrink:0;}
-.fpo-manual-help{font-size:10.5px;color:#A16207;line-height:1.35;}
-.fpo-manual-invalid{align-self:center;font-size:11px;font-weight:700;color:#B91C1C;background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:7px 12px;}
+.fpo-manual-help{grid-area:help;font-size:10.5px;color:#A16207;line-height:1.35;}
+.fpo-manual-invalid{grid-area:result;align-self:start;font-size:11px;font-weight:700;color:#B91C1C;background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:7px 12px;}
 .fpo-calc-caption{font-size:10px;font-weight:700;color:#A16207;text-transform:uppercase;letter-spacing:.04em;width:100%;}
-.fpo-manual-result{display:flex;align-items:baseline;flex-wrap:wrap;gap:8px;padding:9px 14px;background:#FFFFFF;border:1px solid #FDE68A;border-radius:9px;}
+.fpo-manual-result{grid-area:result;display:flex;align-items:baseline;flex-wrap:wrap;gap:8px;min-height:45px;padding:9px 14px;background:#FFFFFF;border:1px solid #FDE68A;border-radius:9px;}
 .fpo-calc-formula{font-size:13px;color:#64748B;white-space:nowrap;}
 .fpo-calc-eq{font-size:15px;color:#94A3B8;font-weight:600;}
 .fpo-calc-value{font-size:24px;font-weight:800;color:#0F172A;line-height:1;}
-.fpo-manual-status{display:flex;align-items:center;padding-bottom:8px;margin-left:auto;}
+.fpo-manual-status{grid-area:status;display:flex;align-items:center;min-height:16px;justify-content:flex-start;}
 @container (max-width:420px){
-  .fpo-manual-input-group{flex:1 1 100%;}
-  .fpo-manual-result{flex:1 1 100%;justify-content:center;}
-  .fpo-manual-status{margin-left:0;flex:1 1 100%;justify-content:center;padding-bottom:0;}
+  .fpo-manual-row{grid-template-columns:1fr;grid-template-areas:"label" "input" "help" "result" "status";}
+  .fpo-manual-result{justify-content:center;}
+  .fpo-manual-status{justify-content:center;}
 }
 .fpo-saving-indicator{font-size:11px;color:#94A3B8;display:flex;align-items:center;gap:4px;}
-.fpo-saved-indicator{font-size:11px;font-weight:600;color:#16A34A;}
-/* An administrator sees submitted ratings, and cannot change them — only the
+.fpo-saved-indicator{font-size:11px;font-weight:700;color:#16A34A;}
+/* An administrator sees submitted ratings, and cannot change them - only the
    assigned rater can. The selected chip used to render in the same solid
    interactive blue as a clickable button, so the panel looked editable and
    people went looking for a Save button that does not exist. Read-only state now
@@ -2546,8 +2536,8 @@ async function finalizeRecord() {
 .toast-slide-enter-from,.toast-slide-leave-to{opacity:0;transform:translateY(8px);}
 
 /* View tabs */
-.view-tabs {display: flex;flex-wrap: wrap;align-items:center;width: 100%;gap: 8px;margin-top: 8px;margin-bottom: 5px;padding: 0 12px;box-sizing: border-box;}
-.view-tab {flex: 0 1 auto;min-width: max-content;max-width: 100%;height: 36px;padding: 6px 12px;display: inline-flex;align-items: center;justify-content: center;gap: 7px;border: 1px solid #dbe4f0;border-radius: 18px;background: #ffffff;color: #52627a;font-size: 13px;font-weight: 600;line-height: 1;cursor: pointer;white-space: nowrap;}
+.view-tabs {display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));align-items:center;width:100%;gap:8px;margin-top:8px;margin-bottom:5px;padding:0 12px;box-sizing:border-box;}
+.view-tab {width:100%;min-width:0;max-width:100%;height:36px;padding:6px 10px;display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid #dbe4f0;border-radius:18px;background:#ffffff;color:#52627a;font-size:13px;font-weight:600;line-height:1;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .view-tab.active {background: #071d36;border-color: #071d36;color: #ffffff;}
 .view-tab-badge {display: inline-flex;align-items: center;justify-content: center;min-width: 18px;height: 18px;padding: 0 5px;border-radius: 999px;background: #ef4444;color: #ffffff;font-size: 10px;font-weight: 700;line-height: 1;}
 /* Sits in the tab row but performs an action rather than switching views, so it
@@ -2691,7 +2681,7 @@ async function finalizeRecord() {
 .eval-footer-count{font-size:12px;font-weight:700;color:#B45309;background:#FEF3E2;padding:5px 12px;border-radius:20px;}
 .eval-footer-count.done{color:#047857;background:#ECFDF5;}
 
-/* ════════════ LEFT PANEL — card polish ════════════ */
+/* ════════════ LEFT PANEL - card polish ════════════ */
 /* Fluid rather than a fixed 560px stepped down at breakpoints. The percentage
    basis resolves against the shell's own width, so the list gives space back to
    the assessment content continuously as the window narrows, instead of holding
@@ -2832,7 +2822,7 @@ async function finalizeRecord() {
   .assessment-content .modal-body-scroll{overflow:visible;}
   .conduct-preview{grid-template-columns:repeat(2,minmax(0,1fr));}
   /* .jf-row is flex so this works; .indicator-row is a GRID, where
-     flex-direction is inert — it is handled in the 640px block below. */
+     flex-direction is inert - it is handled in the 640px block below. */
   .jf-row{align-items:stretch;flex-direction:column;}
   .ind-rating{align-self:flex-end;}
 }
@@ -2852,7 +2842,7 @@ async function finalizeRecord() {
    position:sticky needs a scrolling ancestor with a definite height. At <=980px
    the shell, the right column and the scroll body are all set to height:auto /
    overflow:visible, so sticky had nothing to stick to and the footer fell to the
-   very bottom of a very long document — a rater had to scroll past all 25
+   very bottom of a very long document - a rater had to scroll past all 25
    questions to find Submit. Pin it to the viewport instead. */
 @media (max-width: 980px) {
   .eval-form-footer{
@@ -2897,7 +2887,7 @@ async function finalizeRecord() {
 
 /* Search and division filter row.
    flex:0 0 auto is load-bearing: .filter-bar is a COLUMN here, so the base
-   rule's `flex:1 1 300px` would be read as a 300px height basis with grow —
+   rule's `flex:1 1 300px` would be read as a 300px height basis with grow -
    which stretched this grid to 300px and pushed its two rows 153px apart.
    align-content:start then keeps the rows packed at their natural height. */
 .eval-tp-left .filter-right {
@@ -2942,7 +2932,7 @@ async function finalizeRecord() {
 }
 
 /* ════════════════════════ PHONE ════════════════════════
-   Below 640px the four rating buttons cannot sit beside the question text —
+   Below 640px the four rating buttons cannot sit beside the question text -
    they would leave roughly 150px for a two-line sentence. The row becomes a
    two-line grid instead, with the buttons on their own full-width line and
    sized to a 44px touch target. */
@@ -2978,9 +2968,9 @@ async function finalizeRecord() {
 
   /* Manual FPO entry stacks; the input keeps a comfortable tap height. */
   .fpo-manual-panel{padding:14px 12px;}
-  .fpo-manual-input-group{flex:1 1 100%;}
-  .fpo-manual-result{flex:1 1 100%;justify-content:flex-start;}
-  .fpo-manual-status{flex:1 1 100%;margin-left:0;padding-bottom:0;}
+  .fpo-manual-row{grid-template-columns:1fr;grid-template-areas:"label" "input" "help" "result" "status";}
+  .fpo-manual-result{justify-content:flex-start;}
+  .fpo-manual-status{justify-content:flex-start;}
   .fpo-manual-field{font-size:18px;padding:11px 0;}
   .fpo-panel{grid-template-columns:1fr;}
 

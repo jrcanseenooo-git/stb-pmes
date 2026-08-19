@@ -192,11 +192,11 @@
           </div>
           <div class="maintenance-pill rebuild">
             <span>Rebuild sheets</span>
-            <strong>{{ maintenancePreview?.finalSheetOrder?.length || '—' }}</strong>
+            <strong>{{ maintenancePreview?.finalSheetOrder?.length || '-' }}</strong>
           </div>
           <div class="maintenance-pill remove">
             <span>Remove unused</span>
-            <strong>{{ maintenancePreview?.removeSheets?.length ?? '—' }}</strong>
+            <strong>{{ maintenancePreview?.removeSheets?.length ?? '-' }}</strong>
           </div>
         </div>
 
@@ -307,8 +307,8 @@
                 </td>
                 <td class="text-xs muted">{{ u.email }}</td>
                 <td><span :class="['role-badge', roleBadgeClass(u.role)]">{{ u.role }}</span></td>
-                <td class="text-xs muted">{{ u.division || '—' }}</td>
-                <td class="text-xs muted">{{ u.section || '—' }}</td>
+                <td class="text-xs muted">{{ u.division || '-' }}</td>
+                <td class="text-xs muted">{{ u.section || '-' }}</td>
                 <td v-if="canManageUsers">
                   <div class="flex-row gap-6" v-if="u.tempPassword">
                     <code class="temp-pw">{{ showPw[u.email] ? u.tempPassword : '••••••••' }}</code>
@@ -326,7 +326,7 @@
                     </button>
                     <span v-if="copied" class="copied-tag">Copied!</span>
                   </div>
-                  <span v-else class="text-xs muted">—</span>
+                  <span v-else class="text-xs muted">-</span>
                 </td>
                 <td v-if="canAdministerUsers">
                   <span :class="['status-badge', u.status === 'Active' ? 's-green' : u.status === 'Pending' ? 's-amber' : 's-red']">
@@ -421,7 +421,7 @@
     </div>
 
     <!-- ══════════════════════════════════════════
-         ADD / EDIT USER MODAL — redesigned
+         ADD / EDIT USER MODAL - redesigned
          ══════════════════════════════════════════ -->
     <transition name="modal-fade">
       <div v-if="showModal" class="modal-overlay" @click.self="closeModal">
@@ -488,20 +488,22 @@
                   <label class="field-label">Division</label>
                   <select v-model="form.division" class="field-select">
                     <option value="">Select division…</option>
-                    <option>Admin Pool</option>
-                    <option>Design Formulation Division</option>
-                    <option>Pilot Implementation Division</option>
-                    <option>Social Technology Analysis and Evaluation Division</option>
+                    <option v-for="division in selectedOfficeDivisions" :key="division.id || division.name" :value="division.name">
+                      {{ division.name }}
+                    </option>
                   </select>
                 </div>
                 <div class="field full">
-                  <label class="field-label">Section</label>
+                  <label class="field-label">Section <span v-if="roleRequiresSection" class="req">*</span></label>
                   <select v-model="form.section" class="field-select" :disabled="!form.division">
                     <option value="">{{ form.division ? sectionSelectPlaceholder : 'Select division first…' }}</option>
                     <option v-for="section in sectionsForSelectedDivision" :key="section.id" :value="section.name">
                       {{ section.name }}
                     </option>
                   </select>
+                  <p v-if="!roleRequiresSection && form.role" class="field-help">
+                    Optional for this role - it oversees the whole division or office rather than a single section.
+                  </p>
                 </div>
                 <div v-if="canManageUsers" class="field">
                   <label class="field-label">System Scope</label>
@@ -510,7 +512,7 @@
                   </select>
                   <p class="field-help">{{ systemScopeDescription }}</p>
                   <div v-if="form.systemScope === 'CLUSTER_ADMIN'" class="access-group-warning" style="margin-top:6px;">
-                    This scope alone grants no abilities — provisioning, monitoring, etc. still come from the
+                    This scope alone grants no abilities - provisioning, monitoring, etc. still come from the
                     <strong>Access Groups</strong> checked below (the Cluster / Central Administration section).
                   </div>
                 </div>
@@ -527,7 +529,7 @@
                 <div v-if="canManageUsers" class="field full">
                   <label class="field-label">Access Groups</label>
                   <p class="field-help" style="margin-bottom:10px;">
-                    Groups add system permissions without changing the user's official role. Most accounts need none of these —
+                    Groups add system permissions without changing the user's official role. Most accounts need none of these -
                     only check a box if this specific person needs the extra ability it describes.
                   </p>
 
@@ -548,7 +550,7 @@
                     <div class="access-group-warning">
                       <strong>These are cross-office, not scoped to one office.</strong>
                       To restrict an account to managing only its own office, use
-                      <strong>System Scope → Office Admin Portal</strong> above instead — do not check a box here for that.
+                      <strong>System Scope → Office Admin Portal</strong> above instead - do not check a box here for that.
                       Checking any of these gives visibility or control across every participating office.
                     </div>
                     <div class="access-group-grid">
@@ -579,10 +581,12 @@
                 </div>
                 <div class="field">
                   <label class="field-label">Employment Type</label>
+                  <!-- Options come from the shared list so this screen cannot
+                       write a spelling registration does not use. A retired
+                       value already on the record is appended by
+                       employmentTypeOptions() so it stays visible. -->
                   <select v-model="form.type" class="field-select">
-                    <option value="Regular">Regular</option>
-                    <option value="Contract of Service (COS)">Contract of Service (COS)</option>
-                    <option value="Co-Term">Co-Term</option>
+                    <option v-for="t in employmentTypeOptions(form.type)" :key="t" :value="t">{{ t }}</option>
                   </select>
                 </div>
               </div>
@@ -665,7 +669,7 @@
               </div>
             </div>
             <div class="access-group-warning" style="margin-top:10px;">
-              Copy this now — the system never stores the plain-text password, only a hash.
+              Copy this now - the system never stores the plain-text password, only a hash.
               Once you apply the reset, this is the only place it will ever be shown; the Temp
               Password column reflects it only until this page is next refreshed.
             </div>
@@ -699,35 +703,13 @@ import { ref, computed, h, onMounted, watch } from 'vue'
 import { usersApi, focalAssignmentsApi, maintenanceApi, systemSettingsApi, officeRegistryApi } from '@/services/api'
 import { useConfirm, CONFIRMS } from '@/composables/useConfirm'
 import { usePermissions } from '@/composables/usePermissions'
+import { useOrgOptions } from '@/composables/useOrgOptions'
 import { useAuthStore } from '@/stores/auth'
-
-// Must match the canonical Divisions seeded in InitSheets.gs exactly.
-// The division <select> binds to the display name only; this resolves it to
-// the id the backend actually scopes/filters by (divisionId was previously
-// never sent at all, so every newly-created user got an empty divisionId
-// regardless of role — silently breaking any division/section-scoped access).
-const DIVISION_IDS = {
-  'Admin Pool': 'admin-pool',
-  'Design Formulation Division': 'dfd',
-  'Pilot Implementation Division': 'pid',
-  'Social Technology Analysis and Evaluation Division': 'staed'
-}
-const CANONICAL_SECTIONS = [
-  { id: 'SEC-admin-office', divisionId: 'admin-pool', name: 'Office Admin Personnel' },
-  { id: 'SEC-dfd-cy', divisionId: 'dfd', name: 'Children and Youth Section' },
-  { id: 'SEC-dfd-omg', divisionId: 'dfd', name: 'Other Marginalized Groups Section' },
-  { id: 'SEC-dfd-wpo', divisionId: 'dfd', name: 'Women, Persons with Disability and Older Persons Section' },
-  { id: 'SEC-pid-cy', divisionId: 'pid', name: 'Children and Youth Section' },
-  { id: 'SEC-pid-omg', divisionId: 'pid', name: 'Other Marginalized Groups Section' },
-  { id: 'SEC-pid-wpo', divisionId: 'pid', name: 'Women, Persons with Disability and Older Persons Section' },
-  { id: 'SEC-staed-ev', divisionId: 'staed', name: 'Social Technology Evaluation Section' },
-  { id: 'SEC-staed-pm', divisionId: 'staed', name: 'Social Technology Portfolio Management Section' },
-  { id: 'SEC-staed-pr', divisionId: 'staed', name: 'Social Technology Promotion Section' }
-]
+import { employmentTypeOptions } from '@/utils/employmentTypes'
 
 // Split into two groups because they answer two different questions, and
 // mixing them in one flat grid is what made "10 checkboxes, no idea which one"
-// confusing. STB groups add abilities WITHIN the bureau's own scope — safe
+// confusing. STB groups add abilities WITHIN the bureau's own scope - safe
 // defaults for STB staff. Cluster groups add abilities ACROSS every
 // participating office and are rarely what a new account needs; checking one
 // of these for someone who should only manage their own office is the most
@@ -801,22 +783,22 @@ const systemScopeOptions = [
   {
     value: 'STB_FULL',
     label: 'STB Full PMES',
-    description: 'The complete original PMES for Social Technology Bureau — Dashboard, KRA, IPCRF/CCEF, Accomplishments, Evaluation, Reports. Always uses the central STB spreadsheet, never an office one.'
+    description: 'The complete original PMES for Social Technology Bureau - Dashboard, KRA, IPCRF/CCEF, Accomplishments, Evaluation, Reports. Always uses the central STB spreadsheet, never an office one.'
   },
   {
     value: 'CLUSTER_PORTAL',
     label: 'Innovation Cluster Portal',
-    description: 'Restricted personnel screens only — My Dashboard, My Rating Tasks, My Results, Assessment Library. No KRA, no admin screens. This is what self-registration into a participating office sets automatically.'
+    description: 'Restricted personnel screens only - My Dashboard, My Rating Tasks, My Results, Assessment Library. No KRA, no admin screens. This is what self-registration into a participating office sets automatically.'
   },
   {
     value: 'OFFICE_ADMIN',
     label: 'Office Admin Portal',
-    description: 'Everything Cluster Portal gets, plus office-scoped admin screens (Personnel Validation, Office Dashboard, Rater Tagging) — strictly limited to the Office selected on the right. Use this to make someone an administrator of one office only.'
+    description: 'Everything Cluster Portal gets, plus office-scoped admin screens (Personnel Validation, Office Dashboard, Rater Tagging) - strictly limited to the Office selected on the right. Use this to make someone an administrator of one office only.'
   },
   {
     value: 'CLUSTER_ADMIN',
     label: 'Central Cluster Admin',
-    description: 'Opts out of the "STB is the only full scope" default so cross-office screens (Cluster Overview, Office Registry) become reachable — but grants no ability by itself. What this account can actually do still depends on which Access Groups are checked below.'
+    description: 'Opts out of the "STB is the only full scope" default so cross-office screens (Cluster Overview, Office Registry) become reachable - but grants no ability by itself. What this account can actually do still depends on which Access Groups are checked below.'
   }
 ]
 
@@ -853,7 +835,7 @@ const officeOptionsError = ref(false)
 // ever exceeds this, loadUsers() warns instead of truncating silently.
 const USERS_PAGE_SIZE = 2000
 // Which row is mid-write. Approving hits Apps Script AND the Firebase Admin API,
-// so it is measured in seconds — without this the admin clicked Approve and saw
+// so it is measured in seconds - without this the admin clicked Approve and saw
 // nothing change, with no way to tell whether it had registered.
 const busyUserId = ref('')
 const focalUsers    = ref([])
@@ -880,14 +862,37 @@ const systemAccessModes = ref([
 const { canManageUsers, canManageOfficeUsers, canManageFocalAssignments, canManageDatabase } = usePermissions()
 const { confirm, confirmState } = useConfirm()
 const authStore = useAuthStore()
+const { loadOrgOptions, optionsForOffice } = useOrgOptions()
 const activeUsersCount = computed(() => users.value.filter(u => u.status === 'Active').length)
 const inactiveUsersCount = computed(() => users.value.filter(u => u.status === 'Inactive').length)
 const pendingUsersCount = computed(() => users.value.filter(u => u.status === 'Pending').length)
 const canAdministerUsers = computed(() => canManageUsers.value || canManageOfficeUsers.value)
 const usersTableColspan = computed(() => 6 + (canManageUsers.value ? 1 : 0) + (canAdministerUsers.value ? 1 : 0))
+/**
+ * Roles offered when editing an account.
+ *
+ * Drawn from the SELECTED OFFICE's own configuration, the same source the
+ * Division and Section selects beside it already use. This was a hardcoded
+ * Bureau ladder, so an administrator editing someone in a participating office
+ * was offered STB roles that office does not use - and could not assign the
+ * roles it does.
+ *
+ * The Bureau ladder remains the fallback for STB and for any office that has
+ * not configured its own roles yet.
+ */
 const userFormRoleOptions = computed(() => {
-  const officeRoles = ['Bureau Director', 'Assistant Bureau Director', 'Division Chief', 'Section Head', 'Technical Staff']
-  return canManageUsers.value ? ['System Administrator', ...officeRoles] : officeRoles
+  const STB_ROLES = ['Bureau Director', 'Assistant Bureau Director', 'Division Chief', 'Section Head', 'Technical Staff']
+  const configured = selectedOfficeOrgOptions.value.requestedRoles || []
+  const base = configured.length ? [...configured] : STB_ROLES
+  const roles = canManageUsers.value ? ['System Administrator', ...base] : base
+
+  // The role this person already holds, and the one they asked for at
+  // registration, must always be selectable. Otherwise a pending request for a
+  // role outside the configured list - 'Undersecretary', say - cannot be
+  // approved from this screen at all, and editing an existing account would
+  // silently blank a role that is not on the list.
+  const pinned = [form.value.role, form.value.requestedRole].filter(Boolean)
+  return [...new Set([...roles, ...pinned])]
 })
 const reviewerUsersCount = computed(() => users.value.filter(u =>
   ['System Administrator', 'Bureau Director', 'Assistant Bureau Director', 'Division Chief', 'Section Head'].includes(u.role)
@@ -930,7 +935,7 @@ const SearchSelect = {
         .slice(0, 40)
     })
 
-    // Closed-state text is just the name — full role/division shows in the
+    // Closed-state text is just the name - full role/division shows in the
     // tooltip and in the dropdown itself, so a long title never has to be
     // crammed into a ~200px box.
     watch(() => props.modelValue, () => {
@@ -980,7 +985,7 @@ const SearchSelect = {
         class: 'field-input search-select-input',
         type: 'text',
         placeholder: props.placeholder,
-        title: selected.value ? `${selected.value.fullName} — ${metaFor(selected.value)}` : '',
+        title: selected.value ? `${selected.value.fullName} - ${metaFor(selected.value)}` : '',
         onFocus: () => { open.value = true },
         onInput: event => {
           query.value = event.target.value
@@ -1027,14 +1032,16 @@ const SearchSelect = {
 // ── Load users on mount ──
 onMounted(async () => {
   await loadUsers()
-  if (canManageUsers.value) await Promise.all([loadOfficeOptions(), loadSystemSettings()])
+  const loads = [loadOrgOptions()]
+  if (canManageUsers.value) loads.push(loadOfficeOptions(), loadSystemSettings())
+  await Promise.all(loads)
 })
 
 async function loadOfficeOptions() {
   officeOptionsError.value = false
   try {
     // The full registry (officeRegistryApi.list) is central-admin-only and 403s
-    // for any admin who only has User Management access — this picker endpoint
+    // for any admin who only has User Management access - this picker endpoint
     // is authorized under manage_users instead, since assigning a user to an
     // office is a user-management task, not a central-registry one.
     const data = await officeRegistryApi.picker()
@@ -1048,11 +1055,11 @@ async function loadOfficeOptions() {
 
 const officeFieldHelp = computed(() => {
   if (form.value.systemScope === 'STB_FULL') {
-    return 'Locked to STB — STB Full PMES always uses the central STB spreadsheet.'
+    return 'Locked to STB - STB Full PMES always uses the central STB spreadsheet.'
   }
   if (!officeOptions.value.length) {
     return officeOptionsError.value
-      ? 'Could not load participating offices — the dropdown is disabled until this loads. Refresh the page and try again.'
+      ? 'Could not load participating offices - the dropdown is disabled until this loads. Refresh the page and try again.'
       : 'Disabled: no participating office is active yet. Provision and activate one in Office Registry first.'
   }
   return 'The one office this account is limited to for office-scoped screens and data.'
@@ -1062,7 +1069,7 @@ async function loadUsers() {
   loading.value = true
   try {
     // SpreadsheetService.paginate() defaults to pageSize 50. Calling list() with
-    // no params silently returned only the first 50 rows — and because new
+    // no params silently returned only the first 50 rows - and because new
     // accounts are appended to the bottom of the sheet, the rows that went
     // missing were always the newest ones. That is why self-registered users
     // never appeared under "Pending activation".
@@ -1380,29 +1387,55 @@ function generatePassword() {
 }
 
 // ── Form ──
-const defaultForm = () => ({
-  fullName:'', email:'',
-  role:'', division:'', section:'', position:'',
-  employeeNo:'', type:'Regular',
-  officeId: 'STB',
-  officeCode: 'STB',
-  officeName: 'Social Technology Bureau',
-  systemScope: 'STB_FULL',
-  officeRole: 'STB_PERSONNEL',
-  centralRoles: [],
-  permissionGroups: [],
-  tempPassword: generatePassword()
-})
+const defaultForm = () => {
+  const profile = authStore.profile || {}
+  const centralUserManager = canManageUsers.value
+  return {
+    fullName:'', email:'',
+    role:'', division:'', section:'', position:'',
+    employeeNo:'', type:'Regular',
+    officeId: centralUserManager ? 'STB' : (profile.officeId || 'STB'),
+    officeCode: centralUserManager ? 'STB' : (profile.officeCode || profile.officeId || 'STB'),
+    officeName: centralUserManager ? 'Social Technology Bureau' : (profile.officeName || 'Social Technology Bureau'),
+    systemScope: centralUserManager ? 'STB_FULL' : 'CLUSTER_PORTAL',
+    officeRole: centralUserManager ? 'STB_PERSONNEL' : 'OFFICE_PERSONNEL',
+    centralRoles: [],
+    permissionGroups: [],
+    tempPassword: generatePassword()
+  }
+}
 
 const form = ref(defaultForm())
 function regeneratePassword() { form.value.tempPassword = generatePassword() }
 
+const selectedOfficeOrgOptions = computed(() => optionsForOffice(form.value.officeId, form.value.officeCode))
+const selectedOfficeDivisions = computed(() => selectedOfficeOrgOptions.value.divisions || [])
+const selectedOfficeSections = computed(() => selectedOfficeOrgOptions.value.sections || [])
+const selectedDivisionOption = computed(() =>
+  selectedOfficeDivisions.value.find(division => division.name === form.value.division || division.id === form.value.division)
+)
 const sectionsForSelectedDivision = computed(() => {
-  const divisionId = DIVISION_IDS[form.value.division] || ''
-  return CANONICAL_SECTIONS.filter(section => section.divisionId === divisionId)
+  const divisionId = selectedDivisionOption.value?.id || ''
+  return selectedOfficeSections.value.filter(section => String(section.divisionId || '') === String(divisionId))
 })
 const sectionSelectPlaceholder = computed(() =>
   sectionsForSelectedDivision.value.length ? 'Select section…' : 'No sections available'
+)
+
+/**
+ * Only roles that actually sit inside a section need one. Section Heads and the
+ * staff under them belong to a single section; Assistant Division Chief and
+ * every rank above it oversees a whole division, office, program or bureau, so
+ * pinning them to one section is wrong - and the save used to be blocked until
+ * they picked one.
+ *
+ * Offices configure their own role ladders, so this matches on the section-level
+ * names rather than trying to enumerate everything above them. Anything not on
+ * this list is treated as division-level or higher and saves without a section.
+ */
+const SECTION_LEVEL_ROLES = ['section head', 'technical staff', 'admin staff']
+const roleRequiresSection = computed(() =>
+  SECTION_LEVEL_ROLES.includes(String(form.value.role || '').trim().toLowerCase())
 )
 
 watch(() => form.value.division, () => {
@@ -1436,6 +1469,12 @@ watch(() => form.value.officeId, officeId => {
   if (office) {
     form.value.officeCode = office.officeCode
     form.value.officeName = office.officeName
+  }
+  if (!form.value.division) return
+  const validDivision = selectedOfficeDivisions.value.some(division => division.name === form.value.division)
+  if (!validDivision) {
+    form.value.division = ''
+    form.value.section = ''
   }
 })
 
@@ -1519,7 +1558,7 @@ async function saveUser() {
   if (!form.value.fullName || !form.value.email || !form.value.role) {
     showToast('Please fill in all required fields.', 'error'); return
   }
-  if (sectionsForSelectedDivision.value.length && !form.value.section) {
+  if (roleRequiresSection.value && sectionsForSelectedDivision.value.length && !form.value.section) {
     showToast('Please select a section for the chosen division.', 'error'); return
   }
   if (form.value.systemScope !== 'STB_FULL' && !form.value.officeId) {
@@ -1542,7 +1581,7 @@ async function saveUser() {
       fullName:    form.value.fullName,
       email:       form.value.email,
       role:        form.value.role,
-      divisionId:   DIVISION_IDS[form.value.division] || '',
+      divisionId:   selectedDivisionOption.value?.id || '',
       divisionName: form.value.division,
       section:     form.value.section,
       position:    form.value.position,
@@ -1589,7 +1628,7 @@ async function activateUser(user) {
     message: `${user.name} will be granted access to PMES with the role "${user.role}". Edit their role or division first if it needs to change.`,
     details: [
       { label: 'Email', value: user.email },
-      { label: 'Requested role', value: user.requestedRole || '—' },
+      { label: 'Requested role', value: user.requestedRole || '-' },
       { label: 'Assigned role', value: user.role },
       { label: 'System scope', value: user.systemScope || 'STB_FULL' },
       { label: 'Office', value: user.officeName || 'Social Technology Bureau' }
@@ -1740,7 +1779,7 @@ function showToast(msg, type='success') {
 .btn-sm{padding:4px 9px;font-size:11px;}
 .btn-xs{padding:3px 8px;font-size:10px;border-radius:5px;}
 .btn-xs:disabled{opacity:.65;cursor:not-allowed;}
-/* Inline busy indicator for row actions — approving reaches both Apps Script and
+/* Inline busy indicator for row actions - approving reaches both Apps Script and
    the Firebase Admin API, so the wait is seconds, not milliseconds. */
 .spinner-xs{display:inline-block;width:9px;height:9px;margin-right:5px;vertical-align:-1px;
   border:1.5px solid currentColor;border-top-color:transparent;border-radius:50%;animation:spin .6s linear infinite;}

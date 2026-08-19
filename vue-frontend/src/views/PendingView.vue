@@ -17,7 +17,7 @@
 
         <h2 class="pd-h2">Your account is under review</h2>
         <p class="pd-msg">
-          Thanks, <strong>{{ name }}</strong> — your registration has been submitted and is
+          Thanks, <strong>{{ name }}</strong> - your registration has been submitted and is
           <strong>awaiting activation</strong> by a system administrator. You'll be able to sign in
           once your account is approved.
         </p>
@@ -36,7 +36,7 @@
         <div class="pd-actions">
           <button class="pd-btn pd-btn-ghost" @click="recheck" :disabled="checking">
             <span v-if="checking" class="ob-spin ob-spin-dark"></span>
-            {{ checking ? 'Checking…' : 'I\'ve been approved — check again' }}
+            {{ checking ? 'Checking…' : 'I\'ve been approved - check again' }}
           </button>
           <button class="pd-btn pd-btn-solid" @click="signOut" :disabled="checking">Sign out</button>
         </div>
@@ -68,7 +68,7 @@ async function recheck() {
     } else if (authStore.needsRegistration) {
       router.push('/auth/register')
     } else {
-      notice.value = 'Still pending — your account hasn\'t been activated yet.'
+      notice.value = 'Still pending - your account hasn\'t been activated yet.'
     }
   } catch {
     notice.value = 'Could not check right now. Please try again in a moment.'

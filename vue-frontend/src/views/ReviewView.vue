@@ -101,14 +101,14 @@
               </span>
               <button class="rq-btn rq-btn-outline-warn" @click="returnSelected"
                 :disabled="routing || saveBusy"
-                :title="saveBusy ? 'Please wait — your edits are still saving.' : ''">
+                :title="saveBusy ? 'Please wait - your edits are still saving.' : ''">
                 <span v-if="routingAction === 'return'" class="rq-spinner-xs rq-spinner-warn"></span>
                 {{ routingAction === 'return' ? 'Returning…' : 'Return' }}
               </button>
 
               <div class="rq-assign-wrap" v-click-outside="closeAssignPanel">
                 <button class="rq-btn rq-btn-ghost" @click="openAssignPanel" :disabled="routing || saveBusy"
-                  :title="saveBusy ? 'Please wait — your edits are still saving.' : ''">
+                  :title="saveBusy ? 'Please wait - your edits are still saving.' : ''">
                   <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
                     <circle cx="8" cy="5.5" r="2.5" stroke="currentColor" stroke-width="1.3"/>
                     <path d="M3 13c0-2.5 2.2-4 5-4s5 1.5 5 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
@@ -144,20 +144,20 @@
               </div>
 
               <button class="rq-btn rq-btn-primary" @click="completeSelected" :disabled="routing || entriesLoading || saveBusy"
-                :title="saveBusy ? 'Please wait — your edits are still saving.' : ''">
+                :title="saveBusy ? 'Please wait - your edits are still saving.' : ''">
                 <span v-if="routingAction === 'complete'" class="rq-spinner-xs rq-spinner-light"></span>
                 {{ routingAction === 'complete' ? 'Saving & completing…' : routing ? 'Please wait…' : saveBusy ? 'Saving edits…' : completeButtonLabel }}
               </button>
             </div>
             <div v-else class="rq-owner-badge">
               <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2a4 4 0 014 4v2.5l1 2H3l1-2V6a4 4 0 014-4z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M6.5 14.5a1.5 1.5 0 003 0" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-              Read-only — your form is under review
+              Read-only - your form is under review
             </div>
           </header>
 
           <div class="rq-assignee-line">
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 1.5a4.5 4.5 0 014.5 4.5v3l1.5 2.5H2L3.5 9V6A4.5 4.5 0 018 1.5z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-            Currently with <strong>{{ currentAssigneeName || '—' }}</strong>
+            Currently with <strong>{{ currentAssigneeName || '-' }}</strong>
           </div>
 
           <div v-if="isOwnerView" class="rq-owner-banner">
@@ -348,7 +348,7 @@
                 <div class="rq-entry-hd">
                   <span class="rq-entry-no">{{ i + 1 }}</span>
                   <textarea v-model="editableEntries[entry.id].kraName" class="rq-kra-input" rows="1" placeholder="Key Result Area"></textarea>
-                  <span class="rq-period-chip">{{ entry.applicableRatingPeriod || '—' }}</span>
+                  <span class="rq-period-chip">{{ entry.applicableRatingPeriod || '-' }}</span>
                   <span class="rq-fn-tag">Core</span>
                 </div>
                 <div class="rq-entry-grid">
@@ -417,7 +417,7 @@
                 <div class="rq-entry-hd">
                   <span class="rq-entry-no">{{ i + 1 }}</span>
                   <textarea v-model="editableEntries[entry.id].kraName" class="rq-kra-input" rows="1" placeholder="Key Result Area"></textarea>
-                  <span class="rq-period-chip">{{ entry.applicableRatingPeriod || '—' }}</span>
+                  <span class="rq-period-chip">{{ entry.applicableRatingPeriod || '-' }}</span>
                   <span class="rq-fn-tag">Support</span>
                 </div>
                 <div class="rq-entry-grid">
@@ -530,7 +530,7 @@
               <div><span>Period</span><strong>{{ periodText(selectedForm) }}</strong></div>
               <div><span>Current Review Type</span><strong>{{ selectedReviewType }}</strong></div>
               <div><span>Current Stage</span><strong>{{ currentRouteStage }}</strong></div>
-              <div><span>Currently With</span><strong>{{ currentAssigneeName || '—' }}</strong></div>
+              <div><span>Currently With</span><strong>{{ currentAssigneeName || '-' }}</strong></div>
               <div><span>Targets Submitted</span><strong>{{ formatDate(selectedForm.submittedAt) }}</strong></div>
               <div><span>Targets Approved</span><strong>{{ formatDate(selectedForm.approvedAt) }}</strong></div>
               <div><span>Ratings Completed</span><strong>{{ formatDate(selectedForm.ratingCompletedAt || selectedForm.ratedAt) }}</strong></div>
@@ -560,7 +560,7 @@ const authStore = useAuthStore()
 const loading = ref(false)
 const entriesLoading = ref(false)
 const routing = ref(false)
-const routingAction = ref('')   // 'return' | 'complete' | 'assign' — which routing action is running
+const routingAction = ref('')   // 'return' | 'complete' | 'assign' - which routing action is running
 const forms = ref([])
 const entries = ref([])
 const editableEntries = ref({})
@@ -656,7 +656,7 @@ const saveBusy = computed(() => saveState.value === 'saving')
 const saveChipText = computed(() => {
   if (saveState.value === 'saving') return 'Saving…'
   if (saveState.value === 'dirty') return 'Unsaved changes'
-  if (saveState.value === 'error') return 'Save failed — click to retry'
+  if (saveState.value === 'error') return 'Save failed - click to retry'
   if (saveState.value === 'saved' && savedAt.value) {
     return `Saved ${savedAt.value.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })}`
   }
@@ -970,7 +970,7 @@ async function confirmAssign(person) {
     title: 'Assign for Review',
     message: `This will save edits and comments, then route ${selectedForm.value.employeeName}'s ${selectedForm.value.type} ${selectedReviewType.value.toLowerCase()} to ${person.fullName}.`,
     details: [
-      { label: 'Assign to', value: `${person.fullName}${person.tag ? ' — ' + person.tag : ''}` },
+      { label: 'Assign to', value: `${person.fullName}${person.tag ? ' - ' + person.tag : ''}` },
       { label: 'Review type', value: selectedReviewType.value }
     ],
     confirmLabel: 'Assign',
@@ -1113,7 +1113,7 @@ const vClickOutside = {
   }
 }
 
-// ── Presentational-only helpers (added for the redesign — no state/behavior change) ──
+// ── Presentational-only helpers (added for the redesign - no state/behavior change) ──
 function initials(name) {
   const parts = String(name || '').trim().split(/\s+/).filter(Boolean)
   if (!parts.length) return '?'
@@ -1158,7 +1158,7 @@ const routeSteps = computed(() => {
   return sequence.map((step, i) => ({
     ...step,
     // idx === -1 means this form is currently assigned to someone outside the
-    // usual three (a manual "assign to" pick) — don't falsely light up step 1,
+    // usual three (a manual "assign to" pick) - don't falsely light up step 1,
     // the "Currently With" line above is the source of truth in that case.
     state: idx === -1 ? 'upcoming' : (i < idx ? 'done' : i === idx ? 'current' : 'upcoming')
   }))
@@ -1349,7 +1349,7 @@ const routeSteps = computed(() => {
 
 .rq-field textarea:disabled { background: var(--surface-2); color: var(--ink-soft); cursor: not-allowed; resize: none; }
 
-/* Rating Guide — three-column reference table (Efficiency / Quality / Timeliness) */
+/* Rating Guide - three-column reference table (Efficiency / Quality / Timeliness) */
 .rq-guide-table { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
 .rq-guide-caption { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--ink); color: #fff; font-size: 11px; font-weight: 800; letter-spacing: .03em; text-transform: uppercase; padding: 7px 10px 7px 12px; }
 .rq-guide-period { height: 24px; border: 1px solid rgba(255,255,255,.25); border-radius: 6px; background: rgba(255,255,255,.12); color: #fff; font-size: 10.5px; font-weight: 700; text-transform: none; letter-spacing: 0; padding: 0 6px; }
@@ -1362,7 +1362,7 @@ const routeSteps = computed(() => {
 .rq-guide-input { width: 100%; border: 0; background: transparent; padding: 9px 10px; font: inherit; font-size: 11.5px; line-height: 1.5; color: var(--ink-soft); resize: none; overflow-y: auto; }
 .rq-guide-input:focus { outline: none; background: var(--accent-soft); color: var(--ink); }
 
-/* Ratings figures — even 4-column grid, easy to scan at a glance */
+/* Ratings figures - even 4-column grid, easy to scan at a glance */
 .rq-ratings-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
 .rq-rate-col { display: flex; flex-direction: column; gap: 5px; }
 .rq-rate-col > span { font-size: 10.5px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; text-align: center; }
@@ -1370,7 +1370,7 @@ const routeSteps = computed(() => {
 .rq-rate-col input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .rq-rate-col.rq-avg input { background: var(--accent-soft); border-color: #BFD3FA; color: var(--accent-strong); }
 
-/* MOV / Remarks — full-width, even two columns, tall textareas */
+/* MOV / Remarks - full-width, even two columns, tall textareas */
 .rq-mov-remarks { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .rq-mov-remarks textarea { min-height: 110px; }
 

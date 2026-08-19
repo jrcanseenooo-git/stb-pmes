@@ -17,7 +17,7 @@
  * Participating offices define their own role names through the Office Registry
  * (Configure Registration Options). Any role outside those five literals fell
  * through every branch, produced an empty rater list, and hit that bare
- * `return` — the person was skipped with no assignment, no error, no log entry
+ * `return` - the person was skipped with no assignment, no error, no log entry
  * and nothing in the UI. They were simply never rated.
  *
  * This service moves that decision out of code and into data, so an office can
@@ -57,20 +57,20 @@ const RaterMatrixService = (() => {
   const VALID_RATER_TYPES = ['Self', 'Peer', 'Peer1', 'Peer2', 'Subordinate', 'Supervisor', 'SkipSupervisor']
 
   // The STB hierarchy, transcribed from the five functions this replaces.
-  // Seeding this makes the switch behaviour-preserving for STB — the critical
+  // Seeding this makes the switch behaviour-preserving for STB - the critical
   // safety property, since STB is live and mid-cycle.
   const STB_DEFAULT_MATRIX = [
     // Technical / Administrative staff
     { rateeRole: 'Technical Staff', raterType: 'Self',           sourceRoles: '',                          scope: 'self',                   fallbackScope: '' },
-    { rateeRole: 'Technical Staff', raterType: 'Peer1',          sourceRoles: 'Staff,Technical Staff,Administrative Staff', scope: 'same-section', fallbackScope: 'same-division' },
-    { rateeRole: 'Technical Staff', raterType: 'Peer2',          sourceRoles: 'Staff,Technical Staff,Administrative Staff', scope: 'same-section-preferred', fallbackScope: 'same-division' },
+    { rateeRole: 'Technical Staff', raterType: 'Peer1',          sourceRoles: 'Technical Staff,Administrative Staff', scope: 'same-section', fallbackScope: 'same-division' },
+    { rateeRole: 'Technical Staff', raterType: 'Peer2',          sourceRoles: 'Technical Staff,Administrative Staff', scope: 'same-section-preferred', fallbackScope: 'same-division' },
     { rateeRole: 'Technical Staff', raterType: 'Supervisor',     sourceRoles: 'Section Head',              scope: 'same-section',           fallbackScope: 'same-division' },
     { rateeRole: 'Technical Staff', raterType: 'SkipSupervisor', sourceRoles: 'Division Chief',            scope: 'same-division',          fallbackScope: '' },
 
     // Section Head
     { rateeRole: 'Section Head', raterType: 'Self',           sourceRoles: '',                             scope: 'self',          fallbackScope: '' },
     { rateeRole: 'Section Head', raterType: 'Peer',           sourceRoles: 'Section Head',                 scope: 'same-division', fallbackScope: '' },
-    { rateeRole: 'Section Head', raterType: 'Subordinate',    sourceRoles: 'Staff,Technical Staff,Administrative Staff', scope: 'same-section', fallbackScope: 'same-division' },
+    { rateeRole: 'Section Head', raterType: 'Subordinate',    sourceRoles: 'Technical Staff,Administrative Staff', scope: 'same-section', fallbackScope: 'same-division' },
     { rateeRole: 'Section Head', raterType: 'Supervisor',     sourceRoles: 'Division Chief',               scope: 'same-division', fallbackScope: '' },
     { rateeRole: 'Section Head', raterType: 'SkipSupervisor', sourceRoles: 'Assistant Bureau Director',    scope: 'office-wide',   fallbackScope: '' },
 
@@ -81,20 +81,20 @@ const RaterMatrixService = (() => {
     { rateeRole: 'Division Chief', raterType: 'Supervisor',     sourceRoles: 'Assistant Bureau Director', scope: 'office-wide',   fallbackScope: '' },
     { rateeRole: 'Division Chief', raterType: 'SkipSupervisor', sourceRoles: 'Bureau Director',           scope: 'office-wide',   fallbackScope: '' },
 
-    // Assistant Bureau Director — no skip supervisor above them
+    // Assistant Bureau Director - no skip supervisor above them
     { rateeRole: 'Assistant Bureau Director', raterType: 'Self',        sourceRoles: '',                          scope: 'self',        fallbackScope: '' },
     { rateeRole: 'Assistant Bureau Director', raterType: 'Peer',        sourceRoles: 'Assistant Bureau Director', scope: 'office-wide', fallbackScope: '' },
     { rateeRole: 'Assistant Bureau Director', raterType: 'Subordinate', sourceRoles: 'Division Chief',            scope: 'office-wide', fallbackScope: '' },
     { rateeRole: 'Assistant Bureau Director', raterType: 'Supervisor',  sourceRoles: 'Bureau Director',           scope: 'office-wide', fallbackScope: '' },
 
-    // Bureau Director — self and a subordinate view only
+    // Bureau Director - self and a subordinate view only
     { rateeRole: 'Bureau Director', raterType: 'Self',        sourceRoles: '',                          scope: 'self',        fallbackScope: '' },
     { rateeRole: 'Bureau Director', raterType: 'Subordinate', sourceRoles: 'Assistant Bureau Director', scope: 'office-wide', fallbackScope: '' }
   ]
 
   // Roles treated as equivalent to 'Technical Staff' when seeding, so the STB
   // defaults cover every staff variant without three duplicate blocks.
-  const STAFF_ALIASES = ['Staff', 'Administrative Staff']
+  const STAFF_ALIASES = ['Administrative Staff']
 
   // ── Sheet access ──────────────────────────────────────────────────────────
 
@@ -137,7 +137,7 @@ const RaterMatrixService = (() => {
   // The RaterMatrix table, OfficeOrgOptions and OfficeRegistry are all central
   // configuration. Every public entry point binds to the central database
   // explicitly rather than inheriting whatever spreadsheet the current request
-  // happens to be scoped to — assignment generation, for example, runs inside
+  // happens to be scoped to - assignment generation, for example, runs inside
   // an office-scoped request but must still read the central matrix.
   // officePersonnelRows_ sets its own office override for the Personnel read,
   // which is the one genuinely per-office thing this service touches.
@@ -164,7 +164,7 @@ const RaterMatrixService = (() => {
   /**
    * Replace the whole matrix for one office in a single call.
    * Whole-set replacement rather than per-row edits, because a rater matrix is
-   * only meaningful as a complete set — a half-applied edit could leave a role
+   * only meaningful as a complete set - a half-applied edit could leave a role
    * with no supervisor and silently under-rate everyone in it.
    */
   function save(body, user) {
@@ -233,8 +233,15 @@ const RaterMatrixService = (() => {
    * @returns {{raters: Array, unmappedRole: boolean, missing: Array}}
    */
   function resolveRatersFor(ratee, allUsers, prevAssign, matrixRows, helpers) {
-    const role = String(ratee.role || '').trim()
-    const applicable = matrixRows.filter(r => String(r.rateeRole || '').trim() === role)
+    const role = typeof RoleLabelService !== 'undefined'
+      ? RoleLabelService.canonicalRole(ratee.role)
+      : String(ratee.role || '').trim()
+    const applicable = matrixRows.filter(r => {
+      const rowRole = typeof RoleLabelService !== 'undefined'
+        ? RoleLabelService.canonicalRole(r.rateeRole)
+        : String(r.rateeRole || '').trim()
+      return rowRole === role
+    })
 
     if (!applicable.length) {
       return { raters: [], unmappedRole: true, missing: [] }
@@ -274,7 +281,9 @@ const RaterMatrixService = (() => {
 
     const byRole = allUsers.filter(u =>
       excluded.indexOf(u.id) < 0 &&
-      sourceRoles.indexOf(String(u.role || '').trim()) >= 0
+      sourceRoles.indexOf(typeof RoleLabelService !== 'undefined'
+        ? RoleLabelService.canonicalRole(u.role)
+        : String(u.role || '').trim()) >= 0
     )
 
     const primary = poolForScope_(byRole, ratee, String(row.scope || 'office-wide'))
@@ -303,7 +312,7 @@ const RaterMatrixService = (() => {
     if (scope === 'same-division') return candidates.filter(u => String(u.divisionId || '') === div)
 
     if (scope === 'same-section') {
-      // With no section recorded, the whole division is the section — this
+      // With no section recorded, the whole division is the section - this
       // matches the original behaviour and avoids returning an empty pool for
       // rosters that never captured section data.
       if (!sec) return candidates.filter(u => String(u.divisionId || '') === div)
@@ -325,7 +334,9 @@ const RaterMatrixService = (() => {
   // ── Validation / normalisation ────────────────────────────────────────────
 
   function normalizeRow_(item, officeId, index) {
-    const rateeRole = String(item.rateeRole || '').trim()
+    const rateeRole = typeof RoleLabelService !== 'undefined'
+      ? RoleLabelService.canonicalRole(item.rateeRole)
+      : String(item.rateeRole || '').trim()
     const raterType = String(item.raterType || '').trim()
     const scope = String(item.scope || 'office-wide').trim()
 
@@ -337,7 +348,9 @@ const RaterMatrixService = (() => {
       throw HttpError(`"${scope}" is not a valid scope.`, 400)
     }
 
-    const sourceRoles = String(item.sourceRoles || '').trim()
+    const sourceRoles = typeof RoleLabelService !== 'undefined'
+      ? RoleLabelService.canonicalRoleList(item.sourceRoles || '')
+      : String(item.sourceRoles || '').trim()
     if (scope !== 'self' && !sourceRoles) {
       throw HttpError(`${rateeRole} → ${raterType} needs at least one source role.`, 400)
     }
@@ -365,8 +378,8 @@ const RaterMatrixService = (() => {
       seen[key] = true
     })
 
-    // A role with no Self row is almost certainly a mistake — self-rating is in
-    // every variant of the protocol — but it is not structurally invalid, so
+    // A role with no Self row is almost certainly a mistake - self-rating is in
+    // every variant of the protocol - but it is not structurally invalid, so
     // this surfaces as a warning through coverage rather than a hard rejection.
   }
 
@@ -387,14 +400,21 @@ const RaterMatrixService = (() => {
     const officeId = resolveOfficeId_(profile, params)
     const matrix = rows_(officeId, user)
     const configuredRoles = {}
-    matrix.forEach(r => { configuredRoles[String(r.rateeRole || '').trim()] = true })
+    matrix.forEach(r => {
+      const role = typeof RoleLabelService !== 'undefined'
+        ? RoleLabelService.canonicalRole(r.rateeRole)
+        : String(r.rateeRole || '').trim()
+      if (role) configuredRoles[role] = true
+    })
 
     const users = officePersonnelRows_(officeId, user)
       .filter(u => u.active === true || String(u.active).toLowerCase() === 'true')
 
     const roleCounts = {}
     users.forEach(u => {
-      const role = String(u.role || '').trim()
+      const role = typeof RoleLabelService !== 'undefined'
+        ? RoleLabelService.canonicalRole(u.role)
+        : String(u.role || '').trim()
       if (!role || role === 'System Administrator') return
       roleCounts[role] = (roleCounts[role] || 0) + 1
     })
@@ -404,7 +424,12 @@ const RaterMatrixService = (() => {
       personnel: roleCounts[role],
       configured: Boolean(configuredRoles[role]),
       raterTypes: matrix
-        .filter(r => String(r.rateeRole || '').trim() === role)
+        .filter(r => {
+          const rowRole = typeof RoleLabelService !== 'undefined'
+            ? RoleLabelService.canonicalRole(r.rateeRole)
+            : String(r.rateeRole || '').trim()
+          return rowRole === role
+        })
         .map(r => r.raterType)
     }))
 
@@ -505,13 +530,15 @@ const RaterMatrixService = (() => {
 
   function sanitizeForOfficeRoles_(row, roles) {
     if (!roles) return row
-    const rateeRole = String(row.rateeRole || '').trim()
+    const rateeRole = typeof RoleLabelService !== 'undefined'
+      ? RoleLabelService.canonicalRole(row.rateeRole)
+      : String(row.rateeRole || '').trim()
     if (!roles[rateeRole]) return null
     if (String(row.scope || '') === 'self') return row
 
     const sourceRoles = String(row.sourceRoles || '')
       .split(',')
-      .map(s => s.trim())
+      .map(s => typeof RoleLabelService !== 'undefined' ? RoleLabelService.canonicalRole(s) : s.trim())
       .filter(role => role && roles[role])
     if (!sourceRoles.length) return null
     return {
@@ -536,7 +563,9 @@ const RaterMatrixService = (() => {
     const seen = {}
     const roles = []
     function add(role) {
-      const name = String(role || '').trim()
+      const name = typeof RoleLabelService !== 'undefined'
+        ? RoleLabelService.canonicalRole(role)
+        : String(role || '').trim()
       if (!name || seen[name]) return
       seen[name] = true
       roles.push(name)
@@ -612,7 +641,9 @@ const RaterMatrixService = (() => {
         .filter(row => row.active !== false && String(row.active).toLowerCase() !== 'false')
         .sort((a, b) => Number(a.sequence || 0) - Number(b.sequence || 0))
         .forEach(row => {
-          const role = String(row.rateeRole || '').trim()
+          const role = typeof RoleLabelService !== 'undefined'
+            ? RoleLabelService.canonicalRole(row.rateeRole)
+            : String(row.rateeRole || '').trim()
           if (!role || seen[role]) return
           seen[role] = true
           roles.push(role)

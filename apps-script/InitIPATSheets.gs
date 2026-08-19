@@ -33,7 +33,7 @@ function initIPATSheets() {
     'semester','year','createdAt','updatedAt'
   ])
 
-  // 4. IPATRaterAssignments — auto-generated rater assignments per period
+  // 4. IPATRaterAssignments - auto-generated rater assignments per period
   _createSheetIfMissing(ss, 'IPATRaterAssignments', [
     'id','semester','year',
     'rateeId','rateeName','rateeDivisionId','rateeRole','rateeSection',
@@ -47,7 +47,7 @@ function initIPATSheets() {
 }
 
 function _createSheetIfMissing(ss, name, headers) {
-  // Alias-aware — see SHEET_NAME_FALLBACKS in SpreadsheetService. A tab already
+  // Alias-aware - see SHEET_NAME_FALLBACKS in SpreadsheetService. A tab already
   // renamed (e.g. IPATRecords -> AssessmentRecords) must not be re-created here
   // as an empty duplicate under its old name.
   let sheet = SpreadsheetService.findSheet(name)

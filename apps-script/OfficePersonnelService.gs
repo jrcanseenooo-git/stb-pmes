@@ -8,6 +8,7 @@ const OfficePersonnelService = (() => {
   ]
 
   function list(params, user) {
+    canViewOffice_(user, params || {})
     return withOffice_(params, user, () => {
       let rows = SpreadsheetService.getAllRows(personnelSheet_()).map(safeRow_)
       if (params.search) {
@@ -118,7 +119,6 @@ const OfficePersonnelService = (() => {
       AuthService.hasPermission(profile, 'manage_office_registry') ||
       AuthService.hasPermission(profile, 'manage_cluster_office_admins')
     const officeAdmin = AuthService.hasPermission(profile, 'manage_office_users') ||
-      String(profile.systemScope || '') === 'OFFICE_ADMIN' ||
       String(profile.officeRole || '') === 'OFFICE_ADMIN'
     const profileOffice = String(profile.officeId || profile.officeCode || '').trim().toUpperCase()
     if (!central && !(officeAdmin && officeId && officeId.toUpperCase() === profileOffice && officeId.toUpperCase() !== 'STB')) {
@@ -185,9 +185,24 @@ const OfficePersonnelService = (() => {
     const profile = AuthService.getProfile(user)
     const central = AuthService.hasPermission(profile, 'manage_office_registry') ||
       AuthService.hasPermission(profile, 'manage_cluster_office_admins')
-    const officeAdmin = String(profile.systemScope || '') === 'OFFICE_ADMIN' ||
-      String(profile.officeRole || '') === 'OFFICE_ADMIN'
+    const officeAdmin = String(profile.officeRole || '') === 'OFFICE_ADMIN'
     if (!central && !officeAdmin) throw HttpError('Access denied. Office administrator role required.', 403)
+    resolveOfficeId_(profile, params || {})
+    return profile
+  }
+
+  function canViewOffice_(user, params) {
+    const profile = AuthService.getProfile(user)
+    const role = String(profile.role || '').trim()
+    const ok = String(profile.officeRole || '') === 'OFFICE_ADMIN' ||
+      AuthService.hasPermission(profile, 'manage_office_users') ||
+      AuthService.hasPermission(profile, 'manage_cluster_office_admins') ||
+      AuthService.hasPermission(profile, 'manage_office_registry') ||
+      AuthService.hasPermission(profile, 'view_division_monitoring') ||
+      AuthService.hasPermission(profile, 'view_bureau_monitoring') ||
+      role === 'Division Chief' ||
+      role === 'Section Head'
+    if (!ok) throw HttpError('Access denied. Office personnel view permission required.', 403)
     resolveOfficeId_(profile, params || {})
     return profile
   }
@@ -217,6 +232,9 @@ const OfficePersonnelService = (() => {
   }
 
   function toRow_(body) {
+    const role = typeof RoleLabelService !== 'undefined'
+      ? RoleLabelService.canonicalRole(body.role || 'Technical Staff')
+      : (String(body.role || '').trim() === 'Staff' ? 'Technical Staff' : (body.role || 'Technical Staff'))
     return {
       id: body.id || '',
       uid: body.uid || '',
@@ -224,8 +242,10 @@ const OfficePersonnelService = (() => {
       fullName: body.fullName || '',
       employeeNo: body.employeeNo || '',
       position: body.position || '',
-      positionLevel: body.positionLevel || body.role || '',
-      role: body.role || 'Technical Staff',
+      positionLevel: typeof RoleLabelService !== 'undefined'
+        ? RoleLabelService.canonicalRole(body.positionLevel || role || '')
+        : (body.positionLevel || role || ''),
+      role: role,
       divisionId: body.divisionId || body.organizationalUnitId || '',
       divisionName: body.divisionName || body.organizationalUnitName || '',
       organizationalUnitId: body.organizationalUnitId || body.divisionId || '',

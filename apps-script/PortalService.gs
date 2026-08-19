@@ -209,8 +209,8 @@ const PortalService = (() => {
    * Read-only assessment library for the portal.
    *
    * Returns published assessment content and its categories only. KRA content is
-   * structurally absent — it lives in STB-only sheets that the evaluation-only
-   * office spreadsheets do not contain — so there is nothing to filter out here.
+   * structurally absent - it lives in STB-only sheets that the evaluation-only
+   * office spreadsheets do not contain - so there is nothing to filter out here.
    * Authoring fields are dropped so the response cannot be mistaken for an
    * editing surface.
    */
@@ -257,8 +257,9 @@ const PortalService = (() => {
   /**
    * Office assessment analytics for office administrators.
    *
-   * Aggregated entirely on the server: the response carries counts and
-   * percentages, never personnel rows or rating values. Office routing is
+   * Aggregated entirely on the server. The response carries operational
+   * rollups and consolidated personnel outcomes only; raw rating answers and
+   * individual rater identities never leave the server. Office routing is
    * already applied, so an office administrator can only ever summarize their
    * own office; a central administrator may target one office explicitly and
    * that targeting is validated by OfficeScopeService, not here.
@@ -281,6 +282,8 @@ const PortalService = (() => {
 
     const completed = assignments.filter(row => String(row.status) === 'Completed')
     const outstanding = assignments.filter(row => String(row.status) !== 'Completed')
+
+    const insights = buildOfficeInsights_(assignments, records, profile)
 
     return {
       period: {
@@ -311,6 +314,7 @@ const PortalService = (() => {
       ),
       byRaterType: groupCompletion_(assignments, row => row.raterType || 'Unspecified'),
       attention: buildAttention_(personnel.length, pendingPersonnel.length, assignments.length, completed.length),
+      insights: insights,
       generatedAt: new Date().toISOString()
     }
   }
@@ -365,6 +369,221 @@ const PortalService = (() => {
       .sort((a, b) => b.total - a.total)
   }
 
+  function buildOfficeInsights_(assignments, records, profile) {
+    const pendingPersonnel = buildPendingPersonnel_(assignments)
+    const scoredPersonnel = buildScoredPersonnel_(records)
+
+    return {
+      pendingPersonnel: pendingPersonnel,
+      outstandingPersonnel: scoredPersonnel
+        .filter(row => row.descriptor === 'Outstanding')
+        .sort((a, b) => (Number(b.score) || 0) - (Number(a.score) || 0) || a.name.localeCompare(b.name)),
+      needsImprovementPersonnel: scoredPersonnel
+        .filter(row => row.descriptor === 'Needs Improvement' || (Number(row.score) && Number(row.score) < 3.01))
+        .sort((a, b) => (Number(a.score) || 0) - (Number(b.score) || 0) || a.name.localeCompare(b.name)),
+      lowestPersonnel: scoredPersonnel
+        .slice()
+        .sort((a, b) => (Number(a.score) || 0) - (Number(b.score) || 0) || a.name.localeCompare(b.name))
+        .slice(0, 10),
+      top: {
+        section: buildGroupInsights_(records, assignments, row => sectionLabel_(row), profile),
+        division: buildGroupInsights_(records, assignments, row => divisionLabel_(row), profile),
+        office: buildGroupInsights_(records, assignments, row => officeLabel_(row, profile), profile)
+      }
+    }
+  }
+
+  function buildPendingPersonnel_(assignments) {
+    const groups = {}
+    assignments.forEach(row => {
+      const key = personKey_(row)
+      if (!groups[key]) {
+        groups[key] = {
+          id: key,
+          name: personName_(row),
+          division: divisionLabel_(row),
+          section: sectionLabel_(row),
+          role: row.rateeRole || row.rateePosition || row.position || '',
+          totalTasks: 0,
+          completedTasks: 0,
+          pendingTasks: 0,
+          status: 'Pending'
+        }
+      }
+      groups[key].totalTasks += 1
+      if (String(row.status) === 'Completed') {
+        groups[key].completedTasks += 1
+      } else {
+        groups[key].pendingTasks += 1
+      }
+    })
+
+    return Object.keys(groups)
+      .map(key => {
+        const row = groups[key]
+        row.completionRate = row.totalTasks ? Math.round((row.completedTasks / row.totalTasks) * 100) : 0
+        return row
+      })
+      .filter(row => row.pendingTasks > 0)
+      .sort((a, b) => b.pendingTasks - a.pendingTasks || a.completionRate - b.completionRate || a.name.localeCompare(b.name))
+  }
+
+  function buildScoredPersonnel_(records) {
+    const latest = {}
+    records.forEach(row => {
+      const score = numericScore_(row.overallScore)
+      const descriptor = descriptorLabel_(row)
+      if (!descriptor && score === null) return
+      const key = personKey_(row)
+      const current = latest[key]
+      const updatedAt = String(row.updatedAt || row.createdAt || '')
+      if (!current || updatedAt > String(current.updatedAt || '')) {
+        latest[key] = {
+          id: key,
+          recordId: row.id || '',
+          name: personName_(row),
+          division: divisionLabel_(row),
+          section: sectionLabel_(row),
+          role: row.rateeRole || row.position || row.positionLevel || '',
+          score: score,
+          descriptor: descriptor || descriptorForScore_(score),
+          status: row.status || '',
+          updatedAt: updatedAt
+        }
+      }
+    })
+    return Object.keys(latest).map(key => latest[key])
+  }
+
+  function buildGroupInsights_(records, assignments, keyOf, profile) {
+    const groups = {}
+    const ensure = (label) => {
+      const key = String(label || 'Unassigned').trim() || 'Unassigned'
+      if (!groups[key]) {
+        groups[key] = {
+          id: key,
+          label: key,
+          totalTasks: 0,
+          completedTasks: 0,
+          pendingTasks: 0,
+          scoredCount: 0,
+          scoreTotal: 0,
+          outstandingCount: 0,
+          needsImprovementCount: 0
+        }
+      }
+      return groups[key]
+    }
+
+    assignments.forEach(row => {
+      const group = ensure(keyOf(row) || officeLabel_(row, profile))
+      group.totalTasks += 1
+      if (String(row.status) === 'Completed') {
+        group.completedTasks += 1
+      } else {
+        group.pendingTasks += 1
+      }
+    })
+
+    records.forEach(row => {
+      const score = numericScore_(row.overallScore)
+      const descriptor = descriptorLabel_(row) || descriptorForScore_(score)
+      const group = ensure(keyOf(row) || officeLabel_(row, profile))
+      if (score !== null) {
+        group.scoredCount += 1
+        group.scoreTotal += score
+      }
+      if (descriptor === 'Outstanding') group.outstandingCount += 1
+      if (descriptor === 'Needs Improvement') group.needsImprovementCount += 1
+    })
+
+    const rows = Object.keys(groups).map(key => {
+      const group = groups[key]
+      const averageScore = group.scoredCount ? Math.round((group.scoreTotal / group.scoredCount) * 100) / 100 : null
+      return {
+        id: group.id,
+        label: group.label,
+        totalTasks: group.totalTasks,
+        completedTasks: group.completedTasks,
+        pendingTasks: group.pendingTasks,
+        completionRate: group.totalTasks ? Math.round((group.completedTasks / group.totalTasks) * 100) : 0,
+        scoredCount: group.scoredCount,
+        averageScore: averageScore,
+        outstandingCount: group.outstandingCount,
+        needsImprovementCount: group.needsImprovementCount
+      }
+    })
+
+    return {
+      outstanding: rows
+        .filter(row => row.outstandingCount > 0)
+        .sort((a, b) => b.outstandingCount - a.outstandingCount || (Number(b.averageScore) || 0) - (Number(a.averageScore) || 0))
+        .slice(0, 3),
+      needsImprovement: rows
+        .filter(row => row.needsImprovementCount > 0)
+        .sort((a, b) => b.needsImprovementCount - a.needsImprovementCount || (Number(a.averageScore) || 0) - (Number(b.averageScore) || 0))
+        .slice(0, 3),
+      pending: rows
+        .filter(row => row.pendingTasks > 0)
+        .sort((a, b) => b.pendingTasks - a.pendingTasks || a.completionRate - b.completionRate)
+        .slice(0, 3),
+      all: rows.sort((a, b) => a.label.localeCompare(b.label))
+    }
+  }
+
+  function personKey_(row) {
+    return String(row.rateeId || row.id || row.email || row.rateeName || row.fullName || 'UNKNOWN').trim()
+  }
+
+  function personName_(row) {
+    return String(row.rateeName || row.fullName || row.name || row.email || 'Unspecified personnel').trim()
+  }
+
+  function divisionLabel_(row) {
+    return String(row.rateeDivisionName || row.divisionName || row.organizationalUnitName || row.division || row.rateeDivisionId || 'Unassigned').trim() || 'Unassigned'
+  }
+
+  function sectionLabel_(row) {
+    return String(row.rateeSection || row.section || row.sectionName || 'Unassigned').trim() || 'Unassigned'
+  }
+
+  function officeLabel_(row, profile) {
+    return String(row.officeName || row.officeShortName || (profile && (profile.officeName || profile.officeShortName)) || 'Office').trim() || 'Office'
+  }
+
+  function numericScore_(value) {
+    const score = Number(value)
+    return Number.isFinite(score) && score > 0 ? score : null
+  }
+
+  function descriptorLabel_(row) {
+    const value = String(row && row.descriptor || '').trim()
+    if (!value) return ''
+    const normalized = value.toLowerCase()
+    if (normalized === 'outstanding' || normalized === 'excellent alignment') return 'Outstanding'
+    if (normalized === 'very satisfactory') return 'Very Satisfactory'
+    if (normalized === 'satisfactory') return 'Satisfactory'
+    if (normalized === 'needs improvement') return 'Needs Improvement'
+    if (normalized === 'requires immediate intervention') return 'Requires Immediate Intervention'
+    return value
+  }
+
+  // Fallback used only when a record carries a score but no stored descriptor
+  // (legacy, migrated, or manually encoded rows). It MUST agree with the
+  // protocol's bands, because it feeds the office dashboard's Top Outstanding /
+  // Top Needs Improvement lists and the per-unit outstanding counts.
+  //
+  // This previously used 3.51/3.01/2.51 with only four bands, which overstated
+  // every result - 3.60 read as Outstanding when the protocol calls it Very
+  // Satisfactory - and omitted 'Requires Immediate Intervention' entirely, so
+  // the band that most needs surfacing could never appear. Delegating to
+  // IPATService keeps one implementation of the bands.
+  function descriptorForScore_(score) {
+    const value = Number(score)
+    if (!Number.isFinite(value) || value <= 0) return ''
+    return IPATService.qualitativeDescriptor(value)
+  }
+
   // Neutral operational signals only. These describe the state of the office's
   // configuration and progress, never a judgement about any employee.
   function buildAttention_(personnelCount, pendingCount, taskCount, completedCount) {
@@ -417,7 +636,7 @@ const PortalService = (() => {
         })
       } catch (e) {
         // A missing rating tab means nothing has been saved yet in this office.
-        Logger.log('[Portal] rating sheet unavailable: ' + sheetName + ' — ' + e.message)
+        Logger.log('[Portal] rating sheet unavailable: ' + sheetName + ' - ' + e.message)
       }
     }
     collect(SHEET.IPAT_CBC_RATINGS)

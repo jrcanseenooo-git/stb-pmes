@@ -1,5 +1,6 @@
 import { computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import { officeAcronym } from '@/utils/officeAcronyms'
 
 const STB_PORTAL_TITLE = 'Performance Management and Evaluation System'
 const STB_PORTAL_SUBTITLE = 'Social Technology Bureau'
@@ -9,7 +10,7 @@ const CLUSTER_PORTAL_TITLE = 'Innovation Cluster Personnel Assessment Portal'
  * Single source of truth for portal naming.
  *
  * The cluster specification requires the portal title and the office subtitle to
- * follow the authenticated user everywhere the system names itself — shell,
+ * follow the authenticated user everywhere the system names itself - shell,
  * browser tab, reports, print views and exports. Anything that renders a title
  * should read it from here rather than hard-coding "PMES" or "STB", so a new
  * participating office needs no code change to be named correctly.
@@ -22,6 +23,11 @@ export function useBranding() {
 
   const officeName = computed(() => authStore.profile?.officeName || '')
   const officeCode = computed(() => authStore.profile?.officeCode || '')
+  const officeShortName = computed(() => officeAcronym({
+    officeCode: officeCode.value,
+    officeName: officeName.value,
+    officeId: authStore.profile?.officeId || ''
+  }))
 
   const portalTitle = computed(() => (isClusterPortal.value ? CLUSTER_PORTAL_TITLE : STB_PORTAL_TITLE))
 
@@ -37,7 +43,7 @@ export function useBranding() {
 
   const shortName = computed(() => {
     if (!isClusterPortal.value) return 'PMES'
-    return officeCode.value || 'ICPAP'
+    return officeShortName.value || 'ICPAP'
   })
 
   // Used for the browser tab and for report/print headers.
@@ -49,7 +55,7 @@ export function useBranding() {
   const reportHeader = computed(() => ({
     title: portalTitle.value,
     subtitle: portalSubtitle.value,
-    officeCode: officeCode.value
+    officeCode: officeShortName.value || officeCode.value
   }))
 
   return {
@@ -57,6 +63,7 @@ export function useBranding() {
     isClusterPortal,
     officeName,
     officeCode,
+    officeShortName,
     portalTitle,
     portalSubtitle,
     wordmarkTop,

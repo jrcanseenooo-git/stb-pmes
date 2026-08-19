@@ -1,8 +1,8 @@
 /**
- * ui-kit.css — shared component styles for the multi-office portal modules.
+ * ui-kit.css - shared component styles for the multi-office portal modules.
  *
  * This app's Tailwind build (main.css: @tailwind base/components/utilities)
- * has never been imported since the initial commit — a deliberate prior
+ * has never been imported since the initial commit - a deliberate prior
  * decision, because Tailwind's preflight reset and global `*` rules would
  * visually alter every existing hand-styled STB screen. That stylesheet stays
  * dead. This file is hand-written, plain CSS with no reset and no `*`
@@ -10,12 +10,12 @@
  * cannot collide with or affect any existing view's markup or scoped styles.
  *
  * Values (colors, radii, spacing) are matched to this app's actual established
- * visual language — DashboardView.vue's stat cards, AppLayout's sidebar, and
- * the original OfficeRegistryView/OfficePersonnelView — not to Tailwind's
+ * visual language - DashboardView.vue's stat cards, AppLayout's sidebar, and
+ * the original OfficeRegistryView/OfficePersonnelView - not to Tailwind's
  * defaults.
  */
 
-/* Scoped to `pui-` classes only (attribute selector, not `*`) — every element
+/* Scoped to `pui-` classes only (attribute selector, not `*`) - every element
    with padding + width:100% in this file needs border-box or its rendered
    width exceeds its container under the browser's content-box default,
    producing exactly the horizontal-scrollbar symptom this was written to fix. */
@@ -53,7 +53,7 @@
   margin: 2px 0 0;
 }
 
-/* No padding here — AppLayout's .page-body already pads routed content. */
+/* No padding here - AppLayout's .page-body already pads routed content. */
 .pui-page {
   display: grid;
   gap: 16px;

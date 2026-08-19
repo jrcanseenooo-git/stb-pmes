@@ -44,7 +44,7 @@ const IpcrfService = (() => {
     if (params.divisionId) rows = rows.filter(r => r.divisionId === params.divisionId)
     if (params.type)       rows = rows.filter(r => r.type       === params.type)
 
-    // Attach sectionName — prefer stored value, fall back to live user lookup
+    // Attach sectionName - prefer stored value, fall back to live user lookup
     rows = rows.map(r => ({
       ...r,
       sectionName: r.sectionName || sectionMap[r.userId] || '',
@@ -202,7 +202,7 @@ const IpcrfService = (() => {
     if (existing) throw HttpError(`An ${_type} form already exists for ${body.year}`, 409)
 
     // ── Derive position level and weights from user's position title ──
-    // Never trust frontend input for these — always compute server-side.
+    // Never trust frontend input for these - always compute server-side.
     const _level   = PositionHelper.resolveLevel(profile.position || '')
     const _weights = PositionHelper.resolveWeights(profile)
 
@@ -293,7 +293,7 @@ const IpcrfService = (() => {
     })
     AuditService.log('SUBMIT', 'IPCRF', `Submitted form ${id}`, user)
     // Clear any stale "assigned/routed to you" notifications from a prior review
-    // cycle before notifying the division focal fresh — the form is back at the
+    // cycle before notifying the division focal fresh - the form is back at the
     // start of the chain, so earlier reviewers are no longer the current holder.
     _obsoleteRouteNotifications(id)
     _notifyReviewers(updated, profile)
@@ -424,7 +424,7 @@ const IpcrfService = (() => {
       updatedAt:     new Date().toISOString()
     })
     AuditService.log('RETURN', 'IPCRF', `Returned form ${id}: ${body.remarks || ''}`, user)
-    // The form has left the review chain — clear reviewers' now-stale routing
+    // The form has left the review chain - clear reviewers' now-stale routing
     // notifications so they don't see it "assigned" with an empty queue.
     _obsoleteRouteNotifications(id)
     _notifyUser(row.userId, 'revision',
@@ -440,7 +440,7 @@ const IpcrfService = (() => {
     const row     = SpreadsheetService.getRow(sheet, id)
     if (!row) throw HttpError('Form not found', 404)
     if (row.userId !== profile.id) throw HttpError('Only the form owner can submit ratings for review.', 403)
-    if (row.status === 'Rated') return row  // idempotent — already submitted
+    if (row.status === 'Rated') return row  // idempotent - already submitted
     _assertTransition(row.status, 'Rated')
 
     const updated = SpreadsheetService.updateRow(sheet, id, {
@@ -451,7 +451,7 @@ const IpcrfService = (() => {
     AuditService.log('SUBMIT_RATINGS', 'IPCRF', 'Owner submitted ratings for form ' + id, user)
     _notifyRouteRecipient(
       row.ratingRoutedToUserId,
-      row.employeeName + ' has submitted ' + row.type + ' ratings — ready for Division Chief review.',
+      row.employeeName + ' has submitted ' + row.type + ' ratings - ready for Division Chief review.',
       id
     )
     return updated
@@ -484,7 +484,7 @@ const IpcrfService = (() => {
     AuditService.log('RATE', 'IPCRF', `Rated form ${id}: ${body.finalNumericalRating} (${body.adjectivalRating})`, user)
     _autoRegenDoc(id, user)
     _notifyUser(row.userId, 'approval',
-      `Your ${row.type} has been rated: ${body.finalNumericalRating} – ${body.adjectivalRating}`,
+      `Your ${row.type} has been rated: ${body.finalNumericalRating} - ${body.adjectivalRating}`,
       id, 'IPCRF'
     )
     return updated
@@ -706,7 +706,7 @@ const IpcrfService = (() => {
   // ─────────────────────────────────────────────
 
   // ─────────────────────────────────────────────
-  // CROSS-MODULE LOOKUP — used by IPATService (Evaluation/FPO domain)
+  // CROSS-MODULE LOOKUP - used by IPATService (Evaluation/FPO domain)
   // Finds the IPCRF or CCEF form whose Final Numerical Rating should
   // feed the Functional Performance Output (FPO) score for a given
   // ratee/period. Only forms that have actually been rated carry a
@@ -788,7 +788,7 @@ const IpcrfService = (() => {
 
   // Enforces that an approver's role-level access (checked by requireRole) also
   // matches the specific form's division/section. Previously Division Chief had
-  // no such check here at all — any Division Chief could approve/rate/return any
+  // no such check here at all - any Division Chief could approve/rate/return any
   // division's form via direct API call, not just their own. Section Head needs
   // this even more, since its whole point is a narrower scope than Division Chief.
   function _assertApproverScope(row, profile) {
@@ -865,7 +865,7 @@ const IpcrfService = (() => {
   }
 
   // When a form re-enters (or leaves) the review chain, any earlier "routed/
-  // assigned to you" notifications for it are stale — a reviewer would see the
+  // assigned to you" notifications for it are stale - a reviewer would see the
   // notification but find nothing in their queue because the form has moved on.
   // Mark those unread routing notifications (type 'submission') as read.
   function _obsoleteRouteNotifications(formId) {
@@ -1039,7 +1039,7 @@ const IpcrfService = (() => {
 
   // ── Period status check (self-service Generate Targets/Ratings entry point) ──
   // Derives IPCRF vs CCEF from the caller's own Employment Type, finds their own
-  // form for the given semester/year, and — for Ratings — whether every linked
+  // form for the given semester/year, and - for Ratings - whether every linked
   // Accomplishments record has been approved yet.
   function getPeriodStatus(params, user) {
     const profile = AuthService.getProfile(user)

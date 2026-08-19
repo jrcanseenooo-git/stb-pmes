@@ -11,7 +11,7 @@ const props = defineProps({
 })
 
 // Neutral, non-punitive wording. Section 36 of the cluster specification bans
-// labels that read as a judgement of the employee — these describe the record.
+// labels that read as a judgement of the employee - these describe the record.
 const LABELS = {
   ACTIVE: 'Active',
   INACTIVE: 'Inactive',
@@ -41,7 +41,7 @@ const WARN = ['PENDING', 'PENDING_VALIDATION', 'DRAFT', 'REOPENED', 'FOR_VALIDAT
 const BAD  = ['REJECTED', 'INVALID_SCHEMA', 'INACCESSIBLE', 'EXPIRED', 'SUSPENDED']
 
 const key = computed(() => String(props.status || '').trim().toUpperCase().replace(/[\s-]+/g, '_'))
-const display = computed(() => props.label || LABELS[key.value] || props.status || '—')
+const display = computed(() => props.label || LABELS[key.value] || props.status || '-')
 
 const toneClass = computed(() => {
   if (GOOD.includes(key.value)) return 'pui-badge-good'

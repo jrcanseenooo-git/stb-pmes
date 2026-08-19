@@ -4,7 +4,7 @@
     <div class="ob-shell">
       <div class="ob-hero">
         <div class="ob-kicker">DSWD INNOVATION CLUSTER</div>
-        <h1 class="ob-title">Performance Management and Evaluation System</h1>
+        <h1 class="ob-title">Performance Monitoring &amp; Evaluation System</h1>
       </div>
 
       <div class="ob-card">
@@ -21,7 +21,7 @@
             <circle cx="7.5" cy="7.5" r="6.3" stroke="#1D4ED8" stroke-width="1.3"/>
             <path d="M7.5 4.4v3.6M7.5 10v.1" stroke="#1D4ED8" stroke-width="1.4" stroke-linecap="round"/>
           </svg>
-          Your Google account isn't set up in PMES yet. Fill in your details below — an administrator will review and activate your access.
+          Your Google account isn't set up in PMES yet. Fill in your details below - an administrator will review and activate your access.
         </div>
 
         <transition name="ob-fade">
@@ -98,16 +98,24 @@
             </div>
             <div class="ob-field ob-full">
               <label>
-                Division <span class="ob-hint">{{ divisionOptionsForOffice.length ? 'optional' : 'admin confirms' }}</span>
+                Division <span class="ob-hint">{{ options.divisions.length ? 'optional' : 'admin confirms' }}</span>
                 <button v-if="optionsError" type="button" class="ob-name-reset" @click="loadOptions" :disabled="loadingOptions">
                   {{ loadingOptions ? 'Retrying…' : 'Retry' }}
                 </button>
               </label>
-              <select v-model="form.divisionId" :disabled="submitting || !divisionOptionsForOffice.length">
-                <option value="">{{ divisionSelectPlaceholder }}</option>
-                <option v-for="d in divisionOptionsForOffice" :key="d.id" :value="d.id">{{ d.name }}</option>
+              <!-- Enabled for any office that has divisions configured, not just
+                   STB. It stays disabled only while there is genuinely nothing
+                   to choose from. -->
+              <select v-model="form.divisionId"
+                      :disabled="submitting || !form.officeId || !options.divisions.length">
+                <option value="">{{ divisionPlaceholder }}</option>
+                <option v-for="d in options.divisions" :key="d.id" :value="d.id">{{ d.name }}</option>
               </select>
               <span v-if="optionsError" class="ob-name-tip" style="color:#B45309">{{ optionsError }}</span>
+              <span v-else-if="officeStructureMissing" class="ob-name-tip">
+                {{ selectedOfficeName || 'This office' }} has not set up its divisions and sections yet.
+                You can still submit - an administrator will assign them on approval.
+              </span>
             </div>
             <div class="ob-field">
               <label>Section</label>
@@ -120,14 +128,17 @@
               </select>
               <span v-if="!sectionsForDivision.length && form.divisionId && !loadingOptions"
                     class="ob-name-tip" style="color:#B45309">
-                No section list is available for the selected division. Please ask an administrator to confirm the reference table.
+                No sections are configured under this division. You can submit without one - an administrator will confirm it.
               </span>
             </div>
             <div class="ob-field">
               <label>Requested Role <span class="ob-hint">admin confirms</span></label>
-              <select v-model="form.role" :disabled="submitting">
-                <option value="">Select role…</option>
-                <option v-for="r in requestedRolesForOffice" :key="r" :value="r">{{ r }}</option>
+              <!-- Roles are drawn from the selected office's own configuration,
+                   so there is nothing meaningful to offer until an office is
+                   chosen. -->
+              <select v-model="form.role" :disabled="submitting || !form.officeId">
+                <option value="">{{ rolePlaceholder }}</option>
+                <option v-for="r in options.requestedRoles" :key="r" :value="r">{{ r }}</option>
               </select>
             </div>
           </div>
@@ -196,6 +207,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { authApi } from '@/services/api'
+import { EMPLOYMENT_TYPES } from '@/utils/employmentTypes'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -207,7 +219,9 @@ const initials = computed(() =>
 
 // Static option lists live in the frontend so they always render even if the
 // reference endpoint is unreachable. Only divisions must come from the server.
-const EMPLOYMENT_TYPES = ['Regular', 'Contract of Service (COS)', 'Casual', 'Job Order', 'Co-Terminus']
+// EMPLOYMENT_TYPES is imported from utils/employmentTypes.js - see the import
+// above. It is the fallback used only when the reference endpoint is
+// unreachable; AuthService.gs serves the live list and the two must match.
 const REQUESTED_ROLES  = ['Technical Staff', 'Section Head', 'Division Chief', 'Assistant Bureau Director', 'Bureau Director']
 const FALLBACK_OFFICES = [
   {
@@ -237,48 +251,90 @@ const FALLBACK_SECTIONS = [
   { id: 'SEC-staed-pr', divisionId: 'staed', name: 'Social Technology Promotion Section' }
 ]
 
-const options = ref({
-  offices: FALLBACK_OFFICES,
-  divisions: FALLBACK_DIVISIONS,
-  sections: FALLBACK_SECTIONS,
-  officeOptions: {},
-  employmentTypes: EMPLOYMENT_TYPES,
-  requestedRoles: REQUESTED_ROLES
+// The raw payload from the reference endpoint, kept whole so the office-scoped
+// lists below can be recomputed whenever the registrant changes office.
+const rawOptions = ref(null)
+
+const officeList = computed(() => mergeOfficeOptions(rawOptions.value?.offices))
+
+/**
+ * Divisions, sections and roles belong to the OFFICE being registered into.
+ *
+ * The endpoint returns STB's lists at the top level and every participating
+ * office's own lists under `officeOptions`, keyed by id and code. Reading only
+ * the top level offered STB's divisions to every registrant regardless of the
+ * office they picked, so the controls were disabled for non-STB offices and the
+ * form fell back to "admin will confirm" for everyone else. Scope to the
+ * selected office instead, and fall back to STB's own lists only for STB.
+ */
+const officeScopedOptions = computed(() => {
+  const raw = rawOptions.value || {}
+  const officeId = form.value.officeId
+  if (!officeId) return { divisions: [], sections: [], requestedRoles: [] }
+
+  if (isStbRegistration.value) {
+    return {
+      divisions: mergeDivisionOptions(raw.divisions),
+      sections: mergeSectionOptions(raw.sections),
+      requestedRoles: normalizeRoleOptions(raw.requestedRoles)
+    }
+  }
+
+  const office = officeList.value.find(o => String(o.officeId) === String(officeId)) || null
+  const byOffice = raw.officeOptions || {}
+  const candidates = [officeId, office?.officeCode, office?.officeName]
+    .filter(Boolean)
+    .flatMap(key => [key, String(key).toUpperCase()])
+  const scoped = candidates.map(key => byOffice[key]).find(Boolean) || null
+
+  return {
+    divisions: Array.isArray(scoped?.divisions) ? scoped.divisions : [],
+    sections: Array.isArray(scoped?.sections) ? scoped.sections : [],
+    requestedRoles: normalizeRoleOptions(scoped?.requestedRoles)
+  }
 })
+
+const options = computed(() => ({
+  offices: officeList.value,
+  divisions: officeScopedOptions.value.divisions,
+  sections: officeScopedOptions.value.sections,
+  employmentTypes: rawOptions.value?.employmentTypes?.length
+    ? rawOptions.value.employmentTypes
+    : EMPLOYMENT_TYPES,
+  requestedRoles: officeScopedOptions.value.requestedRoles
+}))
 
 // Sections belong to a division, so only offer the ones that fit the division
 // the registrant chose. Before a division is picked the list is empty and the
 // control shows "Choose a division first".
 const sectionsForDivision = computed(() =>
-  sectionOptionsForOffice.value.filter(s => String(s.divisionId) === String(form.value.divisionId))
+  (options.value.sections || []).filter(s => String(s.divisionId) === String(form.value.divisionId))
 )
+
+// An office whose administrator has not yet configured its structure returns
+// empty lists. Say so, rather than showing an empty dropdown that reads as a
+// fault - registration is still allowed, and an admin assigns on approval.
+const officeStructureMissing = computed(() =>
+  !!form.value.officeId && !loadingOptions.value && !options.value.divisions.length
+)
+
+const divisionPlaceholder = computed(() => {
+  if (!form.value.officeId) return 'Choose an office first'
+  if (loadingOptions.value) return 'Loading…'
+  if (!options.value.divisions.length) return 'Not yet configured - admin will assign'
+  return 'Select division…'
+})
+
 const sectionPlaceholder = computed(() => {
+  if (!form.value.officeId) return 'Choose an office first'
   if (!form.value.divisionId) return 'Choose a division first'
-  if (!sectionsForDivision.value.length) return 'No sections available'
-  return 'Select section...'
+  if (!sectionsForDivision.value.length) return 'No sections configured'
+  return 'Select section…'
 })
-const selectedOfficeOrgOptions = computed(() =>
-  form.value.officeId ? (options.value.officeOptions?.[form.value.officeId] || null) : null
+
+const rolePlaceholder = computed(() =>
+  form.value.officeId ? 'Select role…' : 'Choose an office first'
 )
-const divisionOptionsForOffice = computed(() =>
-  isStbRegistration.value
-    ? options.value.divisions
-    : (selectedOfficeOrgOptions.value?.divisions || [])
-)
-const sectionOptionsForOffice = computed(() =>
-  isStbRegistration.value
-    ? options.value.sections
-    : (selectedOfficeOrgOptions.value?.sections || [])
-)
-const requestedRolesForOffice = computed(() =>
-  selectedOfficeOrgOptions.value?.requestedRoles?.length
-    ? selectedOfficeOrgOptions.value.requestedRoles
-    : options.value.requestedRoles
-)
-const divisionSelectPlaceholder = computed(() => {
-  if (!form.value.officeId) return 'Select office / program first'
-  return divisionOptionsForOffice.value.length ? 'Select division...' : 'No divisions configured - admin will confirm'
-})
 const loadingOptions = ref(false)
 const optionsError = ref('')
 const submitting = ref(false)
@@ -291,8 +347,12 @@ const form = ref({
   position: '', employeeNo: '', type: 'Regular', officeId: '', divisionId: '', section: '', role: ''
 })
 
+// Reads officeList, NOT options.offices. `options` depends on
+// officeScopedOptions, which depends on isStbRegistration, which depends on
+// this - routing it back through `options` would close that loop into infinite
+// recursion the moment an office is selected.
 const selectedOffice = computed(() =>
-  options.value.offices.find(o => String(o.officeId) === String(form.value.officeId)) || null
+  officeList.value.find(o => String(o.officeId) === String(form.value.officeId)) || null
 )
 const selectedOfficeName = computed(() =>
   selectedOffice.value?.officeName || ''
@@ -301,10 +361,10 @@ const isStbRegistration = computed(() =>
   String(selectedOffice.value?.officeId || form.value.officeId || '').toUpperCase() === 'STB'
 )
 const selectedDivisionName = computed(() =>
-  divisionOptionsForOffice.value.find(d => d.id === form.value.divisionId)?.name || ''
+  options.value.divisions.find(d => d.id === form.value.divisionId)?.name || ''
 )
 
-// Full name on record: "First M.I. Last Suffix" — the middle name is shortened
+// Full name on record: "First M.I. Last Suffix" - the middle name is shortened
 // to an initial with a dot (PH government standard). Editable, so the user can
 // validate the exact spelling; auto-composes from the parts until they edit it.
 const fullName = ref('')
@@ -319,7 +379,7 @@ function composeName() {
   const sfx = form.value.suffix.trim()
   return sfx ? `${core}${core ? ' ' : ''}${sfx}` : core
 }
-// Changing division invalidates any section already chosen — a DFD section is
+// Changing division invalidates any section already chosen - a DFD section is
 // not a valid PID section. Clear it rather than submit a mismatched pair, but
 // keep a value that still exists under the new division.
 watch(() => form.value.divisionId, () => {
@@ -328,10 +388,13 @@ watch(() => form.value.divisionId, () => {
   if (!stillValid) form.value.section = ''
 })
 
+// Every one of these lists is office-specific, so a division, section or role
+// chosen under the previous office is meaningless under the new one. Clearing
+// only for non-STB left a stale STB division attached when switching back.
 watch(() => form.value.officeId, () => {
-  if (isStbRegistration.value) return
   form.value.divisionId = ''
   form.value.section = ''
+  form.value.role = ''
 })
 
 watch(() => [form.value.firstName, form.value.middleName, form.value.lastName, form.value.suffix], () => {
@@ -346,7 +409,7 @@ const canSubmit = computed(() =>
 
 // Prefill from the Google display name conservatively: last token is the
 // surname, everything before it is the first name, and middle name is left
-// blank (it can't be reliably guessed — e.g. "John Reiman" is a compound
+// blank (it can't be reliably guessed - e.g. "John Reiman" is a compound
 // first name, not first + middle). The user corrects any of it.
 function splitName(display) {
   const parts = String(display || '').trim().split(/\s+/).filter(Boolean)
@@ -359,21 +422,12 @@ async function loadOptions() {
   loadingOptions.value = true
   optionsError.value = ''
   try {
-    const opts = await authApi.registerOptions()
-    options.value = {
-      offices:         mergeOfficeOptions(opts?.offices),
-      divisions:       mergeDivisionOptions(opts?.divisions),
-      sections:        mergeSectionOptions(opts?.sections),
-      officeOptions:    normalizeOfficeOrgOptions(opts?.officeOptions),
-      employmentTypes: opts?.employmentTypes?.length ? opts.employmentTypes : EMPLOYMENT_TYPES,
-      requestedRoles:  normalizeRoleOptions(opts?.requestedRoles)
-    }
-    if (!options.value.divisions.length) {
-      optionsError.value = 'No divisions were returned. You can still submit — an admin will assign your division on approval.'
-    }
+    // Store the payload whole. The office-scoped lists are derived from it, so
+    // picking a different office re-derives them without another round trip.
+    rawOptions.value = await authApi.registerOptions()
   } catch (e) {
-    // Keep the static role/employment fallbacks; only divisions need the server.
-    optionsError.value = `Could not load divisions (${e.message || 'network error'}). Retry, or submit and an admin will assign it.`
+    rawOptions.value = null
+    optionsError.value = `Could not load office options (${e.message || 'network error'}). Retry, or submit and an admin will assign your division and section.`
   } finally {
     loadingOptions.value = false
   }
@@ -410,38 +464,6 @@ function mergeDivisionOptions(divisions = []) {
     seen.add(key)
     return true
   })
-}
-
-function normalizeOfficeOrgOptions(officeOptions = {}) {
-  const normalized = {}
-  Object.entries(officeOptions || {}).forEach(([officeId, config]) => {
-    normalized[officeId] = {
-      divisions: normalizeOfficeDivisions(config?.divisions || []),
-      sections: normalizeOfficeSections(config?.sections || []),
-      requestedRoles: normalizeRoleOptions(config?.requestedRoles || [])
-    }
-  })
-  return normalized
-}
-
-function normalizeOfficeDivisions(divisions = []) {
-  const seen = new Set()
-  return (Array.isArray(divisions) ? divisions : []).filter(division => {
-    const key = String(division.id || division.name || '').toLowerCase()
-    if (!key || seen.has(key)) return false
-    seen.add(key)
-    return true
-  }).sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')))
-}
-
-function normalizeOfficeSections(sections = []) {
-  const seen = new Set()
-  return (Array.isArray(sections) ? sections : []).filter(section => {
-    const key = `${section.divisionId || ''}:${section.name || ''}`.toLowerCase()
-    if (!section.name || seen.has(key)) return false
-    seen.add(key)
-    return true
-  }).sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')))
 }
 
 function normalizeRoleOptions(roles = []) {

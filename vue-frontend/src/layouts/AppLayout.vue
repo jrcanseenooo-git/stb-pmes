@@ -2,7 +2,7 @@
   <div class="shell" :class="{ 'sidebar-collapsed': collapsed }">
     <aside class="sidebar">
       <!--
-        Text-only wordmark — no seal/icon. The system runs cluster-wide now, not
+        Text-only wordmark - no seal/icon. The system runs cluster-wide now, not
         just for STB, so a fixed STB seal image no longer represents every
         participating office; a text mark scales to any office without needing
         per-office artwork.
@@ -19,10 +19,16 @@
       </div>
 
       <nav class="sb-nav">
-        <div class="nav-group">
-          <div v-if="!collapsed" class="nav-label">{{ canAccessFullSystem ? 'Overview' : 'Main' }}</div>
+        <!-- For cluster oversight this group holds only Evaluation, so it is
+             folded in directly beneath Central Administration and loses its own
+             heading - a heading over a single item, below the group holding the
+             landing page, reads as clutter. -->
+        <div class="nav-group" :class="{ 'nav-group-follow': isUndersecretary }">
+          <div v-if="!collapsed && !isUndersecretary" class="nav-label">{{ canAccessFullSystem ? 'Overview' : 'Main' }}</div>
 
-          <RouterLink v-if="canAccessFullSystem" to="/dashboard" class="nav-item" active-class="active" :title="collapsed ? 'Dashboard' : ''">
+          <!-- Hidden for cluster oversight: their overview is Cluster Overview,
+               and a second "Dashboard" entry pointing elsewhere only confuses. -->
+          <RouterLink v-if="canAccessFullSystem && !isUndersecretary" :to="dashboardPath" class="nav-item" active-class="active" :title="collapsed ? 'Dashboard' : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <rect x="1" y="1" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.4" />
@@ -73,7 +79,7 @@
             </transition>
           </RouterLink>
 
-          <RouterLink v-if="showPortalNav" to="/library" class="nav-item" active-class="active" :title="collapsed ? 'Assessment Library' : ''">
+          <RouterLink v-if="showPortalNav && canViewAssessmentLibrary" to="/library" class="nav-item" active-class="active" :title="collapsed ? 'Assessment Library' : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <path d="M2.5 3a1 1 0 011-1H7v12H3.5a1 1 0 01-1-1V3zM13.5 3a1 1 0 00-1-1H9v12h3.5a1 1 0 001-1V3z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
@@ -84,7 +90,7 @@
             </transition>
           </RouterLink>
 
-          <RouterLink v-if="canManageLibraries" to="/kra" class="nav-item" active-class="active" :title="collapsed ? 'KRA Library' : ''">
+          <RouterLink v-if="canUseStbModules && canManageLibraries" to="/kra" class="nav-item" active-class="active" :title="collapsed ? 'KRA Library' : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.4" />
@@ -109,11 +115,11 @@
           </RouterLink>
         </div>
 
-        <div v-if="canAccessFullSystem" class="nav-group">
+        <div v-if="canUseStbModules && canAccessFullSystem" class="nav-group">
           <div v-if="!collapsed" class="nav-label">Monitoring</div>
           <div v-else class="nav-divider"></div>
 
-          <RouterLink v-if="canAccessFullSystem" to="/ipcrf" class="nav-item" active-class="active" :title="collapsed ? 'KRA & Targets' : ''">
+          <RouterLink to="/ipcrf" class="nav-item" active-class="active" :title="collapsed ? 'KRA & Targets' : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.4" />
@@ -126,7 +132,7 @@
             </transition>
           </RouterLink>
 
-          <RouterLink v-if="canAccessFullSystem" to="/accomplishments" class="nav-item" active-class="active" :title="collapsed ? 'Accomplishments' : ''">
+          <RouterLink to="/accomplishments" class="nav-item" active-class="active" :title="collapsed ? 'Accomplishments' : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <rect x="1.5" y="1.5" width="13" height="13" rx="2" stroke="currentColor" stroke-width="1.4" />
@@ -144,7 +150,7 @@
             <span v-if="collapsed && accomplishmentsUnread > 0" class="nav-badge-dot"></span>
           </RouterLink>
 
-          <RouterLink v-if="canAccessFullSystem" to="/review" class="nav-item" active-class="active" :title="collapsed ? 'Review' : ''">
+          <RouterLink to="/review" class="nav-item" active-class="active" :title="collapsed ? 'Review' : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.4" />
@@ -172,10 +178,16 @@
         </div>
 
         <div class="nav-group">
-          <div v-if="!collapsed" class="nav-label">{{ canAccessFullSystem ? 'Administration' : 'Account' }}</div>
+          <!-- "Administration" heads Reports / Audit Trail / User Management.
+               With all three hidden - as for cluster oversight - the heading was
+               rendering over nothing. The "Account" variant always has items
+               beneath it, so only the Administration case needs the guard. -->
+          <div v-if="!collapsed && (!canAccessFullSystem || showAdministrationNav)" class="nav-label">
+            {{ canAccessFullSystem ? 'Administration' : 'Account' }}
+          </div>
           <div v-else class="nav-divider"></div>
 
-          <RouterLink v-if="canGenerateReports" to="/reports" class="nav-item" active-class="active" :title="collapsed ? 'Reports' : ''">
+          <RouterLink v-if="canGenerateReports && !isUndersecretary" to="/reports" class="nav-item" active-class="active" :title="collapsed ? 'Reports' : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.4" />
@@ -212,7 +224,10 @@
             </transition>
           </RouterLink>
 
-          <RouterLink v-if="isOfficeAdminScope" to="/office-dashboard" class="nav-item" active-class="active" :title="collapsed ? 'Office Dashboard' : ''">
+          <div v-if="showOfficeAdminNav && !collapsed" class="nav-label nav-label-nested">Office Administration</div>
+          <div v-else-if="showOfficeAdminNav && collapsed" class="nav-divider nav-divider-subtle"></div>
+
+          <RouterLink v-if="canViewOfficeDashboard && dashboardPath !== '/office-dashboard'" to="/office-dashboard" class="nav-item" active-class="active" :title="collapsed ? 'Office Dashboard' : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <path d="M2 13.5V9M6 13.5V4M10 13.5V6.5M14 13.5V2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
@@ -237,6 +252,33 @@
             </transition>
           </RouterLink>
 
+          <RouterLink
+            v-if="showOfficeManagementNav"
+            to="/office-management"
+            :class="['nav-item', isOfficeManagementRoute && 'active']"
+            active-class="active"
+            :title="collapsed ? 'Office Management' : ''"
+          >
+            <div class="nav-icon">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M2.5 13.5h11M3.5 13.5V3.5h5v10M8.5 6.5h4v7M5.2 6h1.6M5.2 8.5h1.6M10.2 9h1.2M10.2 11h1.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <transition name="fade">
+              <span v-if="!collapsed" class="nav-label-text">Office Management</span>
+            </transition>
+          </RouterLink>
+
+        </div>
+
+        <!-- Its own group, so it can lead the menu for cluster oversight -
+             that account lands on Cluster Overview, and leaving this nested
+             under Administration put the highlighted item in the second group,
+             below a section the account barely uses. -->
+        <div class="nav-group" :class="{ 'nav-group-lead': isUndersecretary }">
+          <div v-if="showCentralAdminNav && !collapsed" class="nav-label nav-label-nested">Central Administration</div>
+          <div v-else-if="showCentralAdminNav && collapsed" class="nav-divider nav-divider-subtle"></div>
+
           <RouterLink v-if="canViewClusterMonitoring || canManageOfficeRegistry" to="/cluster-overview" class="nav-item" active-class="active" :title="collapsed ? 'Cluster Overview' : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -249,29 +291,22 @@
             </transition>
           </RouterLink>
 
-          <RouterLink v-if="canManageOfficeRegistry || canViewClusterMonitoring" to="/office-registry" class="nav-item" active-class="active" :title="collapsed ? 'Office Registry' : ''">
+          <RouterLink v-if="showCentralAdminNav && !isUndersecretary" to="/office-registry" class="nav-item" active-class="active" :title="collapsed ? officeRegistryLabel : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <path d="M2.5 13.5h11M3.5 13.5V3.5h5v10M8.5 6.5h4v7M5.2 6h1.6M5.2 8.5h1.6M10.2 9h1.2M10.2 11h1.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
             </div>
             <transition name="fade">
-              <span v-if="!collapsed" class="nav-label-text">Office Registry</span>
+              <span v-if="!collapsed" class="nav-label-text">{{ officeRegistryLabel }}</span>
             </transition>
           </RouterLink>
 
-          <RouterLink v-if="isOfficeAdminScope" to="/office-personnel" class="nav-item" active-class="active" :title="collapsed ? 'Office Personnel' : ''">
-            <div class="nav-icon">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <circle cx="5.5" cy="5" r="2.5" stroke="currentColor" stroke-width="1.4"/>
-                <circle cx="11.5" cy="6" r="1.8" stroke="currentColor" stroke-width="1.3"/>
-                <path d="M1.8 14c.4-2.8 2.2-4.4 3.7-4.4s3.3 1.6 3.7 4.4M9.5 13.8c.25-1.7 1.25-2.7 2-2.7s1.75 1 2 2.7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-              </svg>
-            </div>
-            <transition name="fade">
-              <span v-if="!collapsed" class="nav-label-text">Office Personnel</span>
-            </transition>
-          </RouterLink>
+        </div>
+
+        <div class="nav-group">
+          <div v-if="showAccountAdminNav && !collapsed" class="nav-label nav-label-nested">Account</div>
+          <div v-else-if="showAccountAdminNav && collapsed" class="nav-divider nav-divider-subtle"></div>
 
           <RouterLink v-if="showPortalNav" to="/my-notifications" class="nav-item" active-class="active" :title="collapsed ? 'Assessment Status' : ''">
             <div class="nav-icon">
@@ -447,27 +482,57 @@ import PasswordChangePrompt from '@/components/common/PasswordChangePrompt.vue'
 import LogoutConfirmModal from '@/components/common/LogoutConfirmModal.vue'
 
 const authStore = useAuthStore()
-const { canManageUsers, canManageOfficeUsers, canManageLibraries, canManageFocalAssignments, canManageDatabase, canManageOfficeRegistry, canViewClusterMonitoring, canGenerateAssignments, canManageOfficePersonnel, canViewAudit, canGenerateReports, canAccessFullSystem, isOfficeAdminScope, isClusterPortalScope } = usePermissions()
+const { canManageUsers, canManageOfficeUsers, canManageLibraries, canViewAssessmentLibrary, canManageFocalAssignments, canManageDatabase, canManageOfficeRegistry, canConfigureOfficeStructure, canViewClusterMonitoring, canGenerateAssignments, canViewOfficeDashboard, canViewOfficePersonnel, canViewAudit, canGenerateReports, canAccessFullSystem, isExplicitOfficeAdmin, isClusterPortalScope, isUndersecretary } = usePermissions()
 const { isClusterPortal, portalTitle, portalSubtitle, wordmarkTop, wordmarkBottom, shortName, documentTitle } = useBranding()
 const notifStore = useNotificationsStore()
 const { confirm } = useConfirm()
 
-// Unread notifications tied to the Accomplishments module — drives the sidebar nav badge
+// Unread notifications tied to the Accomplishments module - drives the sidebar nav badge
 const accomplishmentsUnread = computed(() =>
   notifStore.notifications.filter(n => !n.read && n.module === 'Accomplishments').length
 )
 // The portal entries replace the STB Dashboard for anyone the rollout guard
-// keeps out of the full system — that is exactly the restricted cluster scope.
+// keeps out of the full system - that is exactly the restricted cluster scope.
 const showPortalNav = computed(() => !canAccessFullSystem.value)
+const dashboardPath = computed(() => {
+  if (!isClusterPortal.value) return '/dashboard'
+  return canViewOfficeDashboard.value ? '/office-dashboard' : '/my-dashboard'
+})
+const canUseStbModules = computed(() => !isClusterPortal.value)
+const officeRegistryLabel = computed(() =>
+  canManageOfficeRegistry.value || canViewClusterMonitoring.value ? 'Office Registry' : 'Office Structure'
+)
+const showCentralAdminNav = computed(() =>
+  canViewClusterMonitoring.value || canManageOfficeRegistry.value
+)
+const showOfficeManagementNav = computed(() =>
+  !showCentralAdminNav.value && (canConfigureOfficeStructure.value || canViewOfficePersonnel.value)
+)
+const showOfficeAdminNav = computed(() =>
+  (canViewOfficeDashboard.value && dashboardPath.value !== '/office-dashboard') ||
+  canGenerateAssignments.value ||
+  showOfficeManagementNav.value
+)
+const showAccountAdminNav = computed(() =>
+  canAccessFullSystem.value
+)
 
 // Ordinary portal personnel get read-only Personal Information. Office
 // administrators and STB users keep the editable Profile & Settings screen,
 // because they still need account controls such as changing a password.
 const isOrdinaryPortalUser = computed(() =>
-  showPortalNav.value && !isOfficeAdminScope.value && isClusterPortalScope.value
+  showPortalNav.value && !isExplicitOfficeAdmin.value && isClusterPortalScope.value
 )
 const personalInfoPath = computed(() => (isOrdinaryPortalUser.value ? '/my-profile' : '/profile'))
 const personalInfoLabel = computed(() => (isOrdinaryPortalUser.value ? 'Personal Information' : 'Profile Settings'))
+
+// Mirrors the v-if on each item directly under the "Administration" heading, so
+// the heading appears only when at least one of them does.
+const showAdministrationNav = computed(() =>
+  (canGenerateReports.value && !isUndersecretary.value) ||
+  canViewAudit.value ||
+  canAccessUserManagement.value
+)
 
 const canAccessUserManagement = computed(() =>
   canManageUsers.value ||
@@ -511,6 +576,7 @@ const titleMap = {
   '/users': { title: 'User Management', sub: 'Access Control' },
   '/office-registry': { title: 'Office Registry', sub: 'Central Administration' },
   '/office-personnel': { title: 'Personnel Validation', sub: 'Office Assessment Roster' },
+  '/office-management': { title: 'Office Management', sub: 'Structure & Personnel' },
   '/office-dashboard': { title: 'Office Assessment Dashboard', sub: 'Office Monitoring' },
   '/rater-matrix': { title: 'Rater Tagging', sub: 'Who Rates Whom' },
   '/cluster-overview': { title: 'Cluster Assessment Overview', sub: 'Central Monitoring' },
@@ -533,6 +599,9 @@ const activeTitle = computed(() => {
 
 const pageTitle = computed(() => activeTitle.value?.title ?? shortName.value)
 const pageSub = computed(() => activeTitle.value?.sub ?? '')
+const isOfficeManagementRoute = computed(() =>
+  ['/office-management', '/office-registry', '/office-personnel'].includes(route.path) && !showCentralAdminNav.value
+)
 
 watch([pageTitle, portalSubtitle], () => {
   document.title = documentTitle(pageTitle.value)
@@ -540,7 +609,7 @@ watch([pageTitle, portalSubtitle], () => {
 
 const currentSemester = computed(() => {
   const now = new Date()
-  const month = now.getMonth() + 1 // 1–12
+  const month = now.getMonth() + 1 // 1-12
   const year = now.getFullYear()
   const sem = month >= 1 && month <= 6 ? 'S1' : 'S2'
   return `${sem} · ${year}`
@@ -576,6 +645,19 @@ function notificationTarget(notification) {
   const text = `${notification?.type || ''} ${notification?.message || ''}`.toLowerCase()
   const relatedId = notification?.relatedId || notification?.formId || notification?.recordId || notification?.assignmentId || ''
   const withRelated = relatedId ? { highlight: relatedId } : {}
+
+  if (!canUseStbModules.value) {
+    if (
+      moduleName.includes('accomplishment') ||
+      moduleName.includes('review') ||
+      moduleName.includes('ipcr') ||
+      moduleName.includes('ccef') ||
+      moduleName.includes('form') ||
+      moduleName.includes('kra')
+    ) {
+      return { path: '/evaluation', query: withRelated }
+    }
+  }
 
   if (moduleName.includes('accomplishment')) return { path: '/accomplishments', query: withRelated }
   if (moduleName.includes('review')) return { path: '/review', query: withRelated }
@@ -677,8 +759,8 @@ async function refreshRealtimeShell(options = {}) {
   const forceProfile = options.forceProfile === true
   const now = Date.now()
   try {
-    // Profile and notifications are independent reads — notifications don't
-    // need a fresh profile to fetch — so on first mount (forceProfile: true,
+    // Profile and notifications are independent reads - notifications don't
+    // need a fresh profile to fetch - so on first mount (forceProfile: true,
     // both firing) they run in parallel rather than paying two sequential
     // Apps Script round trips right as the app becomes visible.
     const shouldRefreshProfile = forceProfile || now - lastProfileRefreshAt > 60000
@@ -799,7 +881,7 @@ onUnmounted(() => {
 }
 
 /* Collapsed-sidebar fallback: a short text initialism (PMES, or the office
-   code) rather than an icon — still pure text, just compact enough for the
+   code) rather than an icon - still pure text, just compact enough for the
    narrow collapsed rail. */
 .brand-mark {
   width: 100%;
@@ -813,7 +895,7 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 
-/* Wraps rather than truncates — the cluster-scope text here is a full system
+/* Wraps rather than truncates - the cluster-scope text here is a full system
    name ("Performance Monitoring and Evaluation System"), not a short label. */
 .brand-sub {
   margin-top: 3px;
@@ -847,6 +929,25 @@ onUnmounted(() => {
   overflow-y: auto;
   overflow-x: hidden;
   padding: 10px 9px;
+  /* Column flex so a group can be hoisted with `order` rather than duplicated
+     in the template. Block-level children stretch the same as before. */
+  display: flex;
+  flex-direction: column;
+}
+
+/* Hoists one group above the rest. Used for cluster oversight, whose landing
+   page lives in Central Administration - the first menu entry should be the
+   page the account actually opens on. */
+.nav-group-lead {
+  order: -2;
+  /* No trailing gap: the folded group below joins this one under its heading. */
+  margin-bottom: 0;
+}
+
+/* Sits immediately under .nav-group-lead with no heading of its own, so its
+   items read as part of the section above rather than a separate group. */
+.nav-group-follow {
+  order: -1;
 }
 
 .sb-nav::-webkit-scrollbar {
@@ -867,10 +968,24 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 
+.nav-label-nested {
+  padding-top: 12px;
+  padding-bottom: 4px;
+  color: rgba(255,255,255,.46);
+  font-size: 8px;
+  letter-spacing: .7px;
+}
+
 .nav-divider {
   height: 1px;
   margin: 9px;
   background: rgba(255,255,255,.08);
+}
+
+.nav-divider-subtle {
+  margin-top: 11px;
+  margin-bottom: 7px;
+  background: rgba(255,255,255,.06);
 }
 
 .nav-item {

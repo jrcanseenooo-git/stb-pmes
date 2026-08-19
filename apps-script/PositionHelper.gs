@@ -43,7 +43,7 @@ const PositionHelper = (() => {
 
   /**
    * resolveWeights(profile)
-   * Returns { core: 70, support: 30 } for all positions — STB standard.
+   * Returns { core: 70, support: 30 } for all positions - STB standard.
    */
   function resolveWeights(profile) {
     return { core: 70, support: 30 }

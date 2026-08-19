@@ -15,7 +15,7 @@ const SHEET = {
   FOCAL_ASSIGNMENTS:  'FocalAssignments',
   REVIEW_COMMENTS:    'ReviewComments',
 
-  // ── Previously missing – now added ──
+  // ── Previously missing - now added ──
   IPCRF_FORMS:        'IPCRForms',
   FORM_ENTRIES:       'FormEntries',
   MASTER_KRA_LIBRARY: 'MasterKRALibrary',
@@ -50,8 +50,8 @@ function doPost(e) {
 // Two independent budgets per minute, because reads and writes cost very
 // different things. A dashboard legitimately fires a burst of reads on load, so
 // a single flat budget either throttles normal browsing or is too loose to stop
-// a write storm. Writes are the expensive, contended path — they take the
-// script lock and mutate sheets — so they get a much tighter budget.
+// a write storm. Writes are the expensive, contended path - they take the
+// script lock and mutate sheets - so they get a much tighter budget.
 const RATE_LIMIT_READS_PER_MIN  = 120
 const RATE_LIMIT_WRITES_PER_MIN = 30
 
@@ -67,7 +67,7 @@ function checkRateLimit(userId, httpMethod) {
     count = parseInt(cache.get(key) || '0', 10) + 1
     cache.put(key, String(count), 90) // TTL 90s so it survives the minute boundary
   } catch (e) {
-    // CacheService failure is non-fatal — allow the request through
+    // CacheService failure is non-fatal - allow the request through
     Logger.log('Rate limiter cache error: ' + e.message)
     return
   }
@@ -86,7 +86,7 @@ const RESERVED_KEYS = ['route', '_method', 'token']
 // ── Main dispatcher ──
 function handleRequest(e, method) {
   try {
-    // Parse the JSON body first — route, method, token and payload now travel
+    // Parse the JSON body first - route, method, token and payload now travel
     // in the POST body so they never land in the URL (logs, history, Referer).
     // Query params are still honored as a fallback for backward compatibility.
     const body   = parseBody(e)
@@ -98,7 +98,7 @@ function handleRequest(e, method) {
 
     // 1. Authenticate every request (signature-verified inside verifyToken)
     const user = AuthService.verifyToken(token)
-    if (!user) return respond(401, false, null, 'Unauthorized – invalid or missing token')
+    if (!user) return respond(401, false, null, 'Unauthorized - invalid or missing token')
 
     // 2. Rate limit per authenticated user, with separate read/write budgets
     checkRateLimit(user.uid || user.email, httpMethod)
@@ -118,9 +118,9 @@ function handleRequest(e, method) {
     Logger.log('PMES Error: ' + err.message + '\n' + err.stack)
     const code = err.statusCode || 500
     // Every HttpError(message, code) thrown across the services is written
-    // specifically for the end user — "An account for this email already
+    // specifically for the end user - "An account for this email already
     // exists", "This active question has already been used", and dozens
-    // more — so a code under 500 is always a deliberate, curated
+    // more - so a code under 500 is always a deliberate, curated
     // business-logic message and should reach the user as written. This
     // used to discard err.message unconditionally and substitute a generic,
     // status-code-keyed string regardless of what was actually thrown,
@@ -162,7 +162,7 @@ function parseBody(e) {
 function respond(status, success, data, message) {
   // `status` used to be accepted and then thrown away. Every response leaves here
   // as HTTP 200 (an Apps Script constraint), so with no status in the body the
-  // client had no way to tell a 401 from a 400 — it fell back to a generic
+  // client had no way to tell a 401 from a 400 - it fell back to a generic
   // "check your input" message even when the real answer was "sign in again".
   // Carrying the code in the envelope lets the frontend react correctly.
   const payload = JSON.stringify({

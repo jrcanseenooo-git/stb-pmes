@@ -15,7 +15,7 @@ import { fileURLToPath, URL } from "node:url"
  * followRedirects it 404'd server-side and returned 404 for /gas itself. Either
  * way requests failed intermittently.
  *
- * Node's fetch follows the redirect correctly — which is exactly what the Vercel
+ * Node's fetch follows the redirect correctly - which is exactly what the Vercel
  * function (vue-frontend/api/gas.js) already does in production. Using it here
  * means dev and prod exercise the same transport instead of two different ones.
  */
@@ -69,7 +69,7 @@ export default defineConfig(({ mode }) => {
   const gasUrl = env.VITE_API_BASE_URL
 
   if (!gasUrl) {
-    console.warn("[PMES] VITE_API_BASE_URL is not set — /gas calls will fail in dev.")
+    console.warn("[PMES] VITE_API_BASE_URL is not set - /gas calls will fail in dev.")
   }
 
   return {

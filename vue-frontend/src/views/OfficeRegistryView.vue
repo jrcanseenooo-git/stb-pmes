@@ -1,6 +1,7 @@
 <template>
   <div class="pui-page">
     <PageHeader
+      v-if="!props.embedded"
       :kicker="centralRegistryMode ? 'Central Administration' : 'Office Administration'"
       :title="centralRegistryMode ? 'Office Registry' : 'Office Structure'"
       :subtitle="centralRegistryMode
@@ -57,10 +58,10 @@
               <strong>{{ officeDisplayCode(office) }}</strong>
               <small>{{ office.officeName }}</small>
             </td>
-            <td style="white-space:nowrap;">{{ office.primaryAdminEmail || '—' }}</td>
-            <td><StatusPill :status="office.officeStatus || 'DRAFT'" /></td>
+            <td style="white-space:nowrap;">{{ office.primaryAdminEmail || '-' }}</td>
+            <td><StatusPill :status="office.officeStatus || 'DRAFT'" :label="officeRegistryStatusLabel(office.officeStatus)" /></td>
             <td>
-              <StatusPill :status="office.spreadsheetStatus || 'NOT_PROVISIONED'" />
+              <StatusPill :status="office.spreadsheetStatus || 'NOT_PROVISIONED'" :label="officeRegistryStatusLabel(office.spreadsheetStatus)" />
               <!-- A registry row left mid-provisioning is recoverable, not broken.
                    Provisioning has timed out in production before, so the resume
                    path is stated rather than left for the operator to infer. -->
@@ -69,11 +70,11 @@
                   {{ office.provisioningError }}
                 </small>
                 <small v-else style="display:block; color:#b45309; font-weight:700; margin-top:3px;">
-                  Schema validation failed — run Validate again to see the specific reason.
+                  Schema validation failed - run Validate again to see the specific reason.
                 </small>
               </template>
               <small v-else-if="needsResume(office)" style="display:block; color:#b45309; font-weight:700; margin-top:3px;">
-                Setup incomplete — run Validate, then Activate.
+                Setup incomplete - run Validate, then Activate.
               </small>
             </td>
             <td style="white-space:nowrap;">{{ formatDate(office.lastValidatedAt) }}</td>
@@ -84,37 +85,37 @@
                     v-if="!isStbOffice(office)"
                     class="pui-btn pui-btn-sm"
                     type="button"
-                    :disabled="busyId === office.officeId"
+                    :disabled="isOfficeBusy(office)"
                     title="Check the office spreadsheet against the required schema"
                     @click="validateOffice(office)"
                   >
-                    {{ busyId === office.officeId && busyAction === 'validate' ? 'Validating...' : 'Validate' }}
+                    {{ officeBusyAction(office) === 'validate' ? 'Validating...' : 'Validate' }}
                   </button>
                   <button
                     v-if="!isStbOffice(office) && office.spreadsheetStatus === 'INVALID_SCHEMA'"
                     class="pui-btn pui-btn-sm"
                     type="button"
-                    :disabled="busyId === office.officeId"
-                    title="Add any headers the schema now requires that this spreadsheet predates. Does not touch existing data — a missing sheet or duplicate header still needs a person."
+                    :disabled="isOfficeBusy(office)"
+                    title="Add any headers the schema now requires that this spreadsheet predates. Does not touch existing data - a missing sheet or duplicate header still needs a person."
                     @click="repairOffice(office)"
                   >
-                    {{ busyId === office.officeId && busyAction === 'repair' ? 'Repairing...' : 'Repair' }}
+                    {{ officeBusyAction(office) === 'repair' ? 'Repairing...' : 'Repair' }}
                   </button>
                   <button
                     v-if="!isStbOffice(office)"
                     class="pui-btn pui-btn-sm"
                     type="button"
-                    :disabled="busyId === office.officeId || !canActivate(office)"
+                    :disabled="isOfficeBusy(office) || !canActivate(office)"
                     :title="activateHint(office)"
                     @click="activateOffice(office)"
                   >
-                    {{ busyId === office.officeId && busyAction === 'activate' ? 'Activating...' : 'Activate' }}
+                    {{ officeBusyAction(office) === 'activate' ? 'Activating...' : 'Activate' }}
                   </button>
                   <span v-if="isStbOffice(office)" style="font-size:11px; font-weight:700; color:#64748b;">Central PMES</span>
                   <button
                     class="pui-btn pui-btn-sm"
                     type="button"
-                    :disabled="busyId === office.officeId"
+                    :disabled="isOfficeBusy(office)"
                     title="Configure the divisions, sections and roles offered at registration"
                     @click="openOrgOptionsModal(office)"
                   >
@@ -123,6 +124,13 @@
                 </template>
                 <span v-else style="font-size:11px; font-weight:700; color:#64748b;">Monitoring only</span>
               </div>
+              <small
+                v-if="officeActionMessage(office)"
+                :class="['office-action-message', `office-action-message-${officeActionMessage(office).type}`]"
+                aria-live="polite"
+              >
+                {{ officeActionMessage(office).text }}
+              </small>
             </td>
           </tr>
         </tbody>
@@ -231,7 +239,7 @@
         <p class="pui-alert-title">Provisioning did not complete</p>
         <p>{{ modalError }}</p>
         <p style="margin-top:6px;">
-          If a partial office row now appears in the registry, do not add the office again —
+          If a partial office row now appears in the registry, do not add the office again -
           use Validate and then Activate on the existing row.
         </p>
       </div>
@@ -298,13 +306,13 @@
             free-text list that has to repeat the division name on every line.
             With several divisions each carrying a few sections, retyping the
             division name that many times is exactly where a typo silently
-            orphans a section — it stops matching its parent division and
+            orphans a section - it stops matching its parent division and
             never appears in the registration form's Section dropdown, with
             no error shown anywhere. Grouping by division removes the free-text
             name entirely, so that failure mode can't happen.
           -->
           <div v-if="!parsedDivisionNames.length" class="pui-hint" style="margin-top:4px;">
-            Enter divisions above first — a section box appears for each one.
+            Enter divisions above first - a section box appears for each one.
           </div>
           <div v-else class="org-section-grid">
             <div v-for="name in parsedDivisionNames" :key="name" class="org-section-card">
@@ -375,6 +383,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
+import { useToast } from 'vue-toastification'
 import { officeRegistryApi } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
 import { usePermissions } from '@/composables/usePermissions'
@@ -388,6 +397,11 @@ import AppModal from '@/components/ui/AppModal.vue'
 const authStore = useAuthStore()
 const { canManageOfficeRegistry, canConfigureOfficeStructure, canViewClusterMonitoring } = usePermissions()
 const { confirm } = useConfirm()
+const toast = useToast()
+
+const props = defineProps({
+  embedded: { type: Boolean, default: false }
+})
 
 const vAutosize = {
   mounted: autosizeTextarea,
@@ -404,8 +418,8 @@ const PROVISION_STEPS = [
 const offices = ref([])
 const loading = ref(false)
 const saving = ref(false)
-const busyId = ref('')
-const busyAction = ref('')
+const officeActionState = ref({})
+const officeActionMessages = ref({})
 const error = ref('')
 const modalError = ref('')
 const search = ref('')
@@ -486,6 +500,10 @@ function officeDisplayCode(office) {
   return officeAcronym(office) || office?.officeCode || ''
 }
 
+function officeRegistryStatusLabel(status) {
+  return String(status || '').trim().toUpperCase() === 'ACTIVE' ? 'Activated' : ''
+}
+
 function canActivate(office) {
   return office.spreadsheetStatus === 'FOR_VALIDATION'
 }
@@ -494,7 +512,46 @@ function activateHint(office) {
   if (canActivate(office)) return 'Activate this office for the assessment portal'
   if (office.spreadsheetStatus === 'ACTIVE') return 'This office is already active'
   if (!office.spreadsheetStatus || office.spreadsheetStatus === 'NOT_PROVISIONED') return 'Provision the office spreadsheet first'
-  return 'Run Validate first — activation requires a passing schema validation'
+  return 'Run Validate first - activation requires a passing schema validation'
+}
+
+function officeKey(office) {
+  return String(office?.officeId || office?.officeCode || '').trim()
+}
+
+function officeBusyAction(office) {
+  return officeActionState.value[officeKey(office)] || ''
+}
+
+function isOfficeBusy(office) {
+  return !!officeBusyAction(office)
+}
+
+function officeActionMessage(office) {
+  return officeActionMessages.value[officeKey(office)] || null
+}
+
+function setOfficeActionState(office, action) {
+  const key = officeKey(office)
+  if (!key) return
+  officeActionState.value = { ...officeActionState.value, [key]: action }
+}
+
+function clearOfficeActionState(office) {
+  const key = officeKey(office)
+  if (!key) return
+  const next = { ...officeActionState.value }
+  delete next[key]
+  officeActionState.value = next
+}
+
+function setOfficeActionMessage(office, type, text) {
+  const key = officeKey(office)
+  if (!key) return
+  officeActionMessages.value = {
+    ...officeActionMessages.value,
+    [key]: { type, text }
+  }
 }
 
 function needsResume(office) {
@@ -534,7 +591,7 @@ function closeProvisionModal() {
 async function provisionOffice() {
   const ok = await confirm({
     title: 'Provision Office',
-    message: `A new evaluation-only Google Spreadsheet will be created for ${form.value.officeName || 'this office'} and registered centrally. This creates real infrastructure — it is not something to undo casually.`,
+    message: `A new evaluation-only Google Spreadsheet will be created for ${form.value.officeName || 'this office'} and registered centrally. This creates real infrastructure - it is not something to undo casually.`,
     confirmLabel: 'Create Spreadsheet'
   })
   if (!ok) return
@@ -561,7 +618,7 @@ async function provisionOffice() {
 async function validateOffice(office) {
   const ok = await confirm({
     title: 'Validate Office Spreadsheet',
-    message: `Check ${office.officeName || office.officeCode}'s spreadsheet against the required schema. The spreadsheet's contents are not modified — only the recorded validation result is updated.`,
+    message: `Check ${office.officeName || office.officeCode}'s spreadsheet against the required schema. The spreadsheet's contents are not modified - only the recorded validation result is updated.`,
     note: 'An office that is already active stays active if the check passes. If the check fails it is marked "Needs Repair" and its portal stops being served until it is fixed.',
     confirmLabel: 'Validate'
   })
@@ -573,7 +630,7 @@ async function repairOffice(office) {
   const ok = await confirm({
     title: 'Repair Office Spreadsheet',
     message: `Adds any headers the current schema requires that ${office.officeName || office.officeCode}'s spreadsheet is missing. Existing rows and data are never touched.`,
-    note: 'If the failure is something other than missing headers — a missing sheet or a duplicate column — this will not fix it, and Validate will still report what remains.',
+    note: 'If the failure is something other than missing headers - a missing sheet or a duplicate column - this will not fix it, and Validate will still report what remains.',
     confirmLabel: 'Repair'
   })
   if (!ok) return
@@ -591,17 +648,29 @@ async function activateOffice(office) {
 }
 
 async function runOfficeAction(office, action, work, fallbackMessage) {
-  busyId.value = office.officeId
-  busyAction.value = action
+  const officeName = office.officeName || officeDisplayCode(office) || 'Office'
+  const labels = {
+    validate: ['Validating', 'validated'],
+    repair: ['Repairing', 'repaired'],
+    activate: ['Activating', 'activated']
+  }
+  const [activeLabel, doneLabel] = labels[action] || ['Processing', 'updated']
+
+  setOfficeActionState(office, action)
+  setOfficeActionMessage(office, 'pending', `${activeLabel} ${officeName}...`)
+  toast.info(`${activeLabel} ${officeName}...`)
   error.value = ''
   try {
     await work()
+    setOfficeActionMessage(office, 'success', `${officeName} ${doneLabel}.`)
+    toast.success(`${officeName} ${doneLabel}.`)
     await loadOffices()
   } catch (e) {
-    error.value = e?.message || fallbackMessage
+    const message = e?.message || fallbackMessage
+    setOfficeActionMessage(office, 'error', message)
+    toast.error(`${officeName}: ${message}`)
   } finally {
-    busyId.value = ''
-    busyAction.value = ''
+    clearOfficeActionState(office)
   }
 }
 
@@ -704,9 +773,9 @@ function autosizeTextarea(el) {
 }
 
 function formatDate(value) {
-  if (!value) return '—'
+  if (!value) return '-'
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
+  if (Number.isNaN(date.getTime())) return '-'
   return date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })
 }
 </script>
@@ -736,6 +805,27 @@ function formatDate(value) {
   margin: 0 0 4px;
   color: #0f172a;
   font-weight: 800;
+}
+
+.office-action-message {
+  display: block;
+  margin-top: 6px;
+  text-align: right;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.office-action-message-pending {
+  color: #1d4ed8;
+}
+
+.office-action-message-success {
+  color: #047857;
+}
+
+.office-action-message-error {
+  color: #b91c1c;
 }
 
 @keyframes org-spin {

@@ -1,7 +1,7 @@
 /**
- * SpreadsheetService.gs — Fixed version
- * Added: hardDeleteRow() — physically removes the row from the sheet
- * Fixed: updateRow() — now writes ALL changed fields correctly
+ * SpreadsheetService.gs - Fixed version
+ * Added: hardDeleteRow() - physically removes the row from the sheet
+ * Fixed: updateRow() - now writes ALL changed fields correctly
  */
 
 const SpreadsheetService = (() => {
@@ -33,9 +33,9 @@ const SpreadsheetService = (() => {
   // catches up. This map lets the SAME deployed code work with either the new
   // name or the old one, which turns a risky cutover into three safe steps:
   //
-  //   1. Deploy this (accepts both names)      — nothing breaks, nothing renamed
-  //   2. Rename the tabs in the spreadsheet    — no downtime, code already copes
-  //   3. Later, delete this map                — once every tab is renamed
+  //   1. Deploy this (accepts both names)      - nothing breaks, nothing renamed
+  //   2. Rename the tabs in the spreadsheet    - no downtime, code already copes
+  //   3. Later, delete this map                - once every tab is renamed
   //
   // Key = the name the code asks for. Values = older names to fall back to.
   const SHEET_NAME_FALLBACKS = {
@@ -96,14 +96,14 @@ const SpreadsheetService = (() => {
   //
   // Office scoping (OfficeScopeService) sets a process-wide override so that a
   // whole request's sheet reads land in one office workbook. That is right for
-  // working data — Personnel, assessment records, ratings — but shared system
+  // working data - Personnel, assessment records, ratings - but shared system
   // configuration (OfficeRegistry, OfficeOrgOptions, RaterMatrix, Users) lives
   // ONLY in the central workbook. A service that owns central config must not
   // silently follow an ambient override into a per-office workbook, where the
   // tab does not exist and gets created empty: reads then return nothing and
   // writes land in a shadow copy nobody else can see.
   //
-  // Nesting is safe — the previous override is restored on the way out, so a
+  // Nesting is safe - the previous override is restored on the way out, so a
   // caller can hop central -> office -> central within one request.
   function withCentralSpreadsheet(work) {
     const previousSs = _overrideSs
@@ -198,7 +198,7 @@ const SpreadsheetService = (() => {
     return data
   }
 
-  // ── Update a row by id — writes ALL provided fields ──
+  // ── Update a row by id - writes ALL provided fields ──
   function updateRow(sheet, id, updates) {
     const data    = sheet.getDataRange().getValues()
     const headers = data[0]
@@ -207,7 +207,7 @@ const SpreadsheetService = (() => {
     const unknownKeys = Object.keys(updates).filter(k => headers.indexOf(k) < 0)
     if (unknownKeys.length) {
       Logger.log(
-        `⚠️ updateRow: column(s) [${unknownKeys.join(', ')}] don't exist in sheet "${sheet.getName()}" — ` +
+        `⚠️ updateRow: column(s) [${unknownKeys.join(', ')}] don't exist in sheet "${sheet.getName()}" - ` +
         `those fields were NOT written, even though the response will look like they were. ` +
         `Run initializeSheets() to add missing columns.`
       )
@@ -220,7 +220,7 @@ const SpreadsheetService = (() => {
         // This previously issued a separate sheet.getRange().setValue() per
         // changed field. Each of those is a round trip to the Sheets backend
         // (~100-300ms), so a 13-field update such as setCbcDeduction spent
-        // several seconds writing — which is what made saving feel slow.
+        // several seconds writing - which is what made saving feel slow.
         // One setValues for the whole row costs a single round trip regardless
         // of how many fields changed.
         const rowValues = data[i].slice()
@@ -248,7 +248,7 @@ const SpreadsheetService = (() => {
     throw HttpError(`Row with id "${id}" not found`, 404)
   }
 
-  // ── HARD DELETE — physically removes the row from the sheet ──
+  // ── HARD DELETE - physically removes the row from the sheet ──
   function hardDeleteRow(sheet, id) {
     const data   = sheet.getDataRange().getValues()
     const headers = data[0]
@@ -265,7 +265,7 @@ const SpreadsheetService = (() => {
     throw HttpError(`Row with id "${id}" not found for deletion`, 404)
   }
 
-  // ── Soft delete — keeps row but marks as deleted ──
+  // ── Soft delete - keeps row but marks as deleted ──
   function softDelete(sheet, id) {
     return updateRow(sheet, id, {
       deleted:   true,

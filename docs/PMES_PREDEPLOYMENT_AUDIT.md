@@ -15,7 +15,8 @@ The matrix below records the audit **as found**. Fixes applied since:
 | Finding | Status | Commit | Live? |
 |---|---|---|---|
 | **C-2 — Office Admin privilege escalation** | **Fixed** | this commit | Not until Apps Script is redeployed |
-| C-1 — `docgen` IDOR | **Fixed** | `f366748` | Not until Apps Script is redeployed |
+| C-1 — `docgen` IDOR | **Fixed** | `f366748` | Live (Apps Script @300) |
+| **H-3 — Accomplishment attribution spoofing** | **Fixed** | this commit | Not until Apps Script is redeployed |
 | H-1 — proxy retries writes | **Fixed** | `7977f34` | Not until Vercel redeploys |
 | H-2 — missing write locks | **Fixed** | this commit | Not until Apps Script is redeployed |
 | M-1 — formula injection | **Fixed** | this commit | Not until Apps Script is redeployed |
@@ -176,6 +177,31 @@ creation, and database maintenance.
 
 **Impact:** compounds H-1. Two concurrent requests (double-click, or a proxy retry racing the
 original) can both pass a "does this already exist?" read and both write.
+
+**H-3. Accomplishment identity and division were taken from the request** *(found during Phase 8)*
+
+`AccomplishmentsService.create` restricted only `Staff`/`Technical Staff` from filing against
+another `userId`. Every other role could pass any id — and since **no role string is validated
+anywhere**, an unrecognised role skipped the check rather than being refused. The guard failed
+open.
+
+`employeeName`, `divisionId` and `division` were also written straight from the request, so the
+attribution stored on the row was whatever the caller claimed. The division-scoped reports and
+monitoring views read exactly those fields.
+
+**Fixed by** resolving identity from the Users sheet instead of the request, and deciding
+authority with the existing `guardAccess` — the same rule that governs editing those records —
+rather than a second, weaker list.
+
+Verified with 7 cases run against both versions. Before: an unrecognised role could file
+against another user, a spoofed `divisionId` crossed divisions, request-supplied attribution
+was written verbatim, and an unknown target produced a row with empty attribution. After: all
+refused. The two "unchanged behaviour" cases — staff filing for themselves, and a division
+chief filing within their own division — pass in both versions.
+
+**Note:** accomplishment ratings do *not* feed IPCRF scoring. `computeScore` reads FormEntries,
+and the sync runs entry → accomplishment only. So this is an attribution and reporting-integrity
+issue, not score manipulation.
 
 ### MEDIUM — 2
 

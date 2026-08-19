@@ -82,19 +82,38 @@ const AccomplishmentsService = (() => {
     const sheet = SpreadsheetService.getSheet(SHEET.ACCOMPLISHMENTS)
     _ensureColumns(sheet, RATING_FIELDS)
 
-    // Technical Staff can only create for themselves. Keep legacy "Staff"
-    // compatible for older rows that have not been migrated yet.
-    if (['Staff', 'Technical Staff'].includes(profile.role) && body.userId && body.userId !== profile.id) {
-      throw HttpError('Technical Staff can only create entries for themselves', 403)
-    }
+    // Who this entry is FOR, and whether the caller may file it.
+    //
+    // The previous check only stopped Staff/Technical Staff from filing
+    // against someone else, so every other role could pass any userId - and
+    // because nothing validates role strings, an unrecognised role skipped the
+    // check entirely rather than being refused. It failed open.
+    //
+    // employeeName, divisionId and division were also taken straight from the
+    // request, so the attribution written to the sheet was whatever the caller
+    // claimed. The division-scoped reports and monitoring views read exactly
+    // those fields, which made a spoofed divisionId a reporting problem as
+    // well as an attribution one - and it defeated any check that trusted the
+    // row's own division.
+    //
+    // Identity now comes from the Users sheet, never the request, and the
+    // authority to file for somebody else is decided by guardAccess - the same
+    // rule that governs editing their records - instead of a second, weaker
+    // list that can drift away from it.
+    const targetUserId = String(body.userId || profile.id)
+    const owner = targetUserId === profile.id
+      ? profile
+      : SpreadsheetService.getAllRows(SpreadsheetService.getSheet(SHEET.USERS))
+        .find(u => String(u.id) === targetUserId)
+    if (!owner) throw HttpError('The person this entry is for could not be found.', 404)
 
     const now  = new Date().toISOString()
     const entry = {
       id:            SpreadsheetService.generateId('ACC-'),
-      userId:        body.userId        || profile.id,
-      employeeName:  body.employeeName  || profile.fullName,
-      divisionId:    body.divisionId    || profile.divisionId,
-      division:      body.division      || profile.divisionName,
+      userId:        targetUserId,
+      employeeName:  owner.fullName     || '',
+      divisionId:    owner.divisionId   || '',
+      division:      owner.divisionName || owner.division || '',
       formId:        body.formId        || '',
       entryId:       body.entryId       || '',
       functionType:  body.functionType  || '',
@@ -119,6 +138,10 @@ const AccomplishmentsService = (() => {
       updatedAt:     now,
       deleted:       false
     }
+
+    // Decided against the resolved row, so the division being checked is the
+    // target's real one rather than anything the caller supplied.
+    guardAccess(entry, profile)
 
     SpreadsheetService.appendRow(sheet, entry)
     AuditService.log('CREATE', 'Accomplishments', `Created entry: ${entry.id}`, user)

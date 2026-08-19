@@ -322,7 +322,7 @@ const UsersService = (() => {
       throw HttpError('Insufficient permissions', 403)
     }
     if (canEditOfficeUser && !canManageUsers) {
-      stripOfficeAdminForbiddenFields_(updateBody)
+      stripOfficeAdminForbiddenFields_(updateBody, canEditOwn)
     }
     if (canEditOwn && !canManageUsers && !canEditOfficeUser) {
       stripSelfForbiddenFields_(updateBody)
@@ -726,10 +726,33 @@ const UsersService = (() => {
     throw HttpError('Access denied. User approval permission required for this office.', 403)
   }
 
-  function stripOfficeAdminForbiddenFields_(body) {
-    if (String(body.role || '').trim() === 'System Administrator') {
-      throw HttpError('Office administrators cannot assign System Administrator role.', 403)
+  // Roles that carry authority beyond the office holding them. Assigning any of
+  // these from the office-admin path is an escalation out of office scope:
+  // 'Undersecretary' maps to cluster-monitoring-admin, whose
+  // view_cluster_monitoring permission is exactly what
+  // OfficeScopeService.canUseExplicitOffice_ accepts as authority to target an
+  // arbitrary officeId - i.e. to read any office's workbook.
+  const OFFICE_ADMIN_FORBIDDEN_ROLES = ['System Administrator', 'Undersecretary']
+
+  function stripOfficeAdminForbiddenFields_(body, isSelfEdit) {
+    const requestedRole = String(body.role || '').trim()
+    if (OFFICE_ADMIN_FORBIDDEN_ROLES.indexOf(requestedRole) >= 0) {
+      throw HttpError('Office administrators cannot assign the ' + requestedRole + ' role.', 403)
     }
+
+    // Nobody promotes themselves. An office admin editing their OWN row lands
+    // in this branch rather than the self-edit branch below, because
+    // sameOffice_ trivially matches your own row - so without this, `role` was
+    // never stripped and an office admin could PUT their own record with
+    // role: 'Undersecretary', pick up view_cluster_monitoring, and from there
+    // read every office's assessment data by passing an explicit officeId.
+    // Changing your own role has no legitimate use: a real promotion is
+    // performed by someone holding manage_users, who never reaches this path.
+    if (isSelfEdit) {
+      delete body.role
+      delete body.requestedRole
+    }
+
     [
       'id', 'uid', 'email', 'officeId', 'officeCode', 'officeName',
       'systemScope', 'officeRole', 'centralRoles',

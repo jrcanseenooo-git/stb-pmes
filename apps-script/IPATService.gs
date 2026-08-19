@@ -688,7 +688,19 @@ const IPATService = (() => {
   // Multi-rater: Self(15%) + Peer(15% or 30%) + Sub(15%) + Supervisor(30%) + Skip(25%)
   // ─────────────────────────────────────────────
 
+  // Serialised: this is an upsert. It reads every existing rating row to decide
+  // per indicator whether to update in place or append. Two concurrent saves
+  // both read before either writes, both conclude the row is new, and both
+  // append - leaving two rating rows for one (ipat, rater, theme, indicator)
+  // and a competency score computed from duplicated values.
   function saveCBCRatings(ipatId, body, user) {
+    return withWriteLock(
+      () => saveCBCRatings_(ipatId, body, user),
+      'The rating system is busy saving other submissions. Please try again in a moment.'
+    )
+  }
+
+  function saveCBCRatings_(ipatId, body, user) {
     const profile = AuthService.getProfile(user)
     const record  = _getRecord(ipatId)
     const sheet   = SpreadsheetService.getSheet(SHEET.IPAT_CBC_RATINGS)
@@ -706,9 +718,13 @@ const IPATService = (() => {
     ].join('|')
     const values = sheet.getDataRange().getValues()
     const headers = values[0] || []
+    // escapeFormula because these rows are written with setValues directly
+    // rather than through SpreadsheetService.appendRow, so they would
+    // otherwise miss its formula-injection guard. indicator and themeName
+    // arrive from the client, not from the server's constants.
     const rowFor = (data, base) => headers.map((h, idx) => {
       const val = Object.prototype.hasOwnProperty.call(data, h) ? data[h] : (base ? base[idx] : '')
-      return val === undefined || val === null ? '' : val
+      return val === undefined || val === null ? '' : SpreadsheetService.escapeFormula(val)
     })
     const existingByKey = {}
     for (let i = 1; i < values.length; i++) {
@@ -927,7 +943,16 @@ const IPATService = (() => {
   // Raters: Self + Immediate Supervisor (average of 2)
   // ─────────────────────────────────────────────
 
+  // Serialised for the same reason as saveCBCRatings - this is the same
+  // read-all, decide, update-or-append upsert over the Job Fitness sheet.
   function saveJFRatings(ipatId, body, user) {
+    return withWriteLock(
+      () => saveJFRatings_(ipatId, body, user),
+      'The rating system is busy saving other submissions. Please try again in a moment.'
+    )
+  }
+
+  function saveJFRatings_(ipatId, body, user) {
     const profile = AuthService.getProfile(user)
     const record  = _getRecord(ipatId)
     const sheet   = SpreadsheetService.getSheet(SHEET.IPAT_JF_RATINGS)
@@ -945,9 +970,13 @@ const IPATService = (() => {
     ].join('|')
     const values = sheet.getDataRange().getValues()
     const headers = values[0] || []
+    // escapeFormula because these rows are written with setValues directly
+    // rather than through SpreadsheetService.appendRow, so they would
+    // otherwise miss its formula-injection guard. indicator and themeName
+    // arrive from the client, not from the server's constants.
     const rowFor = (data, base) => headers.map((h, idx) => {
       const val = Object.prototype.hasOwnProperty.call(data, h) ? data[h] : (base ? base[idx] : '')
-      return val === undefined || val === null ? '' : val
+      return val === undefined || val === null ? '' : SpreadsheetService.escapeFormula(val)
     })
     const existingByKey = {}
     for (let i = 1; i < values.length; i++) {
@@ -1320,6 +1349,13 @@ const IPATService = (() => {
     computeOverall,
     getThemes, getJFIndicators,
     getCBCRatings, getJFRatings,
+    // For callers that already hold the script write lock. Going through the
+    // locking variants from inside a lock would mean acquiring the same script
+    // lock twice in one execution, and IPATRaterAssignmentService submits a
+    // rater's whole assignment - both rating sets plus the assignment row -
+    // under a single lock so the three writes cannot half-apply.
+    saveCBCRatingsUnlocked: saveCBCRatings_,
+    saveJFRatingsUnlocked:  saveJFRatings_,
     ensureRecordSchema,
     // Exported so other services classify scores through the protocol's bands
     // instead of maintaining their own. PortalService previously carried a

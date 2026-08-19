@@ -167,9 +167,26 @@ export default async function handler(req, res) {
     // for a write risks double-applying a mutation, so it's excluded there.
     // The other codes mean Apps Script refused or failed to execute the
     // request at all (rate limit, cold start, transient outage), which is
-    // safe to retry regardless of whether the call is a read or a write.
+    // safe to retry for a read.
+    //
+    // For a write the bar is much higher: re-sending is only safe when Apps
+    // Script certainly never ran the request. 429 is refused at the gate
+    // before any execution, so a second attempt cannot double-apply it.
+    // The rest are all ambiguous and were being retried anyway:
+    //   500 - the script itself threw, which can happen *after* an appendRow
+    //         or setValues has already committed part of the mutation
+    //   502, 504 - gateway level; the execution may have finished normally
+    //         and only the reply was lost on the way back
+    //   503 - may be a cold-start refusal, but may equally be a transient
+    //         failure after execution began
+    // In every one of those cases the row may already be in the sheet, so a
+    // retry is how a single Save quietly becomes two assessment submissions,
+    // two user accounts, or two rater assignments - with no error shown to
+    // anyone. The client already refuses to retry writes for exactly this
+    // reason (see gasSend in src/services/api.js); this layer was silently
+    // reintroducing the risk underneath it.
     const RETRYABLE_GET   = [404, 429, 500, 502, 503, 504]
-    const RETRYABLE_WRITE = [429, 500, 502, 503, 504]
+    const RETRYABLE_WRITE = [429]
     const ATTEMPTS_PER_TARGET = 2
     const looksJson = (t) => {
       const s = String(t || '').trim()
@@ -209,6 +226,14 @@ export default async function handler(req, res) {
           await new Promise((r) => setTimeout(r, 120))
         }
       }
+
+      // Reads may fail over to another deployment; writes may not. The inner
+      // `break` above only ends the attempts against THIS target - without
+      // this, a write that was deliberately not retried was still re-sent to
+      // the next configured deployment, which is the same double-apply risk
+      // wearing a different shape. It only bites when GAS_WEB_APP_URL lists
+      // more than one url, but that is a supported configuration.
+      if (!canRetry) break
     }
 
     console.error('[PMES API] All Apps Script attempts failed for route', routeForLog || '(unknown)', 'last status', lastStatus)

@@ -28,7 +28,16 @@ const OfficePersonnelService = (() => {
     })
   }
 
+  // Serialised: the "email already exists in this office" check and the append
+  // that follows must not interleave with another create for the same person.
   function create(body, user) {
+    return withWriteLock(
+      () => create_(body, user),
+      'Office personnel is busy right now. Please try again in a moment.'
+    )
+  }
+
+  function create_(body, user) {
     const profile = canManageOffice_(user, body || {})
     return withOffice_(body, user, () => {
       const sheet = personnelSheet_()

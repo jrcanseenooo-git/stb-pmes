@@ -17,7 +17,7 @@ The matrix below records the audit **as found**. Fixes applied since:
 | C-1 — `docgen` IDOR | **Fixed** | `f366748` | Not until Apps Script is redeployed |
 | H-1 — proxy retries writes | **Fixed** | `7977f34` | Not until Vercel redeploys |
 | H-2 — missing write locks | **Fixed** | this commit | Not until Apps Script is redeployed |
-| M-1 — formula injection | Open | — | — |
+| M-1 — formula injection | **Fixed** | this commit | Not until Apps Script is redeployed |
 | M-2 — security headers | **Fixed (CSP staged)** | this commit | Not until Vercel redeploys |
 
 Two additional defects were found while fixing the above, and are fixed in the same commits:
@@ -229,6 +229,33 @@ rather than confidentiality.
 
 This verdict is **interim** — it reflects Phase 1 only. It is not a substitute for a formal VA
 or PIA, and Phases 10–14 and 18 have not been performed.
+
+---
+
+## G1. Formula injection — one assumption to confirm on a live sheet
+
+The guard prefixes a dangerous string with an apostrophe, which is Sheets' own
+"treat this as text" marker. The escaping itself is unit-tested (26 cases: injection
+forms neutralised, ordinary text, signed numbers, dates, non-strings and Dates passed
+through by identity, idempotent on repeat writes).
+
+**What could not be verified here:** that `getValue()` returns the string *without* the
+apostrophe, so a value round-trips unchanged. That is the documented and long-standing
+Apps Script behaviour, and the guard is written to be idempotent so apostrophes cannot
+accumulate even if the assumption is wrong — but it is an assumption, and it is easy to
+settle in one minute on the live system:
+
+1. Save an accomplishment or review comment whose text begins with `=SUM(1,1)`.
+2. In the sheet, the cell must show the literal text, not a computed value.
+3. Reopen the record in the app. The field must read back exactly `=SUM(1,1)`,
+   with no leading apostrophe.
+
+If step 3 shows a leading apostrophe, the display path needs a matching strip;
+nothing else about the fix changes.
+
+Existing rows written before this change are untouched. If any already contain a
+leading `=`, `+` or `@`, they are still live formulas and should be found and rewritten
+separately — the guard only protects new writes.
 
 ---
 

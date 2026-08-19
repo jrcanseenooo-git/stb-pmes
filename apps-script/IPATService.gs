@@ -718,9 +718,13 @@ const IPATService = (() => {
     ].join('|')
     const values = sheet.getDataRange().getValues()
     const headers = values[0] || []
+    // escapeFormula because these rows are written with setValues directly
+    // rather than through SpreadsheetService.appendRow, so they would
+    // otherwise miss its formula-injection guard. indicator and themeName
+    // arrive from the client, not from the server's constants.
     const rowFor = (data, base) => headers.map((h, idx) => {
       const val = Object.prototype.hasOwnProperty.call(data, h) ? data[h] : (base ? base[idx] : '')
-      return val === undefined || val === null ? '' : val
+      return val === undefined || val === null ? '' : SpreadsheetService.escapeFormula(val)
     })
     const existingByKey = {}
     for (let i = 1; i < values.length; i++) {
@@ -966,9 +970,13 @@ const IPATService = (() => {
     ].join('|')
     const values = sheet.getDataRange().getValues()
     const headers = values[0] || []
+    // escapeFormula because these rows are written with setValues directly
+    // rather than through SpreadsheetService.appendRow, so they would
+    // otherwise miss its formula-injection guard. indicator and themeName
+    // arrive from the client, not from the server's constants.
     const rowFor = (data, base) => headers.map((h, idx) => {
       const val = Object.prototype.hasOwnProperty.call(data, h) ? data[h] : (base ? base[idx] : '')
-      return val === undefined || val === null ? '' : val
+      return val === undefined || val === null ? '' : SpreadsheetService.escapeFormula(val)
     })
     const existingByKey = {}
     for (let i = 1; i < values.length; i++) {

@@ -185,13 +185,42 @@ const SpreadsheetService = (() => {
     return getAllRows(sheet).find(r => r.id === id) || null
   }
 
+  // ── Neutralise spreadsheet formula injection ──
+  //
+  // Sheets parses a written string the same way it parses typed input, so a
+  // free-text field that begins with = + - or @ becomes a live formula rather
+  // than the text somebody entered. That is not only a display problem: a
+  // stored =IMPORTXML(...) or =IMPORTDATA(...) executes with the sheet's own
+  // access and can push the surrounding rows to an external URL. The same
+  // strings execute in Excel when a report is exported to CSV.
+  //
+  // A leading apostrophe is Sheets' own "treat this as text" marker: it is not
+  // part of the stored string and does not come back from getValue(), so the
+  // value round-trips unchanged while losing its formula meaning.
+  //
+  // Deliberately narrow, because over-sanitising corrupts real data:
+  //   - only strings are touched; numbers, booleans and dates pass through
+  //   - only the FIRST character matters to the parser, so nothing inside the
+  //     string is rewritten
+  //   - a plain numeric string such as "-5" or "+12.5" is data, not a formula,
+  //     and keeps its numeric meaning
+  //   - an already-escaped value is left alone, so repeated writes cannot
+  //     accumulate apostrophes
+  function escapeFormula_(value) {
+    if (typeof value !== 'string' || !value) return value
+    if (value.charAt(0) === "'") return value
+    if (!/^[=+\-@\t\r]/.test(value)) return value
+    if (/^[+-]?(\d+\.?\d*|\.\d+)$/.test(value)) return value
+    return "'" + value
+  }
+
   // ── Append a new row ──
   function appendRow(sheet, data) {
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
     const row     = headers.map(h => {
       const val = data[h]
       if (val === undefined || val === null) return ''
-      return val
+      return escapeFormula_(val)
     })
     sheet.appendRow(row)
     invalidateCache_(sheet)
@@ -230,7 +259,7 @@ const SpreadsheetService = (() => {
           if (colIdx < 0) return
           let cellVal = updates[key]
           if (cellVal === null || cellVal === undefined) cellVal = ''
-          rowValues[colIdx] = cellVal
+          rowValues[colIdx] = escapeFormula_(cellVal)
           touched = true
         })
 
@@ -304,6 +333,9 @@ const SpreadsheetService = (() => {
     appendRow, updateRow,
     hardDeleteRow, softDelete,
     generateId, paginate, filterRows,
+    // Exported for the few writers that build raw row arrays and call
+    // setValues directly instead of going through appendRow/updateRow.
+    escapeFormula: escapeFormula_,
     withSpreadsheet, withSpreadsheetId, withCentralSpreadsheet
   }
 })()

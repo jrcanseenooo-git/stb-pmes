@@ -43,11 +43,19 @@ function uniqueOptions(items = [], getKey = item => item.id || item.name) {
   })
 }
 
+// Module-scope, not inside useOrgOptions() - this is session-static registry
+// data (divisions/sections/roles by office), the same payload for every
+// caller. It was previously declared inside the composable, so each of
+// EvaluationView/OfficePersonnelView/UsersView got its own instance-scoped
+// ref and re-fetched auth/register-options independently on mount, even
+// within the same session. One shared cache means the second and third
+// callers read it for free.
+const loadingOrgOptions = ref(false)
+const orgOptionsError = ref('')
+const rawOptions = ref(null)
+
 export function useOrgOptions() {
   const authStore = useAuthStore()
-  const loadingOrgOptions = ref(false)
-  const orgOptionsError = ref('')
-  const rawOptions = ref(null)
 
   async function loadOrgOptions() {
     if (rawOptions.value || loadingOrgOptions.value) return rawOptions.value

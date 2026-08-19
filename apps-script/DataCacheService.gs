@@ -48,7 +48,16 @@ const DataCacheService = (() => {
     'OfficeRegistry',
     'SystemSettings',
     'MasterKRALibrary',
-    'AssessmentPeriods'
+    'AssessmentPeriods',
+    // Admin-configured, slow-changing, central-only - same category as the
+    // sheets above. Both write paths already call DataCacheService.invalidate
+    // after writing (RaterMatrixService.save via hardDeleteRow/appendRow;
+    // OfficeRegistryService.replaceOrgOptionRows_ explicitly, since it writes
+    // via a raw setValues range rather than through SpreadsheetService), so
+    // adding them here is safe: an edit is never served stale past the write
+    // that changed it, only softened against repeat reads between edits.
+    'RaterMatrix',
+    'OfficeOrgOptions'
   ]
 
   // Short enough that an administrator's change shows up quickly even if an

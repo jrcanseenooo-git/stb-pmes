@@ -123,15 +123,24 @@ const IpcrfService = (() => {
     const sheet = _reviewCommentsSheet()
     const now = new Date().toISOString()
 
+    // Was one getAllRows(sheet) scan of the WHOLE ReviewComments sheet - a
+    // single central table shared by every form in the system - per comment
+    // being saved, because each updateRow/appendRow above it busts the cache
+    // so the next iteration's getAllRows was never a memo hit. Saving N
+    // comments cost N full-sheet reads. formId/reviewType/reviewerId are the
+    // same for every comment in this call, so the only thing that varies per
+    // iteration is entryId - read once, look up in memory from here on.
+    const existingByEntryId = {}
+    SpreadsheetService.getAllRows(sheet).forEach(r => {
+      if (r.formId === formId && r.reviewType === reviewType && r.reviewerId === profile.id) {
+        existingByEntryId[r.entryId] = r
+      }
+    })
+
     comments.forEach(item => {
       const entryId = item.entryId || ''
       if (!entryId) return
-      const existing = SpreadsheetService.getAllRows(sheet).find(r =>
-        r.formId === formId &&
-        r.entryId === entryId &&
-        r.reviewType === reviewType &&
-        r.reviewerId === profile.id
-      )
+      const existing = existingByEntryId[entryId]
       const patch = {
         formId,
         entryId,
@@ -144,11 +153,17 @@ const IpcrfService = (() => {
       if (existing) {
         SpreadsheetService.updateRow(sheet, existing.id, patch)
       } else {
-        SpreadsheetService.appendRow(sheet, {
+        const created = {
           id: SpreadsheetService.generateId('REVCOM-'),
           ...patch,
           createdAt: now
-        })
+        }
+        SpreadsheetService.appendRow(sheet, created)
+        // Keep the map current so a repeated entryId later in this SAME batch
+        // updates the row just created above instead of appending a second
+        // one for it - matching what the old per-iteration getAllRows would
+        // have found after the cache-busting append.
+        existingByEntryId[entryId] = created
       }
     })
 

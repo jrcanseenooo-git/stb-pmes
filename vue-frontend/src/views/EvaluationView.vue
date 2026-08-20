@@ -38,10 +38,22 @@
           <select v-model="tasksYear" class="filter-select" style="width:80px">
             <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}</option>
           </select>
-          <button class="btn" @click="activeView === 'my-tasks' ? loadMyTasks() : loadMyResults()" :disabled="loadingTasks || loadingResults">
-            <span v-if="loadingTasks || loadingResults" class="spinner-sm"></span>
-            {{ (loadingTasks || loadingResults) ? '' : 'Refresh Data' }}
-          </button>
+          <!-- Data is already fresh on load and on every period change (see
+               onMounted and the tasksSemester/tasksYear watcher below) - a
+               standalone button next to it implied the list might be stale
+               when it almost never is. Same "Last updated · Refresh" pattern
+               PortalDashboardView already uses, so the one real gap (someone
+               else generates a new assignment while you stay on this exact
+               screen, same period, without navigating away) still has a way
+               out. -->
+          <span v-if="tasksLastUpdatedLabel" class="tasks-last-updated">
+            Updated {{ tasksLastUpdatedLabel }} ·
+            <button type="button" class="tasks-refresh-link"
+                    :disabled="loadingTasks || loadingResults"
+                    @click="activeView === 'my-tasks' ? loadMyTasks() : loadMyResults()">
+              {{ (loadingTasks || loadingResults) ? 'Refreshing…' : 'Refresh' }}
+            </button>
+          </span>
         </div>
 
         <!-- Filter bar (All view) -->
@@ -1044,6 +1056,13 @@ const selectedRecord = ref(null)
 const currentYear = new Date().getFullYear()
 const tasksSemester = ref(String(new Date().getMonth() < 6 ? 1 : 2))
 const tasksYear     = ref(currentYear)
+// Set on every successful loadMyTasks/loadMyResults - whichever list is
+// currently shown - so "Refresh" always reports how fresh the visible data
+// actually is, not just whichever tab last loaded.
+const tasksLastUpdatedAt = ref(null)
+const tasksLastUpdatedLabel = computed(() =>
+  tasksLastUpdatedAt.value ? tasksLastUpdatedAt.value.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''
+)
 const yearOptions   = computed(() => {
   const years = []
   for (let y = currentYear + 1; y >= 2023; y--) years.push(y)
@@ -1526,6 +1545,7 @@ async function loadMyTasks() {
     const data = await ipatAssignmentsApi.getMyRatees({ semester: requestedSemester, year: requestedYear })
     if (requestedSemester !== String(tasksSemester.value) || requestedYear !== String(tasksYear.value)) return
     myTasks.value = Array.isArray(data) ? data : (data?.items || [])
+    tasksLastUpdatedAt.value = new Date()
     // Deep link from My Rating Tasks: ?assignment=<id> opens that exact task so
     // the portal list can hand off directly into the form the user clicked.
     const requestedAssignment = String(route.query.assignment || '')
@@ -1574,6 +1594,7 @@ async function loadMyResults() {
     const data = await ipatAssignmentsApi.getMyResults({ semester: requestedSemester, year: requestedYear })
     if (requestedSemester !== String(tasksSemester.value) || requestedYear !== String(tasksYear.value)) return
     myResults.value = data || []
+    tasksLastUpdatedAt.value = new Date()
     if (activeView.value === 'my-results') {
       selectedResult.value = myResults.value[0] || null
     }
@@ -2548,6 +2569,9 @@ async function finalizeRecord() {
 /* My Tasks */
 .tasks-period-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
 .tasks-period-label{font-size:12px;font-weight:600;color:#374151;}
+.tasks-last-updated{font-size:11px;color:#94A3B8;}
+.tasks-refresh-link{font-weight:700;color:#1D4ED8;background:none;border:0;padding:0;font-size:11px;cursor:pointer;}
+.tasks-refresh-link:disabled{opacity:.55;cursor:not-allowed;}
 .tasks-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-bottom:16px;}
 .task-card{background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:16px;cursor:pointer;transition:all .15s;}
 .task-card:hover{border-color:#CBD5E1;box-shadow:0 4px 12px rgba(0,0,0,.07);transform:translateY(-1px);}

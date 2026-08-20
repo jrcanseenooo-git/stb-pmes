@@ -47,10 +47,13 @@
                screen, same period, without navigating away) still has a way
                out. -->
           <span v-if="tasksLastUpdatedLabel" class="tasks-last-updated">
-            Updated {{ tasksLastUpdatedLabel }} ·
-            <button type="button" class="tasks-refresh-link"
+            Updated {{ tasksLastUpdatedLabel }}
+            <button type="button" class="tasks-refresh-btn"
                     :disabled="loadingTasks || loadingResults"
                     @click="activeView === 'my-tasks' ? loadMyTasks() : loadMyResults()">
+              <svg class="tasks-refresh-icon" viewBox="0 0 16 16" fill="none">
+                <path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2.5v3.2h-3.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
               {{ (loadingTasks || loadingResults) ? 'Refreshing…' : 'Refresh' }}
             </button>
           </span>
@@ -2569,9 +2572,24 @@ async function finalizeRecord() {
 /* My Tasks */
 .tasks-period-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
 .tasks-period-label{font-size:12px;font-weight:600;color:#374151;}
-.tasks-last-updated{font-size:11px;color:#94A3B8;}
-.tasks-refresh-link{font-weight:700;color:#1D4ED8;background:none;border:0;padding:0;font-size:11px;cursor:pointer;}
-.tasks-refresh-link:disabled{opacity:.55;cursor:not-allowed;}
+/* width:100% forces this onto its own full-width row when it wraps below
+   the Period/select pair (it always does - "Period:" plus both selects
+   already fill the panel's width), then text-align right-anchors it there
+   without touching the Period row's own layout at all. */
+.tasks-last-updated{width:100%;font-size:11px;color:#94A3B8;text-align:right;}
+/* Reuses .btn's own shape (padding, radius, border colour) so it reads as
+   the same scale of control as everything else on this screen, just
+   recoloured to the accent blue with a permanent icon instead of text-only. */
+.tasks-refresh-btn{
+  display:inline-flex;align-items:center;gap:5px;
+  margin-left:6px;padding:5px 11px;border-radius:8px;
+  border:1px solid #E2E8F0;background:#fff;
+  color:#1D4ED8;font-size:12px;font-weight:600;
+  font-family:inherit;cursor:pointer;vertical-align:-4px;
+}
+.tasks-refresh-btn:hover:not(:disabled){border-color:#CBD5E1;background:#F8FAFC;}
+.tasks-refresh-btn:disabled{opacity:.55;cursor:not-allowed;}
+.tasks-refresh-icon{width:13px;height:13px;flex-shrink:0;}
 .tasks-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-bottom:16px;}
 .task-card{background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:16px;cursor:pointer;transition:all .15s;}
 .task-card:hover{border-color:#CBD5E1;box-shadow:0 4px 12px rgba(0,0,0,.07);transform:translateY(-1px);}

@@ -65,7 +65,7 @@
               <input v-model.trim="form.employeeNo" type="text" placeholder="e.g. 24-0001" :disabled="submitting"/>
             </div>
             <div class="ob-field ob-full">
-              <label>Employment Type</label>
+              <label>Employment Type <span class="req">*</span></label>
               <select v-model="form.type" :disabled="submitting">
                 <option v-for="t in options.employmentTypes" :key="t" :value="t">{{ t }}</option>
               </select>
@@ -132,7 +132,7 @@
               </span>
             </div>
             <div class="ob-field">
-              <label>Requested Role <span class="ob-hint">admin confirms</span></label>
+              <label>Requested Role <span class="req">*</span> <span class="ob-hint">admin confirms</span></label>
               <!-- Roles are drawn from the selected office's own configuration,
                    so there is nothing meaningful to offer until an office is
                    chosen. -->
@@ -404,7 +404,8 @@ function onFullNameInput() { fullNameTouched.value = true }
 function resetFullName() { fullNameTouched.value = false; fullName.value = composeName() }
 
 const canSubmit = computed(() =>
-  form.value.firstName.trim() && form.value.lastName.trim() && fullName.value.trim() && form.value.officeId
+  form.value.firstName.trim() && form.value.lastName.trim() && fullName.value.trim() &&
+  form.value.officeId && form.value.type && form.value.role
 )
 
 // Prefill from the Google display name conservatively: last token is the
@@ -506,6 +507,14 @@ async function submit() {
   }
   if (!form.value.officeId) {
     error.value = 'Please select your office or program.'
+    return
+  }
+  if (!form.value.type) {
+    error.value = 'Please select your employment type.'
+    return
+  }
+  if (!form.value.role) {
+    error.value = 'Please select your requested role.'
     return
   }
   error.value = ''

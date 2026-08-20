@@ -150,6 +150,22 @@
       </div>
     </main>
 
+    <!-- The button's own spinner already covers this whole window (popup close
+         through the account check through routing), but it is a small element
+         inside a card the user's attention just left to deal with the Google
+         popup - easy to come back to and not notice. This overlay makes the
+         same wait impossible to miss, and covers the account-check round trip
+         specifically: whether this account already exists in PMES has to be
+         answered before we know whether registration is even needed. -->
+    <transition name="alert-in">
+      <div v-if="googleSigningIn" class="signin-overlay" role="status" aria-live="polite">
+        <div class="signin-overlay-card">
+          <span class="spin-dark" style="width:22px;height:22px;border-width:2.5px;"></span>
+          <p>Setting up your account…</p>
+          <span>Checking your PMES access</span>
+        </div>
+      </div>
+    </transition>
   </div>
 </template>
 
@@ -890,6 +906,36 @@ async function handleGoogleLogin() {
   flex-shrink: 0;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Google sign-in overlay ── */
+.signin-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  background: rgba(9, 19, 38, .55);
+  backdrop-filter: blur(2px);
+}
+.signin-overlay-card {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 28px 34px;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 20px 50px -12px rgba(0,0,0,.35);
+}
+.signin-overlay-card p {
+  margin: 4px 0 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+}
+.signin-overlay-card span:last-child {
+  font-size: 12.5px;
+  color: #64748b;
+}
 
 /* ── Access note ── */
 .access-note {

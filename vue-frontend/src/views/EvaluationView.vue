@@ -2572,14 +2572,11 @@ async function finalizeRecord() {
 /* My Tasks */
 .tasks-period-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
 .tasks-period-label{font-size:12px;font-weight:600;color:#374151;}
-/* margin-left:auto claims all the leftover space on whichever row this
-   wraps onto (it always wraps below Period/both selects - they already
-   fill the panel's width at every breakpoint), pushing it flush to the
-   panel's right edge. Tried width:100% + text-align:right first - it left
-   a gap on wider panels/breakpoints where the wrapped row is wider than
-   this element's own content, since text-align only aligns the text
-   inside the element's own box, not the box within the row. */
-.tasks-last-updated{margin-left:auto;font-size:11px;color:#94A3B8;}
+/* Left-aligned, sitting under "Period:" on the row it wraps onto - no
+   special alignment needed, this is .tasks-period-bar's own default
+   flex-start behaviour. Right-alignment was tried and reverted per
+   feedback. */
+.tasks-last-updated{font-size:11px;color:#94A3B8;}
 /* Reuses .btn's own shape (padding, radius, border colour) so it reads as
    the same scale of control as everything else on this screen, just
    recoloured to the accent blue with a permanent icon instead of text-only. */

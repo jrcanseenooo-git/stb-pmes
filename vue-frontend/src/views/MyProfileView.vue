@@ -77,5 +77,10 @@ const fields = computed(() => [
   { label: 'Position', value: authStore.position },
   { label: 'Immediate Supervisor', value: authStore.profile?.supervisorName },
   { label: 'Current Assessment Period', value: currentPeriod.value }
-])
+  // A row with no value read as a record with a hole in it - "Section: -"
+  // reads as "the office never set this," which is what personnel actually
+  // asked their administrator about. Not every account has every field
+  // (a Division Chief has no Section; some offices skip Immediate
+  // Supervisor), so unset fields are dropped instead of shown empty.
+].filter(field => field.value))
 </script>

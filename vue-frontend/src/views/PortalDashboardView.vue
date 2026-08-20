@@ -5,20 +5,11 @@
       Deliberately excluded per the cluster specification: Account Settings,
       Quick Actions, Recent Activity, Performance Summary, and anything KRA.
       Everything here answers one question - what do I still have to rate?
-    -->
-    <section class="pui-card" style="padding:20px;">
-      <p class="pui-header-kicker">{{ portalSubtitle }}</p>
-      <h1 style="margin:4px 0 0; font-size:24px; font-weight:800; color:#0f172a; line-height:1.2;">
-        {{ loading ? '-' : (person.fullName || 'Welcome') }}
-      </h1>
-      <dl style="margin:14px 0 0; display:flex; flex-wrap:wrap; gap:8px 28px; padding:0;">
-        <div v-for="item in identityItems" :key="item.label" style="min-width:0;">
-          <dt style="font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; color:#94a3b8;">{{ item.label }}</dt>
-          <dd style="margin:2px 0 0; font-size:13px; font-weight:700; color:#334155;">{{ item.value }}</dd>
-        </div>
-      </dl>
-    </section>
 
+      No identity/office header card here - it duplicated the Assessment
+      Record already shown in full on Personal Information (My Account),
+      which is one click away in the sidebar.
+    -->
     <div v-if="error" class="pui-card pui-alert pui-alert-error" style="padding:16px;" role="alert">
       <p class="pui-alert-title">Your assessment summary could not be loaded</p>
       <p>{{ error }}</p>
@@ -88,31 +79,16 @@
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { portalApi } from '@/services/api'
-import { useBranding } from '@/composables/useBranding'
 import StatTile from '@/components/ui/StatTile.vue'
 import ProgressBar from '@/components/ui/ProgressBar.vue'
 
-const { portalSubtitle } = useBranding()
-
 const loading = ref(false)
 const error = ref('')
-const person = ref({})
 const period = ref({})
 const tasks = ref({ total: 0, pending: 0, draft: 0, completed: 0, completionRate: 0 })
 const lastUpdatedAt = ref(null)
 
 onMounted(load)
-
-const identityItems = computed(() => {
-  const p = person.value
-  return [
-    { label: 'Position', value: p.position || p.positionLevel || '-' },
-    { label: 'Office', value: p.officeName || '-' },
-    { label: 'Division / Unit', value: p.divisionName || '-' },
-    { label: 'Section', value: p.section || '-' },
-    { label: 'Assessment Period', value: period.value.label || '-' }
-  ].filter(item => item.value !== '-' || item.label === 'Assessment Period')
-})
 
 const lastUpdatedLabel = computed(() =>
   lastUpdatedAt.value ? lastUpdatedAt.value.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''
@@ -123,7 +99,6 @@ async function load() {
   error.value = ''
   try {
     const data = await portalApi.summary()
-    person.value = data.person || {}
     period.value = data.period || {}
     tasks.value = { total: 0, pending: 0, draft: 0, completed: 0, completionRate: 0, ...(data.tasks || {}) }
     lastUpdatedAt.value = new Date()

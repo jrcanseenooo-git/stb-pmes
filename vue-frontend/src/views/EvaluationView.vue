@@ -39,22 +39,21 @@
             <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}</option>
           </select>
           <!-- Data is already fresh on load and on every period change (see
-               onMounted and the tasksSemester/tasksYear watcher below) - a
-               standalone button next to it implied the list might be stale
-               when it almost never is. Same "Last updated · Refresh" pattern
-               PortalDashboardView already uses, so the one real gap (someone
-               else generates a new assignment while you stay on this exact
-               screen, same period, without navigating away) still has a way
-               out. -->
+               onMounted and the tasksSemester/tasksYear watcher below) - the
+               one real gap is someone else generating a new assignment while
+               you stay on this exact screen, same period, without navigating
+               away. Rather than show a permanent button for a rare case, a
+               quiet check on window focus (see checkForNewData below) only
+               reveals it when there is actually something new to pull in. -->
           <span v-if="tasksLastUpdatedLabel" class="tasks-last-updated">
             Updated {{ tasksLastUpdatedLabel }}
-            <button type="button" class="tasks-refresh-btn"
+            <button v-if="hasNewTaskData" type="button" class="tasks-refresh-btn"
                     :disabled="loadingTasks || loadingResults"
                     @click="activeView === 'my-tasks' ? loadMyTasks() : loadMyResults()">
               <svg class="tasks-refresh-icon" viewBox="0 0 16 16" fill="none">
                 <path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2.5v3.2h-3.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
-              {{ (loadingTasks || loadingResults) ? 'Refreshing…' : 'Refresh' }}
+              {{ (loadingTasks || loadingResults) ? 'Refreshing…' : 'New data · Refresh' }}
             </button>
           </span>
         </div>
@@ -937,7 +936,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ipatApi, ipatAssignmentsApi, usersApi, assessmentContentApi, assessmentCategoryApi } from '@/services/api'
 import { usePermissions } from '@/composables/usePermissions'
@@ -1063,6 +1062,11 @@ const tasksYear     = ref(currentYear)
 // currently shown - so "Refresh" always reports how fresh the visible data
 // actually is, not just whichever tab last loaded.
 const tasksLastUpdatedAt = ref(null)
+// True only once a background check (see checkForNewData) finds the server
+// has something this screen does not. Never true on first load - there is
+// nothing to compare against yet.
+const hasNewTaskData = ref(false)
+const checkingForNewData = ref(false)
 const tasksLastUpdatedLabel = computed(() =>
   tasksLastUpdatedAt.value ? tasksLastUpdatedAt.value.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''
 )
@@ -1514,7 +1518,57 @@ watch([canAdmin, isSystemAdmin], ([admin, sysAdmin]) => {
 }, { immediate: true, flush: 'post' })
 watch(activeView, (view) => {
   if (view === 'all' && canAdmin.value) loadRecords()
+  // A "new data" flag from the tab just left says nothing about the tab just
+  // entered - it has not been checked yet.
+  hasNewTaskData.value = false
 })
+
+// Checking always means asking the backend something - IPATRaterAssignments/
+// IPATRecords are transactional and deliberately not cross-execution cached
+// (see DataCacheService), so this genuinely costs a Sheets read every time,
+// same as a real fetch. Firing it on a timer would add background load to a
+// screen that has none today. Window focus only fires when the user actually
+// comes back to the tab, which is the one moment this is worth paying for.
+async function checkForNewData() {
+  if (checkingForNewData.value || loadingTasks.value || loadingResults.value) return
+  if (activeView.value !== 'my-tasks' && activeView.value !== 'my-results') return
+  checkingForNewData.value = true
+  try {
+    const semester = String(tasksSemester.value)
+    const year = String(tasksYear.value)
+    if (activeView.value === 'my-tasks') {
+      const data = await ipatAssignmentsApi.getMyRatees({ semester, year })
+      if (semester !== String(tasksSemester.value) || year !== String(tasksYear.value)) return
+      const fresh = Array.isArray(data) ? data : (data?.items || [])
+      hasNewTaskData.value = !sameAssignmentIds_(fresh, myTasks.value)
+    } else {
+      const data = await ipatAssignmentsApi.getMyResults({ semester, year })
+      if (semester !== String(tasksSemester.value) || year !== String(tasksYear.value)) return
+      hasNewTaskData.value = !sameAssignmentIds_(data || [], myResults.value)
+    }
+  } catch (e) {
+    // A failed background check should never surface an error to the user -
+    // worst case the Refresh button just does not appear this time.
+    console.warn('[Evaluation] Background new-data check failed:', e.message)
+  } finally {
+    checkingForNewData.value = false
+  }
+}
+// Comparing ids is enough for what this detects: a new assignment appearing.
+// It deliberately does not chase every field an existing row might have
+// changed in place, which would make an ordinary status update on someone
+// else's screen surface a "new data" prompt here too.
+function sameAssignmentIds_(a, b) {
+  const idsA = new Set((a || []).map(r => String(r.id)))
+  const idsB = new Set((b || []).map(r => String(r.id)))
+  if (idsA.size !== idsB.size) return false
+  for (const id of idsA) if (!idsB.has(id)) return false
+  return true
+}
+
+function handleWindowFocusForNewData() {
+  checkForNewData()
+}
 
 onMounted(() => {
   loadAssessmentContent()
@@ -1523,6 +1577,11 @@ onMounted(() => {
   // administrator's (always empty) personal rating tasks.
   if (canAdmin.value || activeView.value === 'all') loadRecords()
   else loadMyTasks()
+  window.addEventListener('focus', handleWindowFocusForNewData)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('focus', handleWindowFocusForNewData)
 })
 
 async function handlePeriodChange() {
@@ -1549,6 +1608,7 @@ async function loadMyTasks() {
     if (requestedSemester !== String(tasksSemester.value) || requestedYear !== String(tasksYear.value)) return
     myTasks.value = Array.isArray(data) ? data : (data?.items || [])
     tasksLastUpdatedAt.value = new Date()
+    hasNewTaskData.value = false
     // Deep link from My Rating Tasks: ?assignment=<id> opens that exact task so
     // the portal list can hand off directly into the form the user clicked.
     const requestedAssignment = String(route.query.assignment || '')
@@ -1598,6 +1658,7 @@ async function loadMyResults() {
     if (requestedSemester !== String(tasksSemester.value) || requestedYear !== String(tasksYear.value)) return
     myResults.value = data || []
     tasksLastUpdatedAt.value = new Date()
+    hasNewTaskData.value = false
     if (activeView.value === 'my-results') {
       selectedResult.value = myResults.value[0] || null
     }

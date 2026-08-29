@@ -308,6 +308,11 @@ Runs `npm audit --prefix vue-frontend --audit-level=high` then `npm run build --
 | Frontend change works locally, breaks on Vercel | Dev proxies `/gas` via Vite; prod goes through `/api/gas`. Check `GAS_WEB_APP_URL` and `PMES_ALLOWED_ORIGINS`. |
 | Backend fix "didn't apply" | You pushed but didn't deploy - or deployed to a new id. |
 | Font looks wrong in a new component | Someone added `font-family`. Remove it. |
+| Frontend fix "didn't apply" though Vercel said success | `--prod` does not always move `stb-pmes.vercel.app`. The deployment can come back with **no aliases**. Verify the served bundle hash, then `vercel alias set <url> stb-pmes.vercel.app`. |
+| A write throws on a freshly provisioned office workbook | A tab holding only its header row. Helpers that bail on `lastRow < 2` must still return the **headers**, or the append builds a zero-column `getRange()` and throws. This broke every first rating submission (fixed 2026-08-29, `IPATService.matchingRowContexts`). |
+| Reading assessment questions returns nothing, intermittently | Apps Script returns 429/5xx while its cache warms. Only non-JSON replies are marked TRANSIENT; a well-formed `{success:false, status:429}` is **not** retried unless the route is in the retry allowlist in `gasSendWithRetry`. |
+| "No active assessment questions are configured" | Often NOT a configuration problem. Check whether the fetch failed - a swallowed error used to surface as this exact message. The banner now shows the real reason. |
+| Question targeting looks wrong in the spreadsheet | You are probably reading **`AssessmentSeedTemplate`**, not the live **`AssessmentContent`** tab. Near-identical columns, different data; the seed template still carries the legacy 3-role restriction. Offices are provisioned from `AssessmentContent`. |
 
 ---
 
@@ -317,7 +322,47 @@ Runs `npm audit --prefix vue-frontend --audit-level=high` then `npm run build --
 
 **Largely built:** IPCRF/CCEF - create, entries, submit, route, approve, return, rate, finalize, review comments, compute score.
 
-**Views present:** Dashboard, IPCRF, Review, KRA, Accomplishments, MOV, Reports, Evaluation, Audit, Users, Profile, Login, Register, Pending, Unauthorized, NotFound.
+**Views present:** Dashboard, IPCRF, Review, KRA, Accomplishments, MOV, Reports, Evaluation, Audit, Users, Profile, Login, Register, Pending, Unauthorized, NotFound, plus the multi-office set (OfficeRegistry, OfficeManagement, OfficeDashboard, PortalDashboard, ClusterOverview, RaterMatrix, HelpGuide, MyNotifications).
+
+### Evaluation is one module - do not re-split it
+
+`EvaluationView.vue` is the single home for everything a rater or ratee does.
+Three standalone views were folded into it and **deliberately deleted**; their
+routes now redirect so old bookmarks still land correctly:
+
+| Removed view | Now |
+|---|---|
+| `MyTasksView.vue` | "My Rating Tasks" tab inside Evaluation · `/my-tasks` → `/evaluation` |
+| `MyResultsView.vue` | "My Results" tab inside Evaluation · `/my-results` → `/evaluation` |
+| `OfficePersonnelView.vue` | Users page · `/office-personnel` → `/users`; the `office-personnel/*` API returns **410** |
+
+Inside Evaluation, `activeView` switches between `my-tasks`, `my-results` and
+`all` (the administrative list, gated on `manage_ipat_scores`). A pure System
+Administrator is not assessed, so their personal tabs are hidden and they land
+on `all`.
+
+**The tabs are load-bearing.** They are how a rater reaches their assigned
+ratees and how an employee sees their own score. Removing them without putting
+that work somewhere else leaves a rater with no route to their ratees.
+
+### Assessment question targeting
+
+`applicableLevels` on a question is an **open, per-office vocabulary**, not a
+fixed ladder. Roles come from each office's own `OfficeOrgOptions` rows
+(`optionType='role'`), served as `requestedRoles`. **Empty = applies to every
+role, and that is the default for a new question.** Rater types, by contrast,
+are a closed set fixed by the protocol.
+
+Matching is implemented **twice and must stay identical** - the client renders
+the form from its copy while the server gates the submission against its own
+count, so any divergence means a rater answers every question shown and is
+still rejected for one they were never given:
+- `AssessmentContentService.levelApplies_`
+- `EvaluationView.levelAppliesToAssignment`
+
+Never route levels through `normalizeOptionArray_`: it discards anything
+outside its allowed list, which is what stopped offices targeting their own
+roles at all.
 
 **Not implemented:** `reports/*` and `deadlines/*` backend routes (501-guarded). `components/audit|evaluation|kra|mov|reports|users` directories are empty - those views are self-contained.
 
@@ -336,3 +381,8 @@ Runs `npm audit --prefix vue-frontend --audit-level=high` then `npm run build --
 7. Never create a new GAS deployment.
 8. Run `npm run deploy:check` before any frontend deploy; push **and** deploy after any `.gs` change.
 9. `DatabaseMaintenanceService` routes are destructive - always call the GET preview first and require explicit confirmation.
+10. **Commit after every change.** Until 2026-08-29 nothing was committed for weeks: the live site was built and pushed straight from the working tree, leaving `main` ~2,200 lines behind the code serving users. That is why regressions were invisible - there was no diff to review and no version to roll back to. A commit cannot reach users; only a deploy can.
+11. **Never assume what is deployed - go and read it.** Pull the live Apps Script into a scratch dir **outside OneDrive** and diff it against `apps-script/`. Today's outage was a fix that had been written weeks earlier and never deployed, while users kept hitting the bug.
+12. **Verify a deploy by what is served, not by what the CLI said.** Compare the live bundle hash against your build; for a specific view, fetch that route's own chunk. Both a `clasp deploy` and a `vercel --prod` have reported success here without reaching users.
+13. **`clasp run` can execute even when it prints an error.** A `NOT_FOUND` "reading from storage" failure is the API failing to read the *result* back - the function may already have run and written. Verify the data before concluding nothing happened.
+14. When a symptom is **intermittent**, suspect the transport before the data. Two of today's three bugs were transient API failures wearing a configuration error's clothing.

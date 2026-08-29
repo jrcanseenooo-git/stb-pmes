@@ -1505,7 +1505,13 @@ const IPATService = (() => {
     // Exported so other services classify scores through the protocol's bands
     // instead of maintaining their own. PortalService previously carried a
     // divergent copy (3.51/3.01/2.51, and no intervention band at all).
-    qualitativeDescriptor
+    qualitativeDescriptor,
+    // Pure: takes a record-shaped object, returns the computed result and writes
+    // nothing. Exported so a migration can recompute a score through the SAME
+    // formula the app uses - FPO 1-5 rescaling, weight renormalisation and
+    // conduct deductions included - rather than reimplementing the arithmetic
+    // and drifting from it.
+    calculateOverallForMigration: calculateOverall
   }
 
 })()

@@ -742,10 +742,31 @@ const RaterMatrixService = (() => {
     const rows = []
     roles.forEach((role, index) => {
       rows.push({ rateeRole: role, raterType: 'Self', sourceRoles: '', scope: 'self', fallbackScope: '' })
-      rows.push({ rateeRole: role, raterType: 'Peer', sourceRoles: role, scope: 'office-wide', fallbackScope: '' })
 
       const lowerRoles = roles.slice(0, index)
       const supervisorRole = roles[index + 1]
+
+      // The peer arrangement follows from whether anyone sits below this role -
+      // the same fact that decides the Subordinate row, and the same fact
+      // generation later reads back as hasSubordinate.
+      //
+      // This used to emit a single 'Peer' for every role unconditionally, so the
+      // LOWEST role in an office - Technical Staff or Admin Staff, the largest
+      // group - was seeded with one peer and no subordinate. The protocol gives
+      // that role two peers, because with no subordinate the subordinate's share
+      // passes to a second peer. The score still computed (one peer carried the
+      // whole share as peerLegacy), so nothing failed visibly; the office simply
+      // collected one colleague's view where it should have had two, and every
+      // new office started that way until someone noticed and fixed it by hand.
+      //
+      // STB's hand-written defaults above already model this correctly; this
+      // generated set now matches them.
+      if (lowerRoles.length) {
+        rows.push({ rateeRole: role, raterType: 'Peer', sourceRoles: role, scope: 'office-wide', fallbackScope: '' })
+      } else {
+        rows.push({ rateeRole: role, raterType: 'Peer1', sourceRoles: role, scope: 'office-wide', fallbackScope: '' })
+        rows.push({ rateeRole: role, raterType: 'Peer2', sourceRoles: role, scope: 'office-wide', fallbackScope: '' })
+      }
       const skipSupervisorRole = roles[index + 2]
       if (lowerRoles.length) {
         rows.push({

@@ -101,9 +101,60 @@ const MigrationMergeOrphanedFpo_ = (() => {
     return (linked.length * 1000) + (completed * 100) + (hasScore * 10) - (created || 0) / 10000000000000
   }
 
+  // Every office keeps its assessment records in its OWN workbook. The first
+  // version of this migration read only the ambient (central) spreadsheet, so it
+  // silently covered STB alone - the same trap MigrationOpenAssessmentLevels
+  // avoids by iterating the registry. A cluster-wide system needs cluster-wide
+  // migrations, or a fix quietly applies to one office out of nine.
   function run(options) {
     const dryRun = !!(options && options.dryRun)
-    const recSheet = SpreadsheetService.getSheet(SHEET.IPAT_RECORDS)
+    const results = []
+
+    results.push(runOneWorkbook_(null, 'CENTRAL', dryRun))
+
+    let offices = []
+    try {
+      offices = SpreadsheetService.withCentralSpreadsheet(() =>
+        SpreadsheetService.getAllRows(SpreadsheetService.getSheet(SHEET.OFFICE_REGISTRY))
+      )
+    } catch (e) {
+      Logger.log('WARNING: office registry unreadable (' + e.message + ') - CENTRAL only')
+    }
+
+    offices.forEach(office => {
+      const id = String(office.spreadsheetId || '').trim()
+      const name = String(office.officeCode || office.officeId || office.id || '?')
+      if (!id) return
+      if (String(office.spreadsheetStatus || '') !== 'ACTIVE') {
+        Logger.log('  ' + name + ': skipped (spreadsheetStatus ' + office.spreadsheetStatus + ')')
+        return
+      }
+      try {
+        results.push(SpreadsheetService.withSpreadsheetId(id, () => runOneWorkbook_(null, name, dryRun)))
+      } catch (e) {
+        Logger.log('  ' + name + ': FAILED to open (' + e.message + ')')
+      }
+    })
+
+    const total = results.reduce((sum, r) => sum + (r ? r.merged : 0), 0)
+    Logger.log('TOTAL ACROSS ALL WORKBOOKS: ' + total +
+      (dryRun ? ' record(s) would be merged' : ' record(s) merged'))
+    return { dryRun: dryRun, total: total, results: results }
+  }
+
+  function runOneWorkbook_(unusedSs, label, dryRun) {
+    Logger.log('--- ' + label + ' ---')
+    let recSheet
+    try {
+      recSheet = SpreadsheetService.getSheet(SHEET.IPAT_RECORDS)
+    } catch (e) {
+      Logger.log('  no assessment records tab; nothing to do')
+      return { label: label, merged: 0, skippedAmbiguous: 0, skippedNoRatings: 0 }
+    }
+    return runOnSheet_(recSheet, label, dryRun)
+  }
+
+  function runOnSheet_(recSheet, label, dryRun) {
     const records = SpreadsheetService.getAllRows(recSheet)
     let assignments = []
     try {
@@ -190,10 +241,10 @@ const MigrationMergeOrphanedFpo_ = (() => {
       }
     })
 
-    Logger.log('TOTAL: ' + merged + (dryRun ? ' record(s) would be merged' : ' record(s) merged') +
+    Logger.log('  = ' + merged + (dryRun ? ' would merge' : ' merged') +
       (skippedAmbiguous ? ', ' + skippedAmbiguous + ' skipped as ambiguous' : '') +
       (skippedNoRatings ? ', ' + skippedNoRatings + ' skipped with no CBC/JF yet' : ''))
-    return { dryRun: dryRun, merged: merged, skippedAmbiguous: skippedAmbiguous, skippedNoRatings: skippedNoRatings }
+    return { label: label, merged: merged, skippedAmbiguous: skippedAmbiguous, skippedNoRatings: skippedNoRatings }
   }
 
   return { run: run }

@@ -204,6 +204,14 @@ const AssessmentContentService = (() => {
       const entries = templateRows.map(row => toRow({
         ...row,
         id: SpreadsheetService.generateId('AC-'),
+        // Seeded questions apply to EVERY role, always. Each office defines its
+        // own roles and adds to them over time, so a seeded question carrying a
+        // role restriction would silently exclude whoever was hired into a role
+        // the template never listed - the failure that left raters staring at an
+        // empty form. Clearing it here means a reseed can never reintroduce a
+        // stale restriction, whatever the template happens to hold: an
+        // administrator narrows a question deliberately afterwards, or not at all.
+        applicableLevels: [],
         hasBeenUsed: false,
         createdBy: 'seed-template',
         createdByName: 'Assessment Seed Template',

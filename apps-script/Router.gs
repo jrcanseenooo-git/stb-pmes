@@ -92,15 +92,24 @@ const Router = (() => {
         if (id === 'office-boundary' && method === 'GET') return DiagnosticsService.officeBoundary(params, user)
         break
 
-      // Central-admin-only reversible dummy data for dashboard testing.
-      // Not office-scoped: it intentionally seeds/cleans multiple registered
-      // office workbooks from the central boundary.
+      // Retired 2026-08-29. PMES holds real personnel performance records, and
+      // nothing should be able to manufacture fabricated ones inside it.
+      //
+      // The route seeded dummy personnel, assessment records and rater
+      // assignments into EVERY registered office workbook, and its permission
+      // gate accepted view_cluster_monitoring - the only permission the
+      // Undersecretary holds - so a role defined as read-only across the
+      // cluster could write to all nine databases. It also created assignments
+      // with a rater type outside the protocol's closed set, which matched no
+      // question and left the rater an empty form: the seeder could recreate on
+      // demand the exact defect the system had just been fixed for.
+      //
+      // Nothing was lost by removing it: no TESTPMES- row existed in the
+      // central workbook or in any office workbook when this was retired.
+      // TestDataService.gs is deleted; this 410 stays so an old client that
+      // still calls the route gets a clear answer instead of a silent 404.
       case 'test-data':
-        if (id === 'seed' && method === 'POST') return TestDataService.seed(body, user)
-        if (id === 'cleanup' && method === 'POST') return TestDataService.cleanup(body, user)
-        if (id === 'accounts' && method === 'POST') return TestDataService.seedAccounts(body, user)
-        if (id === 'accounts-cleanup' && method === 'POST') return TestDataService.cleanupAccounts(body, user)
-        break
+        throw HttpError('Test data seeding has been removed. PMES does not create fabricated records.', 410)
 
       case 'system-settings':
         if (!id && method === 'GET') return SystemSettingsService.list(params, user)

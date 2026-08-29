@@ -402,17 +402,13 @@ export const portalApi = {
   officeSummary: (p = {}) => gasGet('portal/office-summary', p)
 }
 
-export const testDataApi = {
-  seed:    (data = {}) => gasWrite('POST', 'test-data/seed', data),
-  cleanup: (data = {}) => gasWrite('POST', 'test-data/cleanup', data)
-}
-
-if (typeof window !== 'undefined') {
-  window.__pmesTestData = {
-    seedAll: () => testDataApi.seed({ officeIds: 'all', semester: 2, year: 2026 }),
-    cleanupAll: () => testDataApi.cleanup({ officeIds: 'all', confirm: 'DELETE_TEST_DATA' })
-  }
-}
+// testDataApi and the window.__pmesTestData console hook were removed on
+// 2026-08-29 along with the backend route. PMES holds real personnel
+// performance records; nothing in it should be able to manufacture fabricated
+// ones. The hook shipped in the production bundle, so seeding every office
+// database was a one-line console call for anyone the server gate accepted -
+// and that gate accepted view_cluster_monitoring, the Undersecretary's only
+// permission. `test-data/*` now answers 410.
 
 export const dashboardApi = {
   all:             (p = {}) => gasGet('dashboard/all',       p),

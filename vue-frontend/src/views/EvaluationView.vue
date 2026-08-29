@@ -181,6 +181,7 @@
                   <div class="eli-meta">{{ res.divisionName }}</div>
                 </div>
                 <span v-if="res.allComplete && res.overallScore" class="rc-status-badge rc-done" style="font-size:10px">Computed</span>
+                <span v-if="scoreIsPartial(res)" class="rc-status-badge rc-partial" style="font-size:10px" title="A component is missing - this is not a complete score">Incomplete</span>
                 <span v-else class="rc-status-badge rc-pending" style="font-size:10px">In Progress</span>
               </div>
               <div class="eli-chips">
@@ -412,6 +413,9 @@
                      here, but it cost ~150px of the summary bar and forced the four
                      score cards to scroll sideways. It is also a CBC-domain action
                      (NTE / offence level), so it belongs beside the CBC ratings. -->
+              </div>
+              <div v-if="!activeAssignment && scoreIsPartial(activeRecord)" class="rp-partial-note" style="margin:0 0 14px">
+                <strong>Incomplete score.</strong> {{ partialScoreNote(activeRecord) }}
               </div>
 
               <!-- ── CBC TAB ── -->
@@ -677,6 +681,10 @@
                 <div class="rp-score-big">{{ displayOverallScore(selectedResult) ?? '-' }}</div>
                 <div v-if="displayOverallScore(selectedResult)" class="rp-score-equivalent">{{ scoreEquivalentPct(displayOverallScore(selectedResult)) }} equivalent</div>
                 <div v-if="displayDescriptor(selectedResult)" class="rp-score-desc">{{ displayDescriptor(selectedResult) }}</div>
+                <div v-if="scoreIsPartial(selectedResult)" class="rp-partial-badge">Incomplete score</div>
+              </div>
+              <div v-if="scoreIsPartial(selectedResult)" class="rp-partial-note">
+                <strong>This score is not final.</strong> {{ partialScoreNote(selectedResult) }}
               </div>
               <div class="rp-score-grid">
                 <div class="rp-score-block">
@@ -1342,6 +1350,40 @@ function displayOverallScore(record) {
 function displayDescriptor(record) {
   const score = displayOverallScore(record)
   return descriptorForScore(score) || record?.descriptor || ''
+}
+
+// A score with a component missing is NOT a partial score - calculateOverall
+// renormalises the weights of whatever is present so the total is always 1.0.
+// That is deliberate, but it means a score built from CBC and JF alone (45% of
+// the intended weight) renders identically to a complete one, and FPO alone is
+// 55%. The backend already reports appliedComponents/missingComponents; nothing
+// ever showed them to a user, so someone reading "3.47 Satisfactory" had no way
+// to know the largest component was never included. Derived here from the
+// record's own component fields so it works on list reads too, not just the
+// compute response.
+const SCORE_COMPONENTS = [
+  { key: 'cbcScore', label: 'CBC', weight: 30 },
+  { key: 'fpoScore', label: 'FPO', weight: 55 },
+  { key: 'jfScore',  label: 'JF',  weight: 15 }
+]
+function missingScoreComponents(record) {
+  if (!record) return []
+  return SCORE_COMPONENTS.filter(c => {
+    const v = record[c.key]
+    return v === '' || v === null || v === undefined || !Number.isFinite(Number(v))
+  })
+}
+function scoreIsPartial(record) {
+  return !!displayOverallScore(record) && missingScoreComponents(record).length > 0
+}
+function partialScoreNote(record) {
+  const missing = missingScoreComponents(record)
+  if (!missing.length) return ''
+  const names = missing.map(c => c.label).join(' and ')
+  const weight = missing.reduce((sum, c) => sum + c.weight, 0)
+  const present = SCORE_COMPONENTS.filter(c => !missing.includes(c)).map(c => c.label).join(' and ')
+  return `Computed without ${names} (${weight}% of the total weight). ` +
+    `${present} ${missing.length === 2 ? 'was' : 'were'} rescaled to fill 100%, so this is not a complete score.`
 }
 
 async function onFpoManualBlur() {
@@ -2899,6 +2941,11 @@ async function finalizeRecord() {
 .rc-period{font-size:11px;font-weight:600;color:#64748B;}
 .rc-status-badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;}
 .rc-done{background:#F0FDF4;color:#15803D;border:1px solid #BBF7D0;}
+/* Amber, not red: an incomplete score is a caveat on a real number, not an error. */
+.rc-partial{background:#FFFBEB;color:#B45309;border:1px solid #FDE68A;margin-left:6px;}
+.rp-partial-badge{display:inline-block;margin-top:10px;padding:3px 12px;border-radius:20px;background:#FFFBEB;color:#B45309;border:1px solid #FDE68A;font-size:11px;font-weight:700;}
+.rp-partial-note{margin:12px 0 0;padding:11px 14px;border-radius:9px;background:#FFFBEB;border:1px solid #FDE68A;color:#78350F;font-size:12px;line-height:1.55;}
+.rp-partial-note strong{color:#92400E;}
 .rc-pending{background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE;}
 .rc-name{font-size:15px;font-weight:700;color:#0F172A;margin-bottom:2px;}
 .rc-division{font-size:11px;color:#94A3B8;margin-bottom:12px;}

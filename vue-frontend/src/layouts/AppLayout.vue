@@ -14,7 +14,7 @@
             <div class="brand-sub">{{ wordmarkBottom }}</div>
             <div class="brand-office" :title="portalSubtitle">{{ portalSubtitle }}</div>
           </div>
-          <div v-else key="mark" class="brand-mark" :title="portalTitle">{{ shortName }}</div>
+          <div v-else key="mark" class="brand-mark" :style="brandMarkStyle" :title="portalTitle">{{ shortName }}</div>
         </transition>
       </div>
 
@@ -459,6 +459,17 @@ const { isClusterPortal, portalTitle, portalSubtitle, wordmarkTop, wordmarkBotto
 const notifStore = useNotificationsStore()
 const { confirm } = useConfirm()
 
+// The collapsed rail leaves 48px for the wordmark, and what lands there is the
+// office CODE, which ranges from "WGP" to "WALANG-GUTOM" across the registry.
+// One fixed font size cannot serve both: large enough for the short codes to
+// read as a mark, small enough for the long ones to fit. Step it down by length
+// so every office gets its whole code rather than a clipped one.
+const brandMarkStyle = computed(() => {
+  const length = String(shortName.value || '').length
+  const size = length <= 4 ? 11 : length <= 6 ? 10 : length <= 9 ? 9 : 8
+  return { fontSize: size + 'px' }
+})
+
 // Unread notifications tied to the Accomplishments module - drives the sidebar nav badge
 const accomplishmentsUnread = computed(() =>
   notifStore.notifications.filter(n => !n.read && n.module === 'Accomplishments').length
@@ -860,23 +871,35 @@ onUnmounted(() => {
 
 /* Collapsed-sidebar fallback: a short text initialism (PMES, or the office
    code) rather than an icon - still pure text, just compact enough for the
-   narrow collapsed rail. */
+   narrow collapsed rail.
+
+   This is the office CODE in practice, not a hand-picked short name:
+   officeAcronym() is never passed officeShortName by useBranding, so it falls
+   through to officeCode - "OSAS-IPD", "WALANG-GUTOM". At a fixed 42px with
+   nowrap and text-overflow:clip, anything past ~7 characters was sliced off
+   mid-letter, which is what made OSAS-IPD read as "OSAS-IPI".
+
+   Now it wraps instead of clipping. Width fills the collapsed rail's content
+   box (64px rail - 8px padding each side) and the font steps down with length,
+   so every office code in the registry renders whole. Codes break after their
+   hyphen naturally; overflow-wrap catches an unhyphenated one. */
 .brand-mark {
-  width: 42px;
-  height: 32px;
+  width: 48px;
+  min-height: 32px;
+  box-sizing: border-box;
+  padding: 3px 2px;
   display: grid;
   place-items: center;
   border-radius: 10px;
   background: rgba(255,255,255,.06);
   border: 1px solid rgba(255,255,255,.08);
   color: #ffffff;
-  font-size: 9px;
   font-weight: 800;
+  line-height: 1.12;
   text-align: center;
-  letter-spacing: .02em;
-  overflow: hidden;
-  text-overflow: clip;
-  white-space: nowrap;
+  letter-spacing: .01em;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 /* Wraps rather than truncates - the cluster-scope text here is a full system

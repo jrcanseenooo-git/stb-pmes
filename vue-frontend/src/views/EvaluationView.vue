@@ -99,7 +99,7 @@
               <span v-if="pendingTaskCount > 0" class="view-tab-badge">{{ pendingTaskCount }}</span>
             </button>
             <button :class="['view-tab', activeView === 'my-results' && 'active']" @click="switchToMyResults">
-              My Results
+              <span class="view-tab-label">My Results</span>
             </button>
           </template>
           <!-- The action is available to the STB system administrator and to an
@@ -109,10 +109,14 @@
               <circle cx="6.5" cy="6.5" r="5.5" stroke="currentColor" stroke-width="1.4"/>
               <path d="M6.5 3.5v3l2 1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
             </svg>
-            Generate Assignments
+            <!-- Wrapped like the My Rating Tasks label: now that this button is
+                 the same width as the others rather than double, the longest
+                 label in the row needs somewhere to ellipsis on a narrow panel
+                 instead of being clipped mid-word by the button's overflow. -->
+            <span class="view-tab-label">Generate Assignments</span>
           </button>
           <button v-if="canAdmin" :class="['view-tab', activeView === 'all' && 'active']" @click="switchToAll">
-            All Assessments
+            <span class="view-tab-label">All Assessments</span>
           </button>
         </div>
 
@@ -2870,7 +2874,12 @@ async function finalizeRecord() {
 .view-tab-badge {display: inline-flex;align-items: center;justify-content: center;flex:0 0 auto;min-width: 18px;height: 18px;padding: 0 5px;border:1px solid rgba(255,255,255,.75);border-radius: 999px;background: #ef4444;color: #ffffff;font-size: 10px;font-weight: 800;line-height: 1;box-shadow:0 1px 3px rgba(127,29,29,.28);}
 /* Sits in the tab row but performs an action rather than switching views, so it
    is styled as a distinct control and never takes the .active treatment. */
-.view-tab-action {flex:2 1 188px;border-style: dashed;border-color: #b9c8dc;color: #1e3f61;background: #f8fbff;}
+/* Inherits .view-tab's flex:1 0 150px deliberately. It used to override with
+   flex:2 1 188px, which made it claim double the spare space in its row - so
+   "Generate Assignments" rendered visibly wider than "All Assessments" beside
+   it, and wider than the My Rating Tasks / My Results pair above. All four are
+   one grid now; only the dashed outline marks this one as an action. */
+.view-tab-action {border-style: dashed;border-color: #b9c8dc;color: #1e3f61;background: #f8fbff;}
 .view-tab-action:hover {background: #eef5ff;border-color: #8fa9c9;}
 
 /* My Tasks */
@@ -3332,7 +3341,9 @@ async function finalizeRecord() {
   .theme-hd{flex-wrap:wrap;gap:8px;}
   .view-tabs{padding:0 8px;gap:6px;}
   .view-tab{height:38px;font-size:12px;}
-  .view-tab-action{flex-basis:100%;}
+  /* No flex-basis override here. It used to force the action button onto a row
+     of its own on small screens, which paired with its old flex:2 to make it
+     the odd one out. All four tabs are the same width now at every breakpoint. */
   .eli-list{padding:8px;gap:8px;}
   .eval-tp-left .tasks-period-bar,
   .eval-tp-left .filter-bar{padding:12px 10px;}

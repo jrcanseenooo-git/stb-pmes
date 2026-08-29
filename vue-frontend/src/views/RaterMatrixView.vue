@@ -99,6 +99,16 @@
         </div>
       </div>
 
+      <!-- Caught here rather than only on save: the combination looks perfectly
+           reasonable in the editor - three peer rows, three peers - and its
+           consequence is invisible. A plain Peer alongside the numbered pair is
+           not a third peer; when all three are configured the plain Peer's
+           submitted answers are discarded by the score calculation, so a
+           colleague does the rating and it never counts. -->
+      <div v-if="peerConflict(block)" class="pui-alert pui-alert-warn" style="margin:0 16px 12px;">
+        <strong style="display:block;margin-bottom:2px;">Check the peer rows</strong>{{ peerConflict(block) }}
+      </div>
+
       <div class="pui-table-wrap">
         <table class="pui-table">
           <thead>
@@ -113,10 +123,19 @@
           <tbody>
             <tr v-for="(row, index) in block.rows" :key="block.role + '-' + index">
               <td>
-                <select v-model="row.raterType" class="pui-select" @change="markDirty">
-                  <option v-for="t in raterTypes" :key="t" :value="t">{{ raterTypeLabel(t) }}</option>
+                <!-- The explanation is a hover tooltip rather than a line of text
+                     under every row: seven rows of help text pushed the table to
+                     roughly double its height and buried the configuration it was
+                     meant to explain. Titled on the options too, so the meaning is
+                     readable while choosing, not only after. -->
+                <select
+                  v-model="row.raterType"
+                  class="pui-select"
+                  :title="raterTypeHint(row.raterType)"
+                  @change="markDirty"
+                >
+                  <option v-for="t in raterTypes" :key="t" :value="t" :title="raterTypeHint(t)">{{ raterTypeLabel(t) }}</option>
                 </select>
-                <p class="pui-muted" style="margin:5px 0 0;font-size:11px;line-height:1.4;">{{ raterTypeHint(row.raterType) }}</p>
               </td>
               <td>
                 <input
@@ -260,6 +279,24 @@ onMounted(reload)
 
 function raterTypeLabel(type) { return RATER_TYPE_LABELS[type] || type }
 function raterTypeHint(type) { return RATER_TYPE_HINTS[type] || '' }
+
+// 'Peer' and the 'Peer1'/'Peer2' pair are two ways of filling the SAME peer
+// share, not three separate peers. computeCBC prefers the numbered pair, so with
+// all three configured the plain Peer's rating is dropped from the score
+// entirely - no error, no warning, and the rater is never told their work was
+// ignored. Flag it in the editor where the choice is made.
+function peerConflict(block) {
+  const types = (block?.rows || []).map(r => String(r.raterType || ''))
+  const hasPlain = types.includes('Peer')
+  const numbered = types.filter(t => t === 'Peer1' || t === 'Peer2')
+  if (!hasPlain || !numbered.length) return ''
+  if (numbered.length >= 2) {
+    return 'This role has Peer, Peer 1 of 2 and Peer 2 of 2. They are not three peers - Peer 1 and Peer 2 already fill the whole peer share, ' +
+      'so the plain Peer\'s rating would be left out of the score. Remove the plain Peer row.'
+  }
+  return 'This role mixes the plain Peer with ' + raterTypeLabel(numbered[0]) +
+    '. Use one Peer, or the Peer 1 / Peer 2 pair - not a mix of both.'
+}
 function scopeLabel(scope) { return SCOPE_LABELS[scope] || scope }
 
 function personnelCountFor(role) {

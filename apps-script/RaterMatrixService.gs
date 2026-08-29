@@ -512,6 +512,30 @@ const RaterMatrixService = (() => {
       seen[key] = true
     })
 
+    // 'Peer' and the 'Peer1'/'Peer2' pair are two ways of filling the SAME peer
+    // share, not three separate peers. IPATService.computeCBC prefers the
+    // numbered pair, so with all three configured the plain Peer's submitted
+    // answers are dropped from the score - the colleague does the rating and it
+    // silently never counts. Nothing downstream can detect that, because a
+    // missing rater and an ignored one look identical once the weights
+    // renormalise. Reject the combination here, where it can still be corrected.
+    const peerTypesByRole = {}
+    rows.forEach(r => {
+      const type = String(r.raterType || '')
+      if (type !== 'Peer' && type !== 'Peer1' && type !== 'Peer2') return
+      if (!peerTypesByRole[r.rateeRole]) peerTypesByRole[r.rateeRole] = {}
+      peerTypesByRole[r.rateeRole][type] = true
+    })
+    Object.keys(peerTypesByRole).forEach(role => {
+      const types = peerTypesByRole[role]
+      if (types.Peer && (types.Peer1 || types.Peer2)) {
+        throw HttpError(
+          `${role} mixes the plain "Peer" with the numbered Peer 1 / Peer 2 pair. ` +
+          'They fill the same peer share, so the plain Peer\'s rating would be left out of the score. ' +
+          'Use one Peer, or the Peer 1 and Peer 2 pair - not both.', 400)
+      }
+    })
+
     // A role with no Self row is almost certainly a mistake - self-rating is in
     // every variant of the protocol - but it is not structurally invalid, so
     // this surfaces as a warning through coverage rather than a hard rejection.

@@ -103,7 +103,7 @@
         <table class="pui-table">
           <thead>
             <tr>
-              <th scope="col" style="width:170px;">Rater Type</th>
+              <th scope="col" style="width:230px;">Rater Type</th>
               <th scope="col">Drawn From Role(s)</th>
               <th scope="col" style="width:190px;">Where To Look</th>
               <th scope="col" style="width:190px;">If Nobody Found</th>
@@ -116,6 +116,7 @@
                 <select v-model="row.raterType" class="pui-select" @change="markDirty">
                   <option v-for="t in raterTypes" :key="t" :value="t">{{ raterTypeLabel(t) }}</option>
                 </select>
+                <p class="pui-muted" style="margin:5px 0 0;font-size:11px;line-height:1.4;">{{ raterTypeHint(row.raterType) }}</p>
               </td>
               <td>
                 <input
@@ -188,12 +189,30 @@ const toast = useToast()
 
 const RATER_TYPE_LABELS = {
   Self: 'Self',
-  Peer: 'Peer',
-  Peer1: 'Peer 1',
-  Peer2: 'Peer 2',
-  Subordinate: 'Subordinate',
+  Peer: 'Peer (one colleague)',
+  Peer1: 'Peer 1 of 2',
+  Peer2: 'Peer 2 of 2',
+  Subordinate: 'Subordinate (rates upward)',
   Supervisor: 'Immediate Supervisor',
   SkipSupervisor: 'Skip-Level Supervisor'
+}
+
+// An office administrator picks these without knowing the protocol behind them,
+// and three of the seven are genuinely not guessable from a label: that Peer and
+// the Peer 1/Peer 2 pair are ALTERNATIVES rather than additions, that Subordinate
+// means the ratee is rated by someone beneath them, and that adding a Subordinate
+// is what collapses the two peer slots back into one. Describe the person, and
+// the relationship between the slots - deliberately no percentages, because the
+// weights live in each office's Assessment Rules and a number hardcoded here
+// would start lying the moment an office changed one.
+const RATER_TYPE_HINTS = {
+  Self: 'The person rates themselves.',
+  Peer: 'One colleague at the same level fills the entire peer share. Use this OR the Peer 1 / Peer 2 pair - not both.',
+  Peer1: 'First of two colleagues. Pairs with Peer 2, and together they fill the same share one Peer would.',
+  Peer2: 'Second of two colleagues. Needs Peer 1 as well. Not used when a Subordinate is assigned.',
+  Subordinate: 'Someone the person supervises rates them upward. This takes the place of the second peer.',
+  Supervisor: 'The head this person reports to directly.',
+  SkipSupervisor: "One level higher again - the supervisor's own supervisor."
 }
 
 const SCOPE_LABELS = {
@@ -201,7 +220,11 @@ const SCOPE_LABELS = {
   'same-section': 'Same section',
   'same-division': 'Same division',
   'office-wide': 'Anywhere in the office',
-  'same-section-preferred': 'Same section (usually)'
+  // Named honestly: this scope is a coin weighted 70/30, not a preference the
+  // system tries hard to honour. An administrator choosing it should know some
+  // raters WILL come from outside the section, so a cross-section pairing later
+  // reads as the setting working rather than as a bug.
+  'same-section-preferred': 'Same section 70% of the time'
 }
 
 const loading = ref(false)
@@ -236,6 +259,7 @@ const actionNoticeTitleColor = computed(() => {
 onMounted(reload)
 
 function raterTypeLabel(type) { return RATER_TYPE_LABELS[type] || type }
+function raterTypeHint(type) { return RATER_TYPE_HINTS[type] || '' }
 function scopeLabel(scope) { return SCOPE_LABELS[scope] || scope }
 
 function personnelCountFor(role) {

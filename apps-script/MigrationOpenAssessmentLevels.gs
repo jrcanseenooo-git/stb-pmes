@@ -57,9 +57,10 @@ const MigrationOpenAssessmentLevels_ = (() => {
     return keys.join('|') === want.join('|')
   }
 
-  function migrateOneWorkbook_(ss, label, dryRun) {
-    const sheet = ss.getSheetByName('AssessmentContent')
-    if (!sheet) return { label, skipped: 'no AssessmentContent tab', changed: 0, scanned: 0 }
+  function migrateOneWorkbook_(ss, label, dryRun, tabName) {
+    const name = tabName || 'AssessmentContent'
+    const sheet = ss.getSheetByName(name)
+    if (!sheet) return { label, skipped: 'no ' + name + ' tab', changed: 0, scanned: 0 }
 
     const lastRow = sheet.getLastRow()
     const lastCol = sheet.getLastColumn()
@@ -90,11 +91,17 @@ const MigrationOpenAssessmentLevels_ = (() => {
     const dryRun = !!(options && options.dryRun)
     const results = []
 
-    results.push(migrateOneWorkbook_(
-      SpreadsheetApp.openById(SpreadsheetService.getSpreadsheetId()),
-      'CENTRAL',
-      dryRun
-    ))
+    const centralSs = SpreadsheetApp.openById(SpreadsheetService.getSpreadsheetId())
+    results.push(migrateOneWorkbook_(centralSs, 'CENTRAL', dryRun))
+
+    // AssessmentSeedTemplate is the source AssessmentContentService.seed() reads
+    // when the questions are reseeded after a database clear - a supported,
+    // documented workflow. Left carrying the legacy trio it would push the old
+    // restriction straight back into AssessmentContent and re-break every role
+    // outside STB's three, undoing this very migration by way of a button an
+    // administrator is expected to press. Central-only: office workbooks are
+    // provisioned from AssessmentContent and have no seed template tab.
+    results.push(migrateOneWorkbook_(centralSs, 'CENTRAL/SeedTemplate', dryRun, 'AssessmentSeedTemplate'))
 
     // Office workbooks hold a provisioned copy of the same questions. Read the
     // registry from the central workbook explicitly: this runs from the editor

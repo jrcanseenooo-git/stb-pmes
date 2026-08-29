@@ -1,3 +1,13 @@
+// The office marks as the cluster uses them. Without an entry here the mark
+// falls back to the office CODE, which is the wrong string for some offices
+// ("OSAS-IPD" rather than "OSASI") and the wrong casing for others ("BANGUN"
+// rather than "BangUn"). Keys are matched after normalizeKey(), so they are
+// uppercase and punctuation-stripped; the VALUE is printed verbatim, which is
+// what lets a deliberately mixed-case mark like BangUn survive.
+//
+// Confirmed marks: OUSI · OASI · OSASI · STB · WGP · TBTP · PAG-ABOT · EPAHP ·
+// BangUn. Codes that already equal their mark (OUSI, OASI, EPAHP, PAG-ABOT,
+// STB) need no entry and are listed here only so the full set is readable.
 const ACRONYM_OVERRIDES = {
   'TARA-BASA': 'TBTP',
   'TARA BASA': 'TBTP',
@@ -5,7 +15,13 @@ const ACRONYM_OVERRIDES = {
   'TARA BASA TUTORING PROGRAM': 'TBTP',
   'WALANG-GUTOM': 'WGP',
   'WALANG GUTOM': 'WGP',
-  'WALANG GUTOM PROGRAM': 'WGP'
+  'WALANG GUTOM PROGRAM': 'WGP',
+  'OSAS-IPD': 'OSASI',
+  'OFF-OSAS-IPD': 'OSASI',
+  'OSAS IPD': 'OSASI',
+  'OFFICE OF THE SPECIAL ASSISTANT TO THE SECRETARY FOR INNOVATIONS AND PROGRAM DEVELOPMENT': 'OSASI',
+  'BANGUN': 'BangUn',
+  'OFF-BANGUN': 'BangUn'
 }
 
 function normalizeKey(value) {

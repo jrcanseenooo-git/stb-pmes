@@ -50,8 +50,12 @@ export function useBranding() {
   const wordmarkTop = computed(() => (isClusterPortal.value ? 'INNOVATION CLUSTER' : 'PERFORMANCE MANAGEMENT'))
   const wordmarkBottom = computed(() => (isClusterPortal.value ? 'Performance Monitoring and Evaluation System' : 'AND EVALUATION SYSTEM'))
 
+  // The office's own mark, everywhere. A non-cluster STB account used to get the
+  // literal 'PMES' - the system's name, not the office's - so the one office
+  // whose mark is simply "STB" was the only one not showing its own. PMES and
+  // ICPAP remain the fallbacks for an account with no office resolved.
   const shortName = computed(() => {
-    if (!isClusterPortal.value) return isOfficeFullPmes.value ? (officeShortName.value || 'PMES') : 'PMES'
+    if (!isClusterPortal.value) return officeShortName.value || 'PMES'
     return officeShortName.value || 'ICPAP'
   })
 

@@ -45,6 +45,34 @@
  * qualifies. A second run reports 0.
  *
  * ALWAYS run previewMergeOrphanedFpo() first and read the log.
+ *
+ * ── RUN AND VERIFIED 2026-08-29 (central workbook) ──────────────────────────
+ * 4 merged, 7 skipped, 0 ambiguous. Every result matched an offline simulation
+ * to the decimal, which is what confirms the migration reproduced the app's own
+ * formula rather than a parallel one:
+ *
+ *   Jean Pauline H. Villaruel  3.47 Satisfactory      -> 3.76 Very Satisfactory
+ *   Gerardo III B. Badana      3.58                   -> 3.71 Very Satisfactory
+ *   Jelie B. Barceta           3.83                   -> 3.87 Very Satisfactory
+ *   Kyrie Eleison Taganap      3.75                   -> 3.77 Very Satisfactory
+ *
+ * Villaruel is the substantive correction: her FPO of 4.00 had sat in an
+ * orphaned record since July, so she was shown a full descriptor band below
+ * what her own data supported.
+ *
+ * The 7 skipped records still show no score, as intended - Catamin and
+ * De La Cruz would each have been handed a "4.00 Outstanding" built from FPO
+ * alone. Orphaned records were left untouched and still hold their values, so
+ * every one of these changes is reversible.
+ *
+ * Side effect worth knowing: the recompute also replaced legacy descriptors
+ * ("Excellent Alignment") with the current protocol bands. That label is not
+ * produced anywhere in the present codebase - it is residue from an older
+ * version, and other records may still carry it.
+ *
+ * This leaves 11 people who have ratings but NO FPO anywhere in the database.
+ * They are scored on 45% of the intended weight. No migration can fix that -
+ * the values have to be encoded by a person. See PMES_CHANGELOG_MEMORY.md.
  */
 
 // No trailing underscore: these must stay visible in the Run dropdown.

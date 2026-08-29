@@ -117,7 +117,7 @@ const RaterMatrixService = (() => {
   const STB_DEFAULT_MATRIX = [
     // Technical / Administrative staff
     { rateeRole: 'Technical Staff', raterType: 'Self',           sourceRoles: '',                          scope: 'self',                   fallbackScope: '' },
-    { rateeRole: 'Technical Staff', raterType: 'Peer1',          sourceRoles: 'Technical Staff,Administrative Staff', scope: 'same-section', fallbackScope: 'same-division' },
+    { rateeRole: 'Technical Staff', raterType: 'Peer',           sourceRoles: 'Technical Staff,Administrative Staff', scope: 'same-section', fallbackScope: 'same-division' },
     { rateeRole: 'Technical Staff', raterType: 'Peer2',          sourceRoles: 'Technical Staff,Administrative Staff', scope: 'same-section-preferred', fallbackScope: 'same-division' },
     { rateeRole: 'Technical Staff', raterType: 'Supervisor',     sourceRoles: 'Section Head',              scope: 'same-section',           fallbackScope: 'same-division' },
     { rateeRole: 'Technical Staff', raterType: 'SkipSupervisor', sourceRoles: 'Division Chief',            scope: 'same-division',          fallbackScope: '' },
@@ -512,27 +512,45 @@ const RaterMatrixService = (() => {
       seen[key] = true
     })
 
-    // 'Peer' and the 'Peer1'/'Peer2' pair are two ways of filling the SAME peer
-    // share, not three separate peers. IPATService.computeCBC prefers the
-    // numbered pair, so with all three configured the plain Peer's submitted
-    // answers are dropped from the score - the colleague does the rating and it
-    // silently never counts. Nothing downstream can detect that, because a
-    // missing rater and an ignored one look identical once the weights
-    // renormalise. Reject the combination here, where it can still be corrected.
-    const peerTypesByRole = {}
+    // Every role takes a Peer. The fourth slot is EITHER Subordinate - when the
+    // role supervises people - OR Peer 2 standing in for it when the role
+    // supervises nobody. They are substitutes, so the combinations below are the
+    // ones that cannot be scored as the administrator intends.
+    //
+    // Note that Peer + Peer2 is CORRECT and must stay allowed: computeCBC reads
+    // the plain Peer into the primary slot when Peer1 is absent, so the two
+    // colleagues score 15% each exactly as the numbered pair would.
+    const typesByRole = {}
     rows.forEach(r => {
       const type = String(r.raterType || '')
-      if (type !== 'Peer' && type !== 'Peer1' && type !== 'Peer2') return
-      if (!peerTypesByRole[r.rateeRole]) peerTypesByRole[r.rateeRole] = {}
-      peerTypesByRole[r.rateeRole][type] = true
+      if (!typesByRole[r.rateeRole]) typesByRole[r.rateeRole] = {}
+      typesByRole[r.rateeRole][type] = true
     })
-    Object.keys(peerTypesByRole).forEach(role => {
-      const types = peerTypesByRole[role]
-      if (types.Peer && (types.Peer1 || types.Peer2)) {
+    Object.keys(typesByRole).forEach(role => {
+      const t = typesByRole[role]
+
+      // Both substitutes present. Once a Subordinate exists, computeCBC merges
+      // every peer rating into one shared slot, so the Peer 2 colleague rates and
+      // their answers are averaged away rather than counted in their own right.
+      if (t.Subordinate && (t.Peer2 || t.Peer1)) {
         throw HttpError(
-          `${role} mixes the plain "Peer" with the numbered Peer 1 / Peer 2 pair. ` +
-          'They fill the same peer share, so the plain Peer\'s rating would be left out of the score. ' +
-          'Use one Peer, or the Peer 1 and Peer 2 pair - not both.', 400)
+          `${role} has both Subordinate and Peer 2. They are substitutes - a role uses one or the other. ` +
+          'Keep Subordinate if this role supervises people, or Peer 2 if it supervises nobody.', 400)
+      }
+
+      // All three peer labels. computeCBC prefers the numbered pair, so the plain
+      // Peer's submitted answers are dropped from the score entirely - the
+      // colleague rates and it never counts, with nothing downstream able to tell
+      // an ignored rater from a missing one once the weights renormalise.
+      if (t.Peer && t.Peer1 && t.Peer2) {
+        throw HttpError(
+          `${role} has Peer, Peer 1 and Peer 2. That is not three peers - one of the ratings would be left out ` +
+          'of the score entirely. Keep Peer and Peer 2.', 400)
+      }
+
+      // Peer and Peer1 are the same slot under two names.
+      if (t.Peer && t.Peer1) {
+        throw HttpError(`${role} has both Peer and Peer 1, which are the same rater under different names. Remove one.`, 400)
       }
     })
 
@@ -761,10 +779,10 @@ const RaterMatrixService = (() => {
       //
       // STB's hand-written defaults above already model this correctly; this
       // generated set now matches them.
-      if (lowerRoles.length) {
-        rows.push({ rateeRole: role, raterType: 'Peer', sourceRoles: role, scope: 'office-wide', fallbackScope: '' })
-      } else {
-        rows.push({ rateeRole: role, raterType: 'Peer1', sourceRoles: role, scope: 'office-wide', fallbackScope: '' })
+      rows.push({ rateeRole: role, raterType: 'Peer', sourceRoles: role, scope: 'office-wide', fallbackScope: '' })
+      if (!lowerRoles.length) {
+        // Nobody below this role, so Peer 2 stands in for the Subordinate that
+        // the role below would otherwise have provided.
         rows.push({ rateeRole: role, raterType: 'Peer2', sourceRoles: role, scope: 'office-wide', fallbackScope: '' })
       }
       const skipSupervisorRole = roles[index + 2]

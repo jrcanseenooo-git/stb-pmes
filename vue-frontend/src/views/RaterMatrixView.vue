@@ -134,9 +134,12 @@
                   :title="raterTypeHint(row.raterType)"
                   @change="markDirty"
                 >
-                  <optgroup v-for="grp in raterTypeGroups" :key="grp.label" :label="grp.label">
-                    <option v-for="t in grp.types" :key="t" :value="t" :title="raterTypeHint(t)">{{ raterTypeLabel(t) }}</option>
-                  </optgroup>
+                  <option
+                    v-for="t in raterTypeOptionsFor(block, row)"
+                    :key="t"
+                    :value="t"
+                    :title="raterTypeHint(t)"
+                  >{{ raterTypeLabel(t) }}</option>
                 </select>
               </td>
               <td>
@@ -208,28 +211,28 @@ import SkeletonRows from '@/components/ui/SkeletonRows.vue'
 const { confirm } = useConfirm()
 const toast = useToast()
 
+// Every role gets a Peer. The fourth slot is then EITHER Subordinate OR Peer 2 -
+// they are substitutes for one another, which is why Peer 2 says so in its own
+// label. That framing matches the protocol directly (no subordinate means the
+// subordinate's share passes to a second peer) and is easier to hold than the
+// branch-per-arrangement grouping this replaced.
+//
+// Peer1 is legacy: offices configured before this vocabulary still hold it, and
+// it scores identically to Peer, so it stays translatable but is not offered as
+// a new choice. See raterTypeOptionsFor().
 const RATER_TYPE_LABELS = {
   Self: 'Self',
-  Peer: 'Peer (the single peer)',
-  Peer1: 'Peer 1 of 2',
-  Peer2: 'Peer 2 of 2',
-  Subordinate: 'Subordinate (rates upward)',
+  Peer: 'Peer',
+  Subordinate: 'Subordinate',
+  Peer2: 'Peer 2 (substitute to subordinate)',
   Supervisor: 'Immediate Supervisor',
-  SkipSupervisor: 'Skip-Level Supervisor'
+  SkipSupervisor: 'Skip-Level Supervisor',
+  Peer1: 'Peer 1 (older setup - same as Peer)'
 }
 
-// Grouped by the protocol's actual rule rather than listed as seven equal
-// choices. The peer arrangement is not a free choice: it follows from whether
-// the role is rated by a Subordinate, because generation derives hasSubordinate
-// from exactly that - `raterList.some(r => r.raterType === 'Subordinate')` - and
-// computeCBC then reads one peer slot or two. Presenting the options as a flat
-// list invited the mix that silently discards a rating; presenting them under
-// the condition that governs them makes the correct pair obvious while choosing.
-const RATER_TYPE_GROUPS = [
-  { label: 'Always include these', types: ['Self', 'Supervisor', 'SkipSupervisor'] },
-  { label: 'If this role supervises people', types: ['Subordinate', 'Peer'] },
-  { label: 'If this role supervises nobody', types: ['Peer1', 'Peer2'] }
-]
+// Offered order. Peer sits next to Subordinate and Peer 2 so the either/or is
+// visible without reading the labels twice.
+const RATER_TYPE_ORDER = ['Self', 'Peer', 'Subordinate', 'Peer2', 'Supervisor', 'SkipSupervisor']
 
 // An office administrator picks these without knowing the protocol behind them,
 // and three of the seven are genuinely not guessable from a label: that Peer and
@@ -241,12 +244,12 @@ const RATER_TYPE_GROUPS = [
 // would start lying the moment an office changed one.
 const RATER_TYPE_HINTS = {
   Self: 'The person rates themselves. Every role has this.',
-  Peer: 'The single peer, used when this role also has a Subordinate. The subordinate takes the second peer\'s place.',
-  Peer1: 'First of two colleagues, used when this role has no Subordinate.',
-  Peer2: 'Second of two colleagues. Always goes with Peer 1 of 2.',
-  Subordinate: 'Someone this role supervises rates them upward. Pair it with a single Peer.',
+  Peer: 'A colleague at the same level. Every role has one.',
+  Subordinate: 'Someone this role supervises, rating upward. Use this when the role has people under it - instead of Peer 2.',
+  Peer2: 'A second colleague, standing in for the Subordinate when this role supervises nobody. Use this OR Subordinate, never both.',
   Supervisor: 'The head this person reports to directly.',
-  SkipSupervisor: "One level higher again - the supervisor's own supervisor."
+  SkipSupervisor: "One level higher again - the supervisor's own supervisor.",
+  Peer1: 'From an older setup. Scores exactly like Peer; you can leave it or switch it to Peer.'
 }
 
 const SCOPE_LABELS = {
@@ -273,21 +276,30 @@ const actionNotice = ref({ show: false, type: 'info', title: '', message: '' })
 const scopes = ref(['self', 'same-section', 'same-division', 'office-wide', 'same-section-preferred'])
 const raterTypes = ref(['Self', 'Peer', 'Peer1', 'Peer2', 'Subordinate', 'Supervisor', 'SkipSupervisor'])
 
-// Built from raterTypes rather than from the static group list, because the
-// server can replace raterTypes wholesale. Grouping a fixed set would quietly
-// drop any type it did not know about, leaving an administrator unable to pick
-// a rater the backend still accepts - so anything unrecognised is kept and
-// shown under its own heading instead of disappearing.
-const raterTypeGroups = computed(() => {
+// A rater type already used elsewhere in this role is not offered again. The
+// backend rejects duplicates outright, so offering one could only ever lead to a
+// failed save; removing it also means that once Self, Peer, Immediate Supervisor
+// and Skip-Level Supervisor are set, the only choices left are exactly the two
+// that matter - Subordinate or Peer 2 - and the decision makes itself.
+//
+// The row's OWN current value is always kept, or the select would have nothing
+// selected and silently reassign the row on the next change. Legacy values the
+// standard list no longer offers (Peer1) are kept for the same reason, and only
+// for the row that already holds them.
+function raterTypeOptionsFor(block, row) {
   const available = raterTypes.value || []
-  const groups = RATER_TYPE_GROUPS
-    .map(g => ({ label: g.label, types: g.types.filter(t => available.includes(t)) }))
-    .filter(g => g.types.length)
-  const grouped = new Set(groups.flatMap(g => g.types))
-  const rest = available.filter(t => !grouped.has(t))
-  if (rest.length) groups.push({ label: 'Other', types: rest })
-  return groups
-})
+  const current = String(row?.raterType || '')
+  const takenElsewhere = new Set(
+    (block?.rows || [])
+      .filter(r => r !== row)
+      .map(r => String(r.raterType || ''))
+  )
+  const offered = RATER_TYPE_ORDER
+    .filter(t => available.includes(t))
+    .filter(t => t === current || !takenElsewhere.has(t))
+  if (current && !offered.includes(current)) offered.unshift(current)
+  return offered
+}
 
 // A fallback of 'self' makes no sense - self is not a pool to search.
 const fallbackScopes = computed(() => scopes.value.filter(s => s !== 'self'))
@@ -316,34 +328,30 @@ function raterTypeHint(type) { return RATER_TYPE_HINTS[type] || '' }
 // all three configured the plain Peer's rating is dropped from the score
 // entirely - no error, no warning, and the rater is never told their work was
 // ignored. Flag it in the editor where the choice is made.
+// Subordinate and Peer 2 are substitutes, so having both is the one arrangement
+// that is simply wrong: computeCBC collapses every peer into a single slot once a
+// Subordinate is present, so the Peer 2 colleague rates and their answers are
+// averaged away against the other peer instead of counting on their own.
+//
+// Having neither is the quieter mistake - it costs the role a rater with nothing
+// on screen to say so - so it is called out too.
 function peerConflict(block) {
   const types = (block?.rows || []).map(r => String(r.raterType || ''))
-  const hasPlain = types.includes('Peer')
-  const numbered = types.filter(t => t === 'Peer1' || t === 'Peer2')
   const hasSub = types.includes('Subordinate')
+  const hasPeer2 = types.includes('Peer2')
+  const hasPeer = types.includes('Peer') || types.includes('Peer1')
 
-  // Worst case first: the plain Peer's answers are thrown away entirely.
-  if (hasPlain && numbered.length >= 2) {
-    return 'This role has Peer, Peer 1 of 2 and Peer 2 of 2. That is not three peers - Peer 1 and Peer 2 already fill the whole peer share, ' +
-      'so the plain Peer\'s rating would be left out of the score. Remove the plain Peer row.'
+  if (hasSub && hasPeer2) {
+    return 'This role has both Subordinate and Peer 2. They are substitutes - a role uses one or the other. ' +
+      'Keep Subordinate if this role supervises people; keep Peer 2 if it supervises nobody. ' +
+      'With both, the Peer 2 colleague still rates but their answers are merged into the same slot as the Peer and largely cancel out.'
   }
-  if (hasPlain && numbered.length) {
-    return 'This role mixes the plain Peer with ' + raterTypeLabel(numbered[0]) +
-      '. Use one Peer, or the Peer 1 / Peer 2 pair - not a mix of both.'
+  if (types.includes('Peer') && types.includes('Peer1')) {
+    return 'This role has both Peer and Peer 1, which are the same thing under different names. Remove one of them.'
   }
-
-  // Then the two arrangements that run but do not match the protocol.
-  if (hasSub && numbered.length) {
-    return 'This role is rated by a Subordinate, so it takes a single Peer - the subordinate fills the second peer\'s place. ' +
-      'With Peer 1 and Peer 2 here, those two colleagues would share one slot between them. Replace them with a single Peer.'
-  }
-  if (!hasSub && hasPlain) {
-    return 'This role has no Subordinate, so the protocol expects two peers - Peer 1 of 2 and Peer 2 of 2. ' +
-      'A single Peer still works and carries the whole peer share on its own, but only one colleague will rate this role.'
-  }
-  if (!hasSub && numbered.length === 1) {
-    return raterTypeLabel(numbered[0]) + ' is set without its partner. Add the other half of the pair, ' +
-      'or use a single Peer instead.'
+  if (hasPeer && !hasSub && !hasPeer2) {
+    return 'This role has one Peer and no Subordinate. Add Peer 2 as the substitute, ' +
+      'or add Subordinate if this role does supervise people - otherwise it is rated by one colleague instead of two.'
   }
   return ''
 }

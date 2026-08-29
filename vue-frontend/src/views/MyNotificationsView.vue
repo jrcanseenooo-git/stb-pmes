@@ -26,7 +26,7 @@
       error-title="Your updates could not be loaded"
       :empty="!visible.length"
       empty-title="No assessment updates"
-      empty-description="Notices about new rating tasks, saved drafts, submitted ratings and reopened tasks appear here."
+      empty-description="Notices about new rating tasks, saved drafts, submitted ratings and assessment updates appear here."
       refreshable
       @refresh="load"
     >
@@ -82,8 +82,7 @@ const TYPE_LABELS = {
   deadline: 'Deadline',
   alert: 'Notice',
   assignment: 'New Rating Task',
-  submission: 'Rating Submitted',
-  reopened: 'Rating Reopened'
+  submission: 'Rating Submitted'
 }
 
 onMounted(load)

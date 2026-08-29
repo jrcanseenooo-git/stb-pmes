@@ -42,31 +42,76 @@ const SystemSettingsService = (() => {
     return value === MODE_FULL_ACCESS ? MODE_FULL_ACCESS : MODE_EVALUATION_ONLY
   }
 
-  function getAccessMode() {
+  function normaliseOfficeKey_(officeOrProfile) {
+    const source = officeOrProfile && typeof officeOrProfile === 'object'
+      ? (officeOrProfile.officeId || officeOrProfile.officeCode || officeOrProfile.officeName)
+      : officeOrProfile
+    const value = String(source || '').trim().toUpperCase()
+    if (!value || value === 'SOCIAL TECHNOLOGY BUREAU' || value === 'OFF-STB') return 'STB'
+    return value.replace(/[^A-Z0-9_-]/g, '_')
+  }
+
+  function modeKey_(officeKey) {
+    return ACCESS_MODE_KEY + ':' + officeKey
+  }
+
+  function officeOptions_() {
+    const options = [{ officeId: 'STB', officeCode: 'STB', officeName: 'Social Technology Bureau' }]
+    try {
+      if (typeof OfficeRegistryService !== 'undefined') {
+        OfficeRegistryService.registrationOptions().forEach(office => {
+          if (!office || !office.officeId || String(office.officeId).toUpperCase() === 'STB') return
+          options.push({
+            officeId: office.officeId,
+            officeCode: office.officeCode || office.officeId,
+            officeName: office.officeName || office.officeCode || office.officeId
+          })
+        })
+      }
+    } catch (e) {
+      Logger.log('[SystemSettings] officeOptions fallback: ' + e.message)
+    }
+    return options.sort((a, b) => String(a.officeName).localeCompare(String(b.officeName)))
+  }
+
+  function getAccessMode(officeOrProfile) {
     try {
       const sheet = ensureSheet_()
-      const row = SpreadsheetService.getAllRows(sheet).find(r => r.key === ACCESS_MODE_KEY)
-      return normaliseAccessMode_(row && row.value)
+      const rows = SpreadsheetService.getAllRows(sheet)
+      const officeKey = normaliseOfficeKey_(officeOrProfile)
+      const scoped = rows.find(r => r.key === modeKey_(officeKey))
+      if (scoped) return normaliseAccessMode_(scoped.value)
+      if (officeKey === 'STB') {
+        const legacy = rows.find(r => r.key === ACCESS_MODE_KEY)
+        return normaliseAccessMode_(legacy && legacy.value)
+      }
+      return MODE_EVALUATION_ONLY
     } catch (e) {
       Logger.log('[SystemSettings] getAccessMode fallback: ' + e.message)
       return MODE_EVALUATION_ONLY
     }
   }
 
-  function list(user) {
+  function list(params, user) {
     AuthService.requirePermission(user, 'manage_users')
+    const selectedOfficeId = String((params && params.officeId) || 'STB').trim() || 'STB'
+    const offices = officeOptions_()
+    const selected = offices.find(o => String(o.officeId).toUpperCase() === selectedOfficeId.toUpperCase()) || offices[0]
     return {
-      accessMode: getAccessMode(),
+      officeId: selected.officeId,
+      officeName: selected.officeName,
+      accessMode: getAccessMode(selected.officeId),
+      offices: offices.map(office => ({ ...office, accessMode: getAccessMode(office.officeId) })),
       modes: [
         {
           value: MODE_EVALUATION_ONLY,
-          label: 'Evaluation Monitoring only',
-          description: 'Regular users can only access Evaluation and Profile Settings. Hidden module deep links redirect back to Evaluation.'
+          label: 'Evaluation only',
+          description: 'Converts ordinary personnel in the selected office to Innovation Cluster Portal scope. System/super admin accounts are not changed.'
         },
         {
           value: MODE_FULL_ACCESS,
           label: 'Full module access',
-          description: 'Users can access modules allowed by their role and permissions.'
+          description: 'Converts ordinary personnel in the selected office to the full PMES scope: STB Full PMES for STB, Office Full PMES for other offices.'
         }
       ]
     }
@@ -75,13 +120,15 @@ const SystemSettingsService = (() => {
   function update(body, user) {
     const profile = AuthService.requirePermission(user, 'manage_users')
     const mode = normaliseAccessMode_(body.accessMode)
+    const officeKey = normaliseOfficeKey_(body.officeId || 'STB')
     const sheet = ensureSheet_()
     const rows = SpreadsheetService.getAllRows(sheet)
-    const row = rows.find(r => r.key === ACCESS_MODE_KEY)
+    const key = modeKey_(officeKey)
+    const row = rows.find(r => r.key === key)
     const payload = {
-      key: ACCESS_MODE_KEY,
+      key: key,
       value: mode,
-      description: 'Controls whether normal users see only Evaluation or the full PMES modules.',
+      description: 'Controls module access for office ' + officeKey + '.',
       updatedBy: profile.id,
       updatedByName: profile.fullName || profile.email || '',
       updatedAt: new Date().toISOString()
@@ -96,8 +143,24 @@ const SystemSettingsService = (() => {
       })
     }
 
-    AuditService.log('UPDATE_SYSTEM_SETTINGS', 'SystemSettings', `Access mode changed to ${mode}`, user)
-    return list(user)
+    // Keep the legacy key synchronized for older STB clients. It is ignored
+    // for non-STB offices and cannot leak the STB mode elsewhere.
+    if (officeKey === 'STB') {
+      const legacy = rows.find(r => r.key === ACCESS_MODE_KEY)
+      const legacyPayload = { ...payload, key: ACCESS_MODE_KEY, description: 'Legacy STB compatibility setting.' }
+      if (legacy) SpreadsheetService.updateRow(sheet, legacy.id, legacyPayload)
+      else SpreadsheetService.appendRow(sheet, { id: SpreadsheetService.generateId('SET-'), ...legacyPayload })
+    }
+
+    const scopeSync = typeof UsersService !== 'undefined'
+      ? UsersService.applyOfficeAccessScope(officeKey, mode, user)
+      : null
+
+    AuditService.log('UPDATE_SYSTEM_SETTINGS', 'SystemSettings', `Access mode for ${officeKey} changed to ${mode}`, user)
+    return {
+      ...list({ officeId: officeKey }, user),
+      scopeSync
+    }
   }
 
   // ── Nightly forced logout ──

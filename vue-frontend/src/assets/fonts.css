@@ -1,5 +1,8 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
 /*
- * Global system font - single source of truth for the app-wide font-family.
+ * Global app font - single source of truth for the app-wide font-family.
+ * Inter is the Review module baseline the rest of the system should match.
  * Loaded first in main.js so it reaches elements teleported to <body>
  * (modals, toasts) that live outside any view's scoped wrapper.
  *
@@ -10,7 +13,8 @@
 html,
 body,
 #app {
-  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --pmes-font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-family: var(--pmes-font-family);
 }
 
 /* html/body are excluded so this can't out-rank the stack declaration above;

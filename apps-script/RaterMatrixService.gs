@@ -56,6 +56,61 @@ const RaterMatrixService = (() => {
 
   const VALID_RATER_TYPES = ['Self', 'Peer', 'Peer1', 'Peer2', 'Subordinate', 'Supervisor', 'SkipSupervisor']
 
+  // Matrix roles identify distinct positions in an office hierarchy. Keep an
+  // OIC-Division Chief separate from a permanent Division Chief: they have the
+  // same supervisory authority, but may be different people leading different
+  // divisions. RoleLabelService intentionally combines them for permissions;
+  // that broader permission canonicalization must not be used as a matrix key.
+  function matrixRole_(value) {
+    const raw = String(value || '').replace(/[\u200B-\u200D\uFEFF]/g, '').trim()
+    const key = raw.toLowerCase().replace(/[\s_-]+/g, ' ')
+    if (key === 'oic dc' || key === 'oic division chief' ||
+        key === 'officer in charge division chief') return 'OIC-Division Chief'
+    if (key === 'staff' || key === 'technical staff') return 'Technical Staff'
+    return raw
+  }
+
+  function matrixRoleList_(value) {
+    const seen = {}
+    return String(value || '')
+      .split(/[,|]/)
+      .map(matrixRole_)
+      .filter(Boolean)
+      .filter(role => {
+        if (seen[role]) return false
+        seen[role] = true
+        return true
+      })
+      .join(',')
+  }
+
+  function functionalRole_(value) {
+    return typeof RoleLabelService !== 'undefined'
+      ? RoleLabelService.canonicalRole(matrixRole_(value))
+      : matrixRole_(value)
+  }
+
+  // Prefer rules for the person's exact configured title. If an older office
+  // matrix has only Division Chief rules, OIC-Division Chief can still inherit
+  // those rules because both roles have the same function. Exact OIC rows never
+  // combine with Division Chief rows, preventing duplicate Self/Peer tasks.
+  function matrixRowsForRatee_(rows, role) {
+    const exactRole = matrixRole_(role)
+    const exact = rows.filter(row => matrixRole_(row.rateeRole) === exactRole)
+    if (exact.length) return exact
+    const functional = functionalRole_(exactRole)
+    return rows.filter(row => functionalRole_(row.rateeRole) === functional)
+  }
+
+  function sourceRoleMatches_(configuredRoles, actualRole) {
+    const actual = matrixRole_(actualRole)
+    const actualFunction = functionalRole_(actual)
+    return configuredRoles.some(configured => {
+      const expected = matrixRole_(configured)
+      return expected === actual || functionalRole_(expected) === actualFunction
+    })
+  }
+
   // The STB hierarchy, transcribed from the five functions this replaces.
   // Seeding this makes the switch behaviour-preserving for STB - the critical
   // safety property, since STB is live and mid-cycle.
@@ -182,30 +237,21 @@ const RaterMatrixService = (() => {
         : normalized
 
       validateMatrix_(cleaned)
-
-      const s = sheet_()
-      // Clear by the same alias-aware key set the read path uses. Strict
-      // equality here would leave rows stored under another spelling of the
-      // same office (WGP vs OFF-WALANG-GUTOM) in place, so a save would
-      // silently duplicate the matrix instead of replacing it.
-      const officeKeys = officeLookupKeys_(officeId)
-      SpreadsheetService.getAllRows(s)
-        .filter(r => officeKeys[normalizeOfficeKey_(r.officeId)])
-        .forEach(r => SpreadsheetService.hardDeleteRow(s, r.id))
-
-      const now = new Date().toISOString()
-      const by = profile.email || user.email || ''
-      cleaned.forEach(row => {
-        SpreadsheetService.appendRow(s, {
-          ...row,
-          createdAt: now,
-          updatedAt: now,
-          updatedBy: by
-        })
-      })
+      const savedRows = replaceRows_(officeId, cleaned, profile, user)
+      syncOfficeMirror_(officeId, '', savedRows)
 
       audit_('SAVE_RATER_MATRIX', officeId, `Saved ${cleaned.length} rater matrix rows`, user)
-      return list({ officeId: officeId }, user)
+      // The caller already has the validated, canonical rows. Returning them
+      // directly avoids rereading the entire matrix immediately after writing
+      // it; coverage is still refreshed separately because it depends on the
+      // current office personnel roster.
+      return {
+        officeId: officeId,
+        items: savedRows,
+        scopes: SCOPES,
+        raterTypes: VALID_RATER_TYPES,
+        isSeeded: savedRows.length > 0
+      }
     })
   }
 
@@ -226,6 +272,41 @@ const RaterMatrixService = (() => {
   }
 
   /**
+   * Keep an office workbook's RaterMatrix tab readable for administrators who
+   * inspect the Google Sheet directly. The central PMES workbook remains the
+   * source of truth; this is only a synchronized mirror.
+   */
+  function syncOfficeMirrorForRegistryRow(row, user, options) {
+    return central_(() => {
+      const profile = AuthService.getProfile(user)
+      requireManage_(profile)
+      const officeId = String((row && (row.officeId || row.officeCode)) || '').trim()
+      if (!officeId || isStbOffice_(officeId)) return { skipped: true, reason: 'central-office' }
+
+      let items = rows_(officeId, user)
+      let seeded = false
+      if (!items.length && (!options || options.seedIfEmpty !== false)) {
+        try {
+          const defaults = officeDefaultRows_(officeId, user)
+          replaceRows_(officeId, defaults, profile, user)
+          items = rows_(officeId, user)
+          seeded = items.length > 0
+        } catch (e) {
+          Logger.log('[RaterMatrix] default seed skipped for ' + officeId + ': ' + (e && e.message || e))
+        }
+      }
+
+      const mirrored = syncOfficeMirror_(officeId, String((row && row.spreadsheetId) || ''), items)
+      return {
+        officeId: officeId,
+        seeded: seeded,
+        mirrored: mirrored.rows,
+        warning: mirrored.warning || ''
+      }
+    })
+  }
+
+  /**
    * Resolve the rater list for one ratee. Returns the same shape the previous
    * hardcoded functions returned, so the assignment engine is unchanged
    * downstream.
@@ -233,15 +314,7 @@ const RaterMatrixService = (() => {
    * @returns {{raters: Array, unmappedRole: boolean, missing: Array}}
    */
   function resolveRatersFor(ratee, allUsers, prevAssign, matrixRows, helpers) {
-    const role = typeof RoleLabelService !== 'undefined'
-      ? RoleLabelService.canonicalRole(ratee.role)
-      : String(ratee.role || '').trim()
-    const applicable = matrixRows.filter(r => {
-      const rowRole = typeof RoleLabelService !== 'undefined'
-        ? RoleLabelService.canonicalRole(r.rateeRole)
-        : String(r.rateeRole || '').trim()
-      return rowRole === role
-    })
+    const applicable = matrixRowsForRatee_(matrixRows, ratee.role)
 
     if (!applicable.length) {
       return { raters: [], unmappedRole: true, missing: [] }
@@ -271,6 +344,57 @@ const RaterMatrixService = (() => {
     return { raters: raters, unmappedRole: false, missing: missing }
   }
 
+  // Validates an existing assignment against the CURRENT approved roster and
+  // matrix without selecting a new random rater. This is what lets Backfill
+  // preserve legitimate work while replacing only out-of-scope assignments.
+  function isAssignmentValid(ratee, assignment, allUsers, matrixRows) {
+    const row = matrixRowsForRatee_(matrixRows, ratee.role).find(item =>
+      String(item.raterType || '').trim() === String(assignment.raterType || '').trim()
+    )
+    if (!row) return false
+    if (String(row.scope || '') === 'self') {
+      return String(assignment.raterId || '') === String(ratee.id || '')
+    }
+
+    const sourceRoles = String(row.sourceRoles || '').split(',').map(s => s.trim()).filter(Boolean)
+    const candidates = allUsers.filter(person =>
+      String(person.id || '') !== String(ratee.id || '') &&
+      isAuthorizedRaterScope_(person, ratee, assignment.raterType) &&
+      sourceRoleMatches_(sourceRoles, person.role)
+    )
+    const configuredScope = String(row.scope || 'office-wide')
+    const primary = configuredScope === 'same-section-preferred'
+      ? candidates.filter(person => String(person.divisionId || '') === String(ratee.divisionId || ''))
+      : poolForScope_(candidates, ratee, configuredScope)
+    let allowed = primary
+    if (!primary.length && String(row.fallbackScope || '')) {
+      allowed = poolForScope_(candidates, ratee, String(row.fallbackScope))
+    }
+    return allowed.some(person => String(person.id || '') === String(assignment.raterId || ''))
+  }
+
+  // Return the currently eligible people for one configured rater slot.  The
+  // generator uses this only to give a newly approved rater coverage during a
+  // backfill; it does not broaden the matrix scope or bypass division/section
+  // authorization.
+  function eligibleRatersFor(ratee, allUsers, matrixRows, raterType) {
+    const row = matrixRowsForRatee_(matrixRows, ratee.role).find(item =>
+      String(item.raterType || '').trim() === String(raterType || '').trim()
+    )
+    if (!row) return []
+    if (String(row.scope || '') === 'self') return [ratee]
+
+    const sourceRoles = String(row.sourceRoles || '').split(',').map(s => s.trim()).filter(Boolean)
+    const candidates = allUsers.filter(person =>
+      String(person.id || '') !== String(ratee.id || '') &&
+      isAuthorizedRaterScope_(person, ratee, raterType) &&
+      sourceRoleMatches_(sourceRoles, person.role)
+    )
+    const primary = poolForScope_(candidates, ratee, String(row.scope || 'office-wide'))
+    if (primary.length || !String(row.fallbackScope || '')) return primary
+    return poolForScope_(candidates, ratee, String(row.fallbackScope || 'office-wide'))
+  }
+
   // ── Candidate selection ───────────────────────────────────────────────────
 
   function selectCandidate_(ratee, allUsers, row, excluded, prevAssign, raterType, helpers) {
@@ -281,9 +405,8 @@ const RaterMatrixService = (() => {
 
     const byRole = allUsers.filter(u =>
       excluded.indexOf(u.id) < 0 &&
-      sourceRoles.indexOf(typeof RoleLabelService !== 'undefined'
-        ? RoleLabelService.canonicalRole(u.role)
-        : String(u.role || '').trim()) >= 0
+      isAuthorizedRaterScope_(u, ratee, raterType) &&
+      sourceRoleMatches_(sourceRoles, u.role)
     )
 
     const primary = poolForScope_(byRole, ratee, String(row.scope || 'office-wide'))
@@ -302,6 +425,21 @@ const RaterMatrixService = (() => {
     }
 
     return null
+  }
+
+  function isAuthorizedRaterScope_(rater, ratee, raterType) {
+    const role = typeof RoleLabelService !== 'undefined'
+      ? RoleLabelService.canonicalRole(rater.role)
+      : String(rater.role || '').trim()
+    const sameDivision = String(rater.divisionId || '') === String(ratee.divisionId || '')
+    const supervisory = ['Supervisor', 'SkipSupervisor'].indexOf(String(raterType || '')) >= 0
+    if (!supervisory) return true
+    if (role === 'Division Chief') return sameDivision
+    if (role === 'Section Head') {
+      return sameDivision && String(rater.section || '').trim() !== '' &&
+        String(rater.section || '').trim() === String(ratee.section || '').trim()
+    }
+    return true
   }
 
   function poolForScope_(candidates, ratee, scope) {
@@ -334,9 +472,7 @@ const RaterMatrixService = (() => {
   // ── Validation / normalisation ────────────────────────────────────────────
 
   function normalizeRow_(item, officeId, index) {
-    const rateeRole = typeof RoleLabelService !== 'undefined'
-      ? RoleLabelService.canonicalRole(item.rateeRole)
-      : String(item.rateeRole || '').trim()
+    const rateeRole = matrixRole_(item.rateeRole)
     const raterType = String(item.raterType || '').trim()
     const scope = String(item.scope || 'office-wide').trim()
 
@@ -348,9 +484,7 @@ const RaterMatrixService = (() => {
       throw HttpError(`"${scope}" is not a valid scope.`, 400)
     }
 
-    const sourceRoles = typeof RoleLabelService !== 'undefined'
-      ? RoleLabelService.canonicalRoleList(item.sourceRoles || '')
-      : String(item.sourceRoles || '').trim()
+    const sourceRoles = matrixRoleList_(item.sourceRoles || '')
     if (scope !== 'self' && !sourceRoles) {
       throw HttpError(`${rateeRole} → ${raterType} needs at least one source role.`, 400)
     }
@@ -383,6 +517,110 @@ const RaterMatrixService = (() => {
     // this surfaces as a warning through coverage rather than a hard rejection.
   }
 
+  function replaceRows_(officeId, rows, profile, user) {
+    const s = sheet_()
+    // Clear by the same alias-aware key set the read path uses. Strict
+    // equality here would leave rows stored under another spelling of the
+    // same office (WGP vs OFF-WALANG-GUTOM) in place, so a save would
+    // silently duplicate the matrix instead of replacing it.
+    const officeKeys = officeLookupKeys_(officeId)
+    const data = s.getDataRange().getValues()
+    const headers = data[0] || []
+    const officeColumn = headers.indexOf('officeId')
+    const matchingRows = []
+    if (officeColumn >= 0) {
+      for (let index = 1; index < data.length; index += 1) {
+        if (officeKeys[normalizeOfficeKey_(data[index][officeColumn])]) matchingRows.push(index + 1)
+      }
+    }
+
+    // A matrix save replaces a whole office block. Delete contiguous matches
+    // in descending batches so one save is a handful of Sheets operations,
+    // rather than one full sheet read + delete operation per old rule.
+    for (let index = matchingRows.length - 1; index >= 0;) {
+      const end = matchingRows[index]
+      let start = end
+      while (index > 0 && matchingRows[index - 1] === start - 1) {
+        start = matchingRows[index - 1]
+        index -= 1
+      }
+      s.deleteRows(start, end - start + 1)
+      index -= 1
+    }
+    if (matchingRows.length) SpreadsheetService.invalidateSheet(s)
+
+    const now = new Date().toISOString()
+    const by = (profile && profile.email) || (user && user.email) || ''
+    const normalized = rows.map((row, index) => ({
+      ...row,
+      id: row.id || SpreadsheetService.generateId('RMX-'),
+      officeId: officeId,
+      sequence: Number(row.sequence) || index + 1,
+      active: row.active === false || String(row.active).toLowerCase() === 'false' ? false : true,
+      createdAt: row.createdAt || now,
+      updatedAt: now,
+      updatedBy: by
+    }))
+    SpreadsheetService.appendRows(s, normalized)
+    return normalized
+  }
+
+  function syncOfficeMirror_(officeId, spreadsheetId, items) {
+    if (isStbOffice_(officeId)) return { rows: 0, skipped: true }
+    try {
+      let ss = null
+      const targetSpreadsheetId = spreadsheetId || spreadsheetIdForOffice_(officeId)
+      if (targetSpreadsheetId) ss = SpreadsheetApp.openById(targetSpreadsheetId)
+      if (!ss) return { rows: 0, warning: 'office spreadsheet not resolved' }
+
+      return SpreadsheetService.withSpreadsheet(ss, () => {
+        let mirror = SpreadsheetService.findSheet(SHEET_NAME)
+        if (!mirror) mirror = ss.insertSheet(SHEET_NAME)
+        resetMirrorSheet_(mirror)
+        const rows = (items || []).map(row => {
+          const out = {}
+          HEADERS.forEach(header => { out[header] = row[header] === undefined || row[header] === null ? '' : row[header] })
+          return out
+        })
+        SpreadsheetService.appendRows(mirror, rows)
+        return { rows: rows.length }
+      })
+    } catch (e) {
+      const message = e && e.message || e
+      Logger.log('[RaterMatrix] office mirror sync skipped for ' + officeId + ': ' + message)
+      return { rows: 0, warning: String(message || '') }
+    }
+  }
+
+  function resetMirrorSheet_(sheet) {
+    sheet.clear()
+    sheet.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS])
+    sheet.getRange(1, 1, 1, HEADERS.length)
+      .setBackground('#0D2137')
+      .setFontColor('#FFFFFF')
+      .setFontWeight('bold')
+      .setFontSize(10)
+    sheet.setFrozenRows(1)
+    sheet.autoResizeColumns(1, HEADERS.length)
+  }
+
+  function spreadsheetIdForOffice_(officeId) {
+    try {
+      const keys = officeLookupKeys_(officeId)
+      const registry = SpreadsheetService.findSheet(SHEET.OFFICE_REGISTRY || 'OfficeRegistry')
+      if (!registry) return ''
+      const row = SpreadsheetService.getAllRows(registry).find(item =>
+        keys[normalizeOfficeKey_(item.officeId)] || keys[normalizeOfficeKey_(item.officeCode)]
+      )
+      const spreadsheetId = String((row && row.spreadsheetId) || '').trim()
+      if (!spreadsheetId || spreadsheetId === 'CENTRAL_PMES') return ''
+      return spreadsheetId
+    } catch (e) {
+      Logger.log('[RaterMatrix] office spreadsheet lookup failed for ' + officeId + ': ' + (e && e.message || e))
+      return ''
+    }
+  }
+
   // ── Coverage ──────────────────────────────────────────────────────────────
 
   /**
@@ -399,39 +637,25 @@ const RaterMatrixService = (() => {
     requireView_(profile)
     const officeId = resolveOfficeId_(profile, params)
     const matrix = rows_(officeId, user)
-    const configuredRoles = {}
-    matrix.forEach(r => {
-      const role = typeof RoleLabelService !== 'undefined'
-        ? RoleLabelService.canonicalRole(r.rateeRole)
-        : String(r.rateeRole || '').trim()
-      if (role) configuredRoles[role] = true
-    })
-
     const users = officePersonnelRows_(officeId, user)
       .filter(u => u.active === true || String(u.active).toLowerCase() === 'true')
 
     const roleCounts = {}
     users.forEach(u => {
-      const role = typeof RoleLabelService !== 'undefined'
-        ? RoleLabelService.canonicalRole(u.role)
-        : String(u.role || '').trim()
+      const role = matrixRole_(u.role)
       if (!role || role === 'System Administrator') return
       roleCounts[role] = (roleCounts[role] || 0) + 1
     })
 
-    const items = Object.keys(roleCounts).sort().map(role => ({
-      role: role,
-      personnel: roleCounts[role],
-      configured: Boolean(configuredRoles[role]),
-      raterTypes: matrix
-        .filter(r => {
-          const rowRole = typeof RoleLabelService !== 'undefined'
-            ? RoleLabelService.canonicalRole(r.rateeRole)
-            : String(r.rateeRole || '').trim()
-          return rowRole === role
-        })
-        .map(r => r.raterType)
-    }))
+    const items = Object.keys(roleCounts).sort().map(role => {
+      const applicable = matrixRowsForRatee_(matrix, role)
+      return {
+        role: role,
+        personnel: roleCounts[role],
+        configured: applicable.length > 0,
+        raterTypes: applicable.map(r => r.raterType)
+      }
+    })
 
     return {
       officeId: officeId,
@@ -446,6 +670,7 @@ const RaterMatrixService = (() => {
 
   function requireView_(profile) {
     const ok = AuthService.hasPermission(profile, 'generate_ipat_assignments') ||
+      AuthService.hasPermission(profile, 'manage_office_rater_matrix') ||
       AuthService.hasPermission(profile, 'manage_office_registry') ||
       AuthService.hasPermission(profile, 'view_cluster_monitoring') ||
       AuthService.hasPermission(profile, 'manage_office_users') ||
@@ -455,6 +680,7 @@ const RaterMatrixService = (() => {
 
   function requireManage_(profile) {
     const ok = AuthService.hasPermission(profile, 'generate_ipat_assignments') ||
+      AuthService.hasPermission(profile, 'manage_office_rater_matrix') ||
       AuthService.hasPermission(profile, 'manage_office_registry') ||
       String(profile.officeRole || '') === 'OFFICE_ADMIN'
     if (!ok) throw HttpError('Access denied. Assignment administration permission required.', 403)
@@ -530,15 +756,13 @@ const RaterMatrixService = (() => {
 
   function sanitizeForOfficeRoles_(row, roles) {
     if (!roles) return row
-    const rateeRole = typeof RoleLabelService !== 'undefined'
-      ? RoleLabelService.canonicalRole(row.rateeRole)
-      : String(row.rateeRole || '').trim()
+    const rateeRole = matrixRole_(row.rateeRole)
     if (!roles[rateeRole]) return null
     if (String(row.scope || '') === 'self') return row
 
     const sourceRoles = String(row.sourceRoles || '')
       .split(',')
-      .map(s => typeof RoleLabelService !== 'undefined' ? RoleLabelService.canonicalRole(s) : s.trim())
+      .map(matrixRole_)
       .filter(role => role && roles[role])
     if (!sourceRoles.length) return null
     return {
@@ -563,9 +787,7 @@ const RaterMatrixService = (() => {
     const seen = {}
     const roles = []
     function add(role) {
-      const name = typeof RoleLabelService !== 'undefined'
-        ? RoleLabelService.canonicalRole(role)
-        : String(role || '').trim()
+      const name = matrixRole_(role)
       if (!name || seen[name]) return
       seen[name] = true
       roles.push(name)
@@ -641,9 +863,7 @@ const RaterMatrixService = (() => {
         .filter(row => row.active !== false && String(row.active).toLowerCase() !== 'false')
         .sort((a, b) => Number(a.sequence || 0) - Number(b.sequence || 0))
         .forEach(row => {
-          const role = typeof RoleLabelService !== 'undefined'
-            ? RoleLabelService.canonicalRole(row.rateeRole)
-            : String(row.rateeRole || '').trim()
+          const role = matrixRole_(row.rateeRole)
           if (!role || seen[role]) return
           seen[role] = true
           roles.push(role)
@@ -736,8 +956,11 @@ const RaterMatrixService = (() => {
     list,
     save,
     seedDefaults,
+    syncOfficeMirrorForRegistryRow,
     coverage,
     resolveRatersFor,
+    isAssignmentValid,
+    eligibleRatersFor,
     SHEET_NAME,
     HEADERS,
     SCOPES,

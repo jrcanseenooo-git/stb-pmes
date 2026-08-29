@@ -76,6 +76,9 @@ function normalizeProfile(rawProfile) {
 export const useAuthStore = defineStore('auth', () => {
   const user        = ref(null)    // Firebase user
   const profile     = ref(null)    // PMES profile from Google Sheets
+  // An absent profile is only safe to route after the backend has supplied a
+  // definitive account state. A busy first request must not become a 403.
+  const profileResolved = ref(false)
   const initialised = ref(false)
   const loading     = ref(false)
   const error       = ref(null)
@@ -91,7 +94,9 @@ export const useAuthStore = defineStore('auth', () => {
   const officeName      = computed(() => profile.value?.officeName || 'Social Technology Bureau')
   const systemScope     = computed(() => profile.value?.systemScope || 'STB_FULL')
   const isStbFullScope  = computed(() => systemScope.value === 'STB_FULL')
-  const isClusterPortal = computed(() => ['CLUSTER_PORTAL', 'OFFICE_ADMIN', 'CLUSTER_ADMIN'].includes(systemScope.value))
+  const isClusterPortal = computed(() =>
+    ['CLUSTER_PORTAL', 'OFFICE_ADMIN', 'CLUSTER_ADMIN', 'OFFICE_FULL_PMES'].includes(systemScope.value)
+  )
 
   const fullName = computed(() =>
     profile.value?.fullName ||
@@ -187,6 +192,7 @@ export const useAuthStore = defineStore('auth', () => {
   async function fetchProfile() {
     needsRegistration.value = false
     needsActivation.value   = false
+    profileResolved.value   = false
     try {
       const res = await authApi.whoami()
 
@@ -197,15 +203,21 @@ export const useAuthStore = defineStore('auth', () => {
       // registered === false means the account genuinely does not exist.
       if (!res || typeof res !== 'object' || typeof res.registered === 'undefined') {
         console.warn('[PMES] whoami returned no usable payload - leaving account state unresolved.')
-        if (useBootstrapAdminProfile('whoami returned no usable payload')) return
+        if (useBootstrapAdminProfile('whoami returned no usable payload')) {
+          profileResolved.value = true
+          return true
+        }
         if (!profile.value) profile.value = null
         needsRegistration.value = false
         needsActivation.value = false
-        return
+        return false
       }
 
       if (!res.registered) {
-        if (useBootstrapAdminProfile('whoami did not find a PMES row')) return
+        if (useBootstrapAdminProfile('whoami did not find a PMES row')) {
+          profileResolved.value = true
+          return true
+        }
         profile.value = null
         needsRegistration.value = true
         needsActivation.value = false
@@ -217,13 +229,19 @@ export const useAuthStore = defineStore('auth', () => {
         needsRegistration.value = false
         needsActivation.value = false
       }
+      profileResolved.value = true
+      return true
     } catch (e) {
       // Transient error (network/server). Don't misroute to registration -
       // leave a new user unresolved, but preserve an already-loaded profile so
       // a background refresh cannot collapse the sidebar to low-access modules.
       console.warn('[PMES] Could not resolve account status:', e.message)
-      if (useBootstrapAdminProfile(e.message || 'profile request failed')) return
+      if (useBootstrapAdminProfile(e.message || 'profile request failed')) {
+        profileResolved.value = true
+        return true
+      }
       if (!profile.value) profile.value = null
+      return false
     }
   }
 
@@ -418,7 +436,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   return {
     // State
-    user, profile, initialised, loading, error,
+    user, profile, profileResolved, initialised, loading, error,
     needsRegistration, needsActivation,
     // Computed - auth
     isAuthenticated, hasAccess, role, fullName, initials, identity,

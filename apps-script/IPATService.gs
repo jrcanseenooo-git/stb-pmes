@@ -73,6 +73,61 @@ const IPATService = (() => {
     return { ...ctx.record, ...updates }
   }
 
+  function matchingRowContexts(sheet, columnName, value) {
+    const lastRow = sheet.getLastRow()
+    const lastColumn = sheet.getLastColumn()
+    if (lastColumn < 1) return { headers: [], rows: [] }
+
+    const headers = sheet.getRange(1, 1, 1, lastColumn).getValues()[0]
+    // A newly provisioned office rating sheet initially contains only its
+    // header row. Preserve those headers so the first submission can build a
+    // correctly-sized append range; returning [] here produced a zero-column
+    // getRange() call and made every first rating submission fail.
+    if (lastRow < 2) return { headers, rows: [] }
+    const columnIdx = headers.indexOf(columnName)
+    if (columnIdx < 0) return { headers, rows: [] }
+
+    const matches = sheet
+      .getRange(2, columnIdx + 1, lastRow - 1, 1)
+      .createTextFinder(String(value))
+      .matchEntireCell(true)
+      .findAll()
+      .map(cell => cell.getRow())
+      .sort((a, b) => a - b)
+
+    if (!matches.length) return { headers, rows: [] }
+
+    const rows = []
+    let start = matches[0]
+    let length = 1
+
+    function flushGroup() {
+      const values = sheet.getRange(start, 1, length, lastColumn).getValues()
+      values.forEach((rowValues, offset) => {
+        const record = {}
+        headers.forEach((h, idx) => { record[h] = rowValues[idx] })
+        rows.push({
+          record,
+          values: rowValues,
+          rowNumber: start + offset
+        })
+      })
+    }
+
+    for (let i = 1; i < matches.length; i++) {
+      if (matches[i] === start + length) {
+        length++
+      } else {
+        flushGroup()
+        start = matches[i]
+        length = 1
+      }
+    }
+    flushGroup()
+
+    return { headers, rows }
+  }
+
   // Columns ensureRecordSchema() adds to IPATRecords if absent. Named for the
   // migration it performs rather than for one feature, since it now also
   // carries the FPO position-differential fields.
@@ -180,6 +235,7 @@ const IPATService = (() => {
 
   function canEditCbcDeduction(profile, record) {
     if (!profile || !record) return false
+    if (AuthService.hasPermission(profile, 'manage_ipat_scores')) return true
     if (profile.role === 'System Administrator') return true
     return profile.role === 'Division Chief' && String(profile.divisionId || '') === String(record.divisionId || '')
   }
@@ -457,6 +513,43 @@ const IPATService = (() => {
     return ['JFPeer', 'JobFitnessPeer'].includes(String(row && row.raterType || ''))
   }
 
+  function activeAssignmentsForRater_(record, profile) {
+    try {
+      const sheet = SpreadsheetService.getSheet(SHEET.IPAT_ASSIGNMENTS)
+      return SpreadsheetService.getAllRows(sheet).filter(row =>
+        !isObsoleteAssignment(row) &&
+        String(row.ipatRecordId || '') === String(record.id || '') &&
+        String(row.raterId || '') === String(profile.id || '')
+      )
+    } catch (e) {
+      Logger.log('[PMES] rating assignment lookup failed: ' + (e && e.message || e))
+      return []
+    }
+  }
+
+  function assertCanSaveRatings_(record, profile, ratings) {
+    const submittedTypes = Array.from(new Set(
+      (ratings || [])
+        .map(r => String(r.raterType || 'Self'))
+        .filter(Boolean)
+    ))
+    const assignments = activeAssignmentsForRater_(record, profile)
+
+    submittedTypes.forEach(type => {
+      const ownSelfRating =
+        type === 'Self' &&
+        String(record.rateeId || '') === String(profile.id || '')
+
+      const assignedRating = assignments.some(row =>
+        String(row.raterType || '') === type
+      )
+
+      if (!ownSelfRating && !assignedRating) {
+        throw HttpError('Only the assigned rater can save ratings for this assignment.', 403)
+      }
+    })
+  }
+
   function activeProtocolAssignments(rows) {
     return (rows || []).filter(r => !isObsoleteAssignment(r))
   }
@@ -700,7 +793,7 @@ const IPATService = (() => {
     )
   }
 
-  function saveCBCRatings_(ipatId, body, user) {
+  function saveCBCRatings_(ipatId, body, user, options) {
     const profile = AuthService.getProfile(user)
     const record  = _getRecord(ipatId)
     const sheet   = SpreadsheetService.getSheet(SHEET.IPAT_CBC_RATINGS)
@@ -709,6 +802,7 @@ const IPATService = (() => {
     let ratings = body.ratings || []
     if (typeof ratings === 'string') { try { ratings = JSON.parse(ratings) } catch(e) { ratings = [] } }
     if (!Array.isArray(ratings)) ratings = []
+    if (!options || !options.skipRaterGuard) assertCanSaveRatings_(record, profile, ratings)
 
     const keyFor = (row) => [
       row.ipatId,
@@ -716,8 +810,8 @@ const IPATService = (() => {
       row.themeId,
       String(row.indicatorIdx)
     ].join('|')
-    const values = sheet.getDataRange().getValues()
-    const headers = values[0] || []
+    const matched = matchingRowContexts(sheet, 'ipatId', ipatId)
+    const headers = matched.headers || []
     // escapeFormula because these rows are written with setValues directly
     // rather than through SpreadsheetService.appendRow, so they would
     // otherwise miss its formula-injection guard. indicator and themeName
@@ -727,11 +821,11 @@ const IPATService = (() => {
       return val === undefined || val === null ? '' : SpreadsheetService.escapeFormula(val)
     })
     const existingByKey = {}
-    for (let i = 1; i < values.length; i++) {
-      const obj = {}
-      headers.forEach((h, idx) => { obj[h] = values[i][idx] })
-      if (obj.id) existingByKey[keyFor(obj)] = { obj, values: values[i], rowNumber: i + 1 }
-    }
+    matched.rows.forEach(ctx => {
+      if (ctx.record.id && String(ctx.record.raterId || '') === String(profile.id || '')) {
+        existingByKey[keyFor(ctx.record)] = { obj: ctx.record, values: ctx.values, rowNumber: ctx.rowNumber }
+      }
+    })
     const rowsToUpdate = []
     const rowsToAppend = []
 
@@ -739,8 +833,8 @@ const IPATService = (() => {
       const ratingRow = {
         ipatId,
         rateeId:      record.rateeId,
-        raterId:      r.raterId      || profile.id,
-        raterName:    r.raterName    || profile.fullName,
+        raterId:      profile.id,
+        raterName:    profile.fullName,
         raterType:    r.raterType    || 'Self',
         themeId:      r.themeId,
         themeName:    r.themeName    || '',
@@ -771,6 +865,7 @@ const IPATService = (() => {
     if (rowsToAppend.length) {
       sheet.getRange(sheet.getLastRow() + 1, 1, rowsToAppend.length, headers.length).setValues(rowsToAppend)
     }
+    if (rowsToUpdate.length || rowsToAppend.length) SpreadsheetService.invalidateSheet(sheet)
 
     AuditService.log('SAVE_CBC', 'IPAT', `Saved ${ratings.length} CBC ratings for ${ipatId}`, user)
     return { saved: ratings.length }
@@ -952,7 +1047,7 @@ const IPATService = (() => {
     )
   }
 
-  function saveJFRatings_(ipatId, body, user) {
+  function saveJFRatings_(ipatId, body, user, options) {
     const profile = AuthService.getProfile(user)
     const record  = _getRecord(ipatId)
     const sheet   = SpreadsheetService.getSheet(SHEET.IPAT_JF_RATINGS)
@@ -962,14 +1057,15 @@ const IPATService = (() => {
     if (!Array.isArray(ratings)) ratings = []
     ratings = ratings.filter(r => ['Self', 'Supervisor'].includes(String(r.raterType || 'Self')))
     if (!ratings.length) throw HttpError('No valid Job Fitness ratings submitted', 400)
+    if (!options || !options.skipRaterGuard) assertCanSaveRatings_(record, profile, ratings)
 
     const keyFor = (row) => [
       row.ipatId,
       row.raterId,
       String(row.indicatorIdx)
     ].join('|')
-    const values = sheet.getDataRange().getValues()
-    const headers = values[0] || []
+    const matched = matchingRowContexts(sheet, 'ipatId', ipatId)
+    const headers = matched.headers || []
     // escapeFormula because these rows are written with setValues directly
     // rather than through SpreadsheetService.appendRow, so they would
     // otherwise miss its formula-injection guard. indicator and themeName
@@ -979,11 +1075,11 @@ const IPATService = (() => {
       return val === undefined || val === null ? '' : SpreadsheetService.escapeFormula(val)
     })
     const existingByKey = {}
-    for (let i = 1; i < values.length; i++) {
-      const obj = {}
-      headers.forEach((h, idx) => { obj[h] = values[i][idx] })
-      if (obj.id) existingByKey[keyFor(obj)] = { obj, values: values[i], rowNumber: i + 1 }
-    }
+    matched.rows.forEach(ctx => {
+      if (ctx.record.id && String(ctx.record.raterId || '') === String(profile.id || '')) {
+        existingByKey[keyFor(ctx.record)] = { obj: ctx.record, values: ctx.values, rowNumber: ctx.rowNumber }
+      }
+    })
     const rowsToUpdate = []
     const rowsToAppend = []
 
@@ -991,8 +1087,8 @@ const IPATService = (() => {
       const ratingRow = {
         ipatId,
         rateeId:      record.rateeId,
-        raterId:      r.raterId   || profile.id,
-        raterName:    r.raterName || profile.fullName,
+        raterId:      profile.id,
+        raterName:    profile.fullName,
         raterType:    r.raterType || 'Self',   // Self | Supervisor
         indicator:    r.indicator || '',
         indicatorIdx: Number(r.indicatorIdx) || 0,
@@ -1022,6 +1118,7 @@ const IPATService = (() => {
     if (rowsToAppend.length) {
       sheet.getRange(sheet.getLastRow() + 1, 1, rowsToAppend.length, headers.length).setValues(rowsToAppend)
     }
+    if (rowsToUpdate.length || rowsToAppend.length) SpreadsheetService.invalidateSheet(sheet)
 
     AuditService.log('SAVE_JF', 'IPAT', `Saved ${ratings.length} JF ratings for ${ipatId}`, user)
     return { saved: ratings.length }
@@ -1333,6 +1430,53 @@ const IPATService = (() => {
     return SpreadsheetService.getAllRows(sheet).filter(r => r.ipatId === ipatId)
   }
 
+  function deleteRowsByIpatAndRaterTypes_(sheet, ipatId, raterTypes) {
+    const values = sheet.getDataRange().getValues()
+    if (values.length < 2) return 0
+    const headers = values[0]
+    const ipatIdx = headers.indexOf('ipatId')
+    const typeIdx = headers.indexOf('raterType')
+    if (ipatIdx < 0 || typeIdx < 0) return 0
+    const wanted = {}
+    raterTypes.forEach(type => { wanted[String(type || '')] = true })
+    const rowNumbers = []
+    for (let i = 1; i < values.length; i++) {
+      if (String(values[i][ipatIdx] || '') === String(ipatId || '') && wanted[String(values[i][typeIdx] || '')]) rowNumbers.push(i + 1)
+    }
+    const groups = []
+    rowNumbers.sort((a, b) => a - b).forEach(rowNumber => {
+      const last = groups[groups.length - 1]
+      if (last && last.start + last.count === rowNumber) last.count += 1
+      else groups.push({ start: rowNumber, count: 1 })
+    })
+    groups.sort((a, b) => b.start - a.start).forEach(group => sheet.deleteRows(group.start, group.count))
+    if (rowNumbers.length) SpreadsheetService.invalidateSheet(sheet)
+    return rowNumbers.length
+  }
+
+  function removeRatingsAndRecomputeUnlocked(ipatId, raterTypes, user) {
+    const uniqueTypes = Array.from(new Set((raterTypes || []).map(String).filter(Boolean)))
+    if (!uniqueTypes.length) return { removedCBC: 0, removedJF: 0, recomputed: false }
+    const removedCBC = deleteRowsByIpatAndRaterTypes_(SpreadsheetService.getSheet(SHEET.IPAT_CBC_RATINGS), ipatId, uniqueTypes)
+    const removedJF = deleteRowsByIpatAndRaterTypes_(SpreadsheetService.getSheet(SHEET.IPAT_JF_RATINGS), ipatId, uniqueTypes)
+    const recSheet = ensureRecordSchema()
+    const remainingCBC = getCBCRatings(ipatId)
+    if (remainingCBC.length) computeCBC(ipatId, user)
+    else SpreadsheetService.updateRow(recSheet, ipatId, { cbcBaseScore: '', cbcScore: '', overallScore: '', descriptor: '', status: 'Draft', updatedAt: new Date().toISOString() })
+    const remainingJF = getJFRatings(ipatId)
+    if (remainingJF.length) computeJF(ipatId, user)
+    else SpreadsheetService.updateRow(recSheet, ipatId, { jfScore: '', jfVarianceFlagged: '', jfVarianceGap: '', overallScore: '', descriptor: '', status: 'Draft', updatedAt: new Date().toISOString() })
+    const current = SpreadsheetService.getRow(recSheet, ipatId)
+    if (current && (current.cbcScore !== '' || current.jfScore !== '' || current.fpoScore !== '')) {
+      try { recomputeOverallForRecord(recSheet, ipatId, current) } catch (e) { Logger.log('[PMES] Reconciliation overall recompute skipped for ' + ipatId + ': ' + e.message) }
+      SpreadsheetService.updateRow(recSheet, ipatId, { status: 'Draft', updatedAt: new Date().toISOString() })
+    } else if (current) {
+      SpreadsheetService.updateRow(recSheet, ipatId, { overallScore: '', descriptor: '', status: 'Draft', updatedAt: new Date().toISOString() })
+    }
+    AuditService.log('REMOVE_INVALID_RATINGS', 'IPAT', `Removed ${removedCBC} CBC and ${removedJF} JF active response rows for ${ipatId}; rater types=${uniqueTypes.join(',')}`, user)
+    return { removedCBC, removedJF, recomputed: true }
+  }
+
   function _getRecord(id) {
     const sheet = ensureRecordSchema()
     const row   = SpreadsheetService.getRow(sheet, id)
@@ -1356,6 +1500,7 @@ const IPATService = (() => {
     // under a single lock so the three writes cannot half-apply.
     saveCBCRatingsUnlocked: saveCBCRatings_,
     saveJFRatingsUnlocked:  saveJFRatings_,
+    removeRatingsAndRecomputeUnlocked,
     ensureRecordSchema,
     // Exported so other services classify scores through the protocol's bands
     // instead of maintaining their own. PortalService previously carried a

@@ -634,7 +634,7 @@ async function saveEntry() {
 </script>
 
 <style scoped>
-.acc-page { padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif; font-size: 13px; color: #1A2332; min-height: 100%; }
+.acc-page { padding: 0; font-size: 13px; color: #1A2332; min-height: 100%; }
 
 /* Two-panel shell */
 .tp-shell { display: flex; background: #fff; border: 1px solid #E2E8F0; border-radius: 14px; overflow: hidden; min-height: 520px; }

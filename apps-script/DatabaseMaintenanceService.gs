@@ -2,18 +2,27 @@
  * DatabaseMaintenanceService.gs
  * Safe database reset helpers for clearing transactional/test data.
  *
- * This intentionally preserves sheets, headers, users, divisions, and the master KRA
- * library so the system can still boot and generate new forms after the reset.
+ * This intentionally preserves identity, organization, access, assessment
+ * library, rater-matrix, and office-registry configuration so the system can
+ * still boot, seed questions, and generate new forms after the reset.
  */
 
 const DatabaseMaintenanceService = (() => {
-  const CONFIRM_RESET_PHRASE = 'RESET_DATABASE_KEEP_USERS_DIVISIONS_KRAS'
-  const CONFIRM_REBUILD_PHRASE = 'REBUILD_FRESH_DATABASE_KEEP_USERS_DIVISIONS_KRAS'
+  const CONFIRM_RESET_PHRASE = 'RESET_DATABASE_KEEP_CONFIGURATION'
+  const CONFIRM_REBUILD_PHRASE = 'REBUILD_FRESH_DATABASE_KEEP_CONFIGURATION'
   const PRESERVED_SHEETS = [
     SHEET.USERS,
     SHEET.DIVISIONS,
     SHEET.MASTER_KRA_LIBRARY,
-    SHEET.SYSTEM_SETTINGS
+    SHEET.SYSTEM_SETTINGS,
+    SHEET.FOCAL_ASSIGNMENTS,
+    SHEET.ASSESSMENT_CATEGORIES,
+    SHEET.ASSESSMENT_CONTENT,
+    'AssessmentSeedTemplate',
+    'AssessmentRules',
+    'RaterMatrix',
+    SHEET.OFFICE_REGISTRY,
+    SHEET.OFFICE_ORG_OPTIONS
   ]
   const ACTIVE_SCHEMA = [
     {
@@ -54,11 +63,30 @@ const DatabaseMaintenanceService = (() => {
     },
     {
       name: SHEET.FOCAL_ASSIGNMENTS,
+      preserveData: true,
       headers: [
         'id', 'assignmentType', 'divisionId', 'divisionName',
         'focalRole',
         'userId', 'userName', 'userEmail', 'active',
         'assignedBy', 'assignedByName', 'assignedAt', 'updatedAt'
+      ]
+    },
+    {
+      name: 'AssessmentRules',
+      preserveData: true,
+      headers: [
+        'id', 'officeId', 'ruleType', 'ruleKey', 'label', 'value',
+        'active', 'description', 'basis', 'approvedBy',
+        'createdAt', 'updatedAt', 'updatedBy'
+      ]
+    },
+    {
+      name: 'RaterMatrix',
+      preserveData: true,
+      headers: [
+        'id', 'officeId', 'rateeRole', 'raterType', 'sourceRoles',
+        'scope', 'fallbackScope', 'sequence', 'active',
+        'createdAt', 'updatedAt', 'updatedBy'
       ]
     },
     {
@@ -165,16 +193,48 @@ const DatabaseMaintenanceService = (() => {
     },
     {
       name: SHEET.ASSESSMENT_CATEGORIES,
+      preserveData: true,
       headers: ['id', 'domainId', 'domainName', 'categoryId', 'categoryName', 'description', 'sequence', 'status', 'createdAt', 'updatedAt']
     },
     {
       name: SHEET.ASSESSMENT_CONTENT,
+      preserveData: true,
       headers: [
         'id', 'domain', 'category', 'questionText', 'guidanceText', 'sequence',
         'scaleType', 'required', 'evidenceRequired',
         'applicableRaters', 'applicableLevels',
         'status', 'period', 'version', 'hasBeenUsed', 'changeNotes',
         'createdBy', 'createdByName', 'createdAt', 'updatedAt', 'archivedAt'
+      ]
+    },
+    {
+      name: 'AssessmentSeedTemplate',
+      preserveData: true,
+      headers: [
+        'id', 'domain', 'category', 'questionText', 'guidanceText', 'sequence',
+        'scaleType', 'required', 'evidenceRequired',
+        'applicableRaters', 'applicableLevels',
+        'status', 'period', 'version', 'hasBeenUsed', 'changeNotes',
+        'createdBy', 'createdByName', 'createdAt', 'updatedAt', 'archivedAt'
+      ]
+    },
+    {
+      name: SHEET.OFFICE_REGISTRY,
+      preserveData: true,
+      headers: [
+        'id', 'officeId', 'officeCode', 'officeName', 'officeShortName',
+        'primaryAdminEmail', 'officeStatus', 'portalScope', 'spreadsheetId',
+        'spreadsheetStatus', 'schemaVersion', 'templateVersion',
+        'lastValidatedAt', 'lastSyncAt', 'provisioningTransactionId',
+        'provisioningError', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'
+      ]
+    },
+    {
+      name: SHEET.OFFICE_ORG_OPTIONS,
+      preserveData: true,
+      headers: [
+        'id', 'officeId', 'optionType', 'parentId', 'name', 'code',
+        'active', 'sequence', 'createdAt', 'updatedAt', 'updatedBy'
       ]
     }
   ]
@@ -267,7 +327,7 @@ const DatabaseMaintenanceService = (() => {
       createSheets,
       removeSheets,
       finalSheetOrder: activeNames,
-      note: 'This rebuild preserves Users, Divisions, and MasterKRALibrary rows. Other active sheets keep headers only.'
+      note: 'This rebuild preserves identity, organization, access, assessment library, rater-matrix, and office-registry configuration. Transactional sheets keep headers only.'
     }
   }
 
@@ -479,12 +539,23 @@ const DatabaseMaintenanceService = (() => {
     }, {})
   }
 
+  function getSpec() {
+    return {
+      activeSchema: ACTIVE_SCHEMA.map(sheet => ({
+        name: sheet.name,
+        preserveData: !!sheet.preserveData,
+        headers: sheet.headers.slice()
+      }))
+    }
+  }
+
   return {
     previewReset,
     resetTransactionalData,
     previewFreshRebuild,
     rebuildFreshDatabase,
     previewColumnOrder,
-    normalizeColumnOrder
+    normalizeColumnOrder,
+    getSpec
   }
 })()

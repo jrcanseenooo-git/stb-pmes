@@ -15,7 +15,7 @@
 
     <!-- Cluster completion as a slim strip: one headline number that frames
          everything below without competing with it. -->
-    <section class="cluster-progress-strip">
+    <section class="cluster-progress-strip" role="button" tabindex="0" @click="openOfficeList('Cluster office coverage', officeMetrics, 'coverage')" @keydown.enter.prevent="openOfficeList('Cluster office coverage', officeMetrics, 'coverage')">
       <div>
         <span class="cluster-card-label">Overall Completion</span>
         <p>{{ totals.completedAssignments }} submitted · {{ totals.pendingAssignments }} pending · {{ totals.personnel }} personnel covered</p>
@@ -40,47 +40,47 @@
       </div>
       <div class="cluster-signal-grid">
         <div class="cluster-signal-card">
-          <h3>Top Outstanding</h3>
+          <button class="signal-card-head" type="button" @click="openOfficeList('Top Outstanding offices', allOutstandingOffices, 'outstanding')">Top Outstanding</button>
           <div v-if="loading" class="signal-empty">Loading…</div>
           <div v-else-if="!topOutstanding.length" class="signal-empty">No Outstanding ratings yet.</div>
           <div v-else class="signal-list">
-            <div v-for="office in topOutstanding" :key="`out-${office.officeId}`" class="signal-row">
+            <button v-for="office in topOutstanding" :key="`out-${office.officeId}`" class="signal-row" type="button" @click="openOfficeDetail(office)">
               <div>
                 <strong>{{ officeDisplayName(office) }}</strong>
                 <small>{{ office.outstandingCount }} Outstanding of {{ office.assessments.total }} rated</small>
               </div>
               <span>{{ office.outstandingCount }}</span>
-            </div>
+            </button>
           </div>
         </div>
 
         <div class="cluster-signal-card">
-          <h3>Top Needs Improvement</h3>
+          <button class="signal-card-head" type="button" @click="openOfficeList('Offices needing coaching', allNeedsImprovementOffices, 'coaching')">Top Needs Improvement</button>
           <div v-if="loading" class="signal-empty">Loading…</div>
           <div v-else-if="!topNeedsImprovement.length" class="signal-empty">No records below Satisfactory.</div>
           <div v-else class="signal-list">
-            <div v-for="office in topNeedsImprovement" :key="`imp-${office.officeId}`" class="signal-row">
+            <button v-for="office in topNeedsImprovement" :key="`imp-${office.officeId}`" class="signal-row" type="button" @click="openOfficeDetail(office)">
               <div>
                 <strong>{{ officeDisplayName(office) }}</strong>
                 <small>{{ office.coachingCount }} needing improvement</small>
               </div>
               <span>{{ office.coachingCount }}</span>
-            </div>
+            </button>
           </div>
         </div>
 
         <div class="cluster-signal-card">
-          <h3>Pending Rating Workload</h3>
+          <button class="signal-card-head" type="button" @click="openOfficeList('Pending rating workload by office', allPendingWorkload, 'pending')">Pending Rating Workload</button>
           <div v-if="loading" class="signal-empty">Loading…</div>
           <div v-else-if="!pendingWorkload.length" class="signal-empty">No pending rating workload.</div>
           <div v-else class="signal-list">
-            <div v-for="office in pendingWorkload" :key="`pend-${office.officeId}`" class="signal-row">
+            <button v-for="office in pendingWorkload" :key="`pend-${office.officeId}`" class="signal-row" type="button" @click="openOfficeDetail(office)">
               <div>
                 <strong>{{ officeDisplayName(office) }}</strong>
                 <small>{{ office.assignments.pendingPersonnel || 0 }} personnel · {{ office.completionRate }}% complete</small>
               </div>
               <span>{{ office.assignments.pending }}</span>
-            </div>
+            </button>
           </div>
         </div>
       </div>
@@ -96,47 +96,47 @@
 
       <div class="cluster-signal-grid">
         <div class="cluster-signal-card">
-          <h3>Leading Offices</h3>
+          <button class="signal-card-head" type="button" @click="openOfficeList('Leading offices', allLeadingOffices, 'leading')">Leading Offices</button>
           <div v-if="loading" class="signal-empty">Loading office signals...</div>
           <div v-else-if="!leadingOffices.length" class="signal-empty">No submitted ratings yet.</div>
           <div v-else class="signal-list">
-            <div v-for="office in leadingOffices" :key="`lead-${office.officeId}`" class="signal-row">
+            <button v-for="office in leadingOffices" :key="`lead-${office.officeId}`" class="signal-row" type="button" @click="openOfficeDetail(office)">
               <div>
                 <strong>{{ officeDisplayName(office) }}</strong>
                 <small>{{ office.assignments.completed }} of {{ office.assignments.total }} submitted</small>
               </div>
               <span>{{ office.completionRate }}%</span>
-            </div>
+            </button>
           </div>
         </div>
 
         <div class="cluster-signal-card">
-          <h3>Needs Follow-up</h3>
+          <button class="signal-card-head" type="button" @click="openOfficeList('Offices needing follow-up', allOfficesNeedingFollowUp, 'followup')">Needs Follow-up</button>
           <div v-if="loading" class="signal-empty">Loading office signals...</div>
           <div v-else-if="!officesNeedingFollowUp.length" class="signal-empty">No offices need follow-up.</div>
           <div v-else class="signal-list">
-            <div v-for="office in officesNeedingFollowUp" :key="`follow-${office.officeId}`" class="signal-row">
+            <button v-for="office in officesNeedingFollowUp" :key="`follow-${office.officeId}`" class="signal-row" type="button" @click="openOfficeDetail(office)">
               <div>
                 <strong>{{ officeDisplayName(office) }}</strong>
                 <small>{{ office.followUpLabel }}</small>
               </div>
               <span>{{ office.pendingCount }}</span>
-            </div>
+            </button>
           </div>
         </div>
 
         <div class="cluster-signal-card">
-          <h3>Largest Pending Workload</h3>
+          <button class="signal-card-head" type="button" @click="openOfficeList('Largest pending workload', allPendingWorkload, 'pending')">Largest Pending Workload</button>
           <div v-if="loading" class="signal-empty">Loading office signals...</div>
           <div v-else-if="!pendingWorkload.length" class="signal-empty">No pending rating workload.</div>
           <div v-else class="signal-list">
-            <div v-for="office in pendingWorkload" :key="`pending-${office.officeId}`" class="signal-row">
+            <button v-for="office in pendingWorkload" :key="`pending-${office.officeId}`" class="signal-row" type="button" @click="openOfficeDetail(office)">
               <div>
                 <strong>{{ officeDisplayName(office) }}</strong>
                 <small>{{ office.completionRate }}% complete</small>
               </div>
               <span>{{ office.assignments.pending }}</span>
-            </div>
+            </button>
           </div>
         </div>
       </div>
@@ -172,7 +172,14 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="office in filteredItems" :key="office.officeId">
+          <tr
+            v-for="office in filteredItems"
+            :key="office.officeId"
+            class="office-row"
+            tabindex="0"
+            @click="openOfficeDetail(office)"
+            @keydown.enter.prevent="openOfficeDetail(office)"
+          >
             <td>
               <strong>{{ officeDisplayCode(office) }}</strong>
               <small>{{ office.officeName }}</small>
@@ -203,6 +210,85 @@
       Aggregate monitoring only. Individual rating content and individual rater identities are not
       included in cluster analytics.
     </p>
+
+    <div v-if="detail" class="detail-overlay" @click.self="detail = null">
+      <div class="detail-modal" role="dialog" aria-modal="true" :aria-label="detail.title">
+        <div class="detail-head">
+          <div>
+            <h2>{{ detail.title }}</h2>
+            <p>{{ detail.subtitle }}</p>
+          </div>
+          <button class="modal-close" type="button" aria-label="Close" @click="detail = null">x</button>
+        </div>
+
+        <div v-if="detail.kind === 'office'" class="office-detail-body">
+          <div class="office-detail-grid">
+            <div>
+              <span>Personnel</span>
+              <strong>{{ detail.office.personnel.active }} active</strong>
+              <small>{{ detail.office.personnel.pending }} for validation · {{ detail.office.personnel.total }} total</small>
+            </div>
+            <div>
+              <span>Rating Tasks</span>
+              <strong>{{ detail.office.assignments.completed }} / {{ detail.office.assignments.total }}</strong>
+              <small>{{ detail.office.assignments.pending }} pending · {{ detail.office.assignments.pendingPersonnel || 0 }} personnel</small>
+            </div>
+            <div>
+              <span>Completion</span>
+              <strong>{{ detail.office.completionRate }}%</strong>
+              <small>{{ formatDate(detail.office.lastActivityAt) }} last activity</small>
+            </div>
+            <div>
+              <span>Assessment Results</span>
+              <strong>{{ detail.office.assessments.total }} records</strong>
+              <small>{{ detail.office.assessments.averageOverall || '-' }} average score</small>
+            </div>
+          </div>
+
+          <div class="descriptor-breakdown">
+            <h3>Rating Profile</h3>
+            <div class="descriptor-grid">
+              <div v-for="item in descriptorRows(detail.office)" :key="item.label">
+                <span>{{ item.label }}</span>
+                <strong>{{ item.value }}</strong>
+              </div>
+            </div>
+          </div>
+
+          <div class="office-health-note">
+            <strong>{{ detail.office.health || 'Status unavailable' }}</strong>
+            <span>{{ detail.office.healthNote || 'No additional office status note.' }}</span>
+          </div>
+        </div>
+
+        <div v-else class="detail-body">
+          <table v-if="detail.rows.length" class="detail-table">
+            <thead>
+              <tr>
+                <th>Office</th>
+                <th>Personnel</th>
+                <th>Rating Tasks</th>
+                <th>Completion</th>
+                <th>{{ detail.metricLabel }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="office in detail.rows" :key="office.officeId" class="office-row" tabindex="0" @click="openOfficeDetail(office)" @keydown.enter.prevent="openOfficeDetail(office)">
+                <td>
+                  <strong>{{ officeDisplayCode(office) }}</strong>
+                  <span>{{ officeDisplayName(office) }}</span>
+                </td>
+                <td>{{ office.personnel.active }} active · {{ office.personnel.pending }} pending</td>
+                <td>{{ office.assignments.completed }} / {{ office.assignments.total }}</td>
+                <td>{{ office.completionRate }}%</td>
+                <td>{{ detailMetric(office, detail.kind) }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-else class="signal-empty">No office records for this view.</div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -233,6 +319,7 @@ const loading = ref(false)
 const error = ref('')
 const search = ref('')
 const lastUpdatedAt = ref(null)
+const detail = ref(null)
 
 onMounted(() => load(false))
 
@@ -264,45 +351,60 @@ const officeMetrics = computed(() =>
     })
 )
 
-const topOutstanding = computed(() =>
+const allOutstandingOffices = computed(() =>
   officeMetrics.value
     .filter(office => office.outstandingCount > 0)
     .sort((a, b) => b.outstandingCount - a.outstandingCount)
-    .slice(0, 3)
 )
 
-const topNeedsImprovement = computed(() =>
+const topOutstanding = computed(() =>
+  allOutstandingOffices.value.slice(0, 3)
+)
+
+const allNeedsImprovementOffices = computed(() =>
   officeMetrics.value
     .filter(office => office.coachingCount > 0)
     .sort((a, b) => b.coachingCount - a.coachingCount)
-    .slice(0, 3)
 )
 
-const leadingOffices = computed(() =>
+const topNeedsImprovement = computed(() =>
+  allNeedsImprovementOffices.value.slice(0, 3)
+)
+
+const allLeadingOffices = computed(() =>
   officeMetrics.value
     .filter(office => Number(office.assignments?.total || 0) > 0)
     .sort((a, b) =>
       b.completionRate - a.completionRate ||
       Number(b.assignments?.completed || 0) - Number(a.assignments?.completed || 0)
     )
-    .slice(0, 3)
 )
 
-const officesNeedingFollowUp = computed(() =>
+const leadingOffices = computed(() =>
+  allLeadingOffices.value.slice(0, 3)
+)
+
+const allOfficesNeedingFollowUp = computed(() =>
   officeMetrics.value
     .filter(office => office.pendingCount > 0 || String(office.health || '').toLowerCase() !== 'active')
     .sort((a, b) =>
       Number(b.pendingCount || 0) - Number(a.pendingCount || 0) ||
       a.completionRate - b.completionRate
     )
-    .slice(0, 3)
 )
 
-const pendingWorkload = computed(() =>
+const officesNeedingFollowUp = computed(() =>
+  allOfficesNeedingFollowUp.value.slice(0, 3)
+)
+
+const allPendingWorkload = computed(() =>
   officeMetrics.value
     .filter(office => Number(office.assignments?.pending || 0) > 0)
     .sort((a, b) => Number(b.assignments.pending || 0) - Number(a.assignments.pending || 0))
-    .slice(0, 3)
+)
+
+const pendingWorkload = computed(() =>
+  allPendingWorkload.value.slice(0, 3)
 )
 
 function officeDisplayCode(office) {
@@ -350,6 +452,54 @@ function followUpLabel(office) {
   return `${pending} pending rating task${pending === 1 ? '' : 's'}`
 }
 
+function openOfficeList(title, rows, kind) {
+  detail.value = {
+    title,
+    subtitle: `${rows.length} office${rows.length === 1 ? '' : 's'} shown · aggregate monitoring only`,
+    rows,
+    kind,
+    metricLabel: metricLabel(kind)
+  }
+}
+
+function openOfficeDetail(office) {
+  detail.value = {
+    title: officeDisplayName(office),
+    subtitle: `${officeDisplayCode(office) || 'Office'} · aggregate office monitoring`,
+    office,
+    kind: 'office'
+  }
+}
+
+function metricLabel(kind) {
+  if (kind === 'outstanding') return 'Outstanding'
+  if (kind === 'coaching') return 'For Coaching'
+  if (kind === 'pending') return 'Pending'
+  if (kind === 'leading') return 'Submitted'
+  if (kind === 'followup') return 'Follow-up'
+  return 'Status'
+}
+
+function detailMetric(office, kind) {
+  if (kind === 'outstanding') return `${office.outstandingCount} Outstanding`
+  if (kind === 'coaching') return `${office.coachingCount} needing coaching`
+  if (kind === 'pending') return `${office.assignments.pending} pending`
+  if (kind === 'leading') return `${office.assignments.completed} submitted`
+  if (kind === 'followup') return office.followUpLabel
+  return office.health || 'Office'
+}
+
+function descriptorRows(office) {
+  const d = office.assessments?.descriptors || {}
+  return [
+    { label: 'Outstanding', value: Number(d.outstanding || 0) },
+    { label: 'Very Satisfactory', value: Number(d.verySatisfactory || 0) },
+    { label: 'Satisfactory', value: Number(d.satisfactory || 0) },
+    { label: 'Needs Improvement', value: Number(d.needsImprovement || 0) },
+    { label: 'Requires Intervention', value: Number(d.requiresIntervention || 0) }
+  ]
+}
+
 async function load(forceRefresh = false) {
   loading.value = true
   error.value = ''
@@ -385,7 +535,10 @@ async function load(forceRefresh = false) {
   border:1px solid #DCE6F2;
   border-radius:8px;
   padding:14px 18px;
+  cursor:pointer;
 }
+.cluster-progress-strip:hover{border-color:#8BB7EC; box-shadow:0 10px 24px rgba(15,23,42,.07);}
+.cluster-progress-strip:focus{outline:3px solid rgba(37,99,235,.18); outline-offset:2px;}
 
 .cluster-progress-strip > div:first-child{ flex:0 0 auto; min-width:0; }
 .cluster-progress-strip p{ margin:4px 0 0; color:#536881; font-size:12px; }
@@ -459,14 +612,22 @@ async function load(forceRefresh = false) {
   overflow:hidden;
 }
 
-.cluster-signal-card h3{
+.signal-card-head{
+  display:block;
+  width:100%;
   margin:0;
   padding:13px 14px;
+  border:0;
   border-bottom:1px solid #E6EEF7;
+  background:#FFFFFF;
   color:#07172D;
+  cursor:pointer;
   font-size:14px;
   font-weight:800;
+  text-align:left;
 }
+.signal-card-head:hover{background:#F8FBFF;}
+.signal-card-head:focus{outline:3px solid rgba(37,99,235,.18); outline-offset:-3px;}
 
 .signal-list{
   display:flex;
@@ -478,11 +639,20 @@ async function load(forceRefresh = false) {
   align-items:center;
   justify-content:space-between;
   gap:12px;
+  width:100%;
   padding:12px 14px;
+  border:0;
   border-bottom:1px solid #EEF3F8;
+  background:#FFFFFF;
+  cursor:pointer;
+  text-align:left;
 }
 
 .signal-row:last-child{border-bottom:0;}
+.signal-row:hover,
+.office-row:hover{background:#F8FBFF;}
+.signal-row:focus,
+.office-row:focus{outline:3px solid rgba(37,99,235,.18); outline-offset:-3px;}
 
 .signal-row strong{
   display:block;
@@ -521,11 +691,80 @@ async function load(forceRefresh = false) {
   text-align:center;
 }
 
+.office-row{cursor:pointer;}
+
+.detail-overlay{
+  position:fixed;
+  inset:0;
+  z-index:350;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:18px;
+  background:rgba(15,23,42,.45);
+}
+
+.detail-modal{
+  width:min(980px,100%);
+  max-height:86vh;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  border-radius:8px;
+  background:#FFFFFF;
+  box-shadow:0 24px 64px rgba(15,23,42,.24);
+}
+
+.detail-head{
+  display:flex;
+  justify-content:space-between;
+  gap:14px;
+  padding:18px 20px;
+  border-bottom:1px solid #E5EDF7;
+  background:#F8FAFC;
+}
+
+.detail-head h2{margin:0; color:#0F172A; font-size:17px;}
+.detail-head p{margin:4px 0 0; color:#64748B; font-size:12px;}
+.modal-close{width:34px; height:34px; border:1px solid #D5E0EF; border-radius:8px; background:#FFFFFF; color:#0F172A; cursor:pointer; font-weight:900;}
+.detail-body{overflow:auto;}
+.detail-table{width:100%; border-collapse:collapse; font-size:13px;}
+.detail-table th{padding:11px 14px; border-bottom:1px solid #E5EDF7; background:#F8FAFC; color:#64748B; font-size:11px; font-weight:800; letter-spacing:.04em; text-align:left; text-transform:uppercase;}
+.detail-table td{padding:12px 14px; border-bottom:1px solid #EEF2F7; color:#0F172A; vertical-align:top;}
+.detail-table td strong{display:block;}
+.detail-table td span{display:block; margin-top:2px; color:#64748B; font-size:12px;}
+
+.office-detail-body{overflow:auto; padding:18px;}
+.office-detail-grid{display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px;}
+.office-detail-grid > div,
+.descriptor-breakdown,
+.office-health-note{border:1px solid #DCE6F2; border-radius:8px; background:#FFFFFF;}
+.office-detail-grid > div{padding:14px;}
+.office-detail-grid span,
+.descriptor-grid span{display:block; color:#64748B; font-size:11px; font-weight:800; letter-spacing:.04em; text-transform:uppercase;}
+.office-detail-grid strong{display:block; margin-top:8px; color:#07172D; font-size:22px; line-height:1;}
+.office-detail-grid small{display:block; margin-top:8px; color:#5B6E8A; font-size:12px; line-height:1.35;}
+.descriptor-breakdown{margin-top:12px; overflow:hidden;}
+.descriptor-breakdown h3{margin:0; padding:13px 14px; border-bottom:1px solid #E6EEF7; color:#07172D; font-size:14px;}
+.descriptor-grid{display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:0;}
+.descriptor-grid > div{padding:14px; border-right:1px solid #EEF3F8;}
+.descriptor-grid > div:last-child{border-right:0;}
+.descriptor-grid strong{display:block; margin-top:7px; color:#07172D; font-size:20px;}
+.office-health-note{display:grid; gap:4px; margin-top:12px; padding:14px;}
+.office-health-note strong{color:#07172D;}
+.office-health-note span{color:#5B6E8A; font-size:12px;}
+
 @media (max-width:1100px){
   .cluster-signal-grid{grid-template-columns:1fr;}
+  .office-detail-grid,
+  .descriptor-grid{grid-template-columns:1fr 1fr;}
 }
 
 @media (max-width:720px){
     .cluster-signals-head{flex-direction:column;}
+    .office-detail-grid,
+    .descriptor-grid{grid-template-columns:1fr;}
+    .descriptor-grid > div{border-right:0; border-bottom:1px solid #EEF3F8;}
+    .descriptor-grid > div:last-child{border-bottom:0;}
 }
 </style>

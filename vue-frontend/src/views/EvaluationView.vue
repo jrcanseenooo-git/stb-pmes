@@ -95,15 +95,15 @@
         <div class="view-tabs">
           <template v-if="showPersonalTabs">
             <button :class="['view-tab', activeView === 'my-tasks' && 'active']" @click="switchToMyTasks">
-              My Rating Tasks
+              <span class="view-tab-label">My Rating Tasks</span>
               <span v-if="pendingTaskCount > 0" class="view-tab-badge">{{ pendingTaskCount }}</span>
             </button>
             <button :class="['view-tab', activeView === 'my-results' && 'active']" @click="switchToMyResults">
               My Results
             </button>
           </template>
-          <!-- System Administrator: Generate Assignments takes the space the two
-               personal tabs would have occupied. -->
+          <!-- The action is available to the STB system administrator and to an
+               assigned office administrator, with its server-enforced scope. -->
           <button v-if="canGenerate" class="view-tab view-tab-action" @click="openGenerateModal">
             <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
               <circle cx="6.5" cy="6.5" r="5.5" stroke="currentColor" stroke-width="1.4"/>
@@ -370,6 +370,10 @@
                 <svg width="14" height="14" viewBox="0 0 11 11" fill="none"><path d="M5.5 1L1 3.25V6c0 2.3 1.67 4.35 4.5 4.75 2.83-.4 4.5-2.45 4.5-4.75V3.25L5.5 1z" fill="#15803D" stroke="#15803D" stroke-width=".4"/><path d="M3.5 5.5l1.5 1.5 2.5-2.5" stroke="#fff" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 This assessment has been finalized.
               </div>
+              <div v-if="activeAssignment && (loadingAssessment || assessmentLoadError || !assessmentReadyForAssignment)" class="validation-banner" style="margin-bottom:14px">
+                <template v-if="loadingAssessment">Loading assessment questions…</template>
+                <template v-else>{{ assessmentLoadError || 'No active assessment questions are configured for this assignment.' }}<button class="btn" style="margin-left:10px" @click="loadAssessmentContent(true)">Retry</button></template>
+              </div>
 
               <!-- Score summary (admin/self view only) -->
               <div v-if="!activeAssignment" class="score-summary-bar">
@@ -433,13 +437,8 @@
                     <div class="rater-selector">
                       <span class="rater-label">{{ canAdmin ? 'Viewing ratings from:' : 'Rating as:' }}</span>
                       <select v-model="cbcRaterType" class="field-input rater-select">
-                        <option value="Self">Self (15%)</option>
-                        <option value="Peer">Peer (15%)</option>
-                        <option value="Peer1">Peer 1 (15%)</option>
-                        <option value="Peer2">Peer 2 (15%)</option>
-                        <option value="Subordinate">Subordinate (15%)</option>
-                        <option value="Supervisor">Immediate Supervisor (30%)</option>
-                        <option value="SkipSupervisor">Skip Supervisor (25%)</option>
+                        <option v-if="!cbcRaterOptions.length" value="" disabled>No submitted ratings</option>
+                        <option v-for="option in cbcRaterOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
                       </select>
                     </div>
                     <div class="has-sub-note">
@@ -586,8 +585,8 @@
                   <div class="rater-selector" style="margin-bottom:16px">
                     <span class="rater-label">{{ canAdmin ? 'Viewing ratings from:' : 'Rating as:' }}</span>
                     <select v-model="jfRaterType" class="field-input rater-select">
-                      <option value="Self">Self (Ratee)</option>
-                      <option value="Supervisor">Immediate Supervisor</option>
+                      <option v-if="!jfRaterOptions.length" value="" disabled>No submitted ratings</option>
+                      <option v-for="option in jfRaterOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
                     </select>
                   </div>
                 </template>
@@ -629,7 +628,7 @@
                 <div class="eval-footer-progress">
                   <span :class="['eval-footer-count', allRaterAnswered ? 'done' : '']">{{ raterAnsweredTotal }} / {{ raterTotal }} answered</span>
                 </div>
-                <button class="btn btn-submit-rating" :disabled="submittingRating || selectedAssignmentCompleted" @click="submitRatings">
+                <button class="btn btn-submit-rating" :disabled="submittingRating || selectedAssignmentCompleted || !assessmentReadyForAssignment" @click="submitRatings">
                   <span v-if="submittingRating" class="spinner-sm" style="border-top-color:#fff"></span>
                   {{ submittingRating ? 'Submitting...' : (selectedAssignmentCompleted ? 'Submitted' : 'Submit Ratings') }}
                 </button>
@@ -797,7 +796,7 @@
             </div>
             <div>
               <h3 class="modal-title">Generate / Backfill Rater Assignments</h3>
-              <p class="modal-sub">Creates missing rater assignments without changing completed ratings</p>
+              <p class="modal-sub">Creates missing rater assignments for {{ assignmentScopeLabel }} without changing completed ratings</p>
             </div>
             <button class="modal-close" @click="showGenerateModal = false">
               <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M2 2l11 11M13 2L2 13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
@@ -828,6 +827,7 @@
               </div>
               <div class="field full">
                 <div class="gen-info-box">
+                  <p style="margin:0 0 8px;font-size:12px;font-weight:800;color:#1d4ed8;">Scope: {{ assignmentScopeLabel }}</p>
                   <strong>What this does:</strong>
                   <ul style="margin:6px 0 0 18px;padding:0;font-size:12px;line-height:1.7">
                     <li>Creates missing IPAT records for active employees</li>
@@ -946,8 +946,8 @@ import { useOrgOptions } from '@/composables/useOrgOptions'
 
 const { confirm } = useConfirm()
 const route = useRoute()
-const { hasPermission, isAdmin } = usePermissions()
-const { isClusterPortal } = useBranding()
+const { hasPermission, isAdmin, canGenerateAssignments } = usePermissions()
+const { isClusterPortal, portalSubtitle } = useBranding()
 const canViewBureauMonitoring = hasPermission('view_bureau_monitoring')
 const canViewDivisionMonitoring = hasPermission('view_division_monitoring')
 const { loadOrgOptions, currentDivisions } = useOrgOptions()
@@ -962,6 +962,7 @@ const usesIpcrfForFpo = computed(() => !isClusterPortal.value)
 const assessmentQuestions  = ref([])
 const assessmentCategories = ref([])
 const loadingAssessment    = ref(false)
+const assessmentLoadError  = ref('')
 
 const categoryLookup = computed(() => {
   const map = {}
@@ -969,8 +970,44 @@ const categoryLookup = computed(() => {
   return map
 })
 
+function canonicalAssessmentRater(type) {
+  return ({ Peer1: 'Peer', Peer2: 'Peer', Subordinate: 'Upward', SkipSupervisor: 'Skip Supervisor' })[type] || type
+}
+function canonicalAssessmentLevel(role) {
+  const key = String(role || '').trim().toLowerCase().replace(/[\s_-]+/g, ' ')
+  if (key === 'staff' || key === 'technical staff') return 'Technical Staff'
+  if (['oic dc', 'oic division chief', 'officer in charge division chief'].includes(key)) return 'Division Chief'
+  return String(role || '').trim()
+}
+// Mirrors AssessmentContentService.levelApplies_ exactly. An empty list means
+// every role - the default for a new question. A non-empty list is an explicit
+// choice made from the office's own roles, so it is honoured as written.
+// Compared case- and spacing-insensitively because the list is ticked in the
+// content editor while the role is copied onto the assignment from the
+// personnel record. A ratee with no role recorded still sees the questions:
+// an unassessable person is worse than an over-broad form.
+// Keep this in step with the server rule - the server gates the submission
+// against its own count, so a divergence means a rater answers everything
+// shown and is still rejected.
+function levelKey(value) {
+  return String(value || '').trim().toLowerCase().replace(/[\s_-]+/g, ' ')
+}
+function levelAppliesToAssignment(levels, level) {
+  if (!levels.length) return true
+  const key = levelKey(level)
+  if (!key) return true
+  return levels.some(item => levelKey(item) === key)
+}
+function questionAppliesToAssignment(question) {
+  if (!activeAssignment.value) return true
+  const raters = Array.isArray(question.applicableRaters) ? question.applicableRaters : []
+  const levels = Array.isArray(question.applicableLevels) ? question.applicableLevels : []
+  return (!raters.length || raters.includes(canonicalAssessmentRater(activeAssignment.value.raterType))) &&
+    levelAppliesToAssignment(levels, canonicalAssessmentLevel(activeAssignment.value.rateeRole))
+}
+const applicableAssessmentQuestions = computed(() => assessmentQuestions.value.filter(question => String(question.status || '').trim().toLowerCase() === 'active' && questionAppliesToAssignment(question)))
 const HEARTWORK_THEMES = computed(() => {
-  const cbcQuestions = assessmentQuestions.value.filter(q => q.domain === 'cbc' && q.status === 'Active')
+  const cbcQuestions = applicableAssessmentQuestions.value.filter(q => String(q.domain || '').trim().toLowerCase() === 'cbc')
   const grouped = {}
   cbcQuestions.forEach(q => {
     if (!grouped[q.category]) {
@@ -989,24 +1026,46 @@ const HEARTWORK_THEMES = computed(() => {
 })
 
 const JF_INDICATORS = computed(() =>
-  assessmentQuestions.value
-    .filter(q => q.domain === 'jf' && q.status === 'Active')
+  applicableAssessmentQuestions.value
+    .filter(q => String(q.domain || '').trim().toLowerCase() === 'jf')
     .sort((a, b) => (a.sequence || 0) - (b.sequence || 0))
     .map(q => q.questionText)
 )
 
-async function loadAssessmentContent() {
-  if (assessmentQuestions.value.length) return
+async function loadAssessmentContent(force = false) {
+  if (assessmentQuestions.value.length && !force) return
   loadingAssessment.value = true
+  assessmentLoadError.value = ''
   try {
-    const [qData, cData] = await Promise.all([
+    // Settled, not all: categories only supply the display label and blurb for
+    // a competency group. Under Promise.all a failed categories call rejected
+    // the pair and threw the successfully fetched QUESTIONS away, leaving the
+    // rater an empty form over a purely cosmetic lookup. Questions decide
+    // whether the form can be answered at all, so only they may fail it.
+    const [qRes, cRes] = await Promise.allSettled([
       assessmentContentApi.list({ status: 'Active', pageSize: 500 }),
       assessmentCategoryApi.list({ status: 'Active', pageSize: 200 })
     ])
-    assessmentQuestions.value  = qData?.items || (Array.isArray(qData) ? qData : [])
+    if (qRes.status === 'rejected') throw qRes.reason
+    const qData = qRes.value
+    const cData = cRes.status === 'fulfilled' ? cRes.value : []
+    if (cRes.status === 'rejected') {
+      // Groups fall back to their raw category id as the heading.
+      console.error('[Evaluation] Category labels unavailable', cRes.reason)
+    }
+    const questions = qData?.items || (Array.isArray(qData) ? qData : [])
+    // An empty list is a real answer, not a failure: the office has no active
+    // questions yet. Leave assessmentLoadError unset so the banner shows its
+    // "not configured" text, which is the accurate advice in that case.
+    assessmentQuestions.value  = questions
     assessmentCategories.value = cData?.items || (Array.isArray(cData) ? cData : [])
   } catch (e) {
+    // The request itself failed - expired session, network drop, server error.
+    // Surfacing it matters: without this the banner fell back to "no active
+    // assessment questions are configured", sending users to an administrator
+    // over a problem that Retry or a fresh sign-in would have solved.
     console.error(e)
+    assessmentLoadError.value = e?.message || 'Assessment questions could not be loaded. Please retry.'
   } finally {
     loadingAssessment.value = false
   }
@@ -1027,23 +1086,24 @@ function divisionKey(name) {
 }
 
 // View toggle
-// "Can administer assessments" - gates the All Assessments view and the
-// administrative detail panel. Distinct from being able to GENERATE assignments,
-// which is System Administrator-only. Both the System Administrator and the
-// Bureau Director / Assistant Bureau Director hold manage_ipat_scores.
+// "Can administer assessments" gates the All Assessments view and the
+// administrative detail panel. Assignment generation is separately scoped:
+// STB's System Administrator generates STB assignments, while an office admin
+// generates only assignments in their own office workbook.
 const canAdmin = hasPermission('manage_ipat_scores')
 
 // A pure System Administrator maintains the system but is not assessed by it, so
 // "My Rating Tasks" and "My Results" are always empty for them and only take up
 // space. They get Generate Assignments in that row instead.
 //
-// Division Chief / Assistant Bureau Director / Bureau Director are themselves
-// ratees even when they hold evaluation-admin functions, so they keep both
-// personal tabs - and generating assignments is reserved to the System
-// Administrator, so they do not get that button.
+// Office administrators can be ratees too, so they retain their personal tabs
+// and receive the scoped generation action alongside them.
 const isSystemAdmin  = isAdmin
 const showPersonalTabs = computed(() => !isSystemAdmin.value)
-const canGenerate      = computed(() => isSystemAdmin.value)
+const canGenerate      = canGenerateAssignments
+const assignmentScopeLabel = computed(() =>
+  isClusterPortal.value ? (portalSubtitle.value || 'your assigned office') : 'the Social Technology Bureau'
+)
 // A System Administrator has no personal tabs, so landing on 'my-tasks' would
 // strand them on a permanently empty view with no control to leave it.
 const activeView  = ref(isSystemAdmin.value ? 'all' : 'my-tasks')
@@ -1056,8 +1116,14 @@ const selectedTask   = ref(null)
 const selectedResult = ref(null)
 const selectedRecord = ref(null)
 const currentYear = new Date().getFullYear()
-const tasksSemester = ref(String(new Date().getMonth() < 6 ? 1 : 2))
-const tasksYear     = ref(currentYear)
+const requestedSemester = String(route.query.semester || '')
+const requestedYear = Number(route.query.year || 0)
+const tasksSemester = ref(['1', '2'].includes(requestedSemester)
+  ? requestedSemester
+  : String(new Date().getMonth() < 6 ? 1 : 2))
+const tasksYear = ref(Number.isInteger(requestedYear) && requestedYear >= 2023 && requestedYear <= currentYear + 1
+  ? requestedYear
+  : currentYear)
 // Set on every successful loadMyTasks/loadMyResults - whichever list is
 // currently shown - so "Refresh" always reports how fresh the visible data
 // actually is, not just whichever tab last loaded.
@@ -1305,6 +1371,21 @@ const jfEvidence  = ref({})
 const savingJF    = ref(false)
 const computingJF = ref(false)
 
+const CBC_RATER_OPTIONS = [
+  { value: 'Self', label: 'Self (15%)' },
+  { value: 'Peer', label: 'Peer (15%)' },
+  { value: 'Peer1', label: 'Peer 1 (15%)' },
+  { value: 'Peer2', label: 'Peer 2 (15%)' },
+  { value: 'Subordinate', label: 'Subordinate (15%)' },
+  { value: 'Supervisor', label: 'Immediate Supervisor (30%)' },
+  { value: 'SkipSupervisor', label: 'Skip Supervisor (25%)' }
+]
+
+const JF_RATER_OPTIONS = [
+  { value: 'Self', label: 'Self (Ratee)' },
+  { value: 'Supervisor', label: 'Immediate Supervisor' }
+]
+
 const computingOverall  = ref(false)
 const showValidation    = ref(false)
 const submittingRating  = ref(false)
@@ -1392,6 +1473,52 @@ const filteredRecords = computed(() => {
   return r
 })
 
+function submittedRaterOptions(ratings, options) {
+  const presentTypes = new Set((ratings || [])
+    .map(rating => String(rating?.raterType || '').trim())
+    .filter(Boolean))
+  return options.filter(option => presentTypes.has(option.value))
+}
+
+function assignmentRaterOption(type, options) {
+  const value = String(type || '').trim()
+  if (!value) return []
+  return [options.find(option => option.value === value) || { value, label: raterTypeLabel(value) }]
+}
+
+const cbcRaterOptions = computed(() => {
+  if (activeAssignment.value) {
+    return assignmentRaterOption(activeAssignment.value.raterType, CBC_RATER_OPTIONS)
+  }
+  if (canAdmin.value) {
+    return submittedRaterOptions(loadedRec.value?.cbcRatings, CBC_RATER_OPTIONS)
+  }
+  return CBC_RATER_OPTIONS
+})
+
+const jfRaterOptions = computed(() => {
+  if (activeAssignment.value) {
+    return assignmentRaterOption(
+      ['Self', 'Supervisor'].includes(activeAssignment.value.raterType) ? activeAssignment.value.raterType : 'Self',
+      JF_RATER_OPTIONS
+    )
+  }
+  if (canAdmin.value) {
+    return submittedRaterOptions(loadedRec.value?.jfRatings, JF_RATER_OPTIONS)
+  }
+  return JF_RATER_OPTIONS
+})
+
+function alignRaterType(selection, options) {
+  if (!options.length) {
+    selection.value = ''
+    return
+  }
+  if (!options.some(option => option.value === selection.value)) {
+    selection.value = options[0].value
+  }
+}
+
 // Rater progress computeds
 const cbcTotalCount    = computed(() => HEARTWORK_THEMES.value.reduce((s, t) => s + t.indicators.length, 0))
 const cbcAnsweredCount = computed(() => Object.keys(cbcRatings.value).length)
@@ -1401,6 +1528,11 @@ const jfAnsweredCount  = computed(() => JF_INDICATORS.value.filter((_, idx) => g
 const raterTotal        = computed(() => (showCBCTab.value ? cbcTotalCount.value : 0) + (showJFTab.value ? JF_INDICATORS.value.length : 0))
 const raterAnsweredTotal = computed(() => (showCBCTab.value ? cbcAnsweredCount.value : 0) + (showJFTab.value ? jfAnsweredCount.value : 0))
 const allRaterAnswered  = computed(() => raterAnsweredTotal.value >= raterTotal.value)
+const assessmentReadyForAssignment = computed(() => {
+  if (!activeAssignment.value) return true
+  if (loadingAssessment.value || assessmentLoadError.value) return false
+  return (!showCBCTab.value || cbcTotalCount.value > 0) && (!showJFTab.value || JF_INDICATORS.value.length > 0)
+})
 const activeDomainTitle = computed(() => {
   const labels = {
     cbc: 'Core Behavioral Competencies',
@@ -1503,9 +1635,32 @@ function _populateJFRatings(raterType, ratings) {
   jfEvidence.value = emap
 }
 
-// Re-populate when the user switches which rater type they're editing
+function mergeLoadedRatings(kind, incoming) {
+  if (!loadedRec.value) return
+  const field = kind === 'jf' ? 'jfRatings' : 'cbcRatings'
+  const existing = Array.isArray(loadedRec.value[field]) ? loadedRec.value[field] : []
+  const keyFor = kind === 'jf'
+    ? row => `${row.raterType || ''}|${Number(row.indicatorIdx) || 0}`
+    : row => `${row.raterType || ''}|${row.themeId || ''}|${Number(row.indicatorIdx) || 0}`
+  const byKey = new Map(existing.map(row => [keyFor(row), row]))
+  incoming.forEach(row => {
+    byKey.set(keyFor(row), {
+      ...(byKey.get(keyFor(row)) || {}),
+      ...row,
+      rating: Number(row.rating)
+    })
+  })
+  loadedRec.value = {
+    ...loadedRec.value,
+    [field]: Array.from(byKey.values())
+  }
+}
+
+// Re-populate when the user switches which rater type they're editing/viewing.
 watch(cbcRaterType, (type) => { if (loadedRec.value) _populateCBCRatings(type, loadedRec.value.cbcRatings) })
 watch(jfRaterType,  (type) => { if (loadedRec.value) _populateJFRatings(type,  loadedRec.value.jfRatings) })
+watch(cbcRaterOptions, (options) => { alignRaterType(cbcRaterType, options) })
+watch(jfRaterOptions,  (options) => { alignRaterType(jfRaterType, options) })
 watch([tasksSemester, tasksYear], handlePeriodChange)
 watch([canAdmin, isSystemAdmin], ([admin, sysAdmin]) => {
   if (!admin) return
@@ -1746,6 +1901,7 @@ async function openFromAssignment(task) {
   jfRaterType.value      = ['Self', 'Supervisor'].includes(task.raterType) ? task.raterType : 'Self'
   showValidation.value   = false
   activeTab.value        = isJobFitnessOnlyAssignment(task) ? 'jf' : 'cbc'
+  if (!assessmentQuestions.value.length || assessmentLoadError.value) await loadAssessmentContent(true)
   if (task.ipatRecordId) {
     await openDetailModal({ id: task.ipatRecordId, rateeName: task.rateeName, semester: task.semester, year: task.year })
   }
@@ -1767,6 +1923,10 @@ async function submitRatings() {
     showToast('This rating assignment has already been submitted and is locked.', 'error')
     return
   }
+  if (!assessmentReadyForAssignment.value) {
+    showToast(assessmentLoadError.value || 'Assessment questions are not ready. Please retry loading the form.', 'error')
+    return
+  }
 
   const isJobFitnessOnly = isJobFitnessOnlyAssignment(assignment)
   const cbcOk = isJobFitnessOnly || cbcAnsweredCount.value >= cbcTotalCount.value
@@ -1781,6 +1941,13 @@ async function submitRatings() {
     showToast(`Please answer all ${missing} remaining question${missing !== 1 ? 's' : ''} before submitting.`, 'error')
     return
   }
+
+  const confirmed = await confirm({
+    title: 'Submit Ratings',
+    message: `Submit your completed rating for ${assignment.rateeName}? Once submitted, this rating is final and can no longer be edited.`,
+    confirmLabel: 'Submit Ratings'
+  })
+  if (!confirmed) return
 
   submittingRating.value = true
   try {
@@ -1818,7 +1985,19 @@ async function submitRatings() {
       if (myResults.value.length) selectedResult.value = myResults.value[0]
     }
   } catch (e) {
-    console.error(e); showToast('Failed to submit ratings. Please try again.', 'error')
+    console.error(e)
+    try {
+      const data = await ipatAssignmentsApi.getMyRatees({ semester: assignment.semester, year: assignment.year })
+      const tasks = Array.isArray(data) ? data : (data?.items || [])
+      const saved = tasks.find(task => String(task.id) === String(assignment.id))
+      if (String(saved?.status || '') === 'Completed') {
+        myTasks.value = tasks
+        showToast('Ratings submitted successfully!')
+        closeDetailModal()
+        return
+      }
+    } catch (reconcileError) { console.error('[Evaluation] Submission reconciliation failed', reconcileError) }
+    showToast(e?.message || 'Failed to submit ratings. Your answers remain on this page; please try again.', 'error')
   } finally {
     submittingRating.value = false
   }
@@ -1840,11 +2019,12 @@ async function generateAssignments() {
     generateResult.value = result
     const generated = Number(result.generated || 0)
     const ratees = Number(result.ratees || 0)
-    showToast(generated
-      ? `Added ${generated} missing assignment(s) for ${ratees} employee(s)`
-      : 'Assignments are already complete for this period')
+    const removed = Number(result.removedAssignments || 0)
+    showToast(generated || removed
+      ? `Reconciled assignments: ${generated} added, ${removed} invalid removed for ${ratees} affected employee(s) in ${result.scopeLabel || assignmentScopeLabel.value}`
+      : `Assignments are already complete for this period in ${result.scopeLabel || assignmentScopeLabel.value}`)
     await loadRecords()
-  } catch (e) { console.error('[Evaluation] Could not generate assignments', e); showToast('Could not generate assignments. Please try again or contact the system administrator.', 'error') }
+  } catch (e) { console.error('[Evaluation] Could not generate assignments', e); showToast(e?.message || 'Could not generate assignments. Please try again or contact the system administrator.', 'error') }
   finally { generating.value = false }
 }
 
@@ -2000,6 +2180,8 @@ async function openDetailModal(rec) {
     loadedRec.value = full
     activeRecord.value = { ...rec, ...full }
     fpoManualInput.value = full.fpoScore ? String(full.fpoScore) : ''
+    alignRaterType(cbcRaterType, cbcRaterOptions.value)
+    alignRaterType(jfRaterType, jfRaterOptions.value)
     _populateCBCRatings(cbcRaterType.value, full.cbcRatings)
     _populateJFRatings(jfRaterType.value,   full.jfRatings)
   } catch (e) {
@@ -2038,9 +2220,8 @@ async function saveCBCRatings() {
   savingCBC.value = true
   try {
     await ipatApi.saveCBCRatings(activeRecord.value.id, ratings)
+    mergeLoadedRatings('cbc', ratings)
     showToast(`${ratings.length} CBC ratings saved`)
-    const full = await ipatApi.get(activeRecord.value.id)
-    if (full) loadedRec.value = full
   } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
   finally { savingCBC.value = false }
 }
@@ -2064,6 +2245,24 @@ async function computeCBC() {
 
 async function saveCbcDeduction() {
   if (!activeRecord.value?.id) return
+  const preview = cbcDeductionPreview.value
+  const nteLevel = normalizeConductLevel(cbcDeductionForm.value.cbcNteLevel)
+  const offenseLevel = normalizeConductLevel(cbcDeductionForm.value.cbcOffenseLevel)
+  const ok = await confirm({
+    type:         'warning',
+    title:        'Save Offenses Deduction',
+    message:      `This will apply the confidential offenses deduction for ${activeRecord.value.rateeName || 'this assessment'}.`,
+    details: [
+      { label: 'Employee', value: activeRecord.value.rateeName || '-' },
+      { label: 'NTE deduction', value: preview.ntePct ? `${CONDUCT_LEVELS[nteLevel].label} (-${preview.ntePct}%)` : 'None' },
+      { label: 'Final score deduction', value: preview.offenseDeduction ? `${CONDUCT_LEVELS[offenseLevel].label} (-${preview.offenseDeduction})` : 'None' },
+      { label: 'CBC contribution', value: preview.cbcWeightedScore ?? '-' }
+    ],
+    note:         'This adjustment is confidential and affects the computed CBC and overall assessment score.',
+    confirmLabel: 'Save Deduction',
+    cancelLabel:  'Review Again'
+  })
+  if (!ok) return
   savingCbcDeduction.value = true
   try {
     const updated = await ipatApi.setCbcDeduction(activeRecord.value.id, cbcDeductionForm.value)
@@ -2072,7 +2271,9 @@ async function saveCbcDeduction() {
     showToast('Offenses deduction saved')
   } catch (e) {
     console.error(e)
-    showToast('Could not save the offenses deduction. Please try again.', 'error')
+    assessmentLoadError.value = e?.message || 'Assessment questions could not be loaded. Please retry.'
+    if (force) assessmentQuestions.value = []
+    showToast(e?.message || 'Could not save the offenses deduction. Please try again.', 'error')
   } finally {
     savingCbcDeduction.value = false
   }
@@ -2110,9 +2311,8 @@ async function saveJFRatings() {
   savingJF.value = true
   try {
     await ipatApi.saveJFRatings(activeRecord.value.id, ratings)
+    mergeLoadedRatings('jf', ratings)
     showToast(`${ratings.length} Job Fitness ratings saved`)
-    const full = await ipatApi.get(activeRecord.value.id)
-    if (full) loadedRec.value = full
   } catch (e) { console.error(e); showToast('Something went wrong. Please try again.', 'error') }
   finally { savingJF.value = false }
 }
@@ -2180,7 +2380,7 @@ async function finalizeRecord() {
 </script>
 
 <style scoped>
-.eval-page{padding:0;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;font-size:13px;color:#1A2332;min-height:100%;}
+.eval-page{padding:0;font-size:13px;color:#1A2332;min-height:100%;}
 
 /* ── Two-panel shell ── */
 .eval-tp-shell{display:flex;height:86vh;border:1px solid #DDE7F3;border-radius:14px;overflow:hidden;background:#fff;margin-top:4px;box-shadow:0 10px 28px rgba(15,23,42,.05);}
@@ -2621,13 +2821,14 @@ async function finalizeRecord() {
 .toast-slide-enter-from,.toast-slide-leave-to{opacity:0;transform:translateY(8px);}
 
 /* View tabs */
-.view-tabs {display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));align-items:center;width:100%;gap:8px;margin-top:8px;margin-bottom:5px;padding:0 12px;box-sizing:border-box;}
-.view-tab {width:100%;min-width:0;max-width:100%;height:36px;padding:6px 10px;display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid #dbe4f0;border-radius:18px;background:#ffffff;color:#52627a;font-size:13px;font-weight:600;line-height:1;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.view-tabs {display:flex;flex-wrap:wrap;align-items:center;width:100%;gap:8px;margin-top:8px;margin-bottom:5px;padding:0 12px;box-sizing:border-box;}
+.view-tab {flex:1 0 150px;min-width:0;max-width:100%;height:36px;padding:6px 10px;display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid #dbe4f0;border-radius:18px;background:#ffffff;color:#52627a;font-size:13px;font-weight:600;line-height:1;cursor:pointer;white-space:nowrap;overflow:hidden;}
 .view-tab.active {background: #071d36;border-color: #071d36;color: #ffffff;}
-.view-tab-badge {display: inline-flex;align-items: center;justify-content: center;min-width: 18px;height: 18px;padding: 0 5px;border-radius: 999px;background: #ef4444;color: #ffffff;font-size: 10px;font-weight: 700;line-height: 1;}
+.view-tab-label{min-width:0;overflow:hidden;text-overflow:ellipsis;}
+.view-tab-badge {display: inline-flex;align-items: center;justify-content: center;flex:0 0 auto;min-width: 18px;height: 18px;padding: 0 5px;border:1px solid rgba(255,255,255,.75);border-radius: 999px;background: #ef4444;color: #ffffff;font-size: 10px;font-weight: 800;line-height: 1;box-shadow:0 1px 3px rgba(127,29,29,.28);}
 /* Sits in the tab row but performs an action rather than switching views, so it
    is styled as a distinct control and never takes the .active treatment. */
-.view-tab-action {border-style: dashed;border-color: #b9c8dc;color: #1e3f61;background: #f8fbff;}
+.view-tab-action {flex:2 1 188px;border-style: dashed;border-color: #b9c8dc;color: #1e3f61;background: #f8fbff;}
 .view-tab-action:hover {background: #eef5ff;border-color: #8fa9c9;}
 
 /* My Tasks */
@@ -2646,7 +2847,7 @@ async function finalizeRecord() {
   margin-left:6px;padding:5px 11px;border-radius:8px;
   border:1px solid #E2E8F0;background:#fff;
   color:#1D4ED8;font-size:12px;font-weight:600;
-  font-family:inherit;cursor:pointer;vertical-align:-4px;
+  cursor:pointer;vertical-align:-4px;
 }
 .tasks-refresh-btn:hover:not(:disabled){border-color:#CBD5E1;background:#F8FAFC;}
 .tasks-refresh-btn:disabled{opacity:.55;cursor:not-allowed;}
@@ -3084,6 +3285,7 @@ async function finalizeRecord() {
   .theme-hd{flex-wrap:wrap;gap:8px;}
   .view-tabs{padding:0 8px;gap:6px;}
   .view-tab{height:38px;font-size:12px;}
+  .view-tab-action{flex-basis:100%;}
   .eli-list{padding:8px;gap:8px;}
   .eval-tp-left .tasks-period-bar,
   .eval-tp-left .filter-bar{padding:12px 10px;}

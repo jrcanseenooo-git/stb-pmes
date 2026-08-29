@@ -333,8 +333,6 @@ function formatNotifTime(iso) {
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
-
 * {
   box-sizing: border-box;
 }
@@ -401,7 +399,7 @@ function formatNotifTime(iso) {
   font-weight: 600;
   color: #1A2332;
   line-height: 1;
-  font-family: 'DM Mono', monospace;
+  font-family: monospace;
   margin-bottom: 4px;
 }
 

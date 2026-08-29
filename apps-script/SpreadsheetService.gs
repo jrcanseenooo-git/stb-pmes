@@ -152,6 +152,10 @@ const SpreadsheetService = (() => {
     }
   }
 
+  function invalidateSheet(sheet) {
+    invalidateCache_(sheet)
+  }
+
   // ── Read all rows as objects ──
   // Routed through DataCacheService: repeated reads of the same tab within one
   // request are served from memory instead of re-hitting the Sheets backend,
@@ -225,6 +229,21 @@ const SpreadsheetService = (() => {
     sheet.appendRow(row)
     invalidateCache_(sheet)
     return data
+  }
+
+  // ── Append many rows in one Sheets write ──
+  function appendRows(sheet, rows) {
+    const items = Array.isArray(rows) ? rows.filter(Boolean) : []
+    if (!items.length) return []
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
+    const values = items.map(data => headers.map(h => {
+      const val = data[h]
+      if (val === undefined || val === null) return ''
+      return escapeFormula_(val)
+    }))
+    sheet.getRange(sheet.getLastRow() + 1, 1, values.length, headers.length).setValues(values)
+    invalidateCache_(sheet)
+    return items
   }
 
   // ── Update a row by id - writes ALL provided fields ──
@@ -330,7 +349,8 @@ const SpreadsheetService = (() => {
   return {
     getSpreadsheet, getSpreadsheetId,
     getSheet, findSheet, getAllRows, getRow,
-    appendRow, updateRow,
+    appendRow, appendRows, updateRow,
+    invalidateSheet,
     hardDeleteRow, softDelete,
     generateId, paginate, filterRows,
     // Exported for the few writers that build raw row arrays and call

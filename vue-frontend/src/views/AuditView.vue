@@ -144,7 +144,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.audit-page { padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif; font-size: 13px; color: #1A2332; min-height: 100%; }
+.audit-page { padding: 0; font-size: 13px; color: #1A2332; min-height: 100%; }
 .page-hd { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 16px; }
 .page-title { font-size: 20px; font-weight: 700; color: #0F172A; margin: 0 0 3px; letter-spacing: -.3px; }
 .page-sub { font-size: 12px; color: #94A3B8; margin: 0; }
@@ -172,7 +172,7 @@ onMounted(async () => {
 .td.th-module { width: 120px; }
 .td.th-details { flex: 1; }
 .table-footer { padding: 10px 14px; border-top: 1px solid #F1F5F9; }
-.mono { font-family: 'SF Mono', 'Fira Mono', monospace; font-size: 10px; }
+.mono { font-family: monospace; font-size: 10px; }
 .text-muted { color: #94A3B8; font-size: 11px; }
 .action-badge { display: inline-flex; padding: 2px 7px; border-radius: 6px; font-size: 10px; font-weight: 700; }
 .a-blue   { background: #EBF4FF; color: #1A56B0; }

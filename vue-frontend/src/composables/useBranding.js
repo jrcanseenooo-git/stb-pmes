@@ -19,7 +19,16 @@ export function useBranding() {
   const authStore = useAuthStore()
 
   const systemScope = computed(() => authStore.profile?.systemScope || 'STB_FULL')
-  const isClusterPortal = computed(() => systemScope.value !== 'STB_FULL')
+  const evaluationOnlyMode = computed(() => {
+    const mode = authStore.profile?.systemAccessMode
+    if (mode) return mode !== 'full_access'
+    return import.meta.env.VITE_EVALUATION_ONLY_ROLLOUT !== 'false'
+  })
+  const isOfficeFullPmes = computed(() => systemScope.value === 'OFFICE_FULL_PMES')
+  const isFullPmesBrand = computed(() =>
+    (systemScope.value === 'STB_FULL' || isOfficeFullPmes.value) && !evaluationOnlyMode.value
+  )
+  const isClusterPortal = computed(() => !isFullPmesBrand.value)
 
   const officeName = computed(() => authStore.profile?.officeName || '')
   const officeCode = computed(() => authStore.profile?.officeCode || '')
@@ -32,7 +41,7 @@ export function useBranding() {
   const portalTitle = computed(() => (isClusterPortal.value ? CLUSTER_PORTAL_TITLE : STB_PORTAL_TITLE))
 
   const portalSubtitle = computed(() => {
-    if (!isClusterPortal.value) return STB_PORTAL_SUBTITLE
+    if (!isClusterPortal.value) return isOfficeFullPmes.value ? (officeName.value || 'Office Full PMES') : STB_PORTAL_SUBTITLE
     return officeName.value || 'Innovation Cluster'
   })
 
@@ -42,7 +51,7 @@ export function useBranding() {
   const wordmarkBottom = computed(() => (isClusterPortal.value ? 'Performance Monitoring and Evaluation System' : 'AND EVALUATION SYSTEM'))
 
   const shortName = computed(() => {
-    if (!isClusterPortal.value) return 'PMES'
+    if (!isClusterPortal.value) return isOfficeFullPmes.value ? (officeShortName.value || 'PMES') : 'PMES'
     return officeShortName.value || 'ICPAP'
   })
 

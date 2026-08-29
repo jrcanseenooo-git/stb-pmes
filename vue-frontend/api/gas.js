@@ -1,10 +1,11 @@
 const SCRIPT_URL_RE = /^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/
 const CANONICAL_GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzxh0LikZfR2unxODM3cQ1VVppwSHdRfHUrPSz9zGS_qSUR3FfNnWTc3jgD1OVoy2OR7A/exec'
+const SENSITIVE_ROUTE_LIMIT_PER_MIN = 5
+const ipBuckets = new Map()
 
 function configuredScriptUrls() {
   const raw = (
     process.env.GAS_WEB_APP_URL ||
-    process.env.VITE_API_BASE_URL ||
     CANONICAL_GAS_WEB_APP_URL
   )
   return raw
@@ -31,6 +32,36 @@ function orderedTargets(urls, bodyJson) {
   const stickyKey = String(bodyJson.token || bodyJson.route || '')
   const start = hashString(stickyKey) % urls.length
   return urls.slice(start).concat(urls.slice(0, start))
+}
+
+function isSensitiveRoute(route) {
+  const r = String(route || '').toLowerCase()
+  return r === 'auth/register' || /^users\/[^/]+\/reset-password$/.test(r)
+}
+
+function clientIp(req) {
+  const forwarded = String(req.headers['x-forwarded-for'] || '')
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean)[0]
+  return forwarded || String(req.headers['x-real-ip'] || req.socket?.remoteAddress || 'unknown')
+}
+
+function checkIpRateLimit(req, route) {
+  if (!isSensitiveRoute(route)) return true
+
+  const minute = Math.floor(Date.now() / 60000)
+  const key = `${clientIp(req)}:${route}:${minute}`
+  const next = (ipBuckets.get(key) || 0) + 1
+  ipBuckets.set(key, next)
+
+  if (ipBuckets.size > 2000) {
+    for (const bucketKey of ipBuckets.keys()) {
+      if (!bucketKey.endsWith(`:${minute}`)) ipBuckets.delete(bucketKey)
+    }
+  }
+
+  return next <= SENSITIVE_ROUTE_LIMIT_PER_MIN
 }
 
 async function postAppsScript(url, body) {
@@ -148,6 +179,15 @@ export default async function handler(req, res) {
       routeForLog = ''
     }
 
+    if (!checkIpRateLimit(req, routeForLog)) {
+      return res.status(429).json({
+        success: false,
+        status: 429,
+        data: null,
+        message: 'Too many account requests in a short time. Please wait a moment and try again.'
+      })
+    }
+
     const targets = orderedTargets(targetUrls, bodyJson)
     const canRetry = bodyMethod === 'GET'
 
@@ -158,10 +198,10 @@ export default async function handler(req, res) {
     // failed fetch was forwarded verbatim - HTML body, status 404, labelled
     // Content-Type: application/json. The browser then reported
     // "POST /api/gas 404" and the client threw "unexpected response".
-    // Apps Script serialises executions, so retries add queueing pressure as well
-    // as latency. Two attempts recovers the common single-shot echo-URL 404
-    // without letting a burst of concurrent calls pile up into timeouts - three
-    // attempts with backoff pushed 12 concurrent requests past 25s.
+    // Apps Script queues executions under load. Retrying inside the proxy
+    // multiplied a page's GET traffic while it was already slow, pushing more
+    // users into Vercel's 30-second timeout. The client owns one safe retry for
+    // a failed GET, so make one upstream attempt here and let the queue drain.
     // 404 only ever shows up on the post-redirect echo-URL fetch, which means
     // the /exec call itself already ran on Apps Script's side - retrying that
     // for a write risks double-applying a mutation, so it's excluded there.
@@ -187,7 +227,7 @@ export default async function handler(req, res) {
     // reintroducing the risk underneath it.
     const RETRYABLE_GET   = [404, 429, 500, 502, 503, 504]
     const RETRYABLE_WRITE = [429]
-    const ATTEMPTS_PER_TARGET = 2
+    const ATTEMPTS_PER_TARGET = 1
     const looksJson = (t) => {
       const s = String(t || '').trim()
       return s.startsWith('{') || s.startsWith('[')
@@ -222,9 +262,8 @@ export default async function handler(req, res) {
           '[PMES API] Apps Script transient failure (status', upstream.status,
           ') attempt', attempt, 'route', routeForLog || '(unknown)'
         )
-        if (attempt < ATTEMPTS_PER_TARGET) {
-          await new Promise((r) => setTimeout(r, 120))
-        }
+        // The request is deliberately not retried in this proxy. See the
+        // queueing note above; the browser performs the single GET retry.
       }
 
       // Reads may fail over to another deployment; writes may not. The inner

@@ -242,7 +242,7 @@ const OfficePersonnelService = (() => {
 
   function toRow_(body) {
     const role = typeof RoleLabelService !== 'undefined'
-      ? RoleLabelService.canonicalRole(body.role || 'Technical Staff')
+      ? RoleLabelService.storedRole(body.role || 'Technical Staff')
       : (String(body.role || '').trim() === 'Staff' ? 'Technical Staff' : (body.role || 'Technical Staff'))
     return {
       id: body.id || '',
@@ -252,7 +252,7 @@ const OfficePersonnelService = (() => {
       employeeNo: body.employeeNo || '',
       position: body.position || '',
       positionLevel: typeof RoleLabelService !== 'undefined'
-        ? RoleLabelService.canonicalRole(body.positionLevel || role || '')
+        ? RoleLabelService.storedRole(body.positionLevel || role || '')
         : (body.positionLevel || role || ''),
       role: role,
       divisionId: body.divisionId || body.organizationalUnitId || '',

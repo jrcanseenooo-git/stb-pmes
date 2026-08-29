@@ -45,14 +45,8 @@ const routes = [
         path: "my-dashboard",
         component: () => import("@/views/PortalDashboardView.vue"),
       },
-      {
-        path: "my-tasks",
-        component: () => import("@/views/MyTasksView.vue"),
-      },
-      {
-        path: "my-results",
-        component: () => import("@/views/MyResultsView.vue"),
-      },
+      { path: "my-tasks", redirect: "/evaluation" },
+      { path: "my-results", redirect: "/evaluation" },
       {
         path: "library",
         component: () => import("@/views/AssessmentLibraryView.vue"),
@@ -104,8 +98,7 @@ const routes = [
       },
       {
         path: "office-personnel",
-        component: () => import("@/views/OfficePersonnelView.vue"),
-        meta: { officePersonnelAllowed: true },
+        redirect: "/users",
       },
       {
         path: "office-dashboard",
@@ -115,7 +108,7 @@ const routes = [
       {
         path: "rater-matrix",
         component: () => import("@/views/RaterMatrixView.vue"),
-        meta: { anyPermission: ['generate_ipat_assignments', 'manage_office_registry'] },
+        meta: { raterMatrixAllowed: true },
       },
       {
         path: "cluster-overview",
@@ -137,10 +130,11 @@ const router = createRouter({
 });
 
 const EVALUATION_ROLLOUT_ALLOWED_PATHS = new Set([
-  '/my-dashboard', '/my-tasks', '/my-results',
+  '/my-dashboard',
   '/my-notifications', '/my-profile', '/help',
-  '/evaluation', '/profile', '/office-management', '/office-personnel', '/office-dashboard',
-  '/rater-matrix', '/users', '/reports', '/unauthorized'
+  '/evaluation', '/profile', '/office-management', '/office-dashboard',
+  '/rater-matrix', '/cluster-overview', '/office-registry',
+  '/users', '/reports', '/unauthorized'
 ])
 
 const STB_ONLY_PATHS = new Set(['/ipcrf', '/review', '/kra', '/accomplishments'])
@@ -157,9 +151,9 @@ const RESTRICTED_SCOPE_HOME = '/my-dashboard'
 function isOrdinaryPortalUser(profile) {
   if (!profile) return false
   const scope = profile.systemScope || 'STB_FULL'
-  if (scope === 'STB_FULL') return false
   if (scope === 'OFFICE_ADMIN' || scope === 'CLUSTER_ADMIN') return false
   if (profile.officeRole === 'OFFICE_ADMIN') return false
+  if (canViewOfficeScope(profile)) return false
   return !hasFullSystemAccess(profile)
 }
 
@@ -169,24 +163,11 @@ function isEvaluationOnlyRollout(profile) {
 }
 
 function hasFullSystemAccess(profile) {
-  const permissions = profile?.permissions || []
-  const groups = profile?.permissionGroups || []
-  return !isEvaluationOnlyRollout(profile) ||
-    isStbSystemAdmin(profile) ||
-    permissions.includes('manage_users') ||
-    permissions.includes('manage_focal_assignments') ||
-    permissions.includes('manage_database') ||
-    permissions.includes('manage_libraries') ||
-    permissions.includes('manage_assessment_content') ||
-    permissions.includes('manage_office_registry') ||
-    permissions.includes('provision_office_spreadsheets') ||
-    permissions.includes('validate_office_spreadsheets') ||
-    permissions.includes('view_cluster_monitoring') ||
-    permissions.includes('view_bureau_monitoring') ||
-    groups.includes('system-admin') ||
-    groups.includes('user-manager') ||
-    groups.includes('library-manager') ||
-    groups.includes('database-manager')
+  return !isEvaluationOnlyRollout(profile)
+}
+
+function canUseStbOnlyPaths(profile) {
+  return (profile?.systemScope || 'STB_FULL') === 'STB_FULL' && hasFullSystemAccess(profile)
 }
 
 function isStbSystemAdmin(profile) {
@@ -197,7 +178,7 @@ function isStbSystemAdmin(profile) {
 }
 
 function canViewAssessmentLibrary(profile) {
-  return profile?.role === 'System Administrator'
+  return isStbSystemAdmin(profile) && (profile?.permissions || []).includes('manage_assessment_content')
 }
 
 function isExplicitOfficeAdmin(profile) {
@@ -216,6 +197,24 @@ function canViewOfficeScope(profile) {
     permissions.includes('view_division_monitoring') ||
     permissions.includes('view_bureau_monitoring') ||
     permissions.includes('manage_cluster_office_admins') ||
+    permissions.includes('manage_office_registry')
+}
+
+function canManageOfficePersonnel(profile) {
+  const permissions = profile?.permissions || []
+  return isExplicitOfficeAdmin(profile) ||
+    permissions.includes('manage_cluster_office_admins') ||
+    permissions.includes('manage_office_registry')
+}
+
+// Keep this in lock-step with RaterMatrixService.requireManage_. An Office
+// Admin Portal account or delegated rater-tagging focal is allowed to manage
+// only the assigned office's rater configuration.
+function canManageRaterMatrix(profile) {
+  const permissions = profile?.permissions || []
+  return isExplicitOfficeAdmin(profile) ||
+    permissions.includes('generate_ipat_assignments') ||
+    permissions.includes('manage_office_rater_matrix') ||
     permissions.includes('manage_office_registry')
 }
 
@@ -240,7 +239,7 @@ function preferredDashboardPath(profile) {
   // what they monitor.
   if (profile?.role === 'Undersecretary') return '/cluster-overview'
   const scope = profile?.systemScope || 'STB_FULL'
-  if (scope === 'STB_FULL') return '/dashboard'
+  if (canUseStbOnlyPaths(profile)) return '/dashboard'
   return canViewOfficeScope(profile) ? '/office-dashboard' : RESTRICTED_SCOPE_HOME
 }
 
@@ -274,16 +273,21 @@ router.beforeEach(async (to) => {
   if (!to.meta.requiresAuth) return true;
   if (!auth.initialised) await auth.init();
   if (!auth.isAuthenticated) return { path: "/auth/login" };
+  // Do not evaluate route permissions while the signed-in user's PMES profile
+  // is still unavailable because of a transient backend failure. Previously a
+  // null profile fell through to every capability check and rendered a false
+  // 403 page with "Profile not loaded" in the sidebar.
+  if (!auth.profile && !auth.profileResolved && !auth.needsRegistration && !auth.needsActivation) {
+    if (to.path === '/unauthorized' && to.query.reason === 'profile-unavailable') return true;
+    return { path: '/unauthorized', query: { reason: 'profile-unavailable' } };
+  }
   // Signed in but not yet provisioned / approved in PMES
   if (auth.needsRegistration) return { path: "/auth/register" };
   if (auth.needsActivation)   return { path: "/auth/pending" };
-  if (to.path === '/office-personnel') {
-    return { path: '/office-management', query: { ...to.query, tab: 'personnel' } }
-  }
   if (to.path === '/office-registry' && !canViewCentralRegistry(auth.profile)) {
     return { path: '/office-management', query: { ...to.query, tab: 'structure' } }
   }
-  if ((auth.profile?.systemScope || 'STB_FULL') !== 'STB_FULL' && STB_ONLY_PATHS.has(to.path)) {
+  if (!canUseStbOnlyPaths(auth.profile) && STB_ONLY_PATHS.has(to.path)) {
     return { path: preferredDashboardPath(auth.profile) }
   }
   if (to.path === '/library' && !canViewAssessmentLibrary(auth.profile)) {
@@ -302,8 +306,14 @@ router.beforeEach(async (to) => {
   if (to.meta.systemAdminOnly && !isStbSystemAdmin(auth.profile)) {
     return { path: "/unauthorized" };
   }
-  if (to.meta.officeManagementAllowed || to.meta.officePersonnelAllowed || to.meta.officeDashboardAllowed) {
+  if (to.meta.officeManagementAllowed || to.meta.officePersonnelAllowed) {
+    if (!canManageOfficePersonnel(auth.profile)) return { path: "/unauthorized" };
+  }
+  if (to.meta.officeDashboardAllowed) {
     if (!canViewOfficeScope(auth.profile)) return { path: "/unauthorized" };
+  }
+  if (to.meta.raterMatrixAllowed && !canManageRaterMatrix(auth.profile)) {
+    return { path: "/unauthorized" };
   }
   // Ordinary portal personnel are sent to the read-only equivalent rather than
   // the editable Profile & Settings screen.

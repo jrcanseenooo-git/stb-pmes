@@ -65,7 +65,6 @@ const AuthService = (() => {
     // administer-scores capability is now its own permission.
     'evaluation-manager': [
       'manage_ipat_scores',
-      'view_bureau_monitoring',
       'view_division_monitoring'
     ],
     'database-manager': [
@@ -92,9 +91,13 @@ const AuthService = (() => {
     ],
     'office-assessment-admin': [
       'manage_office_users',
-      'manage_ipat_scores',
-      'view_bureau_monitoring',
-      'view_division_monitoring'
+      'manage_ipat_scores'
+    ],
+    // A deliberately narrow delegation for a person who maintains the office's
+    // rater protocol. It does not grant user administration, monitoring, or
+    // cross-office selection; the services enforce the holder's own office.
+    'office-rater-tagging-focal': [
+      'manage_office_rater_matrix'
     ]
   }
 
@@ -125,16 +128,35 @@ const AuthService = (() => {
   function normalizeProfileRow_(row, verifiedEmail) {
     const normalized = { ...row, role: canonicalRole_(row && row.role) }
     const email = normalizeEmail_(verifiedEmail || normalized.email)
-    normalized.officeId = String(normalized.officeId || DEFAULT_STB_OFFICE.officeId).trim()
-    normalized.officeCode = String(normalized.officeCode || normalized.officeId || DEFAULT_STB_OFFICE.officeCode).trim()
-    normalized.officeName = String(normalized.officeName || DEFAULT_STB_OFFICE.officeName).trim()
-    normalized.systemScope = String(normalized.systemScope || DEFAULT_STB_OFFICE.systemScope).trim()
-    normalized.officeRole = String(normalized.officeRole || DEFAULT_STB_OFFICE.officeRole).trim()
+    const suppliedOffice = String(normalized.officeId || normalized.officeCode || normalized.officeName || '').trim()
+    const suppliedScope = String(normalized.systemScope || '').trim()
+    normalized.accessConfigurationValid = !!(suppliedOffice && suppliedScope)
+    if (normalized.accessConfigurationValid) {
+      normalized.officeId = String(normalized.officeId || normalized.officeCode || normalized.officeName).trim()
+      normalized.officeCode = String(normalized.officeCode || normalized.officeId).trim()
+      normalized.officeName = String(normalized.officeName || normalized.officeId).trim()
+      normalized.systemScope = suppliedScope
+      normalized.officeRole = String(normalized.officeRole || 'OFFICE_PERSONNEL').trim()
+    } else {
+      // Never turn a partial or legacy row into an STB_FULL account by default.
+      // It stays readable to a central user manager for repair, but receives no
+      // permissions or office data until its assignment is explicitly set.
+      normalized.officeId = ''
+      normalized.officeCode = ''
+      normalized.officeName = ''
+      normalized.systemScope = 'UNASSIGNED'
+      normalized.officeRole = 'UNASSIGNED'
+    }
     normalized.centralRoles = _splitList(normalized.centralRoles).join(',')
     if (BOOTSTRAP_ADMIN_EMAILS.indexOf(email) >= 0) {
       normalized.role = 'System Administrator'
       normalized.permissionGroups = _unique(_splitList(normalized.permissionGroups).concat(['system-admin', 'cluster-system-admin'])).join(',')
       normalized.systemScope = 'CLUSTER_ADMIN'
+      normalized.officeId = 'STB'
+      normalized.officeCode = 'STB'
+      normalized.officeName = 'Social Technology Bureau'
+      normalized.officeRole = 'CENTRAL_ADMIN'
+      normalized.accessConfigurationValid = true
     }
     return normalized
   }
@@ -236,6 +258,14 @@ const AuthService = (() => {
   // fresh script context, so this map lives exactly as long as one request -
   // there is no cross-user or stale-read risk.
   const _profileCache = {}
+  // The same signed-in person often opens several screens at once. Each Apps
+  // Script execution is isolated, so the per-execution map above cannot stop
+  // every one of those requests from re-reading the entire central Users sheet.
+  // Keep only the already-sanitised effective profile for a very short period;
+  // user mutations explicitly invalidate this entry immediately (see
+  // UsersService), so a permission or office change never waits for expiry.
+  const PROFILE_CACHE_TTL_SECONDS = 30
+  const PROFILE_CACHE_PREFIX = 'pmes.profile.v1.'
 
   function getProfile(user, opts) {
     const options   = opts || {}
@@ -244,6 +274,15 @@ const AuthService = (() => {
     // touchLogin callers must not read a cached copy, since they write to the row.
     if (cacheKey && !options.touchLogin && _profileCache[cacheKey]) {
       return _profileCache[cacheKey]
+    }
+
+    const sharedProfileKey = profileCacheKey_(user)
+    if (!options.touchLogin && sharedProfileKey) {
+      const shared = readProfileCache_(sharedProfileKey)
+      if (shared) {
+        if (cacheKey) _profileCache[cacheKey] = shared
+        return shared
+      }
     }
 
     const sheet = _usersSheet()
@@ -332,7 +371,7 @@ const AuthService = (() => {
     const { passwordHash, tempPassword, tempPasswordHash, mustChangePassword, ...safe } = normalizedRow
     const effective = getEffectiveAccess(normalizedRow)
     const systemAccessMode = typeof SystemSettingsService !== 'undefined'
-      ? SystemSettingsService.getAccessMode()
+      ? SystemSettingsService.getAccessMode(normalizedRow)
       : 'evaluation_only'
     const profile = {
       ...safe,
@@ -343,7 +382,49 @@ const AuthService = (() => {
       mustChangePassword: mustChangePassword === true || String(mustChangePassword).toLowerCase() === 'true'
     }
     if (cacheKey) _profileCache[cacheKey] = profile
+    if (!options.touchLogin && sharedProfileKey) writeProfileCache_(sharedProfileKey, profile)
     return profile
+  }
+
+  function profileCacheKey_(userOrRow) {
+    const uid = String(userOrRow && userOrRow.uid || '').trim()
+    const email = normalizeEmail_(userOrRow && userOrRow.email)
+    if (!uid && !email) return ''
+    return PROFILE_CACHE_PREFIX + _tokenHash(uid + '|' + email)
+  }
+
+  function readProfileCache_(key) {
+    const cache = _safeCache()
+    if (!cache || !key) return null
+    try {
+      const raw = cache.get(key)
+      return raw ? JSON.parse(raw) : null
+    } catch (e) {
+      return null
+    }
+  }
+
+  function writeProfileCache_(key, profile) {
+    const cache = _safeCache()
+    if (!cache || !key) return
+    try { cache.put(key, JSON.stringify(profile), PROFILE_CACHE_TTL_SECONDS) } catch (e) { /* best effort */ }
+  }
+
+  // Called by every UsersService mutation.  Delete both possible key shapes so
+  // it also covers legacy rows that gained a Firebase UID later.
+  function invalidateProfileCache(userOrRow) {
+    const cache = _safeCache()
+    if (!cache || !userOrRow) return
+    const uid = String(userOrRow.uid || '').trim()
+    const email = normalizeEmail_(userOrRow.email)
+    const keys = [
+      profileCacheKey_({ uid, email }),
+      profileCacheKey_({ uid: '', email }),
+      profileCacheKey_({ uid, email: '' })
+    ].filter(Boolean)
+    try { cache.removeAll(keys) } catch (e) {
+      keys.forEach(key => { try { cache.remove(key) } catch (_) { /* best effort */ } })
+    }
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -426,22 +507,27 @@ const AuthService = (() => {
       sections.unshift({ id: 'SEC-admin-office', divisionId: 'admin-pool', name: 'Office Admin Personnel', code: 'OAP' })
     }
 
+    // Resolve the active office list once and pass it into the accompanying
+    // structure lookup. This keeps registration responsive for every
+    // participating office.
+    const registrationOffices = typeof OfficeRegistryService !== 'undefined'
+      ? OfficeRegistryService.registrationOptions()
+      : [{
+        officeId: 'STB',
+        officeCode: 'STB',
+        officeName: 'Social Technology Bureau',
+        officeShortName: 'STB',
+        systemScope: 'STB_FULL',
+        portalScope: 'STB_FULL'
+      }]
+
     return {
       divisions: divisions,
       divisionsError: divisionsError,
       sections: sections,
-      offices: typeof OfficeRegistryService !== 'undefined'
-        ? OfficeRegistryService.registrationOptions()
-        : [{
-          officeId: 'STB',
-          officeCode: 'STB',
-          officeName: 'Social Technology Bureau',
-          officeShortName: 'STB',
-          systemScope: 'STB_FULL',
-          portalScope: 'STB_FULL'
-        }],
+      offices: registrationOffices,
       officeOptions: typeof OfficeRegistryService !== 'undefined'
-        ? OfficeRegistryService.registrationOrgOptions()
+        ? OfficeRegistryService.registrationOrgOptions(registrationOffices)
         : {},
       // Must stay in step with EMPLOYMENT_TYPES in RegisterView.vue - this list
       // is what the form actually renders, and the frontend constant is only a
@@ -475,7 +561,7 @@ const AuthService = (() => {
       const { passwordHash, tempPassword, tempPasswordHash, ...safe } = normalizedRow
       const effective = getEffectiveAccess(normalizedRow)
       const systemAccessMode = typeof SystemSettingsService !== 'undefined'
-        ? SystemSettingsService.getAccessMode()
+        ? SystemSettingsService.getAccessMode(normalizedRow)
         : 'evaluation_only'
       profile = {
         ...safe,
@@ -513,10 +599,31 @@ const AuthService = (() => {
     return profile
   }
 
+  function isCentralSystemAdministrator_(profile) {
+    const normalized = profile || {}
+    if (String(normalized.role || '') !== 'System Administrator') return false
+    const officeKey = String(normalized.officeId || normalized.officeCode || '').trim().toUpperCase()
+    const scope = String(normalized.systemScope || '').trim().toUpperCase()
+    const isStb = !officeKey || officeKey === 'STB' || officeKey === 'OFF-STB' || officeKey === 'SOCIAL TECHNOLOGY BUREAU'
+    return isStb && ['STB_FULL', 'CLUSTER_ADMIN'].indexOf(scope) >= 0
+  }
+
   function getEffectiveAccess(profile) {
     const normalizedProfile = normalizeProfileRow_(profile || {}, profile && profile.email)
-    const roleGroups = ROLE_GROUPS[normalizedProfile.role] || []
+    if (!normalizedProfile.accessConfigurationValid) {
+      return { groups: [], permissions: [] }
+    }
+    // "System Administrator" is a central access persona, not an office job
+    // title. A non-STB account may carry that legacy label in old data, but it
+    // must never receive central capabilities from it. Its office role still
+    // grants the limited office-admin capabilities where applicable.
+    const centralSystemAdmin = isCentralSystemAdministrator_(normalizedProfile)
+    const roleGroups = normalizedProfile.role === 'System Administrator' && !centralSystemAdmin
+      ? []
+      : (ROLE_GROUPS[normalizedProfile.role] || [])
+    const centralOnlyGroups = ['system-admin', 'cluster-system-admin', 'cluster-technical-admin', 'cluster-assessment-admin', 'cluster-monitoring-admin']
     const explicitGroups = _splitList(normalizedProfile.permissionGroups)
+      .filter(group => centralSystemAdmin || centralOnlyGroups.indexOf(group) < 0)
     const scopeGroups = []
     if (String(normalizedProfile.officeRole || '') === 'OFFICE_ADMIN') {
       scopeGroups.push('office-assessment-admin')
@@ -604,6 +711,7 @@ const AuthService = (() => {
   return {
     verifyToken,
     getProfile,
+    invalidateProfileCache,
     whoami,
     registrationOptions,
     backendInfo,
@@ -611,6 +719,7 @@ const AuthService = (() => {
     getEffectiveAccess,
     hasPermission,
     requirePermission,
+    isCentralSystemAdministrator: isCentralSystemAdministrator_,
     debugDecodeToken
   }
 })()

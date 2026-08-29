@@ -155,14 +155,14 @@
          inside a card the user's attention just left to deal with the Google
          popup - easy to come back to and not notice. This overlay makes the
          same wait impossible to miss, and covers the account-check round trip
-         specifically: whether this account already exists in PMES has to be
-         answered before we know whether registration is even needed. -->
+         specifically: PMES has to confirm the signed-in Firebase user still has
+         an active system profile before routing them into the app. -->
     <transition name="alert-in">
       <div v-if="googleSigningIn" class="signin-overlay" role="status" aria-live="polite">
         <div class="signin-overlay-card">
           <span class="spin-dark" style="width:22px;height:22px;border-width:2.5px;"></span>
-          <p>Setting up your account…</p>
-          <span>Checking your PMES access</span>
+          <p>Checking your account…</p>
+          <span>Loading your PMES access</span>
         </div>
       </div>
     </transition>
@@ -205,7 +205,6 @@ const ALLOWED_REDIRECT_PATHS = new Set([
   '/users',
   '/office-registry',
   '/office-management',
-  '/office-personnel',
   '/office-dashboard',
   '/profile',
   '/kra'
@@ -269,7 +268,7 @@ async function handleEmailLogin() {
   loginMethod.value = 'email'
   try {
     await authStore.loginWithEmail(email.value, password.value)
-    router.push(redirect.value)
+    await routeSignedInUser()
   } catch (e) {
     error.value = e?.message || 'Sign-in failed. Please check your account and try again.'
   } finally {

@@ -79,9 +79,9 @@ const Router = (() => {
         if (id && !sub && method === 'GET') return UsersService.get(id, user)
         if (id && !sub && method === 'PUT') return UsersService.update(id, body, user)
         if (id && !sub && method === 'DELETE') return UsersService.remove(id, user)
-        if (id && sub === 'deactivate') return UsersService.deactivate(id, user)
-        if (id && sub === 'activate') return UsersService.activate(id, user)
-        if (id && sub === 'decline') return UsersService.decline(id, user)
+        if (id && sub === 'deactivate' && method === 'PATCH') return UsersService.deactivate(id, user)
+        if (id && sub === 'activate' && method === 'PATCH') return UsersService.activate(id, user)
+        if (id && sub === 'decline' && method === 'PATCH') return UsersService.decline(id, user)
         if (id && sub === 'reset-password') return UsersService.resetPassword(id, body, user)
         break
 
@@ -103,7 +103,7 @@ const Router = (() => {
         break
 
       case 'system-settings':
-        if (!id && method === 'GET') return SystemSettingsService.list(user)
+        if (!id && method === 'GET') return SystemSettingsService.list(params, user)
         if (!id && method === 'PUT') return SystemSettingsService.update(body, user)
         break
 
@@ -114,6 +114,7 @@ const Router = (() => {
         if (id === 'spec' && method === 'GET') return OfficeSchemaService.getSpec()
         if (id === 'monitoring' && method === 'GET') return OfficeRegistryService.monitoring(params, user)
         if (id && !sub && method === 'GET') return OfficeRegistryService.get(id, user)
+        if (id && !sub && method === 'PUT') return OfficeRegistryService.update(id, body, user)
         if (id && sub === 'org-options' && method === 'GET') return OfficeRegistryService.orgOptions(id, user)
         if (id && sub === 'org-options' && method === 'PUT') return OfficeRegistryService.saveOrgOptions(id, body, user)
         if (id && sub === 'validate' && method === 'POST') return OfficeRegistryService.validate(id, user)
@@ -122,12 +123,7 @@ const Router = (() => {
         break
 
       case 'office-personnel':
-        if (!id && method === 'GET') return OfficePersonnelService.list(params, user)
-        if (!id && method === 'POST') return OfficePersonnelService.create(body, user)
-        if (id && !sub && method === 'PUT') return OfficePersonnelService.update(id, body, user)
-        if (id && sub === 'deactivate') return OfficePersonnelService.deactivate(id, user)
-        if (id && sub === 'activate') return OfficePersonnelService.activate(id, user)
-        break
+        throw HttpError('Office personnel is synchronized from User Management and is not edited separately.', 410)
 
       // ─────────────────────────────────────────
       // KRAs & Success Indicators
@@ -166,11 +162,12 @@ const Router = (() => {
         if (!id && method === 'GET') return AssessmentContentService.list(params, user)
         if (!id && method === 'POST') return AssessmentContentService.create(body, user)
         if (id === 'reorder' && method === 'POST') return AssessmentContentService.reorder(body, user)
+        if (id === 'seed-template' && method === 'POST') return AssessmentContentService.promoteSeedTemplate(body, user)
         if (id && !sub && method === 'GET') return AssessmentContentService.get(id, user)
         if (id && !sub && method === 'PUT') return AssessmentContentService.update(id, body, user)
-        if (id && sub === 'publish') return AssessmentContentService.publish(id, body, user)
-        if (id && sub === 'archive') return AssessmentContentService.archive(id, user)
-        if (id && sub === 'duplicate-version') return AssessmentContentService.duplicateVersion(id, body, user)
+        if (id && sub === 'publish' && method === 'PATCH') return AssessmentContentService.publish(id, body, user)
+        if (id && sub === 'archive' && method === 'PATCH') return AssessmentContentService.archive(id, user)
+        if (id && sub === 'duplicate-version' && method === 'POST') return AssessmentContentService.duplicateVersion(id, body, user)
         if (id === 'seed' && method === 'POST') return AssessmentContentService.seed(body, user)
         break
 
@@ -196,9 +193,9 @@ const Router = (() => {
         if (!id && method === 'POST') return AccomplishmentsService.create(body, user)
         if (id && !sub && method === 'GET') return AccomplishmentsService.get(id, user)
         if (id && !sub && method === 'PUT') return AccomplishmentsService.update(id, body, user)
-        if (id && sub === 'status') return AccomplishmentsService.updateStatus(id, body, user)
-        if (id && sub === 'approve') return AccomplishmentsService.approve(id, body, user)
-        if (id && sub === 'revision') return AccomplishmentsService.requestRevision(id, body, user)
+        if (id && sub === 'status' && method === 'PATCH') return AccomplishmentsService.updateStatus(id, body, user)
+        if (id && sub === 'approve' && method === 'PATCH') return AccomplishmentsService.approve(id, body, user)
+        if (id && sub === 'revision' && method === 'PATCH') return AccomplishmentsService.requestRevision(id, body, user)
         if (id && sub === 'history') return AccomplishmentsService.history(id, user)
         break
 
@@ -229,8 +226,8 @@ const Router = (() => {
       // ─────────────────────────────────────────
       case 'notifications':
         if (!id && method === 'GET') return NotificationsService.list(user)
-        if (id === 'read-all') return NotificationsService.markAllRead(user)
-        if (id && sub === 'read') return NotificationsService.markRead(id, user)
+        if (id === 'read-all' && method === 'PATCH') return NotificationsService.markAllRead(user)
+        if (id && sub === 'read' && method === 'PATCH') return NotificationsService.markRead(id, user)
         break
 
       // ─────────────────────────────────────────
@@ -248,6 +245,7 @@ const Router = (() => {
         if (id === 'database-reset' && method === 'POST') return DatabaseMaintenanceService.resetTransactionalData(body, user)
         if (id === 'normalize-columns' && method === 'GET') return DatabaseMaintenanceService.previewColumnOrder(user)
         if (id === 'normalize-columns' && method === 'POST') return DatabaseMaintenanceService.normalizeColumnOrder(body, user)
+        if (id === 'schema-audit' && method === 'GET') return DatabaseSchemaAuditService.runForUser(user)
         if (id === 'fresh-schema' && method === 'GET') return DatabaseMaintenanceService.previewFreshRebuild(user)
         if (id === 'fresh-schema' && method === 'POST') return DatabaseMaintenanceService.rebuildFreshDatabase(body, user)
         if (id === 'normalize-staff-role' && method === 'GET') return RoleLabelMaintenanceService.preview(user)
@@ -315,18 +313,21 @@ const Router = (() => {
       case 'ipat':
         if (!id && method === 'GET')  return IPATService.list(params, user)
         if (!id && method === 'POST') return IPATService.create(body, user)
-        if (id && !sub && method === 'GET') return IPATService.get(id, user)
-        if (id && sub === 'status')         return IPATService.updateStatus(id, body, user)
-        if (id && sub === 'sync-fpo')       return IPATService.syncFPO(id, user)
-        if (id && sub === 'set-fpo' && method === 'POST') return IPATService.setFPO(id, body, user)
-        if (id && sub === 'cbc' && !subId && method === 'POST')  return IPATService.saveCBCRatings(id, body, user)
-        if (id && sub === 'cbc' && subId === 'compute')          return IPATService.computeCBC(id, user)
-        if (id && sub === 'cbc-deduction' && method === 'POST')  return IPATService.setCbcDeduction(id, body, user)
-        if (id && sub === 'jf' && !subId && method === 'POST')   return IPATService.saveJFRatings(id, body, user)
-        if (id && sub === 'jf' && subId === 'compute')           return IPATService.computeJF(id, user)
-        if (id && sub === 'compute')                             return IPATService.computeOverall(id, user)
+        // These two are action words, not record ids, so they must be matched
+        // before the generic id lookup below - otherwise GET ipat/themes
+        // resolves to IPATService.get('themes') and 404s.
         if (id === 'themes')        return IPATService.getThemes(params, user)
         if (id === 'jf-indicators') return IPATService.getJFIndicators(params, user)
+        if (id && !sub && method === 'GET') return IPATService.get(id, user)
+        if (id && sub === 'status' && method === 'PATCH')         return IPATService.updateStatus(id, body, user)
+        if (id && sub === 'sync-fpo' && method === 'POST')       return IPATService.syncFPO(id, user)
+        if (id && sub === 'set-fpo' && method === 'POST') return IPATService.setFPO(id, body, user)
+        if (id && sub === 'cbc' && !subId && method === 'POST')  return IPATService.saveCBCRatings(id, body, user)
+        if (id && sub === 'cbc' && subId === 'compute' && method === 'POST')          return IPATService.computeCBC(id, user)
+        if (id && sub === 'cbc-deduction' && method === 'POST')  return IPATService.setCbcDeduction(id, body, user)
+        if (id && sub === 'jf' && !subId && method === 'POST')   return IPATService.saveJFRatings(id, body, user)
+        if (id && sub === 'jf' && subId === 'compute' && method === 'POST')           return IPATService.computeJF(id, user)
+        if (id && sub === 'compute' && method === 'POST')                             return IPATService.computeOverall(id, user)
         break
 
       // IPAT Rater Assignments

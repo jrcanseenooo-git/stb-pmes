@@ -197,10 +197,6 @@
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1.5l1.8 3.6 3.7.5-2.75 2.7.65 3.8L8 10.3l-3.4 1.8.65-3.8L2.5 5.6l3.7-.5L8 1.5z" stroke="#E9A840" stroke-width="1.4" stroke-linejoin="round"/></svg>
                 View Ratings
               </button>
-              <button v-if="canViewOfficePersonnel" class="quick-btn" @click="$router.push('/office-management?tab=personnel')">
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="5.5" cy="5" r="2.5" stroke="#2F80ED" stroke-width="1.4"/><circle cx="11.5" cy="6" r="1.8" stroke="#2F80ED" stroke-width="1.3"/><path d="M1.8 14c.4-2.8 2.2-4.4 3.7-4.4s3.3 1.6 3.7 4.4M9.5 13.8c.25-1.7 1.25-2.7 2-2.7s1.75 1 2 2.7" stroke="#2F80ED" stroke-width="1.4" stroke-linecap="round"/></svg>
-                Office Personnel
-              </button>
               <button v-if="isStbOfficeProfile" class="quick-btn" @click="$router.push('/kra')">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="3.5" width="13" height="2" rx="1" fill="#7C3AED"/><rect x="1.5" y="7.5" width="9" height="2" rx="1" fill="#7C3AED"/><rect x="1.5" y="11.5" width="11" height="2" rx="1" fill="#7C3AED"/></svg>
                 My IPCRF/CCEF
@@ -235,7 +231,7 @@ import LogoutConfirmModal from '@/components/common/LogoutConfirmModal.vue'
 
 const authStore = useAuthStore()
 const router    = useRouter()
-const { canViewOfficePersonnel, isStbFullScope } = usePermissions()
+const { isStbFullScope } = usePermissions()
 
 // ── State ──
 const editMode      = ref(false)
@@ -465,7 +461,7 @@ function activityColor(action) {
 
 <style scoped>
 *{box-sizing:border-box;}
-.content{padding:20px 24px 24px;font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',system-ui,sans-serif;font-size:13px;color:#1A2332;background:#EEF2F7;min-height:100%;}
+.content{padding:20px 24px 24px;font-size:13px;color:#1A2332;background:#EEF2F7;min-height:100%;}
 
 /* Profile header */
 .profile-header{display:flex;align-items:center;gap:20px;background:#fff;border:1px solid #E2E8F0;border-radius:14px;padding:20px 24px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.04);}

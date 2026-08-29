@@ -46,30 +46,50 @@ function uniqueOptions(items = [], getKey = item => item.id || item.name) {
 // Module-scope, not inside useOrgOptions() - this is session-static registry
 // data (divisions/sections/roles by office), the same payload for every
 // caller. It was previously declared inside the composable, so each of
-// EvaluationView/OfficePersonnelView/UsersView got its own instance-scoped
+// EvaluationView and UsersView each get their own instance-scoped
 // ref and re-fetched auth/register-options independently on mount, even
 // within the same session. One shared cache means the second and third
 // callers read it for free.
 const loadingOrgOptions = ref(false)
 const orgOptionsError = ref('')
 const rawOptions = ref(null)
+let orgOptionsRequest = null
 
 export function useOrgOptions() {
   const authStore = useAuthStore()
 
-  async function loadOrgOptions() {
-    if (rawOptions.value || loadingOrgOptions.value) return rawOptions.value
+  async function loadOrgOptions({ force = false } = {}) {
+    if (!force && rawOptions.value) return rawOptions.value
+    // Several views and modals may ask for the same office structure at once.
+    // They must share one spreadsheet request rather than queue duplicate reads.
+    if (orgOptionsRequest) return orgOptionsRequest
+    const previousOptions = rawOptions.value
     loadingOrgOptions.value = true
     orgOptionsError.value = ''
-    try {
-      rawOptions.value = await authApi.registerOptions()
-    } catch (e) {
-      orgOptionsError.value = e?.message || 'Could not load office options.'
-      rawOptions.value = {}
-    } finally {
-      loadingOrgOptions.value = false
-    }
-    return rawOptions.value
+    orgOptionsRequest = (async () => {
+      try {
+        rawOptions.value = await authApi.registerOptions()
+      } catch (e) {
+        orgOptionsError.value = e?.message || 'Could not load office options.'
+        // A refresh failure must not erase a valid structure that is already
+        // available in this session. Keep it usable and surface the error to the
+        // caller instead of turning every Division selector into an empty list.
+        rawOptions.value = previousOptions || {}
+      } finally {
+        loadingOrgOptions.value = false
+        orgOptionsRequest = null
+      }
+      return rawOptions.value
+    })()
+    return orgOptionsRequest
+  }
+
+  // Office Structure and Edit User share this browser-side cache. Clear it
+  // after a structure save so a new division or section appears in the next
+  // user form without requiring a page reload.
+  function invalidateOrgOptions() {
+    rawOptions.value = null
+    orgOptionsError.value = ''
   }
 
   function optionsForOffice(officeId, officeCode = '') {
@@ -114,6 +134,7 @@ export function useOrgOptions() {
     orgOptionsError,
     rawOptions,
     loadOrgOptions,
+    invalidateOrgOptions,
     optionsForOffice,
     currentOfficeId,
     currentOfficeCode,

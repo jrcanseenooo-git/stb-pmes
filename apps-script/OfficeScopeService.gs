@@ -35,6 +35,9 @@ const OfficeScopeService = (() => {
     if (!isAssessmentScopedResource(resource)) return work()
 
     const profile = AuthService.getProfile(user)
+    if (!profile.accessConfigurationValid) {
+      throw HttpError('Your office and system scope are incomplete. Contact a central administrator to complete your access assignment.', 403)
+    }
     const targetOfficeId = resolveTargetOfficeId_(profile, params || {})
     if (!targetOfficeId || isStbOffice_(targetOfficeId, profile)) return work()
 

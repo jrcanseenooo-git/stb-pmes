@@ -41,7 +41,18 @@ const IPATRaterAssignmentService = (() => {
   const isDivisionChief = (r) => roleOf(r) === 'Division Chief'
   const isABD           = (r) => roleOf(r) === 'Assistant Bureau Director'
   const isDirector      = (r) => roleOf(r) === 'Bureau Director'
-  const isEvaluatable   = (r) => roleOf(r) !== 'System Administrator' && !!roleOf(r)
+  // Administrative access and assessment eligibility are separate. Only the
+  // actual STB/central System Administrator is excluded; a person in an office
+  // who also administers that office remains rateable according to their
+  // assessment role and rater matrix.
+  const isCentralSystemAdministrator = (r) => {
+    if (roleOf(r) !== 'System Administrator') return false
+    const officeKey = String(r && (r.officeId || r.officeCode) || '').trim().toUpperCase()
+    const scope = String(r && r.systemScope || '').trim().toUpperCase()
+    const isStb = !officeKey || officeKey === 'STB' || officeKey === 'OFF-STB' || officeKey === 'SOCIAL TECHNOLOGY BUREAU'
+    return isStb && ['STB_FULL', 'CLUSTER_ADMIN'].indexOf(scope) >= 0
+  }
+  const isEvaluatable   = (r) => !!roleOf(r) && !isCentralSystemAdministrator(r)
   const isObsoleteAssignment = (r) => ['JFPeer', 'JobFitnessPeer'].includes(String(r && r.raterType || ''))
   const activeProtocolAssignments = (rows) => rows.filter(r => !isObsoleteAssignment(r))
 
@@ -107,33 +118,14 @@ const IPATRaterAssignmentService = (() => {
   // the same assessment record concurrently and interleave their score writes.
   //
   // Apps Script only offers a script-wide lock (there is no per-record lock), so
-  // every submission cluster-wide queues here. That is acceptable because the
-  // critical section is short, but it means a submission burst - a deadline
-  // afternoon, say - can pile up.
-  //
-  // Two things make that survivable:
-  //   1. A longer total wait, taken in staggered attempts rather than one block.
-  //      Jitter spreads the retry storm out instead of having every waiter wake
-  //      up and collide at the same instant.
-  //   2. Even when the wait is exhausted the caller gets a 429, which the client
-  //      surfaces as "try again" - never a partial write.
-  const LOCK_ATTEMPTS   = 3
-  const LOCK_WAIT_MS    = 15000   // per attempt; ~45s total worst case
-  const LOCK_JITTER_MS  = 400
+  // A submission must not wait longer than the 30-second proxy limit.  If the
+  // lock is busy, no rating write has started; return a clear 429 quickly so
+  // the client can safely retry rather than showing a misleading timeout.
+  const LOCK_WAIT_MS = 6000
 
   function withRatingWriteLock(work) {
     const lock = LockService.getScriptLock()
-    let acquired = false
-
-    for (let attempt = 0; attempt < LOCK_ATTEMPTS && !acquired; attempt++) {
-      acquired = lock.tryLock(LOCK_WAIT_MS)
-      if (!acquired && attempt < LOCK_ATTEMPTS - 1) {
-        // Randomised pause so simultaneous waiters do not retry in lockstep.
-        Utilities.sleep(Math.floor(Math.random() * LOCK_JITTER_MS))
-      }
-    }
-
-    if (!acquired) {
+    if (!lock.tryLock(LOCK_WAIT_MS)) {
       throw HttpError('The rating system is busy saving other submissions. Please try again in a moment.', 429)
     }
 
@@ -190,6 +182,7 @@ const IPATRaterAssignmentService = (() => {
         if (statusIdx >= 0) values[i][statusIdx] = 'Completed'
         if (updatedAtIdx >= 0) values[i][updatedAtIdx] = now
         assignSheet.getRange(i + 1, 1, 1, headers.length).setValues([values[i]])
+        SpreadsheetService.invalidateSheet(assignSheet)
         const row = allRows.find(r => String(r.id) === String(assignmentId))
         if (row) {
           row.status = 'Completed'
@@ -379,13 +372,62 @@ const IPATRaterAssignmentService = (() => {
     return result.items
   }
 
+  function _isStbOffice_(officeId) {
+    const key = String(officeId || '').trim().toUpperCase()
+    return !key || key === 'STB' || key === 'OFF-STB' || key === 'SOCIAL TECHNOLOGY BUREAU'
+  }
+
+  // STB stores both its own accounts and every participating office account in
+  // the central Users tab.  A generation request made by the STB administrator
+  // must therefore filter that central roster explicitly.  Participating
+  // offices already run inside their own Personnel workbook, whose roster is
+  // inherently office-scoped.
+  function _isStbUser_(user) {
+    const key = String(user && (user.officeId || user.officeCode || user.office) || 'STB').trim().toUpperCase()
+    return !key || key === 'STB' || key === 'OFF-STB' || key === 'SOCIAL TECHNOLOGY BUREAU'
+  }
+
+  function _generationScope_(profile, body) {
+    const requestedOffice = String(body && (body.officeId || body.officeCode) || '').trim()
+    const assignedOffice = String(profile.officeId || profile.officeCode || 'STB').trim() || 'STB'
+    const systemScope = String(profile.systemScope || 'STB_FULL').trim().toUpperCase()
+    // Bootstrap/central administrators use CLUSTER_ADMIN, but their assigned
+    // office remains STB. They retain STB generation only; a non-STB office
+    // administrator can never become central merely by sharing the same role.
+    const isStbScope = _isStbOffice_(assignedOffice) &&
+      (systemScope === 'STB_FULL' || systemScope === 'CLUSTER_ADMIN')
+
+    if (isStbScope) {
+      if (String(profile.role || '') !== 'System Administrator') {
+        throw HttpError('Only the STB System Administrator can generate STB evaluation assignments.', 403)
+      }
+      if (requestedOffice && !_isStbOffice_(requestedOffice)) {
+        throw HttpError('STB assignment generation is limited to the Social Technology Bureau.', 403)
+      }
+      return { officeId: 'STB', label: 'Social Technology Bureau', isStb: true }
+    }
+
+    const isOfficeAssignmentManager = String(profile.officeRole || '') === 'OFFICE_ADMIN' ||
+      AuthService.hasPermission(profile, 'manage_office_users') ||
+      AuthService.hasPermission(profile, 'manage_office_rater_matrix')
+    if (!isOfficeAssignmentManager || _isStbOffice_(assignedOffice)) {
+      throw HttpError('Only an assigned office administrator or rater tagging focal can generate assignments for an office.', 403)
+    }
+    if (requestedOffice && String(requestedOffice).toUpperCase() !== String(assignedOffice).toUpperCase()) {
+      throw HttpError('Assignment generation is limited to your assigned office.', 403)
+    }
+    return {
+      officeId: assignedOffice,
+      label: String(profile.officeName || assignedOffice),
+      isStb: false
+    }
+  }
+
   // ── GENERATE ASSIGNMENTS ─────────────────────────────────────────────────
 
-  function generateAssignments(body, user) {
+  function generateAssignmentsUnlocked(body, user) {
     const profile = AuthService.getProfile(user)
-    if (profile.role !== 'System Administrator') {
-      throw HttpError('Only the System Administrator can generate evaluation assignments', 403)
-    }
+    const generationScope = _generationScope_(profile, body)
 
     const semester = String(body.semester || '')
     const year     = String(body.year     || '')
@@ -398,10 +440,13 @@ const IPATRaterAssignmentService = (() => {
 
     // All active users
     const usersSheet = SpreadsheetService.getSheet(SHEET.USERS)
-    const allUsers = SpreadsheetService.getAllRows(usersSheet).filter(u => {
+    const activeUsers = SpreadsheetService.getAllRows(usersSheet).filter(u => {
       const active = u.active
       return active === true || active === 'true' || active === 1 || active === '1'
     })
+    const allUsers = generationScope.isStb
+      ? activeUsers.filter(_isStbUser_)
+      : activeUsers
 
     // Previous cycle for anti-repeat
     const prevSem  = semester === '1' ? '2' : '1'
@@ -416,15 +461,44 @@ const IPATRaterAssignmentService = (() => {
     const now = new Date().toISOString()
 
     const assignments = []
-    const replacedAssignments = []
+    const recordsToCreate = []
     const evaluatable = allUsers.filter(u => isEvaluatable(u.role))
     const touchedRateeIds = new Set()
     const createdRecordIds = new Set()
+    const assignmentIdsToRemove = new Set()
+    const responseTypesByIpat = {}
+    let replacedAssignments = 0
+    let removedAssignments = 0
+    let removedResponses = 0
+    let recomputedRecords = 0
+    const existingAssignmentsByRatee = {}
+    // Track assignment coverage by rater type. When a person is approved
+    // after a period was generated, all existing slots can be valid yet the
+    // new rater would otherwise remain on Self only forever. Backfill uses
+    // this count to give zero-task eligible raters one pending slot without
+    // touching completed ratings or broadly reshuffling pending work.
+    const raterCountsByType = {}
+    const countRater = (raterType, raterId, delta) => {
+      const type = String(raterType || '')
+      const id = String(raterId || '')
+      if (!type || !id) return
+      if (!raterCountsByType[type]) raterCountsByType[type] = {}
+      raterCountsByType[type][id] = Math.max(0, Number(raterCountsByType[type][id] || 0) + delta)
+    }
+    activeProtocolAssignments(existingAssign).forEach(assignment => {
+      countRater(assignment.raterType, assignment.raterId, 1)
+    })
+    existingAssign.forEach(assignment => {
+      const key = String(assignment.rateeId || '')
+      if (!key) return
+      if (!existingAssignmentsByRatee[key]) existingAssignmentsByRatee[key] = []
+      existingAssignmentsByRatee[key].push(assignment)
+    })
 
     // Rater rules now come from the per-office RaterMatrix rather than the five
     // hardcoded STB role branches this replaced. An office using its own role
     // names no longer falls through to an empty list and a silent skip.
-    const matrixRows = _loadMatrixRows(body, user)
+    const matrixRows = _loadMatrixRows({ officeId: generationScope.officeId }, user)
     const matrixHelpers = { selectRandom: _selectRandom, prevRaterId: _prevRaterId }
 
     // Exceptions are collected and returned rather than swallowed. A role with
@@ -442,7 +516,7 @@ const IPATRaterAssignmentService = (() => {
       if (resolution.unmappedRole) {
         const role = roleOf(ratee.role) || '(no role)'
         unmappedRoles[role] = (unmappedRoles[role] || 0) + 1
-        return
+        if (!(existingAssignmentsByRatee[String(ratee.id)] || []).length) return
       }
 
       const raterList = resolution.raters
@@ -457,7 +531,7 @@ const IPATRaterAssignmentService = (() => {
       // Auto-create IPAT record if not yet existing for this period
       let ipatRecord = _findCanonicalIpatRecord(existingRec, existingAssign, ratee.id, semester, year)
 
-      if (!ipatRecord) {
+      if (!ipatRecord && raterList.length) {
         // Derived from the matrix, not from the STB role names. This flag drives
         // the CBC weight split - with a subordinate the weights are Self/Peer/
         // Subordinate 15 each; without one the subordinate's 15% moves to a
@@ -467,6 +541,7 @@ const IPATRaterAssignmentService = (() => {
         const newId = SpreadsheetService.generateId('IPAT-')
         const newRec = {
           id:            newId,
+          officeId:      generationScope.officeId,
           rateeId:       ratee.id,
           rateeName:     ratee.fullName,
           divisionId:    ratee.divisionId   || '',
@@ -495,39 +570,81 @@ const IPATRaterAssignmentService = (() => {
           createdAt: now,
           updatedAt: now
         }
-        SpreadsheetService.appendRow(ipatSheet, newRec)
+        recordsToCreate.push(newRec)
         existingRec.push(newRec)
         ipatRecord = newRec
         createdRecordIds.add(newRec.id)
       }
 
-      const existingForRatee = existingAssign.filter(a => String(a.rateeId) === String(ratee.id))
+      const existingForRatee = existingAssignmentsByRatee[String(ratee.id)] || []
       const existingByRole = {}
       existingForRatee.forEach(a => {
-        if (!existingByRole[a.raterType]) existingByRole[a.raterType] = a
+        const key = String(a.raterType || '')
+        if (!existingByRole[key]) existingByRole[key] = []
+        existingByRole[key].push(a)
       })
+
+      if (ipatRecord) {
+        const hasSubordinate = raterList.some(r => r.raterType === 'Subordinate')
+        const metadataChanged = String(ipatRecord.rateeName || '') !== String(ratee.fullName || '') ||
+          String(ipatRecord.divisionId || '') !== String(ratee.divisionId || '') ||
+          String(ipatRecord.positionLevel || '') !== String(role || '') ||
+          String(ipatRecord.hasSubordinate) !== String(hasSubordinate)
+        if (metadataChanged && !createdRecordIds.has(ipatRecord.id)) {
+          SpreadsheetService.updateRow(ipatSheet, ipatRecord.id, {
+            rateeName: ratee.fullName || '', divisionId: ratee.divisionId || '',
+            divisionName: ratee.divisionName || '', position: ratee.position || '',
+            positionLevel: role, hasSubordinate, updatedAt: now
+          })
+        }
+      }
 
       // Store only missing rater roles. Existing assignments and submitted
       // ratings are preserved, so admins can safely backfill late accounts.
       raterList.forEach(a => {
-        const existingAssignment = existingByRole[a.raterType]
-        if (existingAssignment) {
-          if (_canReplacePendingRater(existingAssignment, a)) {
-            SpreadsheetService.updateRow(assignSheet, existingAssignment.id, {
-              raterId: a.raterId,
-              raterName: a.raterName,
-              updatedAt: now
-            })
-            existingAssignment.raterId = a.raterId
-            existingAssignment.raterName = a.raterName
-            existingAssignment.updatedAt = now
-            replacedAssignments.push(existingAssignment)
-            touchedRateeIds.add(ratee.id)
+        let selectedRater = a
+        const sameType = existingByRole[a.raterType] || []
+        const validExisting = sameType.length === 1 && RaterMatrixService.isAssignmentValid(ratee, sameType[0], allUsers, matrixRows)
+        if (validExisting) {
+          const current = sameType[0]
+          const eligible = typeof RaterMatrixService.eligibleRatersFor === 'function'
+            ? RaterMatrixService.eligibleRatersFor(ratee, allUsers, matrixRows, a.raterType)
+            : []
+          const counts = raterCountsByType[a.raterType] || {}
+          const uncovered = eligible.find(person =>
+            String(person.id || '') !== String(current.raterId || '') &&
+            Number(counts[String(person.id || '')] || 0) === 0
+          )
+          if (uncovered && String(current.status || 'Pending') !== 'Completed') {
+            assignmentIdsToRemove.add(String(current.id))
+            countRater(a.raterType, current.raterId, -1)
+            countRater(a.raterType, uncovered.id, 1)
+            replacedAssignments += 1
+            selectedRater = {
+              raterId: uncovered.id,
+              raterName: uncovered.fullName,
+              raterType: a.raterType
+            }
+          } else {
+          // Generate / Backfill creates only missing work.  Replacing a pending
+          // assignment on every run both changes an administrator's existing
+          // rater decision and turns an otherwise read-mostly backfill into
+          // hundreds of slow per-row spreadsheet writes.  Completed ratings
+          // were already preserved; pending assignments must be preserved too.
+            return
           }
-          return
+        }
+        if (sameType.length && selectedRater === a) {
+          sameType.forEach(item => assignmentIdsToRemove.add(String(item.id)))
+          if (ipatRecord) {
+            if (!responseTypesByIpat[ipatRecord.id]) responseTypesByIpat[ipatRecord.id] = new Set()
+            responseTypesByIpat[ipatRecord.id].add(a.raterType)
+          }
+          replacedAssignments += 1
         }
         const newAssignment = {
           id:             SpreadsheetService.generateId('RASN-'),
+          officeId:       generationScope.officeId,
           semester,
           year,
           rateeId:        ratee.id,
@@ -535,28 +652,62 @@ const IPATRaterAssignmentService = (() => {
           rateeDivisionId: ratee.divisionId || '',
           rateeRole:      role,
           rateeSection:   ratee.section     || '',
-          raterId:        a.raterId,
-          raterName:      a.raterName,
-          raterType:      a.raterType,
+          raterId:        selectedRater.raterId,
+          raterName:      selectedRater.raterName,
+          raterType:      selectedRater.raterType,
           ipatRecordId:   ipatRecord.id,
           status:         'Pending',
           createdAt:      now,
           updatedAt:      now
         }
         assignments.push(newAssignment)
-        existingByRole[a.raterType] = newAssignment
+        existingByRole[a.raterType] = [newAssignment]
+        if (!(validExisting && selectedRater !== a)) countRater(a.raterType, selectedRater.raterId, 1)
         touchedRateeIds.add(ratee.id)
+      })
+
+      const resolvedTypes = new Set(raterList.map(item => String(item.raterType || '')))
+      existingForRatee.forEach(item => {
+        if (resolvedTypes.has(String(item.raterType || ''))) return
+        assignmentIdsToRemove.add(String(item.id))
+        if (ipatRecord) {
+          if (!responseTypesByIpat[ipatRecord.id]) responseTypesByIpat[ipatRecord.id] = new Set()
+          responseTypesByIpat[ipatRecord.id].add(String(item.raterType || ''))
+        }
       })
     })
 
-    assignments.forEach(a => SpreadsheetService.appendRow(assignSheet, a))
+    if (assignmentIdsToRemove.size) {
+      const values = assignSheet.getDataRange().getValues()
+      const headers = values[0] || []
+      const idIdx = headers.indexOf('id')
+      const rowNumbers = []
+      for (let i = 1; i < values.length; i++) {
+        if (assignmentIdsToRemove.has(String(values[i][idIdx] || ''))) rowNumbers.push(i + 1)
+      }
+      const groups = []
+      rowNumbers.sort((a, b) => a - b).forEach(rowNumber => {
+        const last = groups[groups.length - 1]
+        if (last && last.start + last.count === rowNumber) last.count += 1
+        else groups.push({ start: rowNumber, count: 1 })
+      })
+      groups.sort((a, b) => b.start - a.start).forEach(group => assignSheet.deleteRows(group.start, group.count))
+      removedAssignments = rowNumbers.length
+      if (rowNumbers.length) SpreadsheetService.invalidateSheet(assignSheet)
+    }
+    Object.keys(responseTypesByIpat).forEach(ipatId => {
+      const result = IPATService.removeRatingsAndRecomputeUnlocked(ipatId, Array.from(responseTypesByIpat[ipatId]), user)
+      removedResponses += Number(result.removedCBC || 0) + Number(result.removedJF || 0)
+      recomputedRecords += result.recomputed ? 1 : 0
+    })
+    SpreadsheetService.appendRows(ipatSheet, recordsToCreate)
+    SpreadsheetService.appendRows(assignSheet, assignments)
 
     AuditService.log('GENERATE_ASSIGNMENTS', 'IPAT',
-      `Generated/backfilled ${assignments.length} rater assignments for Semester ${semester} ${year}`, user)
+      `Generated/backfilled ${assignments.length}, removed ${removedAssignments} invalid tasks and ${removedResponses} active response rows for ${generationScope.label}, Semester ${semester} ${year}`, user)
 
     const breakdown = {}
     assignments.forEach(a => { breakdown[a.raterType] = (breakdown[a.raterType] || 0) + 1 })
-    replacedAssignments.forEach(a => { breakdown[a.raterType] = (breakdown[a.raterType] || 0) + 1 })
 
     const unmappedList = Object.keys(unmappedRoles).map(role => ({
       role: role,
@@ -571,11 +722,16 @@ const IPATRaterAssignmentService = (() => {
 
     return {
       generated:  assignments.length,
-      replaced:   replacedAssignments.length,
+      replaced:   replacedAssignments,
+      removedAssignments,
+      removedResponses,
+      recomputedRecords,
       ratees:     touchedRateeIds.size,
       recordsCreated: createdRecordIds.size,
       existing:   new Set(existingAssign.map(a => a.rateeId)).size,
       breakdown,
+      officeId: generationScope.officeId,
+      scopeLabel: generationScope.label,
       semester,
       year,
       // Exceptions the previous implementation discarded silently. `unmapped`
@@ -683,11 +839,13 @@ const IPATRaterAssignmentService = (() => {
     if (isObsoleteAssignment(row)) throw HttpError('This assignment is no longer active under the current protocol', 400)
     const identity = profileRosterIdentity_(profile)
     if (!rowBelongsToProfile_(row, identity).rater) {
-      const isAdmin = AuthService.hasPermission(profile, 'generate_ipat_assignments') ||
-                      AuthService.hasPermission(profile, 'view_bureau_monitoring')
-      if (!isAdmin) throw HttpError('Unauthorized', 403)
+      throw HttpError('Only the assigned rater can complete this assignment.', 403)
     }
     return completeAssignmentFromRows(assignSheet, assignmentId, row, rows, user)
+  }
+
+  function generateAssignments(body, user) {
+    return withRatingWriteLock(() => generateAssignmentsUnlocked(body, user))
   }
 
   function markCompleted(assignmentId, user) {
@@ -703,13 +861,11 @@ const IPATRaterAssignmentService = (() => {
     if (isObsoleteAssignment(row)) throw HttpError('This assignment is no longer active under the current protocol', 400)
     const identity = profileRosterIdentity_(profile)
     if (!rowBelongsToProfile_(row, identity).rater) {
-      const isAdmin = AuthService.hasPermission(profile, 'generate_ipat_assignments') ||
-                      AuthService.hasPermission(profile, 'view_bureau_monitoring')
-      if (!isAdmin) throw HttpError('Unauthorized', 403)
+      throw HttpError('Only the assigned rater can submit ratings for this assignment.', 403)
     }
     if (!row.ipatRecordId) throw HttpError('Assignment has no linked assessment record', 400)
     if (String(row.status || 'Pending') === 'Completed') {
-      throw HttpError('This rating assignment has already been submitted.', 409)
+      return { updated: false, alreadyCompleted: true, savedCBC: 0, savedJF: 0, ipatRecordId: row.ipatRecordId }
     }
 
     let cbcRatings = body.cbcRatings || []
@@ -719,13 +875,20 @@ const IPATRaterAssignmentService = (() => {
     if (!Array.isArray(cbcRatings)) cbcRatings = []
     if (!Array.isArray(jfRatings))  jfRatings  = []
 
+    const requirements = AssessmentContentService.requirementsForAssignment(row, user)
+    if (requirements.cbcCount > 0 && cbcRatings.length < requirements.cbcCount) throw HttpError(`Complete all ${requirements.cbcCount} required CBC questions before submitting.`, 400)
+    if (requirements.jfCount > 0 && jfRatings.length < requirements.jfCount) throw HttpError(`Complete all ${requirements.jfCount} required Job Fitness questions before submitting.`, 400)
+    if (requirements.cbcCount === 0 && requirements.jfCount === 0) throw HttpError('No active assessment questions are configured for this assignment. Ask your administrator to check the assessment form.', 409)
+    cbcRatings = cbcRatings.map(item => ({ ...item, raterType: row.raterType }))
+    jfRatings = jfRatings.map(item => ({ ...item, raterType: ['Self', 'Supervisor'].includes(String(row.raterType || '')) ? row.raterType : '' })).filter(item => item.raterType)
+
     // The unlocked variants: this runs inside withRatingWriteLock already, and
     // the locking entry points would try to take the same script lock a second
     // time in one execution. Keeping the whole submission - both rating sets
     // and the assignment row below - under the single outer lock is also what
     // stops a submission from half-applying.
-    if (cbcRatings.length) IPATService.saveCBCRatingsUnlocked(row.ipatRecordId, { ratings: cbcRatings }, user)
-    if (jfRatings.length)  IPATService.saveJFRatingsUnlocked(row.ipatRecordId, { ratings: jfRatings }, user)
+    if (cbcRatings.length) IPATService.saveCBCRatingsUnlocked(row.ipatRecordId, { ratings: cbcRatings }, user, { skipRaterGuard: true })
+    if (jfRatings.length)  IPATService.saveJFRatingsUnlocked(row.ipatRecordId, { ratings: jfRatings }, user, { skipRaterGuard: true })
 
     const completed = completeAssignmentFromRows(assignSheet, assignmentId, row, rows, user)
     return {

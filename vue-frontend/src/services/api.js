@@ -11,11 +11,30 @@ const BASE_URL = import.meta.env.DEV
   ? normalizeApiBaseUrl(import.meta.env.VITE_API_PROXY_URL, '/gas')
   : normalizeApiBaseUrl(import.meta.env.VITE_API_PROXY_URL, '/api/gas')
 
-const MAX_IN_FLIGHT = Number(import.meta.env.VITE_API_MAX_IN_FLIGHT || 4)
+// Apps Script is spreadsheet-backed and slows sharply when a screen opens
+// several independent reads at once. Two concurrent calls keeps the UI
+// responsive without turning a page load into a request burst that times out.
+const MAX_IN_FLIGHT = Math.max(1, Math.min(2, Number(import.meta.env.VITE_API_MAX_IN_FLIGHT || 2)))
 const API_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS || 45000)
+const LONG_WRITE_TIMEOUT_MS = Number(import.meta.env.VITE_API_LONG_WRITE_TIMEOUT_MS || 90000)
 const requestQueue = []
 const inFlightReads = new Map()
+const responseCache = new Map()
 let activeRequests = 0
+
+const DEFAULT_READ_CACHE_TTL_MS = Number(import.meta.env.VITE_API_READ_CACHE_TTL_MS || 20000)
+const READ_CACHE_TTL_BY_ROUTE = [
+  [/^auth\/backend-info$/, 60000],
+  [/^auth\/register-options$/, 60000],
+  [/^office-registry\/.*org-options$/, 60000],
+  [/^office-registry\/picker$/, 60000],
+  [/^assessment-categories/, 60000],
+  [/^assessment-content/, 60000],
+  [/^assessment-rules/, 60000],
+  [/^rater-matrix/, 30000],
+  [/^ipat\/themes$/, 60000],
+  [/^ipat\/jf-indicators$/, 60000]
+]
 
 function stableStringify(value) {
   if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`
@@ -26,7 +45,56 @@ function stableStringify(value) {
 }
 
 function readKey(route, data) {
-  return `${route}:${stableStringify(data || {})}`
+  // This cache lives in the browser process. Include the Firebase identity so
+  // a logout/login in the same tab can never reuse the previous user's data.
+  const uid = auth.currentUser?.uid || 'anonymous'
+  return `${uid}:${route}:${stableStringify(data || {})}`
+}
+
+function cloneApiData(value) {
+  if (value === null || value === undefined) return value
+  if (typeof structuredClone === 'function') {
+    try { return structuredClone(value) } catch (_) { /* fall through */ }
+  }
+  return JSON.parse(JSON.stringify(value))
+}
+
+function readCacheTtl(route) {
+  const matched = READ_CACHE_TTL_BY_ROUTE.find(([pattern]) => pattern.test(route))
+  return matched ? matched[1] : DEFAULT_READ_CACHE_TTL_MS
+}
+
+function requestTimeoutMs(route) {
+  // First-time Generate/Backfill may create records and assignments for an
+  // entire office. The Vercel proxy permits that write for up to 60 seconds;
+  // the browser must wait a little longer or it aborts a healthy request and
+  // reports a misleading raw AbortController error.
+  return /^ipat-assignments\/generate$/.test(String(route || ''))
+    ? LONG_WRITE_TIMEOUT_MS
+    : API_TIMEOUT_MS
+}
+
+function getCachedRead(key) {
+  const entry = responseCache.get(key)
+  if (!entry) return null
+  if (Date.now() >= entry.expiresAt) {
+    responseCache.delete(key)
+    return null
+  }
+  return cloneApiData(entry.data)
+}
+
+function setCachedRead(route, key, data) {
+  const ttl = readCacheTtl(route)
+  if (ttl <= 0) return
+  responseCache.set(key, {
+    data: cloneApiData(data),
+    expiresAt: Date.now() + ttl
+  })
+}
+
+function clearReadCache() {
+  responseCache.clear()
 }
 
 function drainQueue() {
@@ -42,9 +110,14 @@ function drainQueue() {
   }
 }
 
-function enqueueRequest(run) {
+function enqueueRequest(run, { priority = false } = {}) {
   return new Promise((resolve, reject) => {
-    requestQueue.push({ run, resolve, reject })
+    const request = { run, resolve, reject }
+    // A deliberate save/approval must not wait behind an older burst of
+    // dashboard reads. Active requests still complete normally; this only
+    // decides which queued request gets the next available browser slot.
+    if (priority) requestQueue.unshift(request)
+    else requestQueue.push(request)
     drainQueue()
   })
 }
@@ -142,22 +215,37 @@ function userSafeApiMessage(status) {
 async function gasSend(method, route, data = {}) {
   const send = async ({ forceRefresh = false } = {}) => {
     const token = await getToken({ forceRefresh })
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), API_TIMEOUT_MS)
-    const res = await enqueueRequest(() => fetch(BASE_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      cache: 'no-store',
-      signal: controller.signal,
-      body: JSON.stringify({ route, _method: method, token, ...(data || {}) })
-    }).finally(() => {
-      clearTimeout(timer)
-    }))
+    const res = await enqueueRequest(async () => {
+      // Start the timer only when this request gets a browser slot. Starting it
+      // before queueing meant a write could expire before fetch() even began.
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), requestTimeoutMs(route))
+      try {
+        return await fetch(BASE_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          cache: 'no-store',
+          signal: controller.signal,
+          body: JSON.stringify({ route, _method: method, token, ...(data || {}) })
+        })
+      } catch (error) {
+        if (controller.signal.aborted) {
+          const timeout = new Error('This operation is taking longer than expected. Please wait before trying again.')
+          timeout.status = 504
+          throw timeout
+        }
+        throw error
+      } finally {
+        clearTimeout(timer)
+      }
+    }, { priority: method !== 'GET' })
     return parseApiResponse(res)
   }
 
   if (method === 'GET') {
     const key = readKey(route, data)
+    const cached = getCachedRead(key)
+    if (cached) return cached
     if (inFlightReads.has(key)) return inFlightReads.get(key)
     // NOTE THE TRAILING () - this must be invoked immediately.
     // Without it, `promise` held the async function itself rather than the
@@ -167,11 +255,15 @@ async function gasSend(method, route, data = {}) {
     // app rendered empty with no error.
     const promise = (async () => {
       try {
-        return await send()
+        const result = await send()
+        setCachedRead(route, key, result)
+        return cloneApiData(result)
       } catch (first) {
         if (first?.[AUTH_REJECTED] && auth.currentUser) {
           try {
-            return await send({ forceRefresh: true })
+            const result = await send({ forceRefresh: true })
+            setCachedRead(route, key, result)
+            return cloneApiData(result)
           } catch (second) {
             if (second?.[AUTH_REJECTED]) throw authExpiredError()
             throw second
@@ -188,7 +280,9 @@ async function gasSend(method, route, data = {}) {
   }
 
   try {
-    return await send()
+    const result = await send()
+    clearReadCache()
+    return result
   } catch (first) {
     // A cached ID token can expire between page load and request. Force one
     // refresh and try again before declaring the session dead - this is safe for
@@ -196,7 +290,9 @@ async function gasSend(method, route, data = {}) {
     // the router ran, so nothing was applied.
     if (first?.[AUTH_REJECTED] && auth.currentUser) {
       try {
-        return await send({ forceRefresh: true })
+        const result = await send({ forceRefresh: true })
+        clearReadCache()
+        return result
       } catch (second) {
         if (second?.[AUTH_REJECTED]) throw authExpiredError()
         throw second
@@ -216,9 +312,54 @@ async function gasSendWithRetry(method, route, data = {}) {
     // are never retried because the first attempt may already have applied.
     // An API rejection and an expired session are real answers, not hiccups,
     // and are rethrown untouched.
-    if (!err?.[TRANSIENT] || method !== 'GET') throw err
-    await new Promise(r => setTimeout(r, 400))
-    return gasSend(method, route, data)
+    if (err?.[TRANSIENT] && method === 'GET') {
+      await new Promise(r => setTimeout(r, 400))
+      return gasSend(method, route, data)
+    }
+
+    // `whoami` determines whether a signed-in person is allowed to enter the
+    // app. Apps Script can briefly return 429/5xx while its spreadsheet cache
+    // is warming; that is not an access decision. These are idempotent reads,
+    // so retry twice with short backoff before the UI reports a profile-load
+    // problem. Other list screens keep their normal, lower retry cost.
+    //
+    // The assessment questions belong in the same class. They are fetched once
+    // when a rater opens a rating task, and a single 429/5xx left the form with
+    // no questions at all - reported to the rater as "no active assessment
+    // questions are configured", sending them to an administrator over what was
+    // really a momentary server hiccup. Both are idempotent GETs.
+    const isProfileBootstrap = method === 'GET' && (
+      /^auth\/(whoami|me)$/.test(route) ||
+      /^assessment-(content|categories)$/.test(route)
+    )
+    if (isProfileBootstrap && [429, 500, 502, 503, 504].includes(Number(err?.status))) {
+      for (const delay of [500, 1200]) {
+        await new Promise(resolve => setTimeout(resolve, delay))
+        try {
+          return await gasSend(method, route, data)
+        } catch (retryError) {
+          if (![429, 500, 502, 503, 504].includes(Number(retryError?.status))) throw retryError
+          err = retryError
+        }
+      }
+    }
+
+    // A rating write that receives 429 from the server did not enter its
+    // locked critical section, so it has made no sheet changes. Retrying this
+    // one explicit condition is safe and avoids making staff re-enter ratings
+    // during a short submission burst. Never retry timeouts or other write
+    // failures: those are ambiguous and could otherwise duplicate scores.
+    const isRatingSubmission = /^ipat-assignments\/[^/]+\/submit-ratings$/.test(route)
+    const isRatingDraftSave = /^ipat\/[^/]+\/(cbc|jf)$/.test(route)
+    const isUserApproval = /^users\/[^/]+\/activate$/.test(route)
+    if ((method === 'POST' && (isRatingSubmission || isRatingDraftSave)) ||
+        (method === 'PATCH' && isUserApproval)) {
+      if (err?.status !== 429) throw err
+      await new Promise(r => setTimeout(r, 1200))
+      return gasSend(method, route, data)
+    }
+
+    throw err
   }
 }
 
@@ -316,6 +457,7 @@ export const officeRegistryApi = {
   spec:     ()         => gasGet('office-registry/spec'),
   monitoring:(p = {})  => gasGet('office-registry/monitoring', p),
   provision:(data)     => gasWrite('POST', 'office-registry', data),
+  update:   (id, data) => gasWrite('PUT', `office-registry/${id}`, data),
   orgOptions:(id)      => gasGet(`office-registry/${id}/org-options`),
   saveOrgOptions:(id, data) => gasWrite('PUT', `office-registry/${id}/org-options`, data),
   validate: (id)       => gasWrite('POST', `office-registry/${id}/validate`),
@@ -323,31 +465,11 @@ export const officeRegistryApi = {
   activate: (id)       => gasWrite('POST', `office-registry/${id}/activate`)
 }
 
-export const officePersonnelApi = {
-  list:       (p = {})   => gasGet('office-personnel', p),
-  create:     (data)     => gasWrite('POST', 'office-personnel', data),
-  update:     (id, data) => gasWrite('PUT', `office-personnel/${id}`, data),
-  deactivate: (id)       => gasWrite('PATCH', `office-personnel/${id}/deactivate`),
-  activate:   (id)       => gasWrite('PATCH', `office-personnel/${id}/activate`)
-}
-
 // ── KRAs & Success Indicators ──────────────────
 
 export const systemSettingsApi = {
-  get:    () => gasGet('system-settings'),
+  get:    (p = {}) => gasGet('system-settings', p),
   update: (data) => gasWrite('PUT', 'system-settings', data)
-}
-
-export const kraApi = {
-  list:        (p = {})            => gasGet('kras',                                        p),
-  get:         (id)                => gasGet(`kras/${id}`),
-  create:      (data)              => gasWrite('POST',   'kras',                             data),
-  update:      (id, data)          => gasWrite('PUT',    `kras/${id}`,                       data),
-  delete:      (id)                => gasWrite('DELETE', `kras/${id}`),
-  listSI:      (kraId)             => gasGet(`kras/${kraId}/indicators`),
-  createSI:    (kraId, data)       => gasWrite('POST',   `kras/${kraId}/indicators`,         data),
-  updateSI:    (kraId, siId, data) => gasWrite('PUT',    `kras/${kraId}/indicators/${siId}`, data),
-  deleteSI:    (kraId, siId)       => gasWrite('DELETE', `kras/${kraId}/indicators/${siId}`)
 }
 
 // ── KRA Library (MasterKRALibrary sheet) ───────
@@ -381,7 +503,8 @@ export const assessmentContentApi = {
   reorder:          (payload = [])  => gasWrite('POST',  'assessment-content/reorder', {
     rows: JSON.stringify(payload)
   }),
-  seed:             (data = {})     => gasWrite('POST',  'assessment-content/seed', data)
+  seed:             (data = {})     => gasWrite('POST',  'assessment-content/seed', data),
+  promoteSeedTemplate: (data = {})  => gasWrite('POST',  'assessment-content/seed-template', data)
 }
 
 export const assessmentRulesApi = {
@@ -397,10 +520,6 @@ export const raterMatrixApi = {
   save:         (items = [])  => gasWrite('PUT', 'rater-matrix', { items }),
   seedDefaults: ()            => gasWrite('POST', 'rater-matrix/seed-defaults')
 }
-
-// ── Diagnostics (read-only multi-office boundary report) ───────────────
-// Reachable from the browser console while signed in via
-// `window.pmesDiagnostics()` - see main.js. Temporary verification aid.
 
 export const diagnosticsApi = {
   officeBoundary: (p = {}) => gasGet('diagnostics/office-boundary', p)
@@ -418,17 +537,6 @@ export const accomplishmentsApi = {
   updateStatus:    (id, status, remarks) => gasWrite('PATCH', `accomplishments/${id}/status`,   { status, remarks }),
   history:         (id)                  => gasGet(`accomplishments/${id}/history`)
 }
-
-// ── Evaluations ────────────────────────────────
-
-export const evaluationApi = {
-  list:    (p = {})         => gasGet('evaluations',                    p),
-  get:     (id)             => gasGet(`evaluations/${id}`),
-  compute: (userId, period) => gasWrite('POST', 'evaluations/compute', { userId, period }),
-  update:  (id, data)       => gasWrite('PUT',  `evaluations/${id}`,    data),
-  history: (userId)         => gasGet(`evaluations/history/${userId}`)
-}
-
 
 // ── IPAT ────────────────────────────────────────
 // Innovations Performance Assessment Tool
@@ -501,16 +609,6 @@ export const auditApi = {
   export: (p = {}) => gasGet('audit/export', p)
 }
 
-// ── Deadlines ──────────────────────────────────
-
-export const deadlinesApi = {
-  list:   (p = {})   => gasGet('deadlines',          p),
-  get:    (id)       => gasGet(`deadlines/${id}`),
-  create: (data)     => gasWrite('POST',   'deadlines',       data),
-  update: (id, data) => gasWrite('PUT',    `deadlines/${id}`, data),
-  delete: (id)       => gasWrite('DELETE', `deadlines/${id}`)
-}
-
 // ── IPCRF / CCEF Forms ─────────────────────────
 // Named alias: import { ipcrf as ipcrfApi } from '@/services/api'
 
@@ -564,26 +662,6 @@ export const docGenApi = {
   printPdf:        (fileId, tab)  => gasGet(`docgen/${fileId}/print`, { tab })
 }
 
-// ── Attendance ─────────────────────────────────
-
-export const attendanceApi = {
-  list:          (p = {})   => gasGet('attendance',                          p),
-  get:           (id)       => gasGet(`attendance/${id}`),
-  record:        (data)     => gasWrite('POST', 'attendance',                 data),
-  update:        (id, data) => gasWrite('PUT',  `attendance/${id}`,           data),
-  computeRating: (data)     => gasWrite('POST', 'attendance/compute-rating',  data),
-  listRatings:   (p = {})   => gasGet('attendance/ratings',                  p)
-}
-
-// ── Peer Assignments ───────────────────────────
-
-export const peerAssignmentsApi = {
-  list:         (p = {})        => gasGet('peer-assignments',                          p),
-  get:          (id)            => gasGet(`peer-assignments/${id}`),
-  assign:       (data)          => gasWrite('POST',  'peer-assignments',                data),
-  markComplete: (id, data = {}) => gasWrite('PATCH', `peer-assignments/${id}/complete`, data)
-}
-
 // ── Named aliases for views that import with aliases ──
 // e.g. import { ipcrf as ipcrfApi, kraLibrary as kraLibraryApi } from '@/services/api'
 export { ipcrfApi as ipcrf }
@@ -601,20 +679,15 @@ export default {
   focalAssignmentsApi,
   maintenanceApi,
   officeRegistryApi,
-  kraApi,
   kraLibraryApi,
   assessmentCategoryApi,
   assessmentContentApi,
   assessmentRulesApi,
   raterMatrixApi,
   accomplishmentsApi,
-  evaluationApi,
   reportsApi,
   notificationsApi,
   auditApi,
-  deadlinesApi,
   ipcrfApi,
-  docGenApi,
-  attendanceApi,
-  peerAssignmentsApi
+  docGenApi
 }

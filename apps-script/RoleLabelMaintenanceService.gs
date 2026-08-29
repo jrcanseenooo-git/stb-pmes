@@ -136,7 +136,7 @@ const RoleLabelMaintenanceService = (() => {
   function canonicalRoleCell_(value) {
     const text = String(value || '').trim()
     if (!text) return ''
-    return RoleLabelService.canonicalRole(text)
+    return RoleLabelService.storedRole(text)
   }
 
   function canonicalRoleListCell_(value) {
@@ -149,7 +149,7 @@ const RoleLabelMaintenanceService = (() => {
     const roles = []
     parts.forEach(part => {
       const raw = String(part || '').trim()
-      const role = RoleLabelService.canonicalRole(raw)
+      const role = RoleLabelService.storedRole(raw)
       if (role !== raw) changed = true
       if (!role || seen[role]) {
         if (role) changed = true

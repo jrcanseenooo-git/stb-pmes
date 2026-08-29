@@ -54,11 +54,21 @@ function doPost(e) {
 // script lock and mutate sheets - so they get a much tighter budget.
 const RATE_LIMIT_READS_PER_MIN  = 120
 const RATE_LIMIT_WRITES_PER_MIN = 30
+const RATE_LIMIT_AUTH_ADJACENT_PER_MIN = 5
 
-function checkRateLimit(userId, httpMethod) {
+function isAuthAdjacentRoute_(route) {
+  const r = String(route || '').toLowerCase()
+  return r === 'auth/register' ||
+    /^users\/[^/]+\/reset-password$/.test(r)
+}
+
+function checkRateLimit(userId, httpMethod, route) {
   const isWrite = String(httpMethod || 'GET').toUpperCase() !== 'GET'
-  const bucket  = isWrite ? 'w' : 'r'
-  const limit   = isWrite ? RATE_LIMIT_WRITES_PER_MIN : RATE_LIMIT_READS_PER_MIN
+  const authAdjacent = isAuthAdjacentRoute_(route)
+  const bucket  = authAdjacent ? 'auth' : (isWrite ? 'w' : 'r')
+  const limit   = authAdjacent
+    ? RATE_LIMIT_AUTH_ADJACENT_PER_MIN
+    : (isWrite ? RATE_LIMIT_WRITES_PER_MIN : RATE_LIMIT_READS_PER_MIN)
 
   let count = 0
   try {
@@ -73,7 +83,9 @@ function checkRateLimit(userId, httpMethod) {
   }
   if (count > limit) {
     throw HttpError(
-      isWrite
+      authAdjacent
+        ? 'Too many account requests in a short time. Please wait a moment and try again.'
+        : isWrite
         ? 'Too many save requests in a short time. Please wait a moment and try again.'
         : 'Too many requests. Please wait a moment.',
       429
@@ -125,7 +137,7 @@ function handleRequest(e, method) {
     }
 
     // 2. Rate limit per authenticated user, with separate read/write budgets
-    checkRateLimit(user.uid || user.email, httpMethod)
+    checkRateLimit(user.uid || user.email, httpMethod, route)
 
     // 3. Build the params/body handed to the router: query + body, minus the
     //    reserved routing keys. Router reads this for both GET filters and writes.
@@ -133,6 +145,12 @@ function handleRequest(e, method) {
     Object.keys(q).forEach(k => { params[k] = q[k] })
     Object.keys(body).forEach(k => { params[k] = body[k] })
     RESERVED_KEYS.forEach(k => { delete params[k] })
+    // Internal routing flags live in the `__` namespace and are set by the
+    // server alone (e.g. the __officeScopeApplied recursion guard in Router).
+    // A client that supplied one could skip office scoping entirely and read
+    // the central workbook instead of its own. Strip the whole namespace here,
+    // at the trust boundary, so future internal flags are covered too.
+    Object.keys(params).forEach(k => { if (k.indexOf('__') === 0) delete params[k] })
 
     // 4. Route
     const result = Router.dispatch(route, httpMethod, params, params, user)
@@ -217,29 +235,18 @@ function HttpError(message, code) {
 // write. The result is two accounts for one email, two offices for one code,
 // or two rating rows for one indicator, and nobody sees an error.
 //
-// Modelled on withRatingWriteLock in IPATRaterAssignmentService, which has
-// carried this pattern in production: bounded waits so a caller never hangs
-// indefinitely, jittered retries so simultaneous waiters do not collide in
-// lockstep, and a 429 - never a partial write - once the budget is spent.
+// Keep the wait safely below Vercel's 30-second function limit.  The old
+// three 15-second waits could leave the browser waiting for ~45 seconds, then
+// turn a perfectly valid "busy" result into a proxy timeout.  A failed lock
+// acquisition runs no user code, so the caller can safely retry a 429.
 //
 // Wrap only the check and its write. This is one global script lock, so
 // whatever runs inside it blocks every other writer for the duration.
 function withWriteLock(work, busyMessage) {
-  const LOCK_ATTEMPTS  = 3
-  const LOCK_WAIT_MS   = 15000   // per attempt; ~45s total worst case
-  const LOCK_JITTER_MS = 400
+  const LOCK_WAIT_MS = 6000
 
   const lock = LockService.getScriptLock()
-  let acquired = false
-
-  for (let attempt = 0; attempt < LOCK_ATTEMPTS && !acquired; attempt++) {
-    acquired = lock.tryLock(LOCK_WAIT_MS)
-    if (!acquired && attempt < LOCK_ATTEMPTS - 1) {
-      Utilities.sleep(Math.floor(Math.random() * LOCK_JITTER_MS))
-    }
-  }
-
-  if (!acquired) {
+  if (!lock.tryLock(LOCK_WAIT_MS)) {
     throw HttpError(
       busyMessage || 'The system is busy saving other changes. Please try again in a moment.',
       429

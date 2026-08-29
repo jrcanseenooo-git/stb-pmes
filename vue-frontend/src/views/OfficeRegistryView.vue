@@ -11,9 +11,6 @@
       <template #actions>
         <RouterLink v-if="centralRegistryMode && canViewClusterMonitoring" to="/cluster-overview" class="pui-btn">Cluster Overview</RouterLink>
         <button v-if="canManageOfficeRegistry" class="pui-btn pui-btn-primary" type="button" @click="openProvisionModal">Add Office</button>
-        <button v-if="ownOfficeStructureMode" class="pui-btn pui-btn-primary" type="button" @click="openOrgOptionsModal(ownOffice)">
-          Configure
-        </button>
       </template>
     </PageHeader>
 
@@ -113,6 +110,16 @@
                   </button>
                   <span v-if="isStbOffice(office)" style="font-size:11px; font-weight:700; color:#64748b;">Central PMES</span>
                   <button
+                    v-if="!isStbOffice(office)"
+                    class="pui-btn pui-btn-sm"
+                    type="button"
+                    :disabled="isOfficeBusy(office)"
+                    title="Edit office name and primary office admin email"
+                    @click="openEditOfficeModal(office)"
+                  >
+                    Edit
+                  </button>
+                  <button
                     class="pui-btn pui-btn-sm"
                     type="button"
                     :disabled="isOfficeBusy(office)"
@@ -139,41 +146,97 @@
 
     <DataPanel
       v-else
-      title="Registration Options"
-      :subtitle="ownOffice.officeName || ownOffice.officeCode || 'Your office'"
-      :loading="loading"
+      title="Structure & Registration"
+      :subtitle="`Configure the divisions, sections, and role choices for ${ownOffice.officeName || ownOffice.officeCode || 'your office'}.`"
+      :loading="loading || orgLoading"
       :error="error"
       error-title="The office structure could not be loaded"
       :empty="false"
       refreshable
       :last-updated="lastUpdatedLabel"
-      @refresh="loadOffices"
+      @refresh="refreshOwnOfficeStructure"
     >
-      <table class="pui-table">
-        <thead>
-          <tr>
-            <th scope="col">Office</th>
-            <th scope="col">Available Action</th>
-            <th scope="col" style="text-align:right;">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>
-              <strong>{{ officeDisplayCode(ownOffice) }}</strong>
-              <small>{{ ownOffice.officeName }}</small>
-            </td>
-            <td>Configure divisions, sections and registration role choices for this office only.</td>
-            <td>
-              <div style="display:flex; justify-content:flex-end;">
-                <button class="pui-btn pui-btn-sm" type="button" @click="openOrgOptionsModal(ownOffice)">
-                  Configure
-                </button>
+      <form v-if="!orgLoading" id="own-office-org-form" class="own-office-org-form" @submit.prevent="saveOrgOptions">
+        <div class="pui-alert pui-alert-info structure-note" role="note">
+          <p><strong>Future-facing setup.</strong> Changes affect future registration choices and assignment grouping. Existing user records are not moved automatically.</p>
+        </div>
+
+        <label>
+          <span class="pui-label">Divisions / Units</span>
+          <div class="numbered-textarea">
+            <ol class="line-number-gutter" aria-hidden="true">
+              <li v-for="(line, index) in numberedEntries(orgForm.divisionsText)" :key="`${index}-${line}`">
+                <span class="line-number-value">{{ index + 1 }}</span>
+                <span class="line-number-measure">{{ line || ' ' }}</span>
+              </li>
+            </ol>
+            <textarea
+              v-autosize
+              v-model="orgForm.divisionsText"
+              class="pui-textarea numbered-input"
+              :rows="textareaRows(orgForm.divisionsText, 3)"
+              placeholder="One per line&#10;Operations Division&#10;ADMIN | Administrative Unit"
+            ></textarea>
+          </div>
+          <small class="pui-hint">One line per unit. Optional format: <code>CODE | Name</code>.</small>
+        </label>
+
+        <div>
+          <span class="pui-label">Sections</span>
+          <div v-if="!parsedDivisionNames.length" class="pui-hint" style="margin-top:4px;">Enter divisions above first - a section box appears for each one.</div>
+          <div v-else class="org-section-grid">
+            <div v-for="name in parsedDivisionNames" :key="name" class="org-section-card">
+              <p class="org-section-title">{{ name }}</p>
+              <div class="numbered-textarea">
+                <ol class="line-number-gutter" aria-hidden="true">
+                  <li v-for="(line, index) in numberedEntries(sectionsByDivision[name])" :key="`${index}-${line}`">
+                    <span class="line-number-value">{{ index + 1 }}</span>
+                    <span class="line-number-measure">{{ line || ' ' }}</span>
+                  </li>
+                </ol>
+                <textarea
+                  v-autosize
+                  v-model="sectionsByDivision[name]"
+                  class="pui-textarea numbered-input"
+                  :rows="textareaRows(sectionsByDivision[name], 2)"
+                  placeholder="One section per line"
+                ></textarea>
               </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+            </div>
+          </div>
+        </div>
+
+        <label>
+          <span class="pui-label">Requested Roles</span>
+          <div class="numbered-textarea">
+            <ol class="line-number-gutter" aria-hidden="true">
+              <li v-for="(line, index) in numberedEntries(orgForm.rolesText)" :key="`${index}-${line}`">
+                <span class="line-number-value">{{ index + 1 }}</span>
+                <span class="line-number-measure">{{ line || ' ' }}</span>
+              </li>
+            </ol>
+            <textarea
+              v-autosize
+              v-model="orgForm.rolesText"
+              class="pui-textarea numbered-input"
+              :rows="textareaRows(orgForm.rolesText, 3)"
+              placeholder="Technical Staff&#10;Section Head&#10;Division Chief"
+            ></textarea>
+          </div>
+          <small class="pui-hint">These are request choices only; an administrator still validates the approved role.</small>
+        </label>
+
+        <div class="own-office-save-bar">
+          <div>
+            <strong>This will be saved as</strong>
+            <span>{{ parsedPreview.divisions }} division(s) · {{ parsedPreview.sections }} section(s) · {{ parsedPreview.roles }} requested role(s)</span>
+          </div>
+          <button class="pui-btn pui-btn-primary" type="submit" :disabled="orgSaving">
+            {{ orgSaving ? 'Saving Structure...' : 'Save Structure' }}
+          </button>
+        </div>
+        <div v-if="orgError" class="pui-alert pui-alert-error" role="alert"><p>{{ orgError }}</p></div>
+      </form>
     </DataPanel>
 
     <!-- Provisioning -->
@@ -257,6 +320,45 @@
         <button class="pui-btn" type="button" :disabled="saving" @click="closeProvisionModal">Cancel</button>
         <button class="pui-btn pui-btn-primary" type="submit" form="provision-form" :disabled="saving">
           {{ saving ? 'Provisioning...' : 'Create Evaluation Spreadsheet' }}
+        </button>
+      </template>
+    </AppModal>
+
+    <AppModal
+      :show="showEditOfficeModal"
+      title="Edit Office Details"
+      description="Updates the central registry and the office spreadsheet configuration when one is available."
+      :busy="savingOffice"
+      @close="closeEditOfficeModal"
+    >
+      <form id="office-edit-form" class="pui-grid pui-grid-2" @submit.prevent="saveOfficeDetails">
+        <label>
+          <span class="pui-label">Office Code</span>
+          <input v-model="officeEditForm.officeCode" class="pui-input" type="text" disabled />
+        </label>
+        <label>
+          <span class="pui-label">Office Short Name</span>
+          <input v-model="officeEditForm.officeShortName" class="pui-input" type="text" :disabled="savingOffice" />
+        </label>
+        <label class="pui-span-2">
+          <span class="pui-label">Office Name</span>
+          <input v-model="officeEditForm.officeName" class="pui-input" type="text" required :disabled="savingOffice" />
+        </label>
+        <label class="pui-span-2">
+          <span class="pui-label">Primary Office Admin Email</span>
+          <input v-model="officeEditForm.primaryAdminEmail" class="pui-input" type="email" required :disabled="savingOffice" />
+        </label>
+      </form>
+
+      <div v-if="officeEditError" class="pui-alert pui-alert-error" role="alert">
+        <p class="pui-alert-title">Office details could not be saved</p>
+        <p>{{ officeEditError }}</p>
+      </div>
+
+      <template #footer>
+        <button class="pui-btn" type="button" :disabled="savingOffice" @click="closeEditOfficeModal">Cancel</button>
+        <button class="pui-btn pui-btn-primary" type="submit" form="office-edit-form" :disabled="savingOffice">
+          {{ savingOffice ? 'Saving...' : 'Save Details' }}
         </button>
       </template>
     </AppModal>
@@ -387,6 +489,7 @@ import { useToast } from 'vue-toastification'
 import { officeRegistryApi } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
 import { usePermissions } from '@/composables/usePermissions'
+import { useOrgOptions } from '@/composables/useOrgOptions'
 import { useConfirm } from '@/composables/useConfirm'
 import { officeAcronym } from '@/utils/officeAcronyms'
 import PageHeader from '@/components/ui/PageHeader.vue'
@@ -395,6 +498,7 @@ import StatusPill from '@/components/ui/StatusPill.vue'
 import AppModal from '@/components/ui/AppModal.vue'
 
 const authStore = useAuthStore()
+const { invalidateOrgOptions } = useOrgOptions()
 const { canManageOfficeRegistry, canConfigureOfficeStructure, canViewClusterMonitoring } = usePermissions()
 const { confirm } = useConfirm()
 const toast = useToast()
@@ -424,6 +528,7 @@ const error = ref('')
 const modalError = ref('')
 const search = ref('')
 const showProvisionModal = ref(false)
+const showEditOfficeModal = ref(false)
 const showOrgModal = ref(false)
 const lastValidation = ref(null)
 const lastUpdatedAt = ref(null)
@@ -434,8 +539,15 @@ const orgSaving = ref(false)
 const orgForm = ref({ divisionsText: '', rolesText: '' })
 const sectionsByDivision = ref({})
 const form = ref(defaultForm())
+const officeEditTarget = ref(null)
+const officeEditForm = ref(defaultForm())
+const officeEditError = ref('')
+const savingOffice = ref(false)
 
-onMounted(loadOffices)
+onMounted(async () => {
+  await loadOffices()
+  if (ownOfficeStructureMode.value) await loadOrgOptions(ownOffice.value)
+})
 
 const centralRegistryMode = computed(() => canManageOfficeRegistry.value || canViewClusterMonitoring.value)
 const ownOfficeStructureMode = computed(() => !centralRegistryMode.value && canConfigureOfficeStructure.value)
@@ -588,6 +700,57 @@ function closeProvisionModal() {
   showProvisionModal.value = false
 }
 
+async function refreshOwnOfficeStructure() {
+  await loadOffices()
+  await loadOrgOptions(ownOffice.value)
+}
+
+function openEditOfficeModal(office) {
+  officeEditTarget.value = office
+  officeEditForm.value = {
+    officeCode: office.officeCode || office.officeId || '',
+    officeName: office.officeName || '',
+    officeShortName: office.officeShortName || office.officeCode || '',
+    primaryAdminEmail: office.primaryAdminEmail || ''
+  }
+  officeEditError.value = ''
+  showEditOfficeModal.value = true
+}
+
+function closeEditOfficeModal() {
+  if (savingOffice.value) return
+  showEditOfficeModal.value = false
+}
+
+async function saveOfficeDetails() {
+  const office = officeEditTarget.value
+  if (!office) return
+  const ok = await confirm({
+    title: 'Update Office Details',
+    message: `Update ${office.officeName || office.officeCode}'s primary office admin email and office details?`,
+    note: 'This does not change user accounts or rating data. It updates the office registry and the office spreadsheet configuration.',
+    confirmLabel: 'Save Details'
+  })
+  if (!ok) return
+
+  savingOffice.value = true
+  officeEditError.value = ''
+  try {
+    await officeRegistryApi.update(office.officeId, {
+      officeName: officeEditForm.value.officeName,
+      officeShortName: officeEditForm.value.officeShortName,
+      primaryAdminEmail: officeEditForm.value.primaryAdminEmail
+    })
+    await loadOffices()
+    showEditOfficeModal.value = false
+    toast.success('Office details updated.')
+  } catch (e) {
+    officeEditError.value = e?.message || 'Please check the details and try again.'
+  } finally {
+    savingOffice.value = false
+  }
+}
+
 async function provisionOffice() {
   const ok = await confirm({
     title: 'Provision Office',
@@ -676,11 +839,17 @@ async function runOfficeAction(office, action, work, fallbackMessage) {
 
 async function openOrgOptionsModal(office) {
   orgOffice.value = office
+  showOrgModal.value = true
+  await loadOrgOptions(office)
+}
+
+async function loadOrgOptions(office) {
+  if (!office?.officeId) return
+  orgOffice.value = office
   orgError.value = ''
   orgLoading.value = true
   orgForm.value = { divisionsText: '', rolesText: '' }
   sectionsByDivision.value = {}
-  showOrgModal.value = true
   try {
     const data = await officeRegistryApi.orgOptions(office.officeId)
     const divisions = data.divisions || []
@@ -728,7 +897,9 @@ async function saveOrgOptions() {
       sections: sectionsFromGroupedInputs(),
       requestedRoles: parseSimpleLines(orgForm.value.rolesText).map(name => ({ name }))
     })
-    showOrgModal.value = false
+    invalidateOrgOptions()
+    if (showOrgModal.value) showOrgModal.value = false
+    toast.success('Office structure saved.')
   } catch (e) {
     orgError.value = e?.message || 'Could not save registration options.'
   } finally {
@@ -781,6 +952,48 @@ function formatDate(value) {
 </script>
 
 <style scoped>
+.own-office-org-form {
+  display: grid;
+  gap: 18px;
+  padding: 18px;
+}
+
+.structure-note {
+  padding: 12px 14px;
+}
+
+.structure-note p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.own-office-save-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px;
+  border: 1px solid #dbe6f4;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.own-office-save-bar div {
+  display: grid;
+  gap: 3px;
+}
+
+.own-office-save-bar strong {
+  color: #0f172a;
+  font-size: 12px;
+}
+
+.own-office-save-bar span {
+  color: #475569;
+  font-size: 12px;
+}
+
 .org-loading {
   min-height: 220px;
   display: flex;
@@ -885,7 +1098,7 @@ function formatDate(value) {
   overflow: hidden;
   background: #f8fafc;
   color: #64748b;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-family: monospace;
   font-size: 12px;
   line-height: 18px;
   pointer-events: none;
@@ -919,7 +1132,7 @@ function formatDate(value) {
   border-radius: 0;
   background: transparent;
   box-shadow: none;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-family: monospace;
   font-size: 12px;
   line-height: 18px;
   overflow: hidden;

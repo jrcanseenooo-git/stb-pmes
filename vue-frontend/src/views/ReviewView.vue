@@ -1190,7 +1190,6 @@ const routeSteps = computed(() => {
   --slate: #64748B;
   --slate-soft: #F1F4F9;
 
-  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
   min-height: 100%;
   padding: 18px;
   background: var(--bg);
@@ -1389,7 +1388,7 @@ const routeSteps = computed(() => {
 .rq-feedback-edit { display: flex; flex-direction: column; gap: 0; }
 .rq-feedback-edit > div { padding: 10px 14px; border-top: 1px solid var(--border); }
 .rq-fb-label { display: block; font-size: 11px; font-weight: 700; color: var(--muted); margin-bottom: 5px; }
-.rq-fb-input { width: 100%; resize: vertical; border: 1px solid var(--border); border-radius: 7px; padding: 7px 9px; font-size: 12.5px; color: var(--ink-soft); background: var(--surface); font-family: inherit; box-sizing: border-box; }
+.rq-fb-input { width: 100%; resize: vertical; border: 1px solid var(--border); border-radius: 7px; padding: 7px 9px; font-size: 12.5px; color: var(--ink-soft); background: var(--surface); box-sizing: border-box; }
 .rq-fb-input:focus { outline: none; border-color: var(--accent); }
 .rq-fb-note { margin: 0; padding: 8px 14px 10px; font-size: 11px; color: var(--muted); font-style: italic; }
 

@@ -19,6 +19,33 @@
  * spreadsheet. No office or spreadsheet identifier is accepted from the client.
  */
 const PortalService = (() => {
+  const DIVISION_NAME_FALLBACKS = {
+    'admin-pool': 'Admin Pool',
+    dfd: 'Design Formulation Division',
+    pid: 'Pilot Implementation Division',
+    staed: 'Social Technology Analysis and Evaluation Division'
+  }
+  const SECTION_NAME_FALLBACKS = {
+    'children and youth': 'Children and Youth Section',
+    'children and youth section': 'Children and Youth Section',
+    'other marginalized group': 'Other Marginalized Groups Section',
+    'other marginalized groups': 'Other Marginalized Groups Section',
+    'other marginalized section': 'Other Marginalized Groups Section',
+    'other marginalized group section': 'Other Marginalized Groups Section',
+    'other marginalized groups section': 'Other Marginalized Groups Section',
+    'women, pwd, op': 'Women, Persons with Disability and Older Persons Section',
+    'women, pwd and op': 'Women, Persons with Disability and Older Persons Section',
+    'women, pwd, and op': 'Women, Persons with Disability and Older Persons Section',
+    'women, older persons and persons with disability section': 'Women, Persons with Disability and Older Persons Section',
+    'women, older persons and persons with disabilities section': 'Women, Persons with Disability and Older Persons Section',
+    'women, persons with disability and older persons': 'Women, Persons with Disability and Older Persons Section',
+    'women, persons with disability and older persons section': 'Women, Persons with Disability and Older Persons Section',
+    'promotion section': 'Social Technology Promotion Section',
+    'promotions section': 'Social Technology Promotion Section',
+    'social technology promotion section': 'Social Technology Promotion Section',
+    'social technology evaluation section': 'Social Technology Evaluation Section',
+    'social technology portfolio management section': 'Social Technology Portfolio Management Section'
+  }
 
   function normalizeEmail_(value) {
     return String(value || '').replace(/[\u200B-\u200D\uFEFF]/g, '').trim().toLowerCase()
@@ -69,14 +96,19 @@ const PortalService = (() => {
 
   function summary(params, user) {
     const profile = AuthService.getProfile(user)
-    const period = resolvePeriod_(params)
     const identity = profileRosterIdentity_(profile)
 
     const assignSheet = SpreadsheetService.getSheet(SHEET.IPAT_ASSIGNMENTS)
-    const myAssignments = SpreadsheetService.getAllRows(assignSheet).filter(row =>
-      isProfileRater_(row, identity) &&
-      matchesPeriod_(row, period)
+    const allMyAssignments = SpreadsheetService.getAllRows(assignSheet).filter(row =>
+      isProfileRater_(row, identity)
     )
+    // The dashboard is a call to action, not a generic reporting filter. When
+    // an employee has unfinished tasks from a previous semester, surface the
+    // oldest such period first so "Open Evaluation" can take them straight to
+    // the work that still needs attention. A supplied period remains an
+    // explicit override for future consumers of this endpoint.
+    const period = resolvePeriod_(params, allMyAssignments)
+    const myAssignments = allMyAssignments.filter(row => matchesPeriod_(row, period))
 
     const completed = myAssignments.filter(row => String(row.status) === 'Completed')
     const outstanding = myAssignments.filter(row => String(row.status) !== 'Completed')
@@ -187,7 +219,7 @@ const PortalService = (() => {
       fpoScore: row.fpoScore,
       jfScore: row.jfScore,
       overallScore: row.overallScore,
-      descriptor: row.descriptor,
+      descriptor: descriptorForScore_(row.overallScore) || row.descriptor,
       status: row.status,
       // Progress only. No rater is named and no rater type is disclosed.
       raterProgress: {
@@ -269,12 +301,15 @@ const PortalService = (() => {
     requireOfficeMonitoring_(profile)
 
     const period = resolvePeriod_(params)
+    const scope = monitoringScope_(profile)
 
-    const personnel = safeRows_(SHEET.USERS, 'Personnel')
+    const personnel = applyMonitoringScope_(safeRows_(SHEET.USERS, 'Personnel'), scope)
     const assignments = safeRows_(SHEET.IPAT_ASSIGNMENTS, 'RaterAssignments')
       .filter(row => matchesPeriod_(row, period))
+      .filter(row => matchesMonitoringScope_(row, scope))
     const records = safeRows_(SHEET.IPAT_RECORDS, 'AssessmentRecords')
       .filter(row => matchesPeriod_(row, period))
+      .filter(row => matchesMonitoringScope_(row, scope))
 
     const isTrue = (value) => value === true || String(value).toLowerCase() === 'true'
     const activePersonnel = personnel.filter(row => isTrue(row.active))
@@ -283,7 +318,10 @@ const PortalService = (() => {
     const completed = assignments.filter(row => String(row.status) === 'Completed')
     const outstanding = assignments.filter(row => String(row.status) !== 'Completed')
 
-    const insights = buildOfficeInsights_(assignments, records, profile)
+    const personDirectory = buildPersonDirectory_(personnel)
+    const enrichedAssignments = enrichMonitoringRows_(assignments, personDirectory)
+    const enrichedRecords = enrichMonitoringRows_(records, personDirectory)
+    const insights = buildOfficeInsights_(personnel, enrichedAssignments, enrichedRecords, profile, personDirectory)
 
     return {
       period: {
@@ -309,11 +347,16 @@ const PortalService = (() => {
         { label: 'Submitted', count: completed.length },
         { label: 'Outstanding', count: outstanding.length }
       ],
-      byUnit: groupCompletion_(assignments, row =>
+      byUnit: groupCompletion_(enrichedAssignments, row =>
         row.rateeDivisionName || row.divisionName || row.organizationalUnitName || 'Unassigned'
       ),
       byRaterType: groupCompletion_(assignments, row => row.raterType || 'Unspecified'),
-      attention: buildAttention_(personnel.length, pendingPersonnel.length, assignments.length, completed.length),
+      // These are configuration and workload signals. Return them only to the
+      // assigned office administrator (or its delegated rater-tagging focal),
+      // because ordinary personnel cannot act on them.
+      attention: canReceiveOfficeAttention_(profile)
+        ? buildAttention_(personnel.length, pendingPersonnel.length, assignments.length, completed.length)
+        : [],
       insights: insights,
       generatedAt: new Date().toISOString()
     }
@@ -326,9 +369,113 @@ const PortalService = (() => {
       AuthService.hasPermission(profile, 'view_division_monitoring') ||
       AuthService.hasPermission(profile, 'view_cluster_monitoring') ||
       AuthService.hasPermission(profile, 'manage_office_users') ||
+      AuthService.hasPermission(profile, 'manage_office_registry') ||
+      String(profile.systemScope || '') === 'OFFICE_ADMIN' ||
+      String(profile.officeRole || '') === 'OFFICE_ADMIN' ||
+      String(profile.role || '') === 'Division Chief' ||
+      String(profile.role || '') === 'Section Head'
+    if (!allowed) throw HttpError('Access denied to office monitoring', 403)
+  }
+
+  function canReceiveOfficeAttention_(profile) {
+    return String(profile.officeRole || '') === 'OFFICE_ADMIN' ||
+      AuthService.hasPermission(profile, 'manage_office_users') ||
+      AuthService.hasPermission(profile, 'manage_office_rater_matrix')
+  }
+
+  function monitoringScope_(profile) {
+    const canSeeOffice = AuthService.hasPermission(profile, 'view_bureau_monitoring') ||
+      AuthService.hasPermission(profile, 'view_cluster_monitoring') ||
+      AuthService.hasPermission(profile, 'manage_office_users') ||
+      AuthService.hasPermission(profile, 'manage_office_registry') ||
       String(profile.systemScope || '') === 'OFFICE_ADMIN' ||
       String(profile.officeRole || '') === 'OFFICE_ADMIN'
-    if (!allowed) throw HttpError('Access denied to office monitoring', 403)
+    if (canSeeOffice) return { level: 'office' }
+
+    const divisionKeys = orgKeys_([
+      profile.divisionId,
+      profile.divisionName,
+      profile.division
+    ])
+    if (AuthService.hasPermission(profile, 'view_division_monitoring') || String(profile.role || '') === 'Division Chief') {
+      return { level: 'division', divisionKeys: divisionKeys }
+    }
+
+    if (String(profile.role || '') === 'Section Head') {
+      return {
+        level: 'section',
+        divisionKeys: divisionKeys,
+        sectionKeys: orgKeys_([profile.section, profile.sectionName])
+      }
+    }
+
+    return {
+      level: 'self',
+      ids: orgKeys_([profile.id, profile.personnelId, profile.officePersonnelId]),
+      emails: orgKeys_([profile.email])
+    }
+  }
+
+  function applyMonitoringScope_(rows, scope) {
+    return (rows || []).filter(row => matchesMonitoringScope_(row, scope))
+  }
+
+  function matchesMonitoringScope_(row, scope) {
+    if (!scope || scope.level === 'office') return true
+    if (scope.level === 'division') return intersects_(rowDivisionKeys_(row), scope.divisionKeys)
+    if (scope.level === 'section') {
+      return intersects_(rowDivisionKeys_(row), scope.divisionKeys) &&
+        intersects_(rowSectionKeys_(row), scope.sectionKeys)
+    }
+    if (scope.level === 'self') {
+      return intersects_(orgKeys_([row.id, row.rateeId, row.userId, row.email, row.rateeEmail]), scope.ids.concat(scope.emails))
+    }
+    return false
+  }
+
+  function rowDivisionKeys_(row) {
+    return orgKeys_([
+      row.rateeDivisionId,
+      row.divisionId,
+      row.division,
+      row.rateeDivisionName,
+      row.divisionName,
+      row.organizationalUnitName
+    ])
+  }
+
+  function rowSectionKeys_(row) {
+    return orgKeys_([
+      row.rateeSection,
+      row.section,
+      row.sectionName,
+      sectionLabel_(row)
+    ])
+  }
+
+  function orgKeys_(values) {
+    const keys = []
+    ;(values || []).forEach(value => {
+      const raw = String(value || '').trim()
+      if (!raw) return
+      keys.push(raw)
+      const fallback = DIVISION_NAME_FALLBACKS[raw.toLowerCase()]
+      if (fallback) keys.push(fallback)
+      Object.keys(DIVISION_NAME_FALLBACKS).forEach(id => {
+        if (DIVISION_NAME_FALLBACKS[id].toLowerCase() === raw.toLowerCase()) keys.push(id)
+      })
+    })
+    return Array.from(new Set(keys.map(normalizeOrgKey_).filter(Boolean)))
+  }
+
+  function normalizeOrgKey_(value) {
+    return String(value || '').trim().toLowerCase()
+  }
+
+  function intersects_(left, right) {
+    const rightSet = {}
+    ;(right || []).forEach(key => { if (key) rightSet[key] = true })
+    return (left || []).some(key => rightSet[key])
   }
 
   // Office spreadsheets use the IPAT-compatible tab names; the central STB
@@ -369,41 +516,161 @@ const PortalService = (() => {
       .sort((a, b) => b.total - a.total)
   }
 
-  function buildOfficeInsights_(assignments, records, profile) {
-    const pendingPersonnel = buildPendingPersonnel_(assignments)
-    const scoredPersonnel = buildScoredPersonnel_(records)
+  function buildOfficeInsights_(personnel, assignments, records, profile, personDirectory) {
+    const scoredPersonnel = buildScoredPersonnel_(records, personDirectory)
+    const pendingPersonnel = buildPendingPersonnel_(assignments, scoredPersonnel, personDirectory)
+    const allPersonnelScores = buildAllPersonnelScores_(personnel, scoredPersonnel, pendingPersonnel)
 
     return {
+      allPersonnelScores: allPersonnelScores,
       pendingPersonnel: pendingPersonnel,
       outstandingPersonnel: scoredPersonnel
-        .filter(row => row.descriptor === 'Outstanding')
+        .filter(row => descriptorForScore_(row.score) === 'Outstanding')
         .sort((a, b) => (Number(b.score) || 0) - (Number(a.score) || 0) || a.name.localeCompare(b.name)),
       needsImprovementPersonnel: scoredPersonnel
-        .filter(row => row.descriptor === 'Needs Improvement' || (Number(row.score) && Number(row.score) < 3.01))
-        .sort((a, b) => (Number(a.score) || 0) - (Number(b.score) || 0) || a.name.localeCompare(b.name)),
+        .filter(row => {
+          const descriptor = descriptorForScore_(row.score)
+          return descriptor === 'Needs Improvement' || descriptor === 'Requires Immediate Intervention'
+        })
+        .sort(scoreListSort_),
       lowestPersonnel: scoredPersonnel
         .slice()
-        .sort((a, b) => (Number(a.score) || 0) - (Number(b.score) || 0) || a.name.localeCompare(b.name))
+        .sort(scoreListSort_)
         .slice(0, 10),
       top: {
-        section: buildGroupInsights_(records, assignments, row => sectionLabel_(row), profile),
-        division: buildGroupInsights_(records, assignments, row => divisionLabel_(row), profile),
-        office: buildGroupInsights_(records, assignments, row => officeLabel_(row, profile), profile)
+        section: buildGroupInsights_(scoredPersonnel, assignments, row => sectionLabel_(row), profile),
+        division: buildGroupInsights_(scoredPersonnel, assignments, row => divisionLabel_(row), profile),
+        office: buildGroupInsights_(scoredPersonnel, assignments, row => officeLabel_(row, profile), profile)
       }
     }
   }
 
-  function buildPendingPersonnel_(assignments) {
+  function buildAllPersonnelScores_(personnel, scoredPersonnel, pendingPersonnel) {
+    const rowsByPerson = {}
+    ;(personnel || []).forEach(row => {
+      const key = personKey_(row)
+      if (!key || key === 'UNKNOWN') return
+      rowsByPerson[key] = {
+        id: key,
+        name: personName_(row),
+        division: divisionLabel_(row),
+        section: sectionLabel_(row),
+        role: row.role || row.position || row.positionLevel || '',
+        score: null,
+        descriptor: '',
+        status: 'Not computed',
+        totalTasks: 0,
+        completedTasks: 0,
+        pendingTasks: 0
+      }
+    })
+
+    ;(pendingPersonnel || []).forEach(row => {
+      const key = String(row.id || '').trim()
+      if (!key) return
+      rowsByPerson[key] = {
+        ...(rowsByPerson[key] || {}),
+        ...row,
+        status: row.pendingTasks > 0 ? 'Pending tasks' : (row.status || 'Not computed')
+      }
+    })
+
+    ;(scoredPersonnel || []).forEach(row => {
+      const key = String(row.id || '').trim()
+      if (!key) return
+      rowsByPerson[key] = {
+        ...(rowsByPerson[key] || {}),
+        ...row,
+        status: row.status || 'Computed'
+      }
+    })
+
+    return Object.keys(rowsByPerson)
+      .map(key => rowsByPerson[key])
+      .sort(scoreListSort_)
+  }
+
+  function buildPersonDirectory_(personnel) {
+    const directory = {}
+    ;(personnel || []).forEach(row => {
+      const org = {
+        division: divisionLabel_(row),
+        section: sectionLabel_(row),
+        role: row.role || row.position || row.positionLevel || ''
+      }
+      personIdentityKeys_(row).forEach(key => {
+        directory[key] = org
+      })
+    })
+    return directory
+  }
+
+  function personOrg_(row, personDirectory) {
+    const directory = personDirectory || {}
+    const keys = personIdentityKeys_(row)
+    for (let i = 0; i < keys.length; i += 1) {
+      const found = directory[keys[i]]
+      if (found) return found
+    }
+    return {
+      division: divisionLabel_(row),
+      section: sectionLabel_(row),
+      role: row.role || row.rateeRole || row.rateePosition || row.position || row.positionLevel || ''
+    }
+  }
+
+  function personIdentityKeys_(row) {
+    return orgKeys_([
+      row.id,
+      row.userId,
+      row.personnelId,
+      row.officePersonnelId,
+      row.rateeId,
+      row.email,
+      row.rateeEmail,
+      row.fullName,
+      row.name,
+      row.rateeName,
+      row.employeeNo,
+      row.employeeNumber
+    ])
+  }
+
+  function enrichMonitoringRows_(rows, personDirectory) {
+    return (rows || []).map(row => {
+      const org = personOrg_(row, personDirectory)
+      return {
+        ...row,
+        divisionName: org.division,
+        rateeDivisionName: org.division,
+        section: org.section,
+        rateeSection: org.section,
+        position: org.role || row.position || row.rateePosition || row.positionLevel || '',
+        rateeRole: org.role || row.rateeRole || row.rateePosition || row.position || row.positionLevel || ''
+      }
+    })
+  }
+
+  function buildPendingPersonnel_(assignments, scoredPersonnel, personDirectory) {
+    const scoredByPerson = {}
+    ;(scoredPersonnel || []).forEach(row => {
+      scoredByPerson[String(row.id || '').trim()] = row
+    })
     const groups = {}
     assignments.forEach(row => {
       const key = personKey_(row)
+      const scored = scoredByPerson[key] || null
+      const org = personOrg_(row, personDirectory)
       if (!groups[key]) {
         groups[key] = {
           id: key,
           name: personName_(row),
-          division: divisionLabel_(row),
-          section: sectionLabel_(row),
-          role: row.rateeRole || row.rateePosition || row.position || '',
+          division: org.division,
+          section: org.section,
+          role: org.role || row.rateeRole || row.rateePosition || row.position || '',
+          score: scored ? scored.score : null,
+          descriptor: scored ? scored.descriptor : '',
+          scoreStatus: scored ? scored.status : '',
           totalTasks: 0,
           completedTasks: 0,
           pendingTasks: 0,
@@ -428,25 +695,26 @@ const PortalService = (() => {
       .sort((a, b) => b.pendingTasks - a.pendingTasks || a.completionRate - b.completionRate || a.name.localeCompare(b.name))
   }
 
-  function buildScoredPersonnel_(records) {
+  function buildScoredPersonnel_(records, personDirectory) {
     const latest = {}
     records.forEach(row => {
       const score = numericScore_(row.overallScore)
-      const descriptor = descriptorLabel_(row)
+      const descriptor = descriptorForScore_(score) || descriptorLabel_(row)
       if (!descriptor && score === null) return
       const key = personKey_(row)
       const current = latest[key]
       const updatedAt = String(row.updatedAt || row.createdAt || '')
       if (!current || updatedAt > String(current.updatedAt || '')) {
+        const org = personOrg_(row, personDirectory)
         latest[key] = {
           id: key,
           recordId: row.id || '',
           name: personName_(row),
-          division: divisionLabel_(row),
-          section: sectionLabel_(row),
-          role: row.rateeRole || row.position || row.positionLevel || '',
+          division: org.division,
+          section: org.section,
+          role: org.role || row.rateeRole || row.position || row.positionLevel || '',
           score: score,
-          descriptor: descriptor || descriptorForScore_(score),
+          descriptor: descriptor,
           status: row.status || '',
           updatedAt: updatedAt
         }
@@ -455,7 +723,7 @@ const PortalService = (() => {
     return Object.keys(latest).map(key => latest[key])
   }
 
-  function buildGroupInsights_(records, assignments, keyOf, profile) {
+  function buildGroupInsights_(scoredPersonnel, assignments, keyOf, profile) {
     const groups = {}
     const ensure = (label) => {
       const key = String(label || 'Unassigned').trim() || 'Unassigned'
@@ -475,7 +743,7 @@ const PortalService = (() => {
       return groups[key]
     }
 
-    assignments.forEach(row => {
+    ;(assignments || []).forEach(row => {
       const group = ensure(keyOf(row) || officeLabel_(row, profile))
       group.totalTasks += 1
       if (String(row.status) === 'Completed') {
@@ -485,16 +753,16 @@ const PortalService = (() => {
       }
     })
 
-    records.forEach(row => {
-      const score = numericScore_(row.overallScore)
-      const descriptor = descriptorLabel_(row) || descriptorForScore_(score)
+    ;(scoredPersonnel || []).forEach(row => {
+      const score = numericScore_(row.score)
+      const descriptor = descriptorForScore_(score) || descriptorLabel_(row)
       const group = ensure(keyOf(row) || officeLabel_(row, profile))
       if (score !== null) {
         group.scoredCount += 1
         group.scoreTotal += score
       }
       if (descriptor === 'Outstanding') group.outstandingCount += 1
-      if (descriptor === 'Needs Improvement') group.needsImprovementCount += 1
+      if (descriptor === 'Needs Improvement' || descriptor === 'Requires Immediate Intervention') group.needsImprovementCount += 1
     })
 
     const rows = Object.keys(groups).map(key => {
@@ -540,11 +808,30 @@ const PortalService = (() => {
   }
 
   function divisionLabel_(row) {
-    return String(row.rateeDivisionName || row.divisionName || row.organizationalUnitName || row.division || row.rateeDivisionId || 'Unassigned').trim() || 'Unassigned'
+    const raw = String(row.rateeDivisionName || row.divisionName || row.organizationalUnitName || row.division || row.rateeDivisionId || 'Unassigned').trim()
+    return canonicalDivisionName_(raw)
   }
 
   function sectionLabel_(row) {
-    return String(row.rateeSection || row.section || row.sectionName || 'Unassigned').trim() || 'Unassigned'
+    const raw = String(row.rateeSection || row.section || row.sectionName || 'Unassigned').trim()
+    return canonicalSectionName_(raw)
+  }
+
+  function canonicalDivisionName_(value) {
+    const raw = String(value || '').trim()
+    if (!raw) return 'Unassigned'
+    return DIVISION_NAME_FALLBACKS[raw.toLowerCase()] || raw
+  }
+
+  function canonicalSectionName_(value) {
+    const raw = String(value || '').trim()
+    if (!raw) return 'Unassigned'
+    const normalized = raw.toLowerCase()
+      .replace(/\band\b/g, 'and')
+      .replace(/&/g, 'and')
+      .replace(/\s+/g, ' ')
+      .trim()
+    return SECTION_NAME_FALLBACKS[normalized] || raw
   }
 
   function officeLabel_(row, profile) {
@@ -554,6 +841,15 @@ const PortalService = (() => {
   function numericScore_(value) {
     const score = Number(value)
     return Number.isFinite(score) && score > 0 ? score : null
+  }
+
+  function scoreListSort_(a, b) {
+    const left = numericScore_(a && a.score)
+    const right = numericScore_(b && b.score)
+    if (left !== null && right !== null) return right - left || String(a.name || '').localeCompare(String(b.name || ''))
+    if (left !== null) return -1
+    if (right !== null) return 1
+    return String(a && a.name || '').localeCompare(String(b && b.name || ''))
   }
 
   function descriptorLabel_(row) {
@@ -600,9 +896,6 @@ const PortalService = (() => {
     if (taskCount && completedCount === 0) {
       items.push({ level: 'FOR_ATTENTION', label: 'No ratings submitted yet', detail: 'Raters have assignments but none have been submitted.' })
     }
-    if (!items.length) {
-      items.push({ level: 'ON_TRACK', label: 'No items need attention', detail: 'Personnel and rating tasks are progressing normally.' })
-    }
     return items
   }
 
@@ -644,11 +937,38 @@ const PortalService = (() => {
     return seen
   }
 
-  function resolvePeriod_(params) {
+  function resolvePeriod_(params, assignments) {
+    const hasExplicitPeriod = Boolean(params && (params.semester || params.year))
     const now = new Date()
     const year = Number(params && params.year) || now.getFullYear()
     const semester = Number(params && params.semester) || (now.getMonth() < 6 ? 1 : 2)
-    return { semester: semester, year: year }
+    if (hasExplicitPeriod) return { semester: semester, year: year, selection: 'requested' }
+
+    const periods = {}
+    ;(assignments || []).forEach(row => {
+      const rowSemester = Number(row.semester)
+      const rowYear = Number(row.year)
+      if ((rowSemester !== 1 && rowSemester !== 2) || !rowYear) return
+      const key = rowYear + ':' + rowSemester
+      if (!periods[key]) {
+        periods[key] = { semester: rowSemester, year: rowYear, hasOutstanding: false }
+      }
+      if (String(row.status || '').toLowerCase() !== 'completed') {
+        periods[key].hasOutstanding = true
+      }
+    })
+
+    const candidates = Object.keys(periods).map(key => periods[key])
+    const outstanding = candidates
+      .filter(period => period.hasOutstanding)
+      .sort((a, b) => a.year - b.year || a.semester - b.semester)
+    if (outstanding.length) return { ...outstanding[0], selection: 'pending' }
+
+    // No action is required, so keep the completion card meaningful by showing
+    // the most recent period in which the employee actually had a task.
+    const latest = candidates.sort((a, b) => b.year - a.year || b.semester - a.semester)[0]
+    if (latest) return { ...latest, selection: 'latest' }
+    return { semester: semester, year: year, selection: 'current' }
   }
 
   function matchesPeriod_(row, period) {

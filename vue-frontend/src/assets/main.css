@@ -10,7 +10,7 @@
     height: 100%;
     margin: 0;
     overflow: hidden !important;
-    font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
+    font-family: var(--pmes-font-family, 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif);
     background: #f4f7fb;
     color: #0f172a;
   }
@@ -207,6 +207,6 @@
 }
 
 html, body, #app {
-  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
+  font-family: var(--pmes-font-family, 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif);
 }
 * { font-family: inherit; }

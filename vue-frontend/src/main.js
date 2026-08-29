@@ -71,17 +71,6 @@ window.addEventListener('unhandledrejection', () => {
 // The sign-in route is /auth/login - it lives under the /auth layout, which is
 // what the router's own guard redirects to. '/login' does not exist and lands on
 // the 404 page.
-// TEMPORARY verification aid for the multi-office data boundary. Read-only -
-// it counts rows and reports which spreadsheet each resource resolves to. Run
-// `await pmesDiagnostics()` in the browser console while signed in as an
-// administrator. Remove once the office boundary is confirmed across offices.
-window.pmesDiagnostics = async () => {
-  const { diagnosticsApi } = await import('@/services/api')
-  const report = await diagnosticsApi.officeBoundary()
-  console.log(JSON.stringify(report, null, 2))
-  return report
-}
-
 const LOGIN_PATH = '/auth/login'
 
 let handlingAuthExpiry = false

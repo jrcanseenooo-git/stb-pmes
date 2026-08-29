@@ -296,9 +296,7 @@ async function reload() {
       raterMatrixApi.list(),
       raterMatrixApi.coverage()
     ])
-    roleBlocks.value = groupRows(matrix.items || [])
-    if (matrix.scopes?.length) scopes.value = matrix.scopes
-    if (matrix.raterTypes?.length) raterTypes.value = matrix.raterTypes
+    applyMatrix(matrix)
     coverage.value = cov || {}
     dirty.value = false
   } catch (e) {
@@ -307,6 +305,12 @@ async function reload() {
   } finally {
     loading.value = false
   }
+}
+
+function applyMatrix(matrix) {
+  roleBlocks.value = groupRows(matrix?.items || [])
+  if (matrix?.scopes?.length) scopes.value = matrix.scopes
+  if (matrix?.raterTypes?.length) raterTypes.value = matrix.raterTypes
 }
 
 function addRoleBlock(role) {
@@ -360,9 +364,11 @@ async function save() {
   setActionNotice('info', 'Saving rater matrix', 'Writing the rater rules to the database. Please keep this page open.')
   toast.info('Saving rater matrix...')
   try {
-    await raterMatrixApi.save(flattenBlocks())
-    setActionNotice('info', 'Refreshing rater matrix', 'Save completed. Reloading the latest rules and coverage counts.')
-    await reload()
+    const matrix = await raterMatrixApi.save(flattenBlocks())
+    applyMatrix(matrix)
+    setActionNotice('info', 'Updating coverage', 'Save completed. Checking the latest personnel coverage.')
+    coverage.value = await raterMatrixApi.coverage()
+    dirty.value = false
     setActionNotice('success', 'Rater matrix saved', 'The latest rules are now stored in the database.')
     toast.success('Rater matrix saved.')
   } catch (e) {
@@ -389,9 +395,11 @@ async function restoreDefaults() {
   setActionNotice('info', 'Applying standard hierarchy', 'Building rater rules from this office structure and saving them to the database.')
   toast.info('Applying standard hierarchy...')
   try {
-    await raterMatrixApi.seedDefaults()
-    setActionNotice('info', 'Refreshing rater matrix', 'The standard hierarchy was saved. Reloading the latest rules.')
-    await reload()
+    const matrix = await raterMatrixApi.seedDefaults()
+    applyMatrix(matrix)
+    setActionNotice('info', 'Updating coverage', 'The standard hierarchy was saved. Checking the latest personnel coverage.')
+    coverage.value = await raterMatrixApi.coverage()
+    dirty.value = false
     setActionNotice('success', 'Standard hierarchy applied', 'The rater matrix now follows this office structure.')
     toast.success('Standard hierarchy applied.')
   } catch (e) {

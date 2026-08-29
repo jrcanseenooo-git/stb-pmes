@@ -225,7 +225,7 @@
                 <span class="pui-badge" style="flex-shrink:0;">{{ r.format?.toUpperCase() }}</span>
                 <div style="min-width:0; flex:1;">
                   <p style="margin:0; font-size:13px; font-weight:700; color:#0f172a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ r.name }}</p>
-                  <p style="margin:2px 0 0; font-size:11px; color:#94a3b8;">{{ fmtDate(r.createdAt) }}</p>
+                  <p style="margin:2px 0 0; font-size:11px; color:#94a3b8;">{{ r.scopeLabel ? r.scopeLabel + ' · ' : '' }}{{ fmtDate(r.createdAt) }}</p>
                 </div>
                 <button class="pui-btn pui-btn-sm" style="flex-shrink:0;" type="button" @click="downloadReport(r)">
                   Download

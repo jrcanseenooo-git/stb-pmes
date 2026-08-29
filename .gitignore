@@ -24,3 +24,11 @@ output/
 
 # Claude Code local machine settings (not shared)
 .claude/settings.local.json
+
+# Ad-hoc backup copies of deployed Apps Script from earlier sessions.
+# Kept on disk, excluded from git: they are stale duplicates of apps-script/,
+# and release-approve-ui/ carries a full node_modules tree.
+release-approve-fix/
+release-approve-ui/
+release-evaluation-fix/
+verification/

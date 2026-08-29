@@ -42,7 +42,7 @@
             </transition>
           </RouterLink>
 
-          <RouterLink v-if="showPortalNav" to="/my-dashboard" class="nav-item" active-class="active" :title="collapsed ? 'Dashboard' : ''">
+          <RouterLink v-if="showPortalNav" :to="dashboardPath" class="nav-item" active-class="active" :title="collapsed ? 'Dashboard' : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <rect x="1" y="1" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.4" />
@@ -53,29 +53,6 @@
             </div>
             <transition name="fade">
               <span v-if="!collapsed" class="nav-label-text">Dashboard</span>
-            </transition>
-          </RouterLink>
-
-          <RouterLink v-if="showPortalNav" to="/my-tasks" class="nav-item" active-class="active" :title="collapsed ? 'My Rating Tasks' : ''">
-            <div class="nav-icon">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <rect x="2.5" y="1.5" width="11" height="13" rx="2" stroke="currentColor" stroke-width="1.4" />
-                <path d="M5.5 5.5h5M5.5 8h5M5.5 10.5h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
-              </svg>
-            </div>
-            <transition name="fade">
-              <span v-if="!collapsed" class="nav-label-text">My Rating Tasks</span>
-            </transition>
-          </RouterLink>
-
-          <RouterLink v-if="showPortalNav" to="/my-results" class="nav-item" active-class="active" :title="collapsed ? 'My Results' : ''">
-            <div class="nav-icon">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path d="M2 13.5V9M6 13.5V4M10 13.5V6.5M14 13.5V2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-              </svg>
-            </div>
-            <transition name="fade">
-              <span v-if="!collapsed" class="nav-label-text">My Results</span>
             </transition>
           </RouterLink>
 
@@ -177,14 +154,8 @@
           </RouterLink> -->
         </div>
 
-        <div class="nav-group">
-          <!-- "Administration" heads Reports / Audit Trail / User Management.
-               With all three hidden - as for cluster oversight - the heading was
-               rendering over nothing. The "Account" variant always has items
-               beneath it, so only the Administration case needs the guard. -->
-          <div v-if="!collapsed && (!canAccessFullSystem || showAdministrationNav)" class="nav-label">
-            {{ canAccessFullSystem ? 'Administration' : 'Account' }}
-          </div>
+        <div v-if="showAdministrationNav" class="nav-group">
+          <div v-if="!collapsed" class="nav-label">Administration</div>
           <div v-else class="nav-divider"></div>
 
           <RouterLink v-if="canGenerateReports && !isUndersecretary" to="/reports" class="nav-item" active-class="active" :title="collapsed ? 'Reports' : ''">
@@ -223,9 +194,11 @@
               <span v-if="!collapsed" class="nav-label-text">User Management</span>
             </transition>
           </RouterLink>
+        </div>
 
-          <div v-if="showOfficeAdminNav && !collapsed" class="nav-label nav-label-nested">Office Administration</div>
-          <div v-else-if="showOfficeAdminNav && collapsed" class="nav-divider nav-divider-subtle"></div>
+        <div v-if="showOfficeAdminNav" class="nav-group">
+          <div v-if="!collapsed" class="nav-label">Office Administration</div>
+          <div v-else class="nav-divider"></div>
 
           <RouterLink v-if="canViewOfficeDashboard && dashboardPath !== '/office-dashboard'" to="/office-dashboard" class="nav-item" active-class="active" :title="collapsed ? 'Office Dashboard' : ''">
             <div class="nav-icon">
@@ -265,19 +238,18 @@
               </svg>
             </div>
             <transition name="fade">
-              <span v-if="!collapsed" class="nav-label-text">Office Management</span>
+              <span v-if="!collapsed" class="nav-label-text">Office Structure</span>
             </transition>
           </RouterLink>
-
         </div>
 
         <!-- Its own group, so it can lead the menu for cluster oversight -
              that account lands on Cluster Overview, and leaving this nested
              under Administration put the highlighted item in the second group,
              below a section the account barely uses. -->
-        <div class="nav-group" :class="{ 'nav-group-lead': isUndersecretary }">
-          <div v-if="showCentralAdminNav && !collapsed" class="nav-label nav-label-nested">Central Administration</div>
-          <div v-else-if="showCentralAdminNav && collapsed" class="nav-divider nav-divider-subtle"></div>
+        <div v-if="showCentralAdminNav" class="nav-group" :class="{ 'nav-group-lead': isUndersecretary }">
+          <div v-if="showCentralAdminNav && !collapsed" class="nav-label">Central Administration</div>
+          <div v-else-if="showCentralAdminNav && collapsed" class="nav-divider"></div>
 
           <RouterLink v-if="canViewClusterMonitoring || canManageOfficeRegistry" to="/cluster-overview" class="nav-item" active-class="active" :title="collapsed ? 'Cluster Overview' : ''">
             <div class="nav-icon">
@@ -305,8 +277,8 @@
         </div>
 
         <div class="nav-group">
-          <div v-if="showAccountAdminNav && !collapsed" class="nav-label nav-label-nested">Account</div>
-          <div v-else-if="showAccountAdminNav && collapsed" class="nav-divider nav-divider-subtle"></div>
+          <div v-if="!collapsed" class="nav-label">Account</div>
+          <div v-else class="nav-divider"></div>
 
           <RouterLink v-if="showPortalNav" to="/my-notifications" class="nav-item" active-class="active" :title="collapsed ? 'Assessment Status' : ''">
             <div class="nav-icon">
@@ -482,7 +454,7 @@ import PasswordChangePrompt from '@/components/common/PasswordChangePrompt.vue'
 import LogoutConfirmModal from '@/components/common/LogoutConfirmModal.vue'
 
 const authStore = useAuthStore()
-const { canManageUsers, canManageOfficeUsers, canManageLibraries, canViewAssessmentLibrary, canManageFocalAssignments, canManageDatabase, canManageOfficeRegistry, canConfigureOfficeStructure, canViewClusterMonitoring, canGenerateAssignments, canViewOfficeDashboard, canViewOfficePersonnel, canViewAudit, canGenerateReports, canAccessFullSystem, isExplicitOfficeAdmin, isClusterPortalScope, isUndersecretary } = usePermissions()
+const { canManageUsers, canManageOfficeUsers, canManageLibraries, canViewAssessmentLibrary, canManageFocalAssignments, canManageDatabase, canManageOfficeRegistry, canConfigureOfficeStructure, canViewClusterMonitoring, canGenerateAssignments, canManageOfficePersonnel, canViewOfficeDashboard, canViewAudit, canGenerateReports, canAccessFullSystem, isExplicitOfficeAdmin, isClusterPortalScope, isStbFullScope, isUndersecretary } = usePermissions()
 const { isClusterPortal, portalTitle, portalSubtitle, wordmarkTop, wordmarkBottom, shortName, documentTitle } = useBranding()
 const notifStore = useNotificationsStore()
 const { confirm } = useConfirm()
@@ -498,7 +470,7 @@ const dashboardPath = computed(() => {
   if (!isClusterPortal.value) return '/dashboard'
   return canViewOfficeDashboard.value ? '/office-dashboard' : '/my-dashboard'
 })
-const canUseStbModules = computed(() => !isClusterPortal.value)
+const canUseStbModules = computed(() => isStbFullScope.value && canAccessFullSystem.value)
 const officeRegistryLabel = computed(() =>
   canManageOfficeRegistry.value || canViewClusterMonitoring.value ? 'Office Registry' : 'Office Structure'
 )
@@ -506,17 +478,13 @@ const showCentralAdminNav = computed(() =>
   canViewClusterMonitoring.value || canManageOfficeRegistry.value
 )
 const showOfficeManagementNav = computed(() =>
-  !showCentralAdminNav.value && (canConfigureOfficeStructure.value || canViewOfficePersonnel.value)
+  !showCentralAdminNav.value && (canConfigureOfficeStructure.value || canManageOfficePersonnel.value)
 )
 const showOfficeAdminNav = computed(() =>
   (canViewOfficeDashboard.value && dashboardPath.value !== '/office-dashboard') ||
   canGenerateAssignments.value ||
   showOfficeManagementNav.value
 )
-const showAccountAdminNav = computed(() =>
-  canAccessFullSystem.value
-)
-
 // Ordinary portal personnel get read-only Personal Information. Office
 // administrators and STB users keep the editable Profile & Settings screen,
 // because they still need account controls such as changing a password.
@@ -556,12 +524,12 @@ const showPwPrompt = ref(false)
 const showLogoutConfirm = ref(false)
 let notificationTimer = null
 let lastProfileRefreshAt = 0
+let shellRefreshInFlight = null
+let lastShellRefreshStartedAt = 0
 
 const titleMap = {
   '/dashboard': { title: 'Dashboard', sub: 'Bureau Overview' },
   '/my-dashboard': { title: 'Dashboard', sub: 'Assessment Overview' },
-  '/my-tasks': { title: 'My Rating Tasks', sub: 'Assigned Assessments' },
-  '/my-results': { title: 'My Results', sub: 'Consolidated Assessment Results' },
   '/library': { title: 'Assessment Library', sub: 'Official Assessment Content' },
   '/my-notifications': { title: 'Assessment Status', sub: 'Updates' },
   '/my-profile': { title: 'Personal Information', sub: '' },
@@ -573,10 +541,9 @@ const titleMap = {
   '/reports': { title: 'Reports', sub: 'Generate & Export' },
   '/evaluation': { title: 'Evaluation Ratings', sub: 'Innovations Performance Assessment Tool' },
   '/audit': { title: 'Audit Trail', sub: 'Activity Log' },
-  '/users': { title: 'User Management', sub: 'Access Control' },
+  '/users': { title: 'User Management', sub: 'Accounts & approvals' },
   '/office-registry': { title: 'Office Registry', sub: 'Central Administration' },
-  '/office-personnel': { title: 'Personnel Validation', sub: 'Office Assessment Roster' },
-  '/office-management': { title: 'Office Management', sub: 'Structure & Personnel' },
+  '/office-management': { title: 'Office Structure', sub: 'Divisions, sections & registration' },
   '/office-dashboard': { title: 'Office Assessment Dashboard', sub: 'Office Monitoring' },
   '/rater-matrix': { title: 'Rater Tagging', sub: 'Who Rates Whom' },
   '/cluster-overview': { title: 'Cluster Assessment Overview', sub: 'Central Monitoring' },
@@ -588,7 +555,7 @@ const titleMap = {
 const CLUSTER_TITLE_OVERRIDES = {
   '/evaluation': { title: 'Evaluation Rating', sub: 'Assessment Form' },
   '/reports': { title: 'Reports', sub: 'Office Assessment Reports' },
-  '/users': { title: 'Personnel Validation', sub: 'Office Accounts' },
+  '/users': { title: 'User Management', sub: 'Accounts & approvals' },
   '/profile': { title: 'Personal Information', sub: '' }
 }
 
@@ -600,7 +567,7 @@ const activeTitle = computed(() => {
 const pageTitle = computed(() => activeTitle.value?.title ?? shortName.value)
 const pageSub = computed(() => activeTitle.value?.sub ?? '')
 const isOfficeManagementRoute = computed(() =>
-  ['/office-management', '/office-registry', '/office-personnel'].includes(route.path) && !showCentralAdminNav.value
+  ['/office-management', '/office-registry'].includes(route.path) && !showCentralAdminNav.value
 )
 
 watch([pageTitle, portalSubtitle], () => {
@@ -758,6 +725,9 @@ async function refreshRealtimeShell(options = {}) {
   if (!authStore.hasAccess) return
   const forceProfile = options.forceProfile === true
   const now = Date.now()
+  if (shellRefreshInFlight && now - lastShellRefreshStartedAt < 5000) {
+    return shellRefreshInFlight
+  }
   try {
     // Profile and notifications are independent reads - notifications don't
     // need a fresh profile to fetch - so on first mount (forceProfile: true,
@@ -769,9 +739,13 @@ async function refreshRealtimeShell(options = {}) {
       tasks.push(authStore.fetchProfile())
       lastProfileRefreshAt = now
     }
-    await Promise.all(tasks)
+    lastShellRefreshStartedAt = now
+    shellRefreshInFlight = Promise.all(tasks)
+    await shellRefreshInFlight
   } catch {
     // Background refresh should never interrupt the user.
+  } finally {
+    shellRefreshInFlight = null
   }
 }
 
@@ -832,7 +806,6 @@ onUnmounted(() => {
   --text: #0f172a;
   --muted: #64748b;
 
-  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
   position: fixed;
   inset: 0;
   display: flex;
@@ -857,6 +830,11 @@ onUnmounted(() => {
 .sidebar-collapsed .sidebar {
   width: var(--sidebar-collapsed-w);
   flex-basis: var(--sidebar-collapsed-w);
+}
+
+.sidebar-collapsed .sb-brand {
+  justify-content: center;
+  padding: 10px 8px;
 }
 
 .sb-brand {
@@ -884,14 +862,20 @@ onUnmounted(() => {
    code) rather than an icon - still pure text, just compact enough for the
    narrow collapsed rail. */
 .brand-mark {
-  width: 100%;
+  width: 42px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.08);
   color: #ffffff;
-  font-size: 12px;
+  font-size: 9px;
   font-weight: 800;
   text-align: center;
-  letter-spacing: .03em;
+  letter-spacing: .02em;
   overflow: hidden;
-  text-overflow: ellipsis;
+  text-overflow: clip;
   white-space: nowrap;
 }
 
@@ -968,24 +952,10 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 
-.nav-label-nested {
-  padding-top: 12px;
-  padding-bottom: 4px;
-  color: rgba(255,255,255,.46);
-  font-size: 8px;
-  letter-spacing: .7px;
-}
-
 .nav-divider {
   height: 1px;
   margin: 9px;
   background: rgba(255,255,255,.08);
-}
-
-.nav-divider-subtle {
-  margin-top: 11px;
-  margin-bottom: 7px;
-  background: rgba(255,255,255,.06);
 }
 
 .nav-item {
@@ -1011,6 +981,12 @@ onUnmounted(() => {
   background: #ffffff;
   color: var(--blue);
   box-shadow: 0 8px 18px rgba(0,0,0,.16);
+}
+
+.sidebar-collapsed .nav-item {
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
 }
 
 .nav-icon {
@@ -1075,6 +1051,14 @@ onUnmounted(() => {
 
 .sb-user.centered {
   justify-content: center;
+}
+
+.sidebar-collapsed .sb-user {
+  width: 46px;
+  min-height: 46px;
+  padding: 6px;
+  margin: 0 auto;
+  border-radius: 14px;
 }
 
 .user-av,

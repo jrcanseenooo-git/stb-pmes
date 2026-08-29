@@ -29,7 +29,8 @@ const OfficeSchemaService = (() => {
     ],
     AssessmentRules: [
       'id', 'officeId', 'ruleType', 'ruleKey', 'label', 'value',
-      'active', 'description', 'createdAt', 'updatedAt', 'updatedBy'
+      'active', 'description', 'basis', 'approvedBy',
+      'createdAt', 'updatedAt', 'updatedBy'
     ],
     AssessmentCategories: [
       'id', 'domainId', 'domainName', 'categoryId', 'categoryName',
@@ -165,6 +166,7 @@ const OfficeSchemaService = (() => {
       AssessmentRulesService.ensureDefaultsForSpreadsheet(ss, office, user)
     }
     copyAssessmentReference_(ss)
+    syncRaterMatrixMirror_(ss, office, user)
     applyProtections_(ss)
     return validateSpreadsheet(ss.getId(), office)
   }
@@ -278,6 +280,19 @@ const OfficeSchemaService = (() => {
   function repairSpreadsheet(spreadsheetId) {
     const ss = SpreadsheetApp.openById(spreadsheetId)
     return repairMissingHeaders_(ss)
+  }
+
+  function syncRaterMatrixMirror_(ss, office, user) {
+    if (typeof RaterMatrixService === 'undefined') return
+    try {
+      RaterMatrixService.syncOfficeMirrorForRegistryRow({
+        officeId: office.officeId,
+        officeCode: office.officeCode,
+        spreadsheetId: ss.getId()
+      }, user, { seedIfEmpty: true })
+    } catch (e) {
+      Logger.log('[OfficeSchema] RaterMatrix mirror skipped for ' + office.officeId + ': ' + (e && e.message || e))
+    }
   }
 
   function setHeaders_(sheet, headers) {

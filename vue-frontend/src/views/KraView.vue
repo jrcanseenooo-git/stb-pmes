@@ -262,6 +262,14 @@
               <strong>{{ activeCategoryQuestions.length }}</strong> / {{ filteredAssessmentQuestions.length }} questions
               <span>(Active)</span>
             </div>
+            <button
+              class="btn btn-outline assessment-template-btn"
+              type="button"
+              :disabled="promotingSeedTemplate || loadingQuestions || !assessmentQuestions.length"
+              @click="promoteCurrentAsSeedTemplate"
+            >
+              {{ promotingSeedTemplate ? 'Updating Template…' : 'Update Seed Template' }}
+            </button>
             <button class="btn btn-primary assessment-add-btn" type="button" @click="openQuestionModal()" style="margin:0;white-space:nowrap">
               <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
                 <path d="M6.5 1v11M1 6.5h11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
@@ -706,7 +714,8 @@
                 </div>
               </div>
               <div class="field full">
-                <label class="field-label">Applicable Levels <span class="req">*</span></label>
+                <label class="field-label">Applicable Roles</label>
+                <p class="field-hint">Leave every role unticked to apply this question to everyone. Tick roles only to narrow it. Roles come from your office's structure.</p>
                 <div class="check-grid">
                   <label v-for="level in employeeLevelOptions" :key="level" class="check-pill green">
                     <input type="checkbox" :checked="isQuestionArrayChecked('applicableLevels', level)" :disabled="questionReadOnly" @change="toggleQuestionArray('applicableLevels', level)">
@@ -746,9 +755,31 @@
           <div class="modal-footer">
             <button class="btn" @click="closeQuestionModal">Cancel</button>
             <button v-if="editingQuestion && questionForm.status !== 'Active'" class="btn" :disabled="savingQuestion || questionReadOnly" @click="confirmPublishQuestion">Publish</button>
-            <button class="btn btn-primary" :disabled="savingQuestion || questionReadOnly" @click="saveQuestion">
+            <button class="btn btn-primary" :disabled="savingQuestion || questionReadOnly" @click="confirmSaveQuestion">
               <span v-if="savingQuestion" class="spinner-sm"></span>
               {{ savingQuestion ? 'Saving...' : 'Save Question' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </teleport>
+
+    <teleport to="body">
+      <div v-if="saveQuestionConfirm.show" class="modal-overlay">
+        <div class="confirm-box">
+          <div class="cb-title">{{ editingQuestion ? 'Save Question Changes?' : 'Save New Question?' }}</div>
+          <div class="cb-msg">{{ saveQuestionConfirmMessage }}</div>
+          <div class="cb-details">
+            <div><span>Status</span><strong>{{ questionForm.status }}</strong></div>
+            <div><span>Period</span><strong>{{ questionForm.period || 'All periods' }}</strong></div>
+            <div><span>Raters</span><strong>{{ questionForm.applicableRaters.length }}</strong></div>
+            <div><span>Levels</span><strong>{{ questionForm.applicableLevels.length }}</strong></div>
+          </div>
+          <div class="cb-btns">
+            <button class="btn" :disabled="savingQuestion" @click="saveQuestionConfirm.show = false">Cancel</button>
+            <button class="btn btn-primary" :disabled="savingQuestion" @click="saveQuestion">
+              <span v-if="savingQuestion" class="spinner-sm"></span>
+              {{ savingQuestion ? 'Saving...' : 'Confirm Save' }}
             </button>
           </div>
         </div>
@@ -795,6 +826,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { kraLibrary as kraLibraryApi, assessmentContent as assessmentContentApi, assessmentCategory as assessmentCategoryApi } from '@/services/api'
 import { usePermissions } from '@/composables/usePermissions'
+import { useOrgOptions } from '@/composables/useOrgOptions'
 
 const PHASES = ['ANALYSIS', 'DESIGN', 'TESTING', 'EVALUATION', 'PROMOTION', 'PORTFOLIO', 'SOCIAL_MARKETING', 'STRATEGIC', 'SUPPORT']
 
@@ -844,17 +876,49 @@ const loadingQuestions = ref(false)
 const assessmentLoaded = ref(false)
 const seeding = ref(false)
 const seedingCategories = ref(false)
+const promotingSeedTemplate = ref(false)
 const showCategoryModal = ref(false)
 const savingCategory = ref(false)
 const categoryEditForm = ref({ id: '', domainName: '', categoryName: '', description: '' })
 const savingQuestion = ref(false)
 const showQuestionModal = ref(false)
 const editingQuestion = ref(null)
+const saveQuestionConfirm = ref({ show: false })
 const publishConfirm = ref({ show: false, id: null })
 const archiveConfirm = ref({ show: false, id: null })
 
+// Rater types are a closed set fixed by the assessment protocol.
 const raterOptions = ['Self', 'Peer', 'Upward', 'Supervisor', 'Skip Supervisor']
-const employeeLevelOptions = ['Technical Staff', 'Section Head', 'Division Chief']
+
+// Employee levels are NOT a closed set. Each office defines its own roles in its
+// structure data, served per office as requestedRoles. This was hardcoded to
+// STB's three-rung ladder, so an administrator could not tick "Admin Staff" -
+// the option was never rendered - and every ratee outside those three matched no
+// question at all. Fall back to the ladder only while the office options load.
+const STB_FALLBACK_LEVELS = ['Technical Staff', 'Section Head', 'Division Chief']
+const { currentOrgOptions, loadOrgOptions } = useOrgOptions()
+const employeeLevelOptions = computed(() => {
+  const roles = currentOrgOptions.value?.requestedRoles || []
+  const names = roles
+    .map(role => String(typeof role === 'string' ? role : (role?.name || role?.label || '')).trim())
+    .filter(Boolean)
+  return names.length ? Array.from(new Set(names)) : [...STB_FALLBACK_LEVELS]
+})
+const raterAliases = {
+  subordinate: 'Upward',
+  upward: 'Upward',
+  skipsupervisor: 'Skip Supervisor',
+  'skip supervisor': 'Skip Supervisor',
+  supervisor: 'Supervisor',
+  peer: 'Peer',
+  self: 'Self'
+}
+const levelAliases = {
+  'technical staff': 'Technical Staff',
+  staff: 'Technical Staff',
+  'section head': 'Section Head',
+  'division chief': 'Division Chief'
+}
 
 const assessmentCategoryRows = ref([])
 const loadingCategories = ref(false)
@@ -905,8 +969,10 @@ function emptyQuestionForm() {
     scaleType: '1-4 Likert',
     required: true,
     evidenceRequired: false,
-    applicableRaters: ['Self', 'Peer', 'Upward', 'Supervisor'],
-    applicableLevels: ['Technical Staff', 'Section Head', 'Division Chief'],
+    applicableRaters: [...raterOptions],
+    // Empty = applies to every role. An administrator narrows it deliberately by
+    // ticking roles from their own office's list.
+    applicableLevels: [],
     status: 'Draft',
     period: 'S2 2026',
     version: 1,
@@ -923,6 +989,15 @@ const pageSubtitle = computed(() => activeLibraryTab.value === 'assessment'
   ? 'Manage evaluation domains, competency themes, and assessment questions'
   : 'Master KRA & Success Indicator List'
 )
+const saveQuestionConfirmMessage = computed(() => {
+  if (questionForm.value.status === 'Active') {
+    return 'This active question will be saved and synced to the seed template used for future reseeding.'
+  }
+  if (questionForm.value.status === 'Archived') {
+    return 'This question will be archived and removed from the seed template for future reseeding.'
+  }
+  return 'This question will be saved as a draft and will not be used for future reseeding until it becomes active.'
+})
 
 const filteredKRAs = computed(() => {
   let rows = kras.value
@@ -1107,8 +1182,8 @@ function openQuestionModal(question = null) {
         scaleType: question.scaleType || '1-4 Likert',
         required: question.required !== false,
         evidenceRequired: Boolean(question.evidenceRequired),
-        applicableRaters: [...(question.applicableRaters || [])],
-        applicableLevels: [...(question.applicableLevels || [])],
+        applicableRaters: normalizeRaters(question.applicableRaters),
+        applicableLevels: normalizeLevels(question.applicableLevels, true),
         status: question.status || 'Draft',
         period: question.period || 'S2 2026',
         version: Number(question.version) || 1,
@@ -1123,6 +1198,7 @@ function openQuestionModal(question = null) {
 
 function closeQuestionModal() {
   showQuestionModal.value = false
+  saveQuestionConfirm.value.show = false
   editingQuestion.value = null
   questionForm.value = emptyQuestionForm()
 }
@@ -1145,6 +1221,8 @@ function questionPayload(statusOverride = null) {
     status: statusOverride || questionForm.value.status,
     sequence: Number(questionForm.value.sequence) || 1,
     version: Number(questionForm.value.version) || 1,
+    applicableRaters: normalizeRaters(questionForm.value.applicableRaters),
+    applicableLevels: normalizeLevels(questionForm.value.applicableLevels),
     updatedAt: new Date().toISOString()
   }
 }
@@ -1160,8 +1238,8 @@ function normalizeQuestion(row = {}) {
     scaleType: row.scaleType || '1-4 Likert',
     required: row.required !== false,
     evidenceRequired: Boolean(row.evidenceRequired),
-    applicableRaters: Array.isArray(row.applicableRaters) ? row.applicableRaters : String(row.applicableRaters || '').split(',').map(v => v.trim()).filter(Boolean),
-    applicableLevels: Array.isArray(row.applicableLevels) ? row.applicableLevels : String(row.applicableLevels || '').split(',').map(v => v.trim()).filter(Boolean),
+    applicableRaters: normalizeRaters(row.applicableRaters),
+    applicableLevels: normalizeLevels(row.applicableLevels, true),
     status: row.status || 'Draft',
     period: row.period || 'S2 2026',
     version: Number(row.version) || 1,
@@ -1170,6 +1248,53 @@ function normalizeQuestion(row = {}) {
     createdAt: row.createdAt || new Date().toISOString(),
     updatedAt: row.updatedAt || new Date().toISOString()
   }
+}
+
+function normalizeRaters(value) {
+  const raters = normalizeOptionList(value, raterAliases, raterOptions)
+  if (
+    raters.includes('Self') &&
+    raters.includes('Peer') &&
+    raters.includes('Upward') &&
+    raters.includes('Supervisor') &&
+    !raters.includes('Skip Supervisor')
+  ) {
+    raters.push('Skip Supervisor')
+  }
+  return raters
+}
+
+// Mirrors AssessmentContentService.normalizeLevels_. Open vocabulary: fold the
+// legacy STB spellings onto canonical labels, keep every other office role
+// verbatim. Passing these through normalizeOptionList would silently delete any
+// role outside the hardcoded three, which is what made offices unable to target
+// their own roles at all.
+function normalizeLevels(value, defaultWhenEmpty = false) {
+  const raw = Array.isArray(value)
+    ? value
+    : String(value || '').split(',').map(v => v.trim()).filter(Boolean)
+  const seen = new Set()
+  const levels = []
+  raw.forEach(item => {
+    const trimmed = String(item || '').trim()
+    if (!trimmed) return
+    const label = levelAliases[trimmed.toLowerCase().replace(/[\s_-]+/g, ' ')] || trimmed
+    const key = label.toLowerCase()
+    if (seen.has(key)) return
+    seen.add(key)
+    levels.push(label)
+  })
+  return levels.length || !defaultWhenEmpty ? levels : [...employeeLevelOptions.value]
+}
+
+function normalizeOptionList(value, aliases, allowed) {
+  const raw = Array.isArray(value)
+    ? value
+    : String(value || '').split(',').map(v => v.trim()).filter(Boolean)
+  const seen = new Set()
+  return raw
+    .map(item => aliases[String(item || '').trim().toLowerCase()])
+    .filter(item => item && allowed.includes(item) && !seen.has(item) && seen.add(item))
 }
 
 function applyLocalQuestion(payload, id = null) {
@@ -1272,7 +1397,7 @@ function confirmRemove(item) {
 }
 
 // ── API ──
-onMounted(() => { loadKRAs(); loadCategories() })
+onMounted(() => { loadKRAs(); loadCategories(); loadOrgOptions() })
 
 async function loadKRAs() {
   loading.value = true
@@ -1345,12 +1470,26 @@ async function seedFromStandard(force = false) {
   seeding.value = true
   try {
     const result = await assessmentContentApi.seed({ force })
-    showToast(`Seeded ${result.seeded || result.cbcCount + result.jfCount} standard assessment questions.`)
+    const sourceLabel = result.source === 'seed-template' ? 'template' : 'standard'
+    showToast(`Seeded ${result.seeded || result.cbcCount + result.jfCount} ${sourceLabel} assessment questions.`)
     await loadAssessmentQuestions()
   } catch (e) {
     console.error(e); showToast('Something went wrong. Please try again.', 'error')
   } finally {
     seeding.value = false
+  }
+}
+
+async function promoteCurrentAsSeedTemplate() {
+  promotingSeedTemplate.value = true
+  try {
+    const result = await assessmentContentApi.promoteSeedTemplate()
+    showToast(`Seed template updated from ${result.count || 0} active assessment questions.`)
+  } catch (e) {
+    console.error(e)
+    showToast(assessmentQuestionErrorMessage(e), 'error')
+  } finally {
+    promotingSeedTemplate.value = false
   }
 }
 
@@ -1400,8 +1539,14 @@ async function seedCategories() {
   }
 }
 
+function confirmSaveQuestion() {
+  if (!validateQuestionForm()) return
+  saveQuestionConfirm.value.show = true
+}
+
 async function saveQuestion() {
   if (!validateQuestionForm()) return
+  saveQuestionConfirm.value.show = false
   savingQuestion.value = true
   try {
     const payload = questionPayload()
@@ -1535,7 +1680,7 @@ async function moveQuestion(id, direction) {
 </script>
 
 <style scoped>
-.kra-page { padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif; font-size: 13px; color: #1A2332; min-height: 100%; }
+.kra-page { padding: 0; font-size: 13px; color: #1A2332; min-height: 100%; }
 .muted-text { color: #94A3B8; }
 .req { color: #EF4444; font-size: 11px; }
 
@@ -1683,6 +1828,7 @@ async function moveQuestion(id, direction) {
 .field { display: flex; flex-direction: column; gap: 5px; }
 .full { grid-column: span 2; }
 .field-label { font-size: 11px; font-weight: 600; color: #374151; }
+.field-hint { margin: 3px 0 6px; font-size: 11px; line-height: 1.45; color: #6B7280; }
 .field-input { padding: 9px 12px; border: 1.5px solid #E2E8F0; border-radius: 9px; font-size: 13px; color: #0F172A; background: #fff; outline: none; transition: border-color .15s; resize: vertical; }
 .field-input:focus { border-color: #3B82F6; box-shadow: 0 0 0 3px rgba(59,130,246,.1); }
 .field-input::placeholder { color: #CBD5E1; }
@@ -1694,6 +1840,10 @@ async function moveQuestion(id, direction) {
 .cb-icon { width: 48px; height: 48px; border-radius: 14px; background: #FEF2F2; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; }
 .cb-title { font-size: 15px; font-weight: 700; color: #0F172A; margin-bottom: 7px; }
 .cb-msg { font-size: 12px; color: #475569; line-height: 1.65; margin-bottom: 20px; }
+.cb-details { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; margin:-8px 0 18px; text-align:left; }
+.cb-details div { border:1px solid #E2E8F0; border-radius:8px; padding:8px 10px; background:#F8FAFC; min-width:0; }
+.cb-details span { display:block; color:#64748B; font-size:10px; font-weight:800; text-transform:uppercase; margin-bottom:3px; }
+.cb-details strong { display:block; color:#0F172A; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .cb-btns { display: flex; justify-content: center; gap: 8px; }
 
 /* Spinner */
@@ -1751,6 +1901,7 @@ async function moveQuestion(id, direction) {
 .assessment-count { color:#475569; font-size:12px; text-align:right; white-space:nowrap; }
 .assessment-count strong { color:#0F172A; font-size:14px; }
 .assessment-count span { display:block; color:#168A43; font-weight:700; margin-top:2px; }
+.assessment-template-btn { margin:0; white-space:nowrap; font-size:12px; }
 .assessment-toolbar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding:16px 24px; border-bottom:1px solid #F1F5F9; }
 .assessment-search { flex:1 1 230px; max-width:310px; }
 .assessment-view-toggle { display:inline-flex; align-items:center; border:1px solid #E2E8F0; border-radius:8px; background:#F8FAFC; overflow:hidden; margin-left:auto; }

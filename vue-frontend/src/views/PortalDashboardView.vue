@@ -46,8 +46,8 @@
           <h2 class="pui-card-title">Your rating task completion</h2>
           <p class="pui-card-subtitle">{{ period.label || 'Current assessment period' }}</p>
         </div>
-        <RouterLink to="/my-tasks" class="pui-btn pui-btn-primary" style="flex-shrink:0;">
-          {{ tasks.pending || tasks.draft ? 'Continue Rating' : 'Open My Rating Tasks' }}
+        <RouterLink :to="evaluationLink" class="pui-btn pui-btn-primary" style="flex-shrink:0;">
+          {{ tasks.pending || tasks.draft ? 'Continue Rating' : 'Open Evaluation' }}
         </RouterLink>
       </div>
 
@@ -93,6 +93,14 @@ onMounted(load)
 const lastUpdatedLabel = computed(() =>
   lastUpdatedAt.value ? lastUpdatedAt.value.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''
 )
+
+const evaluationLink = computed(() => ({
+  path: '/evaluation',
+  query: {
+    semester: String(period.value.semester || (new Date().getMonth() < 6 ? 1 : 2)),
+    year: String(period.value.year || new Date().getFullYear())
+  }
+}))
 
 async function load() {
   loading.value = true

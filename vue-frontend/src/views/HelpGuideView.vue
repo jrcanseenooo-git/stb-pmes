@@ -116,8 +116,9 @@
       <p style="font-size:12px; color:#475569; line-height:1.55; margin:0;">
         <b style="color:#334155;">Still need help?</b>
         Contact your office administrator for questions about your assignments, your personnel
-        details, or the assessment period. They can also request a rating task be reopened if a
-        correction is needed after submission.
+        details, or the assessment period. Submitted ratings are final, so corrections after
+        submission must be handled through administrative review without changing the rater's
+        submitted answers.
       </p>
     </section>
   </div>
@@ -171,17 +172,17 @@ const RATER_TYPES = [
 ]
 
 const STEPS = [
-  { title: 'Open My Rating Tasks', detail: 'Every person you have been assigned to rate for the current period is listed there with its status.' },
+  { title: 'Open Evaluation', detail: 'Every person you have been assigned to rate for the current period is listed in the My Rating Tasks tab.' },
   { title: 'Open a task', detail: 'Select Start Rating for a new task, or Continue for one you have already partly filled in.' },
   { title: 'Rate every indicator', detail: 'Work through each category. Indicators marked as required must be answered before the form can be submitted.' },
   { title: 'Save your draft as you go', detail: 'Saving keeps your entries without submitting them. You can close the form and come back later.' },
-  { title: 'Submit the final rating', detail: 'Submitting is final. The task moves to Submitted and can only be changed if an administrator reopens it.' }
+  { title: 'Submit the final rating', detail: 'Submitting is final. The task moves to Submitted and your answers can no longer be edited.' }
 ]
 
 const FAQS = [
   {
     question: 'Can I change a rating after I submit it?',
-    answer: 'No. A submitted rating is locked. If a correction is genuinely needed, ask your office administrator to reopen the task - reopening is recorded in the audit log.'
+    answer: 'No. A submitted rating is final and locked. If a concern is raised after submission, it must be handled through administrative review without changing the rater\'s submitted answers.'
   },
   {
     question: 'What happens if I lose connection while rating?',
@@ -193,7 +194,7 @@ const FAQS = [
   },
   {
     question: 'When will I see my own results?',
-    answer: 'Your consolidated result appears under My Results once every assigned rater has submitted and the result has been finalized for the period.'
+    answer: 'Your consolidated result appears in Evaluation under the My Results tab once every assigned rater has submitted and the result has been finalized for the period.'
   },
   {
     question: 'A person I should be rating is missing from my list.',

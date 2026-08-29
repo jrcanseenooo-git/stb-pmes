@@ -226,12 +226,27 @@ const OfficeRegistryService = (() => {
     return offices
   }
 
-  function registrationOrgOptions() {
+  // The registration screen needs the structure for every active office. Read
+  // the shared OfficeOrgOptions tab once and group the rows in memory instead
+  // of re-reading/filtering it once per office.
+  function registrationOrgOptions(registrationOffices) {
     const map = {}
     try {
-      registrationOptions().forEach(office => {
+      const offices = Array.isArray(registrationOffices)
+        ? registrationOffices
+        : registrationOptions()
+      const rowsByOffice = {}
+      SpreadsheetService.getAllRows(orgOptionsSheet_())
+        .filter(row => row.active !== false && String(row.active).toLowerCase() !== 'false')
+        .forEach(row => {
+          const officeId = String(row.officeId || '')
+          if (!officeId) return
+          if (!rowsByOffice[officeId]) rowsByOffice[officeId] = []
+          rowsByOffice[officeId].push(row)
+        })
+      offices.forEach(office => {
         if (!office || !office.officeId) return
-        const options = getOrgOptionsForOffice_(office.officeId)
+        const options = orgOptionsFromRows_(rowsByOffice[String(office.officeId)] || [])
         officeAliasKeys_(office).forEach(key => {
           map[key] = options
           map[key.toUpperCase()] = options
@@ -421,12 +436,40 @@ const OfficeRegistryService = (() => {
     }
   }
 
+  function update(id, body, user) {
+    const profile = requireCentralAdmin_(user)
+    const row = findByIdOrCode_(id)
+    if (!row) throw HttpError('Office record not found.', 404)
+    if (isStbRow_(row)) throw HttpError('STB is the built-in central office and cannot be edited from the office registry.', 400)
+
+    const input = normalizeUpdateInput_(body, row)
+    validateInput_(input)
+    if (input.officeCode !== String(row.officeCode || '').trim().toUpperCase()) {
+      throw HttpError('Office code cannot be changed after provisioning.', 400)
+    }
+
+    const now = new Date().toISOString()
+    const payload = {
+      officeName: input.officeName,
+      officeShortName: input.officeShortName || input.officeCode,
+      primaryAdminEmail: input.primaryAdminEmail,
+      updatedAt: now,
+      updatedBy: profile.email || user.email || ''
+    }
+    const updated = SpreadsheetService.updateRow(registrySheet_(), row.id, payload)
+    syncOfficeConfig_(updated, profile)
+    clearMonitoringCache_()
+    auditCentral_('UPDATE_OFFICE_DETAILS', 'Office', row.officeId, '', 'SUCCESS', 'Updated office details for ' + row.officeCode, user)
+    return { office: safeRegistryRow_(updated) }
+  }
+
   function validate(id, user) {
     const profile = requireCentralAdmin_(user)
     const row = findByIdOrCode_(id)
     if (!row) throw HttpError('Office record not found.', 404)
     if (isStbRow_(row)) throw HttpError('STB uses the central PMES database and does not require office spreadsheet validation.', 400)
     if (!row.spreadsheetId) throw HttpError('Office has no provisioned spreadsheet to validate.', 400)
+    const matrixMirror = syncRaterMatrixMirror_(row, user)
     const validation = OfficeSchemaService.validateSpreadsheet(row.spreadsheetId, row)
     SpreadsheetService.updateRow(registrySheet_(), row.id, {
       spreadsheetStatus: passingStatusFor_(row, validation),
@@ -437,7 +480,7 @@ const OfficeRegistryService = (() => {
     })
     clearMonitoringCache_()
     auditCentral_('VALIDATE_OFFICE_SCHEMA', 'Office', row.officeId, '', validation.valid ? 'SUCCESS' : 'FAILED', 'Validated office schema for ' + row.officeCode, user)
-    return { office: safeRegistryRow_(findByIdOrCode_(id)), validation }
+    return { office: safeRegistryRow_(findByIdOrCode_(id)), validation, raterMatrixMirror: matrixMirror }
   }
 
   // Adds headers the spec has grown since this office was provisioned -
@@ -454,6 +497,7 @@ const OfficeRegistryService = (() => {
     if (!row.spreadsheetId) throw HttpError('Office has no provisioned spreadsheet to repair.', 400)
 
     const repaired = OfficeSchemaService.repairSpreadsheet(row.spreadsheetId)
+    const matrixMirror = syncRaterMatrixMirror_(row, user)
     const validation = OfficeSchemaService.validateSpreadsheet(row.spreadsheetId, row)
     SpreadsheetService.updateRow(registrySheet_(), row.id, {
       spreadsheetStatus: passingStatusFor_(row, validation),
@@ -465,7 +509,7 @@ const OfficeRegistryService = (() => {
     clearMonitoringCache_()
     auditCentral_('REPAIR_OFFICE_SCHEMA', 'Office', row.officeId, '', validation.valid ? 'SUCCESS' : 'PARTIAL',
       'Repaired office schema for ' + row.officeCode + (repaired.length ? ': ' + repaired.join(' | ') : ' (nothing to add)'), user)
-    return { office: safeRegistryRow_(findByIdOrCode_(id)), repaired, validation }
+    return { office: safeRegistryRow_(findByIdOrCode_(id)), repaired, validation, raterMatrixMirror: matrixMirror }
   }
 
   function activate(id, user) {
@@ -474,6 +518,7 @@ const OfficeRegistryService = (() => {
     if (!row) throw HttpError('Office record not found.', 404)
     if (isStbRow_(row)) throw HttpError('STB uses the central PMES database and does not require office spreadsheet activation.', 400)
     if (!row.spreadsheetId) throw HttpError('Office spreadsheet is not provisioned.', 400)
+    const matrixMirror = syncRaterMatrixMirror_(row, user)
     const validation = OfficeSchemaService.validateSpreadsheet(row.spreadsheetId, row)
     if (!validation.valid) {
       SpreadsheetService.updateRow(registrySheet_(), row.id, {
@@ -495,7 +540,7 @@ const OfficeRegistryService = (() => {
     })
     clearMonitoringCache_()
     auditCentral_('ACTIVATE_OFFICE', 'Office', row.officeId, '', 'SUCCESS', 'Activated office ' + row.officeCode, user)
-    return { office: safeRegistryRow_(updated), validation }
+    return { office: safeRegistryRow_(updated), validation, raterMatrixMirror: matrixMirror }
   }
 
   function getSpreadsheetForOffice(officeId, user) {
@@ -542,14 +587,14 @@ const OfficeRegistryService = (() => {
   // no extra spreadsheet reads and ride the existing monitoring cache.
 
   function descriptorBreakdown_(records) {
-    // Prefer the stored descriptor; fall back to deriving it from the score via
-    // the protocol's own bands rather than a second local copy of them.
+    // Derive from the numeric score first so older stored descriptors cannot
+    // override the current protocol bands after an interpretation update.
     const bandOf = (row) => {
-      const stored = String(row.descriptor || '').trim()
-      if (stored) return stored
       const score = Number(row.overallScore)
-      if (!isFinite(score) || score <= 0) return ''
-      return typeof IPATService !== 'undefined' ? IPATService.qualitativeDescriptor(score) : ''
+      if (isFinite(score) && score > 0 && typeof IPATService !== 'undefined') {
+        return IPATService.qualitativeDescriptor(score)
+      }
+      return String(row.descriptor || '').trim()
     }
     const counts = {
       outstanding: 0,
@@ -800,8 +845,10 @@ const OfficeRegistryService = (() => {
     const rowOfficeKeys = officeAliasKeys_(row).map(normalizeOfficeLookupKey_).filter(Boolean)
     const profileOfficeKeys = officeAliasKeys_(profile).map(normalizeOfficeLookupKey_).filter(Boolean)
     const isOwnOffice = profileOfficeKeys.some(key => rowOfficeKeys.indexOf(key) >= 0)
-    const isStb = rowOfficeKeys.indexOf('STB') >= 0 || rowOfficeKeys.indexOf('SOCIAL TECHNOLOGY BUREAU') >= 0
-    if (!isOwnOffice || isStb) {
+    // STB is an office too. An STB Office Admin may configure STB's own
+    // structure just as another Office Admin may configure theirs; the office
+    // key comparison above still prevents cross-office changes.
+    if (!isOwnOffice) {
       throw HttpError('Access denied. You can only configure registration options for your own office.', 403)
     }
     return profile
@@ -905,6 +952,15 @@ const OfficeRegistryService = (() => {
     }
   }
 
+  function normalizeUpdateInput_(body, existing) {
+    return {
+      officeCode: String(existing.officeCode || '').trim().toUpperCase().replace(/[^A-Z0-9-]/g, ''),
+      officeName: String(body.officeName || existing.officeName || '').trim(),
+      officeShortName: String(body.officeShortName || existing.officeShortName || existing.officeCode || '').trim(),
+      primaryAdminEmail: String(body.primaryAdminEmail || existing.primaryAdminEmail || '').trim().toLowerCase()
+    }
+  }
+
   function validateInput_(input) {
     if (!/^[A-Z0-9-]{2,24}$/.test(input.officeCode)) {
       throw HttpError('Office code must be 2-24 letters, numbers, or hyphens.', 400)
@@ -928,6 +984,47 @@ const OfficeRegistryService = (() => {
       provisioningError: provisioningError || '',
       hasSpreadsheet: !!spreadsheetId,
       hasProvisioningError: !!provisioningError
+    }
+  }
+
+  function syncOfficeConfig_(row, profile) {
+    const spreadsheetId = String(row.spreadsheetId || '').trim()
+    if (!spreadsheetId || spreadsheetId === 'CENTRAL_PMES') return
+    try {
+      const ss = SpreadsheetApp.openById(spreadsheetId)
+      const sheet = ss.getSheetByName('OfficeConfig')
+      if (!sheet || sheet.getLastRow() < 2) return
+      const headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0].map(h => String(h || '').trim())
+      const idIdx = headers.indexOf('id')
+      const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, headers.length).getValues()
+      const targetId = 'CFG-' + row.officeId
+      let rowOffset = rows.findIndex(values => idIdx >= 0 && String(values[idIdx] || '') === targetId)
+      if (rowOffset < 0) rowOffset = 0
+      const current = rows[rowOffset] || []
+      const updates = {
+        officeName: row.officeName || '',
+        officeShortName: row.officeShortName || row.officeCode || '',
+        primaryAdminEmail: row.primaryAdminEmail || '',
+        updatedAt: new Date().toISOString(),
+        updatedBy: profile.email || ''
+      }
+      Object.keys(updates).forEach(key => {
+        const index = headers.indexOf(key)
+        if (index >= 0) current[index] = updates[key]
+      })
+      sheet.getRange(rowOffset + 2, 1, 1, headers.length).setValues([current])
+    } catch (e) {
+      Logger.log('[OfficeRegistry] OfficeConfig sync skipped for ' + row.officeId + ': ' + (e && e.message || e))
+    }
+  }
+
+  function syncRaterMatrixMirror_(row, user) {
+    if (typeof RaterMatrixService === 'undefined') return { skipped: true, reason: 'service-unavailable' }
+    try {
+      return RaterMatrixService.syncOfficeMirrorForRegistryRow(row, user, { seedIfEmpty: true })
+    } catch (e) {
+      Logger.log('[OfficeRegistry] RaterMatrix mirror sync skipped for ' + (row && row.officeId) + ': ' + (e && e.message || e))
+      return { skipped: true, warning: String(e && e.message || e || '') }
     }
   }
 
@@ -1050,7 +1147,7 @@ const OfficeRegistryService = (() => {
         parentId: String(item.parentId || item.divisionId || '').trim(),
         divisionName: String(item.divisionName || item.parentName || '').trim(),
         name: optionType === 'role' && typeof RoleLabelService !== 'undefined'
-          ? RoleLabelService.canonicalRole(item.name || item.label || item.value || item)
+          ? RoleLabelService.storedRole(item.name || item.label || item.value || item)
           : String(item.name || item.label || item.value || item).trim(),
         code: String(item.code || '').trim(),
         sequence: Number(item.sequence || index + 1)
@@ -1090,6 +1187,7 @@ const OfficeRegistryService = (() => {
     saveOrgOptions,
     resolveRegistrationOffice,
     provision,
+    update,
     validate,
     activate,
     getSpreadsheetForCentralProcess,

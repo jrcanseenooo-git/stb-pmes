@@ -43,8 +43,8 @@
           <strong>{{ activeUsersCount }}</strong>
         </div>
         <div class="summary-item">
-          <span>Review roles</span>
-          <strong>{{ reviewerUsersCount }}</strong>
+          <span>Pending approval</span>
+          <strong>{{ pendingUsersCount }}</strong>
         </div>
         <div class="summary-item">
           <span>Inactive</span>
@@ -53,21 +53,38 @@
       </div>
 
       <div v-if="canManageUsers" class="access-mode-strip">
-        <div class="access-mode-copy">
-          <span>System Access Mode</span>
-          <strong>{{ accessModeLabel }}</strong>
-          <p>{{ accessModeDescription }}</p>
+        <div class="access-mode-header">
+          <div>
+            <span class="access-mode-title">Office Module Access Mode</span>
+            <strong>{{ selectedAccessOfficeName }}</strong>
+            <p>Choose the module set for an office. Saving also updates ordinary personnel system scopes for that office.</p>
+          </div>
+          <label class="access-mode-office-field">
+            <span>Office</span>
+            <select v-model="selectedAccessOfficeId" class="field-select access-mode-office" :disabled="systemSettingsLoading || systemSettingsSaving" @change="selectAccessOffice">
+              <option v-for="office in systemAccessOffices" :key="office.officeId" :value="office.officeId">{{ office.officeName }}</option>
+            </select>
+          </label>
         </div>
-        <div class="access-mode-controls">
+        <div class="access-mode-body">
           <label
             v-for="mode in systemAccessModes"
             :key="mode.value"
             :class="['access-mode-option', systemAccessMode === mode.value && 'is-selected']"
           >
             <input v-model="systemAccessMode" type="radio" :value="mode.value" />
-            <span>{{ mode.label }}</span>
+            <span>
+              <strong>{{ mode.label }}</strong>
+              <small>{{ mode.description }}</small>
+            </span>
           </label>
-          <button class="btn btn-primary" :disabled="systemSettingsSaving || systemSettingsLoading" @click="saveSystemSettings">
+        </div>
+        <div class="access-mode-footer">
+          <div class="access-mode-impact">
+            <span>Selected scope result</span>
+            <strong>{{ accessModeScopeImpact }}</strong>
+          </div>
+          <button class="btn btn-primary access-mode-save" :disabled="systemSettingsSaving || systemSettingsLoading" @click="saveSystemSettings">
             {{ systemSettingsSaving ? 'Saving...' : 'Save Mode' }}
           </button>
         </div>
@@ -345,9 +362,11 @@
                     </button>
                     <template v-if="u.status === 'Pending'">
                       <button class="btn btn-xs approve" :disabled="busyUserId === u.id" @click="activateUser(u)">
-                        <span v-if="busyUserId === u.id" class="spinner-xs"></span>{{ busyUserId === u.id ? 'Approving…' : 'Approve' }}
+                        <span v-if="busyUserId === u.id && busyUserAction === 'approve'" class="spinner-xs"></span>{{ busyUserId === u.id && busyUserAction === 'approve' ? 'Approving…' : 'Approve' }}
                       </button>
-                      <button class="btn btn-xs deactivate" :disabled="busyUserId === u.id" @click="declineUser(u)">Decline</button>
+                      <button class="btn btn-xs deactivate" :disabled="busyUserId === u.id" @click="declineUser(u)">
+                        <span v-if="busyUserId === u.id && busyUserAction === 'decline'" class="spinner-xs"></span>{{ busyUserId === u.id && busyUserAction === 'decline' ? 'Declining…' : 'Decline' }}
+                      </button>
                     </template>
                     <button v-else-if="u.status === 'Inactive'" class="btn btn-xs activate" :disabled="busyUserId === u.id" @click="activateUser(u)">
                       <span v-if="busyUserId === u.id" class="spinner-xs"></span>{{ busyUserId === u.id ? 'Activating…' : 'Activate' }}
@@ -479,10 +498,13 @@
               <div class="form-grid">
                 <div class="field">
                   <label class="field-label">Role <span class="req">*</span></label>
-                  <select v-model="form.role" class="field-select">
+                  <select v-model="form.role" class="field-select" :disabled="isEditingOwnRole">
                     <option value="">Select role…</option>
                     <option v-for="role in userFormRoleOptions" :key="role">{{ role }}</option>
                   </select>
+                  <p v-if="isEditingOwnRole" class="field-help">
+                    Your assessment role can only be changed by a central Super Admin.
+                  </p>
                 </div>
                 <div class="field">
                   <label class="field-label">Division</label>
@@ -494,15 +516,15 @@
                   </select>
                 </div>
                 <div class="field full">
-                  <label class="field-label">Section <span v-if="roleRequiresSection" class="req">*</span></label>
+                  <label class="field-label">Section <span class="field-optional">(optional)</span></label>
                   <select v-model="form.section" class="field-select" :disabled="!form.division">
                     <option value="">{{ form.division ? sectionSelectPlaceholder : 'Select division first…' }}</option>
                     <option v-for="section in sectionsForSelectedDivision" :key="section.id" :value="section.name">
                       {{ section.name }}
                     </option>
                   </select>
-                  <p v-if="!roleRequiresSection && form.role" class="field-help">
-                    Optional for this role - it oversees the whole division or office rather than a single section.
+                  <p v-if="form.division" class="field-help">
+                    Leave this blank when the person is assigned to the division or office, rather than to one section.
                   </p>
                 </div>
                 <div v-if="canManageUsers" class="field">
@@ -536,17 +558,32 @@
                   <div class="access-group-subhead">STB Bureau Access</div>
                   <p class="access-group-subnote">Adds abilities within the Social Technology Bureau's own scope.</p>
                   <div class="access-group-grid">
-                    <label v-for="group in stbAccessGroupOptions" :key="group.value" class="access-group-option">
-                      <input v-model="form.permissionGroups" type="checkbox" :value="group.value"/>
+                    <label
+                      v-for="group in stbAccessGroupOptions"
+                      :key="group.value"
+                      :class="['access-group-option', isPermissionGroupDisabled(group.value) && 'is-disabled']"
+                    >
+                      <input
+                        v-model="form.permissionGroups"
+                        type="checkbox"
+                        :value="group.value"
+                        :disabled="isPermissionGroupDisabled(group.value)"
+                      />
                       <span>
                         <strong>{{ group.label }}</strong>
                         <small>{{ group.description }}</small>
+                        <small v-if="permissionGroupDisabledReason(group.value)" class="access-group-note">
+                          {{ permissionGroupDisabledReason(group.value) }}
+                        </small>
                       </span>
                     </label>
                   </div>
 
                   <details class="cluster-group-disclosure" :open="hasClusterGroupSelected">
-                    <summary class="access-group-subhead">Cluster / Central Administration</summary>
+                    <summary class="cluster-disclosure-button">
+                      <span class="cluster-disclosure-title">Cluster / Central Administration</span>
+                      <span class="cluster-disclosure-hint">Expand</span>
+                    </summary>
                     <div class="access-group-warning">
                       <strong>These are cross-office, not scoped to one office.</strong>
                       To restrict an account to managing only its own office, use
@@ -563,6 +600,22 @@
                       </label>
                     </div>
                   </details>
+                </div>
+                <div v-if="canAssignOfficeRaterTaggingFocal" class="field full">
+                  <label class="field-label">Office Delegation</label>
+                  <p class="field-help" style="margin-bottom:10px;">
+                    Assign this only to the office personnel responsible for maintaining the rater tagging protocol.
+                    It does not make them an office administrator and does not grant access to any other office.
+                  </p>
+                  <div class="access-group-grid">
+                    <label class="access-group-option">
+                      <input v-model="form.permissionGroups" type="checkbox" value="office-rater-tagging-focal" />
+                      <span>
+                        <strong>Office Rater Tagging Focal</strong>
+                        <small>Can configure Rater Tagging and generate evaluation assignments for this assigned office only.</small>
+                      </span>
+                    </label>
+                  </div>
                 </div>
               </div>
             </div>
@@ -775,6 +828,33 @@ const hasClusterGroupSelected = computed(() =>
   clusterAccessGroupOptions.some(g => (form.value.permissionGroups || []).includes(g.value))
 )
 
+const hasBureauMonitoringSelected = computed(() =>
+  (form.value.permissionGroups || []).includes('bureau-monitor')
+)
+
+const canAssignOfficeRaterTaggingFocal = computed(() => {
+  const officeId = String(form.value.officeId || form.value.officeCode || '').trim().toUpperCase()
+  return canManageOfficeUsers.value && !!officeId && officeId !== 'STB' && officeId !== 'SOCIAL TECHNOLOGY BUREAU'
+})
+
+function sanitizePermissionGroups(groups = []) {
+  const selected = Array.from(new Set(groups.filter(Boolean)))
+  return selected.includes('bureau-monitor')
+    ? selected.filter(group => group !== 'division-monitor')
+    : selected
+}
+
+function isPermissionGroupDisabled(group) {
+  return group === 'division-monitor' && hasBureauMonitoringSelected.value
+}
+
+function permissionGroupDisabledReason(group) {
+  if (group === 'division-monitor' && hasBureauMonitoringSelected.value) {
+    return 'Already included in Bureau Monitoring.'
+  }
+  return ''
+}
+
 // Same fix as Access Groups: the difference between these four was only ever
 // explained in chat, not in the form itself, so it had to be re-explained
 // every time someone hit this screen. Putting the description at the point of
@@ -788,7 +868,7 @@ const systemScopeOptions = [
   {
     value: 'CLUSTER_PORTAL',
     label: 'Innovation Cluster Portal',
-    description: 'Restricted personnel screens only - My Dashboard, My Rating Tasks, My Results, Assessment Library. No KRA, no admin screens. This is what self-registration into a participating office sets automatically.'
+    description: 'Restricted personnel screens only - Dashboard, Evaluation, Assessment Library, and account/status pages. No KRA and no admin screens. This is what self-registration into a participating office sets automatically.'
   },
   {
     value: 'OFFICE_ADMIN',
@@ -838,6 +918,9 @@ const USERS_PAGE_SIZE = 2000
 // so it is measured in seconds - without this the admin clicked Approve and saw
 // nothing change, with no way to tell whether it had registered.
 const busyUserId = ref('')
+// The row id prevents duplicate writes. Keep the action separately so a
+// decline never renders as an approval while its request is in progress.
+const busyUserAction = ref('')
 const focalUsers    = ref([])
 const divisionFocalRows = ref([])
 const bureauFocals = ref({ primaryUserId: '', alternateUserId: '' })
@@ -846,22 +929,29 @@ const maintenanceRunning = ref(false)
 const maintenancePreview = ref(null)
 const systemSettingsLoading = ref(false)
 const systemSettingsSaving = ref(false)
+const selectedAccessOfficeId = ref('STB')
+const systemAccessOffices = ref([])
 const systemAccessMode = ref('evaluation_only')
 const systemAccessModes = ref([
   {
     value: 'evaluation_only',
-    label: 'Evaluation Monitoring only',
-    description: 'Regular users can only access Evaluation and Profile Settings. Hidden module links redirect to Evaluation.'
+    label: 'Evaluation only',
+    description: 'Ordinary personnel become Innovation Cluster Portal accounts. System/super admins are not changed.'
   },
   {
     value: 'full_access',
     label: 'Full module access',
-    description: 'Users can access the modules allowed by their role and permissions.'
+    description: 'Ordinary personnel become full PMES accounts for the selected office.'
   }
 ])
 const { canManageUsers, canManageOfficeUsers, canManageFocalAssignments, canManageDatabase } = usePermissions()
 const { confirm, confirmState } = useConfirm()
 const authStore = useAuthStore()
+const isEditingOwnRole = computed(() => Boolean(
+  editingUser.value && authStore.profileId &&
+  String(editingUser.value.id || '') === String(authStore.profileId) &&
+  !canManageUsers.value
+))
 const { loadOrgOptions, optionsForOffice } = useOrgOptions()
 const activeUsersCount = computed(() => users.value.filter(u => u.status === 'Active').length)
 const inactiveUsersCount = computed(() => users.value.filter(u => u.status === 'Inactive').length)
@@ -894,9 +984,6 @@ const userFormRoleOptions = computed(() => {
   const pinned = [form.value.role, form.value.requestedRole].filter(Boolean)
   return [...new Set([...roles, ...pinned])]
 })
-const reviewerUsersCount = computed(() => users.value.filter(u =>
-  ['System Administrator', 'Bureau Director', 'Assistant Bureau Director', 'Division Chief', 'Section Head'].includes(u.role)
-).length)
 const roleOptions = computed(() => [...new Set(users.value.map(u => u.role).filter(Boolean))].sort())
 const preservedSheetNames = computed(() =>
   maintenancePreview.value?.preservedDataSheets || ['Users', 'Divisions', 'MasterKRALibrary']
@@ -905,12 +992,18 @@ const rebuiltSheetNames = computed(() => {
   const preserved = new Set(preservedSheetNames.value)
   return (maintenancePreview.value?.finalSheetOrder || []).filter(name => !preserved.has(name))
 })
-const accessModeLabel = computed(() =>
-  systemAccessModes.value.find(mode => mode.value === systemAccessMode.value)?.label || 'Evaluation Monitoring only'
+const selectedAccessOffice = computed(() =>
+  systemAccessOffices.value.find(o => o.officeId === selectedAccessOfficeId.value) || null
 )
-const accessModeDescription = computed(() =>
-  systemAccessModes.value.find(mode => mode.value === systemAccessMode.value)?.description || ''
+const selectedAccessOfficeName = computed(() =>
+  selectedAccessOffice.value?.officeName || 'Selected office'
 )
+const accessModeScopeImpact = computed(() => {
+  if (systemAccessMode.value !== 'full_access') return 'Innovation Cluster Portal'
+  return String(selectedAccessOfficeId.value || '').toUpperCase() === 'STB'
+    ? 'STB Full PMES'
+    : 'Office Full PMES'
+})
 
 const SearchSelect = {
   props: {
@@ -1031,13 +1124,21 @@ const SearchSelect = {
 
 // ── Load users on mount ──
 onMounted(async () => {
-  // loadUsers was awaited alone before this batch even started, paying a
-  // full extra round trip up front, though none of these reads depend on
-  // each other - loadOrgOptions/loadOfficeOptions/loadSystemSettings never
-  // read users.value.
-  const loads = [loadUsers(), loadOrgOptions()]
-  if (canManageUsers.value) loads.push(loadOfficeOptions(), loadSystemSettings())
-  await Promise.all(loads)
+  // The directory is the only data needed to render this page. Starting the
+  // modal-only structure, office-picker and settings calls at the same moment
+  // created a burst of four spreadsheet-backed requests for a central admin
+  // (and two for an office admin), which is exactly when Apps Script is most
+  // likely to queue or reject work under load. Render the directory first;
+  // warm form data just after it becomes usable. Open Add/Edit still loads the
+  // same shared request immediately if a user clicks before that warm-up.
+  await loadUsers()
+  setTimeout(() => {
+    void loadOrgOptions()
+    if (canManageUsers.value) {
+      void loadOfficeOptions()
+      void loadSystemSettings()
+    }
+  }, 400)
 })
 
 async function loadOfficeOptions() {
@@ -1058,7 +1159,7 @@ async function loadOfficeOptions() {
 
 const officeFieldHelp = computed(() => {
   if (form.value.systemScope === 'STB_FULL') {
-    return 'Locked to STB - STB Full PMES always uses the central STB spreadsheet.'
+    return 'Locked to STB. Use Office Module Access Mode to switch STB personnel between evaluation-only and full modules; do not edit personnel one by one for that.'
   }
   if (!officeOptions.value.length) {
     return officeOptionsError.value
@@ -1098,6 +1199,8 @@ async function loadSystemSettings() {
   systemSettingsLoading.value = true
   try {
     const data = await systemSettingsApi.get()
+    selectedAccessOfficeId.value = data.officeId || 'STB'
+    systemAccessOffices.value = Array.isArray(data.offices) ? data.offices : []
     systemAccessMode.value = data.accessMode || 'evaluation_only'
     if (Array.isArray(data.modes) && data.modes.length) {
       systemAccessModes.value = data.modes
@@ -1110,17 +1213,33 @@ async function loadSystemSettings() {
   }
 }
 
+async function selectAccessOffice() {
+  systemSettingsLoading.value = true
+  try {
+    const data = await systemSettingsApi.get({ officeId: selectedAccessOfficeId.value })
+    systemAccessMode.value = data.accessMode || 'evaluation_only'
+    if (Array.isArray(data.modes) && data.modes.length) systemAccessModes.value = data.modes
+  } catch (e) {
+    console.warn('[SystemSettings]', e.message)
+    showToast('Could not load the selected office access mode.', 'error')
+  } finally {
+    systemSettingsLoading.value = false
+  }
+}
+
 async function saveSystemSettings() {
   const selected = systemAccessModes.value.find(mode => mode.value === systemAccessMode.value)
   const ok = await confirm({
     type: 'info',
-    title: 'Change System Access Mode',
-    message: `Set PMES access mode to "${selected?.label || systemAccessMode.value}"?`,
+    title: 'Change Office Module Access Mode',
+    message: `Set ${selectedAccessOfficeName.value} to "${selected?.label || systemAccessMode.value}"?`,
     details: [
+      { label: 'Office', value: selectedAccessOfficeName.value },
       { label: 'Selected mode', value: selected?.label || systemAccessMode.value },
-      { label: 'Effect', value: selected?.description || 'Updates module access rules.' }
+      { label: 'Personnel scope will become', value: accessModeScopeImpact.value },
+      { label: 'Protected accounts', value: 'System/super admin accounts are skipped.' }
     ],
-    note: 'This affects regular users after their profile refreshes or next sign-in. Your own navigation will refresh immediately.',
+    note: 'This is a bulk office update. Personnel see the change after profile refresh or next sign-in.',
     confirmLabel: 'Save Mode',
     cancelLabel: 'Cancel'
   })
@@ -1128,16 +1247,23 @@ async function saveSystemSettings() {
 
   systemSettingsSaving.value = true
   try {
-    const data = await systemSettingsApi.update({ accessMode: systemAccessMode.value })
+    const data = await systemSettingsApi.update({ accessMode: systemAccessMode.value, officeId: selectedAccessOfficeId.value })
+    selectedAccessOfficeId.value = data.officeId || selectedAccessOfficeId.value
+    systemAccessOffices.value = Array.isArray(data.offices) ? data.offices : systemAccessOffices.value
     systemAccessMode.value = data.accessMode || systemAccessMode.value
     if (Array.isArray(data.modes) && data.modes.length) {
       systemAccessModes.value = data.modes
     }
     await authStore.fetchProfile()
-    showToast('System access mode updated.')
+    await loadUsers()
+    const sync = data.scopeSync
+    const summary = sync
+      ? ` Updated ${sync.updated || 0} account scope(s); skipped ${sync.skippedProtected || 0} protected account(s).`
+      : ''
+    showToast(`Office module access mode updated.${summary}`)
   } catch (e) {
     console.error(e)
-    showToast('Could not update system access mode. Please try again.', 'error')
+    showToast('Could not update office module access mode. Please try again.', 'error')
   } finally {
     systemSettingsSaving.value = false
   }
@@ -1425,21 +1551,12 @@ const sectionSelectPlaceholder = computed(() =>
   sectionsForSelectedDivision.value.length ? 'Select section…' : 'No sections available'
 )
 
-/**
- * Only roles that actually sit inside a section need one. Section Heads and the
- * staff under them belong to a single section; Assistant Division Chief and
- * every rank above it oversees a whole division, office, program or bureau, so
- * pinning them to one section is wrong - and the save used to be blocked until
- * they picked one.
- *
- * Offices configure their own role ladders, so this matches on the section-level
- * names rather than trying to enumerate everything above them. Anything not on
- * this list is treated as division-level or higher and saves without a section.
- */
-const SECTION_LEVEL_ROLES = ['section head', 'technical staff', 'admin staff']
-const roleRequiresSection = computed(() =>
-  SECTION_LEVEL_ROLES.includes(String(form.value.role || '').trim().toLowerCase())
-)
+watch(() => form.value.permissionGroups, groups => {
+  const cleaned = sanitizePermissionGroups(groups || [])
+  if (cleaned.length !== (groups || []).length || cleaned.some((group, index) => group !== groups[index])) {
+    form.value.permissionGroups = cleaned
+  }
+}, { deep: true })
 
 watch(() => form.value.division, () => {
   if (!form.value.section) return
@@ -1530,7 +1647,19 @@ watch(totalPages, pages => {
 })
 
 // ── Modal ──
-function openAddModal()  { editingUser.value = null; form.value = defaultForm(); showModal.value = true }
+function warmOrgOptions() {
+  // The form can render immediately from the session cache. If this is the
+  // first visit, populate its division/section selectors in the background
+  // instead of making the Edit/Add button appear unresponsive.
+  void loadOrgOptions()
+}
+
+function openAddModal() {
+  editingUser.value = null
+  form.value = defaultForm()
+  showModal.value = true
+  warmOrgOptions()
+}
 function closeModal()    { showModal.value = false }
 
 function openEditModal(user) {
@@ -1550,19 +1679,17 @@ function openEditModal(user) {
     systemScope:  user.systemScope || 'STB_FULL',
     officeRole:   user.officeRole  || 'STB_PERSONNEL',
     centralRoles: [...(user.centralRoles || [])],
-    permissionGroups: [...(user.permissionGroups || [])],
+    permissionGroups: sanitizePermissionGroups(user.permissionGroups || []),
     tempPassword: ''
   }
   showModal.value = true
+  warmOrgOptions()
 }
 
 // ── Save ──
 async function saveUser() {
   if (!form.value.fullName || !form.value.email || !form.value.role) {
     showToast('Please fill in all required fields.', 'error'); return
-  }
-  if (roleRequiresSection.value && sectionsForSelectedDivision.value.length && !form.value.section) {
-    showToast('Please select a section for the chosen division.', 'error'); return
   }
   if (form.value.systemScope !== 'STB_FULL' && !form.value.officeId) {
     showToast('Please select the assigned office for this portal user.', 'error'); return
@@ -1596,7 +1723,7 @@ async function saveUser() {
       systemScope: form.value.systemScope || 'STB_FULL',
       officeRole:  form.value.officeRole || 'STB_PERSONNEL',
       centralRoles: [...(form.value.centralRoles || [])],
-      permissionGroups: [...(form.value.permissionGroups || [])]
+      permissionGroups: sanitizePermissionGroups(form.value.permissionGroups || [])
     }
     if (editingUser.value) {
       const updated = await usersApi.update(editingUser.value.id, payload)
@@ -1642,6 +1769,7 @@ async function activateUser(user) {
   } : CONFIRMS.activateUser(user.name))
   if (!ok) return
   busyUserId.value = user.id
+  busyUserAction.value = isApproval ? 'approve' : 'activate'
   try {
     await usersApi.activate(user.id)
     user.status = 'Active'
@@ -1649,9 +1777,30 @@ async function activateUser(user) {
     showToast(`${user.name} ${isApproval ? 'approved' : 'activated'}.`)
   } catch (e) {
     console.error(e)
+    // A gateway response can be lost after Apps Script has committed the
+    // approval. Re-read the single record before presenting a failure: this
+    // never repeats the write, avoids duplicate roster work, and tells the
+    // administrator the true account state.
+    const uncertainTransport = [0, 502, 503, 504].includes(Number(e?.status || 0))
+    if (uncertainTransport) {
+      try {
+        const current = await usersApi.get(user.id)
+        const active = current?.active !== false && String(current?.active).toLowerCase() !== 'false'
+        const pending = current?.pendingActivation === true || String(current?.pendingActivation).toLowerCase() === 'true'
+        if (active && !pending) {
+          user.status = 'Active'
+          user.pendingActivation = false
+          showToast(`${user.name} was approved successfully. The confirmation response was delayed.`, 'success')
+          return
+        }
+      } catch (reconcileError) {
+        console.warn('Could not reconcile delayed approval:', reconcileError)
+      }
+    }
     showToast(e?.message || 'Something went wrong. Please try again.', 'error')
   } finally {
     busyUserId.value = ''
+    busyUserAction.value = ''
   }
 }
 
@@ -1666,6 +1815,7 @@ async function declineUser(user) {
   })
   if (!ok) return
   busyUserId.value = user.id
+  busyUserAction.value = 'decline'
   try {
     await usersApi.decline(user.id)
     users.value = users.value.filter(u => u.id !== user.id)
@@ -1675,6 +1825,7 @@ async function declineUser(user) {
     showToast(e?.message || 'Something went wrong. Please try again.', 'error')
   } finally {
     busyUserId.value = ''
+    busyUserAction.value = ''
   }
 }
 async function deactivateUser(user) {
@@ -1754,14 +1905,27 @@ function showToast(msg, type='success') {
 .summary-item{border:1px solid #E2E8F0;background:#F8FAFC;border-radius:10px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
 .summary-item span{font-size:11px;color:#7183A3;font-weight:700;text-transform:uppercase;letter-spacing:.05em;}
 .summary-item strong{font-size:20px;color:#0D2137;line-height:1;}
-.access-mode-strip{display:grid;grid-template-columns:minmax(260px,1fr) auto;gap:16px;align-items:center;border:1px solid #DDE7F3;background:#F8FAFC;border-radius:11px;padding:13px 14px;margin-bottom:14px;}
-.access-mode-copy span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#2F80ED;font-weight:800;margin-bottom:3px;}
-.access-mode-copy strong{display:block;font-size:15px;color:#0D2137;line-height:1.2;}
-.access-mode-copy p{margin:4px 0 0;color:#7183A3;font-size:12px;line-height:1.35;}
-.access-mode-controls{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap;}
-.access-mode-option{display:inline-flex;align-items:center;gap:7px;min-height:36px;padding:8px 11px;border:1px solid #DDE7F3;border-radius:9px;background:#fff;color:#475569;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;}
+.access-mode-strip{display:grid;gap:12px;border:1px solid #DDE7F3;background:#F8FAFC;border-radius:11px;padding:14px;margin-bottom:14px;}
+.access-mode-header{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,420px);gap:18px;align-items:start;}
+.access-mode-title{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#2F80ED;font-weight:800;margin-bottom:5px;}
+.access-mode-header strong{display:block;font-size:15px;color:#0D2137;line-height:1.25;}
+.access-mode-header p{max-width:760px;margin:5px 0 0;color:#7183A3;font-size:12px;line-height:1.45;}
+.access-mode-office-field{display:grid;gap:6px;min-width:0;}
+.access-mode-office-field span{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#64748B;font-weight:800;}
+.access-mode-office{width:100%;min-width:0;}
+.access-mode-body{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:stretch;}
+.access-mode-option{display:flex;align-items:flex-start;gap:10px;min-height:74px;padding:12px;border:1px solid #DDE7F3;border-radius:10px;background:#fff;color:#475569;cursor:pointer;transition:all .15s;line-height:1.25;}
 .access-mode-option input{width:13px;height:13px;accent-color:#0B4DB3;}
+.access-mode-option span{min-width:0;}
+.access-mode-option strong{display:block;font-size:13px;color:#0F172A;font-weight:800;}
+.access-mode-option small{display:block;margin-top:4px;color:#7183A3;font-size:11.5px;line-height:1.35;}
 .access-mode-option.is-selected{border-color:#2F80ED;background:#EBF4FF;color:#0B4DB3;box-shadow:0 0 0 3px rgba(47,128,237,.08);}
+.access-mode-option.is-selected strong{color:#0B4DB3;}
+.access-mode-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid #E8EEF6;padding-top:12px;}
+.access-mode-impact{display:flex;align-items:center;gap:8px;min-width:0;color:#7183A3;font-size:12px;}
+.access-mode-impact span{font-weight:700;}
+.access-mode-impact strong{color:#0D2137;font-weight:800;}
+.access-mode-save{min-height:38px;white-space:nowrap;}
 .control-strip{display:grid;grid-template-columns:minmax(260px,1fr) 190px 150px;gap:10px;align-items:center;}
 .search-box{display:flex;align-items:center;gap:8px;background:#fff;border:1.5px solid #DDE7F3;border-radius:9px;padding:9px 12px;min-width:0;}
 .search-box:focus-within{border-color:#2F80ED;box-shadow:0 0 0 3px rgba(47,128,237,.09);}
@@ -1877,8 +2041,9 @@ function showToast(msg, type='success') {
   .page-heading{flex-direction:column;align-items:stretch;}
   .top-actions{justify-content:flex-start;}
   .summary-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
-  .access-mode-strip{grid-template-columns:1fr;}
-  .access-mode-controls{justify-content:flex-start;}
+  .access-mode-header{grid-template-columns:1fr;}
+  .access-mode-body{grid-template-columns:1fr;}
+  .access-mode-save{width:max-content;}
   .control-strip{grid-template-columns:1fr;}
   .focal-routing-shell,.route-table-head,.division-route-row{grid-template-columns:1fr;}
   .route-table-head{display:none;}
@@ -1892,6 +2057,9 @@ function showToast(msg, type='success') {
   .summary-grid{grid-template-columns:1fr;}
   .page-heading h1{font-size:20px;}
   .top-actions .btn{width:100%;justify-content:center;}
+  .access-mode-footer{align-items:stretch;flex-direction:column;}
+  .access-mode-impact{align-items:flex-start;flex-direction:column;gap:3px;}
+  .access-mode-save{width:100%;justify-content:center;}
   .pagination-bar{align-items:stretch;flex-direction:column;}
   .pagination-meta{justify-content:space-between;}
   .pagination-controls{justify-content:space-between;}
@@ -1950,7 +2118,7 @@ function showToast(msg, type='success') {
 .approve:hover{background:#1e3f61;}
 
 /* Temp pw */
-.temp-pw{font-family:'DM Mono',monospace;font-size:11px;color:#0F172A;background:#F1F5F9;padding:3px 7px;border-radius:5px;letter-spacing:.5px;}
+.temp-pw{font-family:monospace;font-size:11px;color:#0F172A;background:#F1F5F9;padding:3px 7px;border-radius:5px;letter-spacing:.5px;}
 .icon-btn-sm{background:none;border:none;cursor:pointer;padding:3px;border-radius:4px;color:#94A3B8;transition:all .15s;}
 .icon-btn-sm:hover{background:#F1F5F9;color:#64748B;}
 .icon-btn-sm.danger:hover{background:#FEF2F2;color:#EF4444;}
@@ -2005,23 +2173,53 @@ function showToast(msg, type='success') {
   cursor:pointer;transition:border-color .15s,background .15s,box-shadow .15s;
 }
 .access-group-option:hover{border-color:#BFDBFE;background:#F0F7FF;}
+.access-group-option.is-disabled{background:#F8FAFC;border-color:#E2E8F0;color:#94A3B8;cursor:not-allowed;opacity:.72;}
+.access-group-option.is-disabled:hover{background:#F8FAFC;border-color:#E2E8F0;}
+.access-group-option.is-disabled strong,
+.access-group-option.is-disabled small{color:#94A3B8;}
 .access-group-option input{margin-top:2px;accent-color:#0B4BB3;}
+.access-group-option input:disabled{cursor:not-allowed;}
 .access-group-option strong{display:block;font-size:12px;color:#0F172A;line-height:1.2;}
 .access-group-option small{display:block;margin-top:3px;font-size:10.5px;color:#7183A3;line-height:1.35;}
+.access-group-note{color:#0B4BB3!important;font-weight:700;}
 
 .access-group-subhead{
   font-size:10px;font-weight:700;color:#475569;text-transform:uppercase;
   letter-spacing:.5px;margin:14px 0 4px;cursor:default;list-style:none;
 }
 .access-group-subhead::-webkit-details-marker{display:none;}
-summary.access-group-subhead{cursor:pointer;display:flex;align-items:center;gap:6px;}
-summary.access-group-subhead::before{
-  content:'▸';display:inline-block;font-size:9px;color:#94A3B8;
-  transition:transform .15s;
-}
-.cluster-group-disclosure[open] summary.access-group-subhead::before{transform:rotate(90deg);}
 .access-group-subnote{margin:0 0 8px;font-size:10.5px;color:#94A3B8;line-height:1.3;}
 .cluster-group-disclosure{margin-top:2px;}
+.cluster-disclosure-button{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  width:100%;margin:14px 0 8px;padding:10px 12px;
+  border:1px solid #CFE0F5;border-radius:9px;background:#F8FBFF;
+  color:#0F2E5E;cursor:pointer;list-style:none;
+  transition:background .15s,border-color .15s,box-shadow .15s;
+}
+.cluster-disclosure-button::-webkit-details-marker{display:none;}
+.cluster-disclosure-button:hover{background:#EFF6FF;border-color:#93C5FD;}
+.cluster-disclosure-button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(37,99,235,.16);border-color:#3B82F6;}
+.cluster-disclosure-title{
+  display:flex;align-items:center;gap:8px;font-size:11px;font-weight:800;
+  text-transform:uppercase;letter-spacing:.5px;line-height:1.2;
+}
+.cluster-disclosure-title::before{
+  content:'›';display:grid;place-items:center;width:18px;height:18px;
+  border-radius:6px;background:#E7F0FF;color:#0B4BB3;font-size:17px;
+  line-height:1;transition:transform .15s;
+}
+.cluster-disclosure-hint{
+  flex-shrink:0;padding:3px 8px;border-radius:999px;background:#EAF2FF;
+  color:#0B4BB3;font-size:10px;font-weight:800;
+}
+.cluster-group-disclosure[open] .cluster-disclosure-button{
+  background:#EFF6FF;border-color:#60A5FA;box-shadow:0 1px 0 rgba(15,46,94,.04);
+}
+.cluster-group-disclosure[open] .cluster-disclosure-title::before{transform:rotate(90deg);}
+.cluster-group-disclosure[open] .cluster-disclosure-hint::before{content:'Collapse';}
+.cluster-group-disclosure[open] .cluster-disclosure-hint{font-size:0;}
+.cluster-group-disclosure[open] .cluster-disclosure-hint::before{font-size:10px;}
 .access-group-warning{
   display:flex;flex-direction:column;gap:2px;margin:6px 0 10px;padding:9px 11px;
   background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;
@@ -2050,7 +2248,7 @@ summary.access-group-subhead::before{
 .pw-section-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
 .pw-section-note{font-size:11px;color:#94A3B8;margin-top:2px;}
 .pw-display{display:flex;align-items:center;gap:8px;}
-.pw-code{font-family:'DM Mono',monospace;font-size:13px;color:#0F172A;background:#fff;border:1px solid #E2E8F0;padding:6px 12px;border-radius:7px;letter-spacing:.8px;flex:1;}
+.pw-code{font-family:monospace;font-size:13px;color:#0F172A;background:#fff;border:1px solid #E2E8F0;padding:6px 12px;border-radius:7px;letter-spacing:.8px;flex:1;}
 
 /* Modal footer */
 .modal-footer{display:flex;justify-content:flex-end;gap:8px;padding:14px 24px;border-top:1px solid #F1F5F9;background:#F8FAFC;}

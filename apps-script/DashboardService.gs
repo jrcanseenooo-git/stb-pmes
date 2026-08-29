@@ -8,6 +8,7 @@ const DashboardService = (() => {
 
   function summary(params, user) {
     const profile  = AuthService.getProfile(user)
+    requireStbDashboardAccess_(profile)
     const accSheet = SpreadsheetService.getSheet(SHEET.ACCOMPLISHMENTS)
     const usrSheet = SpreadsheetService.getSheet(SHEET.USERS)
 
@@ -38,6 +39,7 @@ const DashboardService = (() => {
 
   function divisions(params, user) {
     const profile  = AuthService.getProfile(user)
+    requireStbDashboardAccess_(profile)
     if (!AuthService.hasPermission(profile, 'view_bureau_monitoring') &&
         !AuthService.hasPermission(profile, 'view_division_monitoring')) {
       throw HttpError('Access denied to dashboard monitoring', 403)
@@ -70,6 +72,7 @@ const DashboardService = (() => {
 
   function statusBreakdown(params, user) {
     const profile  = AuthService.getProfile(user)
+    requireStbDashboardAccess_(profile)
     const accSheet = SpreadsheetService.getSheet(SHEET.ACCOMPLISHMENTS)
     let accs       = SpreadsheetService.getAllRows(accSheet).filter(r => !r.deleted)
     accs           = applyScope(accs, profile)
@@ -86,6 +89,7 @@ const DashboardService = (() => {
 
   function monthlyActivity(params, user) {
     const profile  = AuthService.getProfile(user)
+    requireStbDashboardAccess_(profile)
     const accSheet = SpreadsheetService.getSheet(SHEET.ACCOMPLISHMENTS)
     const type     = params.type || 'IPCR'
     let accs       = SpreadsheetService.getAllRows(accSheet)
@@ -117,6 +121,7 @@ const DashboardService = (() => {
   // four results from that single pass.
   function all(params, user) {
     const profile  = AuthService.getProfile(user)
+    requireStbDashboardAccess_(profile)
     const accSheet = SpreadsheetService.getSheet(SHEET.ACCOMPLISHMENTS)
     const usrSheet = SpreadsheetService.getSheet(SHEET.USERS)
 
@@ -195,6 +200,19 @@ const DashboardService = (() => {
   }
 
   // ── Scope helpers ──
+  // This is the legacy STB dashboard backed by the central workbook. Office
+  // dashboards use PortalService.officeSummary, which is routed into the
+  // assigned office workbook by OfficeScopeService. Guarding here prevents a
+  // direct API request from bypassing the frontend route redirect.
+  function requireStbDashboardAccess_(profile) {
+    const scope = String(profile.systemScope || '').trim().toUpperCase()
+    const officeKey = String(profile.officeId || profile.officeCode || '').trim().toUpperCase()
+    const isStb = !officeKey || officeKey === 'STB' || officeKey === 'OFF-STB' || officeKey === 'SOCIAL TECHNOLOGY BUREAU'
+    if (!isStb || ['STB_FULL', 'CLUSTER_ADMIN'].indexOf(scope) < 0) {
+      throw HttpError('The central dashboard is only available to STB/central accounts. Use the Office Dashboard for your assigned office.', 403)
+    }
+  }
+
   function applyScope(rows, profile) {
     if (AuthService.hasPermission(profile, 'view_bureau_monitoring')) return rows
     if (AuthService.hasPermission(profile, 'view_division_monitoring')) return rows.filter(r => r.divisionId === profile.divisionId)

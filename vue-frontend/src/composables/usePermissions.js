@@ -14,29 +14,32 @@ export function usePermissions() {
     authStore.profile?.permissionGroups?.includes('office-assessment-admin') ||
     authStore.profile?.permissions?.includes('manage_office_users')
   )
-  const permissions = computed(() => {
-    const base = authStore.profile?.permissions || []
-    if (!isExplicitOfficeAdmin.value) return base
-    return Array.from(new Set(base.concat([
-      'manage_office_users',
-      'manage_ipat_scores',
-      'view_bureau_monitoring',
-      'view_division_monitoring'
-    ])))
-  })
-  const permissionGroups = computed(() => {
-    const base = authStore.profile?.permissionGroups || []
-    if (!isExplicitOfficeAdmin.value) return base
-    return Array.from(new Set(base.concat(['office-assessment-admin'])))
-  })
+  // The backend is the authority for permissions. Do not manufacture broader
+  // client-side capabilities from an office-admin marker: doing so made the
+  // interface disagree with server-side office boundaries.
+  const permissions = computed(() => authStore.profile?.permissions || [])
+  const permissionGroups = computed(() => authStore.profile?.permissionGroups || [])
   const isStbFullScope = computed(() => systemScope.value === 'STB_FULL')
-  const isClusterPortalScope = computed(() => ['CLUSTER_PORTAL', 'OFFICE_ADMIN', 'CLUSTER_ADMIN'].includes(systemScope.value))
+  const isOfficeFullPmesScope = computed(() => systemScope.value === 'OFFICE_FULL_PMES')
+  const isClusterPortalScope = computed(() =>
+    ['CLUSTER_PORTAL', 'OFFICE_ADMIN', 'CLUSTER_ADMIN', 'OFFICE_FULL_PMES'].includes(systemScope.value)
+  )
 
   const hasPermission = (permission) => computed(() =>
     permissions.value.includes(permission)
   )
 
-  const isAdmin       = computed(() => role.value === 'System Administrator')
+  const isAdmin = computed(() => {
+    if (role.value !== 'System Administrator') return false
+    if (!['STB_FULL', 'CLUSTER_ADMIN'].includes(systemScope.value)) return false
+    const officeKey = String(
+      authStore.profile?.officeId ||
+      authStore.profile?.officeCode ||
+      authStore.profile?.officeName ||
+      ''
+    ).trim().toUpperCase()
+    return !officeKey || officeKey === 'STB' || officeKey === 'SOCIAL TECHNOLOGY BUREAU'
+  })
   const isStbSystemAdmin = computed(() => {
     if (!isAdmin.value || systemScope.value !== 'STB_FULL') return false
     const officeKey = String(
@@ -102,10 +105,13 @@ export function usePermissions() {
     permissions.value.includes('view_cluster_monitoring')
   )
   // Gates the Rater Tagging screen. Mirrors the backend check in
-  // RaterMatrixService.requireManage_ so the menu and the API agree.
+  // RaterMatrixService.requireManage_ and assignment-generation scope checks.
+  // The delegated focal is still limited server-side to their assigned office.
   const canGenerateAssignments = computed(() =>
     permissions.value.includes('generate_ipat_assignments') ||
-    permissions.value.includes('manage_office_registry')
+    permissions.value.includes('manage_office_rater_matrix') ||
+    permissions.value.includes('manage_office_registry') ||
+    isExplicitOfficeAdmin.value
   )
   const canManageOfficePersonnel = computed(() =>
     isExplicitOfficeAdmin.value ||
@@ -120,33 +126,25 @@ export function usePermissions() {
     permissions.value.includes('view_bureau_monitoring')
   )
   const canViewOfficePersonnel = computed(() =>
-    canManageOfficePersonnel.value ||
-    isDivChief.value ||
-    isSectionHead.value ||
-    permissions.value.includes('view_division_monitoring') ||
-    permissions.value.includes('view_bureau_monitoring')
+    !isStbFullScope.value && (
+      canManageOfficePersonnel.value ||
+      isDivChief.value ||
+      isSectionHead.value ||
+      permissions.value.includes('view_division_monitoring') ||
+      permissions.value.includes('view_bureau_monitoring')
+    )
   )
   const evaluationOnlyRollout = computed(() => {
     const mode = authStore.profile?.systemAccessMode
     if (mode) return mode !== 'full_access'
     return import.meta.env.VITE_EVALUATION_ONLY_ROLLOUT !== 'false'
   })
-  const canAccessFullSystem = computed(() =>
-    !evaluationOnlyRollout.value ||
-    isAdmin.value ||
-    permissions.value.includes('manage_users') ||
-    permissions.value.includes('manage_focal_assignments') ||
-    permissions.value.includes('manage_database') ||
-    permissions.value.includes('manage_libraries') ||
-    permissions.value.includes('manage_assessment_content') ||
-    permissions.value.includes('manage_office_registry') ||
-    permissions.value.includes('provision_office_spreadsheets') ||
-    permissions.value.includes('view_cluster_monitoring') ||
-    permissionGroups.value.includes('system-admin') ||
-    permissionGroups.value.includes('user-manager') ||
-    permissionGroups.value.includes('library-manager') ||
-    permissionGroups.value.includes('database-manager')
-  )
+  // Full system access means the legacy STB module set (Dashboard, KRA,
+  // IPCRF/CCEF, Accomplishments, Review) is available. In evaluation-only
+  // mode, even STB_FULL profiles use the simplified evaluation portal; assigned
+  // admin and monitoring abilities are still exposed by their own permission
+  // checks below, but they do not implicitly reopen the STB-only modules.
+  const canAccessFullSystem = computed(() => !evaluationOnlyRollout.value)
   const divisionScope = computed(() => {
     if (canViewAllDivisions.value) return null
     if (permissions.value.includes('view_division_monitoring') || isDivChief.value) return authStore.profile?.divisionId ?? null
@@ -155,7 +153,7 @@ export function usePermissions() {
 
   return {
     role, permissions, permissionGroups, hasPermission,
-    systemScope, isStbFullScope, isClusterPortalScope, isOfficeAdminScope, isExplicitOfficeAdmin,
+    systemScope, isStbFullScope, isOfficeFullPmesScope, isClusterPortalScope, isOfficeAdminScope, isExplicitOfficeAdmin,
     isAdmin, isStbSystemAdmin, isDirector, isAsstDir, isDivChief, isSectionHead, isStaff, isUndersecretary,
     canViewAllDivisions, canApprove, canManageUsers, canManageLibraries, canViewAssessmentLibrary,
     canManageFocalAssignments, canViewAudit, canGenerateReports,

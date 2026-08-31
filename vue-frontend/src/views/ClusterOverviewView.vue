@@ -280,6 +280,76 @@
             </div>
           </div>
 
+          <div class="drill">
+            <div class="drill-head">
+              <h3>Personnel Score List</h3>
+              <input
+                v-model="drillSearch"
+                class="drill-search"
+                type="search"
+                placeholder="Search name, division or section…"
+              />
+            </div>
+
+            <p v-if="drillLoading" class="drill-note">Loading this office's personnel…</p>
+            <p v-else-if="drillError" class="drill-note drill-error">{{ drillError }}</p>
+            <template v-else>
+              <div class="drill-stats">
+                <div>
+                  <span>Still to finish rating</span>
+                  <strong>{{ drillPending.length }}</strong>
+                </div>
+                <div>
+                  <span>Outstanding</span>
+                  <strong>{{ drillOutstanding.length }}</strong>
+                </div>
+                <div>
+                  <span>Needs improvement</span>
+                  <strong>{{ drillNeedsImprovement.length }}</strong>
+                </div>
+              </div>
+
+              <div v-if="drillRows.length" class="drill-table-wrap">
+                <table class="detail-table">
+                  <thead>
+                    <tr>
+                      <th>Personnel</th>
+                      <th>Division</th>
+                      <th>Section</th>
+                      <th>Rating</th>
+                      <th>Progress</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="row in drillRows" :key="row.id || row.name">
+                      <td>
+                        <strong>{{ row.name }}</strong>
+                        <span>{{ row.role || '-' }}</span>
+                      </td>
+                      <td>{{ row.division || '-' }}</td>
+                      <td>{{ row.section || '-' }}</td>
+                      <td>
+                        <span v-if="row.score" :class="['drill-band', bandClass(row.descriptor)]">
+                          {{ row.score }} · {{ row.descriptor || 'Rated' }}
+                        </span>
+                        <span v-else class="drill-muted">{{ row.status || 'Not computed' }}</span>
+                      </td>
+                      <td>
+                        <span v-if="row.totalTasks">
+                          {{ row.completedTasks || 0 }} / {{ row.totalTasks }} submitted
+                        </span>
+                        <span v-else class="drill-muted">No rating tasks</span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p v-else class="drill-note">
+                {{ drillSearch ? 'Nobody matches that search.' : 'No personnel records for this office and period.' }}
+              </p>
+            </template>
+          </div>
+
         </div>
 
         <div v-else class="detail-body">
@@ -316,7 +386,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { officeRegistryApi } from '@/services/api'
+import { officeRegistryApi, portalApi } from '@/services/api'
 import { usePermissions } from '@/composables/usePermissions'
 import { officeAcronym } from '@/utils/officeAcronyms'
 import PageHeader from '@/components/ui/PageHeader.vue'
@@ -324,6 +394,10 @@ import DataPanel from '@/components/ui/DataPanel.vue'
 import ProgressBar from '@/components/ui/ProgressBar.vue'
 
 const { canManageOfficeRegistry } = usePermissions()
+
+const clusterNow = new Date()
+const currentYear = clusterNow.getFullYear()
+const currentSemester = clusterNow.getMonth() < 6 ? 1 : 2
 
 const EMPTY_TOTALS = {
   offices: 0, activeOffices: 0, activeSpreadsheets: 0, attention: 0,
@@ -509,6 +583,17 @@ function openOfficeList(title, rows, kind) {
   }
 }
 
+// Opening an office now loads that office's own personnel, the same payload
+// its administrators see on their dashboard. The cluster payload deliberately
+// carries only per-office summaries - nine offices' rosters in one response
+// would be large and almost entirely unread - so the detail is fetched when an
+// office is actually opened.
+//
+// portal/office-summary already accepts an explicit officeId and validates it
+// against view_cluster_monitoring in OfficeScopeService, so this reuses the
+// existing office dashboard path rather than adding a parallel one. No new
+// permission surface: an account that cannot monitor the cluster cannot target
+// another office here either.
 function openOfficeDetail(office) {
   detail.value = {
     title: officeDisplayName(office),
@@ -516,6 +601,62 @@ function openOfficeDetail(office) {
     office,
     kind: 'office'
   }
+  loadOfficeDrill(office)
+}
+
+const drillLoading = ref(false)
+const drillError = ref('')
+const drillInsights = ref(null)
+const drillSearch = ref('')
+let drillRequestId = 0
+
+async function loadOfficeDrill(office) {
+  const officeId = String(office?.officeId || office?.officeCode || '').trim()
+  drillSearch.value = ''
+  drillInsights.value = null
+  drillError.value = ''
+  if (!officeId) {
+    drillError.value = 'This office has no id, so its personnel cannot be loaded.'
+    return
+  }
+  // Guards against a slow response for one office landing after the user has
+  // already opened another - the modal would otherwise show the wrong roster
+  // under the right heading.
+  const requestId = ++drillRequestId
+  drillLoading.value = true
+  try {
+    const data = await portalApi.officeSummary({
+      officeId,
+      semester: currentSemester,
+      year: currentYear
+    })
+    if (requestId !== drillRequestId) return
+    drillInsights.value = data?.insights || {}
+  } catch (e) {
+    if (requestId !== drillRequestId) return
+    drillError.value = e?.message || 'This office\'s personnel could not be loaded.'
+  } finally {
+    if (requestId === drillRequestId) drillLoading.value = false
+  }
+}
+
+const drillPending = computed(() => drillInsights.value?.pendingPersonnel || [])
+const drillOutstanding = computed(() => drillInsights.value?.outstandingPersonnel || [])
+const drillNeedsImprovement = computed(() => drillInsights.value?.needsImprovementPersonnel || [])
+
+const drillRows = computed(() => {
+  const rows = drillInsights.value?.allPersonnelScores || []
+  const term = drillSearch.value.trim().toLowerCase()
+  if (!term) return rows
+  return rows.filter(row => [row.name, row.division, row.section, row.role]
+    .some(field => String(field || '').toLowerCase().includes(term)))
+})
+
+function bandClass(descriptor) {
+  const value = String(descriptor || '')
+  if (value === 'Outstanding') return 'band-good'
+  if (value === 'Needs Improvement' || value === 'Requires Immediate Intervention') return 'band-low'
+  return 'band-mid'
 }
 
 function metricLabel(kind) {
@@ -564,6 +705,26 @@ async function load(forceRefresh = false) {
 </script>
 
 <style scoped>
+/* Per-office drill-down inside the detail modal. */
+.drill { margin-top: 14px; border-top: 1px solid #E2E8F0; padding-top: 12px; }
+.drill-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.drill-head h3 { margin: 0; font-size: 13px; font-weight: 800; color: #0F172A; }
+.drill-search { margin-left: auto; min-width: 220px; padding: 6px 10px; font-size: 12px;
+  border: 1px solid #E2E8F0; border-radius: 8px; background: #fff; color: #0F172A; }
+.drill-note { margin: 8px 0; font-size: 12px; color: #64748B; }
+.drill-error { color: #B91C1C; }
+.drill-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
+.drill-stats > div { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 8px 10px; }
+.drill-stats span { display: block; font-size: 11px; color: #64748B; }
+.drill-stats strong { font-size: 17px; color: #0F172A; }
+/* The roster can run to a hundred rows; keep it scrolling inside the modal
+   rather than pushing the modal itself past the viewport. */
+.drill-table-wrap { max-height: 340px; overflow-y: auto; border: 1px solid #E2E8F0; border-radius: 8px; }
+.drill-band { font-weight: 700; font-size: 11px; white-space: nowrap; }
+.band-good { color: #1A56B0; }
+.band-mid { color: #0F766E; }
+.band-low { color: #B45309; }
+.drill-muted { color: #94A3B8; font-size: 11px; }
 /* Named people under each office in the performance cards. */
 .signal-block { border-bottom: 1px solid #F1F5F9; padding-bottom: 6px; }
 .signal-block:last-child { border-bottom: 0; padding-bottom: 0; }

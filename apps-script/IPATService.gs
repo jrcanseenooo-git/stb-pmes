@@ -171,11 +171,24 @@ const IPATService = (() => {
     }
   }
 
+  // Verified once per execution, not once per call. This is a migration guard -
+  // it adds columns that older workbooks lack - so the answer cannot change
+  // within a single request, yet get(), create(), updateRecord(), computeOverall
+  // and getMyResults each called it and each paid a separate header round trip
+  // to Sheets. Keyed by spreadsheet id because office scoping points the same
+  // code at a different workbook per request.
+  const recordSchemaChecked_ = {}
+
   function ensureRecordSchema() {
     const sheet = SpreadsheetService.getSheet(SHEET.IPAT_RECORDS)
+    let ownerId = 'default'
+    try { ownerId = sheet.getParent().getId() } catch (e) { /* fall back to the shared key */ }
+    if (recordSchemaChecked_[ownerId]) return sheet
+
     const lastColumn = Math.max(sheet.getLastColumn(), 1)
     const headers = sheet.getRange(1, 1, 1, lastColumn).getValues()[0].map(String)
     const missing = AUTO_MIGRATED_RECORD_HEADERS.filter(h => headers.indexOf(h) < 0)
+    recordSchemaChecked_[ownerId] = true
     if (missing.length) {
       sheet.getRange(1, headers.length + 1, 1, missing.length).setValues([missing])
       sheet.getRange(1, headers.length + 1, 1, missing.length)
@@ -1420,14 +1433,41 @@ const IPATService = (() => {
   function getThemes()       { return HEARTWORK_THEMES }
   function getJFIndicators() { return JOB_FITNESS_INDICATORS.map((label, idx) => ({ idx, label })) }
 
+  // Targeted lookup instead of pulling the whole sheet and filtering in memory.
+  //
+  // These two are the hottest reads in the module - every task opened, every
+  // submission (computeCBC/computeJF) and every reconciliation calls them - and
+  // the ratings sheets are the fastest-growing tables in the system: one row per
+  // question per rater per ratee, so 25 CBC questions x 5 raters is 125 rows for
+  // a SINGLE person, and an office of 30 crosses 3,700. getAllRows transferred
+  // every one of those cells to find the handful belonging to one record, and
+  // the cost grew with the office's whole history rather than with the record
+  // being opened.
+  //
+  // matchingRowContexts asks Sheets to find the matching rows server-side and
+  // then reads only those, so the work now scales with the record instead. It is
+  // the same helper the save path already uses, including its header-only-sheet
+  // handling, and it reads live rather than through the row cache - which is
+  // what the callers here want anyway: computeCBC after a save, and the
+  // reconciliation path immediately after deleting rows.
+  // The `.filter(r => r.id)` mirrors getAllRows, which drops blank rows the same
+  // way. getAllRows also coerces 'TRUE'/'FALSE' strings to booleans; neither
+  // ratings sheet has a boolean column, so that difference cannot bite here -
+  // but it is why this shortcut is applied to these two reads only, and not to
+  // getAllRows generally.
+  function ratingRowsFor_(sheetName, ipatId) {
+    const sheet = SpreadsheetService.getSheet(sheetName)
+    return matchingRowContexts(sheet, 'ipatId', ipatId).rows
+      .map(ctx => ctx.record)
+      .filter(r => r.id)
+  }
+
   function getCBCRatings(ipatId) {
-    const sheet = SpreadsheetService.getSheet(SHEET.IPAT_CBC_RATINGS)
-    return SpreadsheetService.getAllRows(sheet).filter(r => r.ipatId === ipatId)
+    return ratingRowsFor_(SHEET.IPAT_CBC_RATINGS, ipatId)
   }
 
   function getJFRatings(ipatId) {
-    const sheet = SpreadsheetService.getSheet(SHEET.IPAT_JF_RATINGS)
-    return SpreadsheetService.getAllRows(sheet).filter(r => r.ipatId === ipatId)
+    return ratingRowsFor_(SHEET.IPAT_JF_RATINGS, ipatId)
   }
 
   function deleteRowsByIpatAndRaterTypes_(sheet, ipatId, raterTypes) {

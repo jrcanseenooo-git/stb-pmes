@@ -753,11 +753,16 @@ const IPATRaterAssignmentService = (() => {
       removedAssignments = rowNumbers.length
       if (rowNumbers.length) SpreadsheetService.invalidateSheet(assignSheet)
     }
-    Object.keys(responseTypesByIpat).forEach(ipatId => {
-      const result = IPATService.removeRatingsAndRecomputeUnlocked(ipatId, Array.from(responseTypesByIpat[ipatId]), user)
-      removedResponses += Number(result.removedCBC || 0) + Number(result.removedJF || 0)
-      recomputedRecords += result.recomputed ? 1 : 0
-    })
+    // One pass per ratings sheet for ALL affected records, rather than a full
+    // scan of both sheets per record. Those are the largest tables in the
+    // system, and this loop is what took a backfill past the proxy's 60-second
+    // ceiling once a Rating Tagging change invalidated assignments across an
+    // office.
+    if (Object.keys(responseTypesByIpat).length) {
+      const removal = IPATService.removeRatingsForManyAndRecomputeUnlocked(responseTypesByIpat, user)
+      removedResponses += Number(removal.removedCBC || 0) + Number(removal.removedJF || 0)
+      recomputedRecords += Number(removal.recomputed || 0)
+    }
     // One read of the records tab, every changed row written back in as few
     // ranges as the row numbers allow, instead of a round trip per ratee.
     if (recordMetadataUpdates.length) {

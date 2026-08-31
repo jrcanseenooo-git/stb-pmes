@@ -1494,11 +1494,84 @@ const IPATService = (() => {
     return rowNumbers.length
   }
 
-  function removeRatingsAndRecomputeUnlocked(ipatId, raterTypes, user) {
-    const uniqueTypes = Array.from(new Set((raterTypes || []).map(String).filter(Boolean)))
-    if (!uniqueTypes.length) return { removedCBC: 0, removedJF: 0, recomputed: false }
-    const removedCBC = deleteRowsByIpatAndRaterTypes_(SpreadsheetService.getSheet(SHEET.IPAT_CBC_RATINGS), ipatId, uniqueTypes)
-    const removedJF = deleteRowsByIpatAndRaterTypes_(SpreadsheetService.getSheet(SHEET.IPAT_JF_RATINGS), ipatId, uniqueTypes)
+  // Deletes rows for MANY records in one pass over each ratings sheet.
+  //
+  // Reconciliation during Generate/Backfill previously called the single-record
+  // function once per affected record, and each call read the whole CBC sheet
+  // and the whole JF sheet to find its rows. Those are the largest tables in the
+  // system - one row per question per rater per ratee - so thirty affected
+  // records meant sixty full scans of thousands of rows. That is what pushed a
+  // backfill past the proxy's 60-second ceiling and surfaced to the admin as
+  // "the server returned an unexpected response".
+  //
+  // Now: one read per sheet, every matching row identified, deleted bottom-up in
+  // contiguous blocks. Returns counts per record so the caller can recompute.
+  function deleteRatingRowsForMany_(sheet, typesByIpatId) {
+    const values = sheet.getDataRange().getValues()
+    if (values.length < 2) return {}
+    const headers = values[0]
+    const ipatIdx = headers.indexOf('ipatId')
+    const typeIdx = headers.indexOf('raterType')
+    if (ipatIdx < 0 || typeIdx < 0) return {}
+
+    const removedByIpat = {}
+    const rowNumbers = []
+    for (let i = 1; i < values.length; i++) {
+      const ipatId = String(values[i][ipatIdx] || '')
+      const wanted = typesByIpatId[ipatId]
+      if (!wanted || !wanted[String(values[i][typeIdx] || '')]) continue
+      rowNumbers.push(i + 1)
+      removedByIpat[ipatId] = (removedByIpat[ipatId] || 0) + 1
+    }
+    if (!rowNumbers.length) return removedByIpat
+
+    // Bottom-up so earlier row numbers stay valid as later blocks are removed.
+    const groups = []
+    rowNumbers.sort((a, b) => a - b).forEach(rowNumber => {
+      const last = groups[groups.length - 1]
+      if (last && last.start + last.count === rowNumber) last.count += 1
+      else groups.push({ start: rowNumber, count: 1 })
+    })
+    groups.sort((a, b) => b.start - a.start).forEach(g => sheet.deleteRows(g.start, g.count))
+    SpreadsheetService.invalidateSheet(sheet)
+    return removedByIpat
+  }
+
+  function removeRatingsForManyAndRecomputeUnlocked(typesByIpatIdInput, user) {
+    const typesByIpatId = {}
+    Object.keys(typesByIpatIdInput || {}).forEach(ipatId => {
+      const set = {}
+      Array.from(typesByIpatIdInput[ipatId] || []).map(String).filter(Boolean).forEach(t => { set[t] = true })
+      if (Object.keys(set).length) typesByIpatId[ipatId] = set
+    })
+    const ids = Object.keys(typesByIpatId)
+    if (!ids.length) return { removedCBC: 0, removedJF: 0, recomputed: 0 }
+
+    const removedCBCByIpat = deleteRatingRowsForMany_(SpreadsheetService.getSheet(SHEET.IPAT_CBC_RATINGS), typesByIpatId)
+    const removedJFByIpat = deleteRatingRowsForMany_(SpreadsheetService.getSheet(SHEET.IPAT_JF_RATINGS), typesByIpatId)
+
+    let removedCBC = 0
+    let removedJF = 0
+    let recomputed = 0
+    ids.forEach(ipatId => {
+      removedCBC += Number(removedCBCByIpat[ipatId] || 0)
+      removedJF += Number(removedJFByIpat[ipatId] || 0)
+      try {
+        recomputeRecordAfterRemoval_(ipatId, user)
+        recomputed += 1
+      } catch (e) {
+        Logger.log('[PMES] Recompute after reconciliation failed for ' + ipatId + ': ' + e.message)
+      }
+    })
+
+    AuditService.log('REMOVE_INVALID_RATINGS', 'IPAT',
+      `Removed ${removedCBC} CBC and ${removedJF} JF active response rows across ${ids.length} record(s) during reconciliation`, user)
+    return { removedCBC, removedJF, recomputed }
+  }
+
+  // The scoring half of removeRatingsAndRecompute, shared by the single-record
+  // and batched paths so the two can never drift on how a record is rebuilt.
+  function recomputeRecordAfterRemoval_(ipatId, user) {
     const recSheet = ensureRecordSchema()
     const remainingCBC = getCBCRatings(ipatId)
     if (remainingCBC.length) computeCBC(ipatId, user)
@@ -1513,6 +1586,16 @@ const IPATService = (() => {
     } else if (current) {
       SpreadsheetService.updateRow(recSheet, ipatId, { overallScore: '', descriptor: '', status: 'Draft', updatedAt: new Date().toISOString() })
     }
+  }
+
+  function removeRatingsAndRecomputeUnlocked(ipatId, raterTypes, user) {
+    const uniqueTypes = Array.from(new Set((raterTypes || []).map(String).filter(Boolean)))
+    if (!uniqueTypes.length) return { removedCBC: 0, removedJF: 0, recomputed: false }
+    const removedCBC = deleteRowsByIpatAndRaterTypes_(SpreadsheetService.getSheet(SHEET.IPAT_CBC_RATINGS), ipatId, uniqueTypes)
+    const removedJF = deleteRowsByIpatAndRaterTypes_(SpreadsheetService.getSheet(SHEET.IPAT_JF_RATINGS), ipatId, uniqueTypes)
+    // Shared with the batched path so the two can never drift on how a record
+    // is rebuilt after its ratings are removed.
+    recomputeRecordAfterRemoval_(ipatId, user)
     AuditService.log('REMOVE_INVALID_RATINGS', 'IPAT', `Removed ${removedCBC} CBC and ${removedJF} JF active response rows for ${ipatId}; rater types=${uniqueTypes.join(',')}`, user)
     return { removedCBC, removedJF, recomputed: true }
   }
@@ -1541,6 +1624,7 @@ const IPATService = (() => {
     saveCBCRatingsUnlocked: saveCBCRatings_,
     saveJFRatingsUnlocked:  saveJFRatings_,
     removeRatingsAndRecomputeUnlocked,
+    removeRatingsForManyAndRecomputeUnlocked,
     ensureRecordSchema,
     // Exported so other services classify scores through the protocol's bands
     // instead of maintaining their own. PortalService previously carried a

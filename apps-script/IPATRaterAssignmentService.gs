@@ -513,6 +513,7 @@ const IPATRaterAssignmentService = (() => {
     const createdRecordIds = new Set()
     const assignmentIdsToRemove = new Set()
     const responseTypesByIpat = {}
+    const recordMetadataUpdates = []
     let replacedAssignments = 0
     let removedAssignments = 0
     let removedResponses = 0
@@ -636,11 +637,22 @@ const IPATRaterAssignmentService = (() => {
           String(ipatRecord.divisionId || '') !== String(ratee.divisionId || '') ||
           String(ipatRecord.positionLevel || '') !== String(role || '') ||
           String(ipatRecord.hasSubordinate) !== String(hasSubordinate)
+        // Collected, not written here. updateRow is a round trip to Sheets, and
+        // this sits inside the per-ratee loop - so an office where names or
+        // divisions had shifted paid one sequential write per person. Forty
+        // people meant forty round trips before a single assignment was even
+        // created, which is what pushed Generate/Backfill past the proxy's
+        // 60-second ceiling and surfaced as "the server returned an unexpected
+        // response": the request had not failed, it had simply outlived the
+        // gateway. Applied in one pass after the loop.
         if (metadataChanged && !createdRecordIds.has(ipatRecord.id)) {
-          SpreadsheetService.updateRow(ipatSheet, ipatRecord.id, {
-            rateeName: ratee.fullName || '', divisionId: ratee.divisionId || '',
-            divisionName: ratee.divisionName || '', position: ratee.position || '',
-            positionLevel: role, hasSubordinate, updatedAt: now
+          recordMetadataUpdates.push({
+            id: ipatRecord.id,
+            updates: {
+              rateeName: ratee.fullName || '', divisionId: ratee.divisionId || '',
+              divisionName: ratee.divisionName || '', position: ratee.position || '',
+              positionLevel: role, hasSubordinate, updatedAt: now
+            }
           })
         }
       }
@@ -746,6 +758,48 @@ const IPATRaterAssignmentService = (() => {
       removedResponses += Number(result.removedCBC || 0) + Number(result.removedJF || 0)
       recomputedRecords += result.recomputed ? 1 : 0
     })
+    // One read of the records tab, every changed row written back in as few
+    // ranges as the row numbers allow, instead of a round trip per ratee.
+    if (recordMetadataUpdates.length) {
+      const values = ipatSheet.getDataRange().getValues()
+      const headers = values[0] || []
+      const idIdx = headers.indexOf('id')
+      if (idIdx >= 0) {
+        const rowByRecordId = {}
+        for (let i = 1; i < values.length; i++) rowByRecordId[String(values[i][idIdx])] = i
+        const touchedRowNumbers = []
+        recordMetadataUpdates.forEach(entry => {
+          const i = rowByRecordId[String(entry.id)]
+          if (i === undefined) return
+          Object.keys(entry.updates).forEach(key => {
+            const columnIdx = headers.indexOf(key)
+            if (columnIdx >= 0) values[i][columnIdx] = entry.updates[key]
+          })
+          touchedRowNumbers.push(i + 1)
+        })
+        // Contiguous runs go out as one setValues rather than one per row.
+        const sorted = Array.from(new Set(touchedRowNumbers)).sort((a, b) => a - b)
+        let start = null
+        let block = []
+        const flush = () => {
+          if (!block.length) return
+          ipatSheet.getRange(start, 1, block.length, headers.length).setValues(block)
+          block = []
+        }
+        sorted.forEach(rowNumber => {
+          if (start !== null && rowNumber === start + block.length) {
+            block.push(values[rowNumber - 1])
+            return
+          }
+          flush()
+          start = rowNumber
+          block = [values[rowNumber - 1]]
+        })
+        flush()
+        if (sorted.length) SpreadsheetService.invalidateSheet(ipatSheet)
+      }
+    }
+
     SpreadsheetService.appendRows(ipatSheet, recordsToCreate)
     SpreadsheetService.appendRows(assignSheet, assignments)
 
@@ -913,7 +967,8 @@ const IPATRaterAssignmentService = (() => {
     return withRatingWriteLock(() => markCompletedUnlocked(assignmentId, user))
   }
 
-  function submitAssignmentRatingsUnlocked(assignmentId, body, user) {
+  // Read-only. Safe to run before the lock is taken.
+  function prepareAssignmentSubmission_(assignmentId, body, user) {
     const profile = AuthService.getProfile(user)
     const assignSheet = SpreadsheetService.getSheet(SHEET.IPAT_ASSIGNMENTS)
     const rows = SpreadsheetService.getAllRows(assignSheet)
@@ -926,7 +981,7 @@ const IPATRaterAssignmentService = (() => {
     }
     if (!row.ipatRecordId) throw HttpError('Assignment has no linked assessment record', 400)
     if (String(row.status || 'Pending') === 'Completed') {
-      return { updated: false, alreadyCompleted: true, savedCBC: 0, savedJF: 0, ipatRecordId: row.ipatRecordId }
+      return { alreadyCompleted: true, response: { updated: false, alreadyCompleted: true, savedCBC: 0, savedJF: 0, ipatRecordId: row.ipatRecordId } }
     }
 
     let cbcRatings = body.cbcRatings || []
@@ -940,14 +995,34 @@ const IPATRaterAssignmentService = (() => {
     if (requirements.cbcCount > 0 && cbcRatings.length < requirements.cbcCount) throw HttpError(`Complete all ${requirements.cbcCount} required CBC questions before submitting.`, 400)
     if (requirements.jfCount > 0 && jfRatings.length < requirements.jfCount) throw HttpError(`Complete all ${requirements.jfCount} required Job Fitness questions before submitting.`, 400)
     if (requirements.cbcCount === 0 && requirements.jfCount === 0) throw HttpError('No active assessment questions are configured for this assignment. Ask your administrator to check the assessment form.', 409)
-    cbcRatings = cbcRatings.map(item => ({ ...item, raterType: row.raterType }))
-    jfRatings = jfRatings.map(item => ({ ...item, raterType: ['Self', 'Supervisor'].includes(String(row.raterType || '')) ? row.raterType : '' })).filter(item => item.raterType)
+
+    return {
+      alreadyCompleted: false,
+      assignmentId,
+      assignSheet,
+      rows,
+      row,
+      cbcRatings: cbcRatings.map(item => ({ ...item, raterType: row.raterType })),
+      jfRatings: jfRatings.map(item => ({ ...item, raterType: ['Self', 'Supervisor'].includes(String(row.raterType || '')) ? row.raterType : '' })).filter(item => item.raterType)
+    }
+  }
+
+  // Runs INSIDE withRatingWriteLock. Only writes belong here.
+  function commitAssignmentSubmission_(prepared, user) {
+    const { assignmentId, assignSheet, rows, row, cbcRatings, jfRatings } = prepared
+
+    // Re-checked under the lock. The same rater submitting from two tabs is the
+    // one race the validation above cannot exclude, and without this both would
+    // pass and write the same ratings twice.
+    const current = SpreadsheetService.findRowsByColumn(assignSheet, 'id', [assignmentId])[0]
+    if (current && String(current.status || 'Pending') === 'Completed') {
+      return { updated: false, alreadyCompleted: true, savedCBC: 0, savedJF: 0, ipatRecordId: row.ipatRecordId }
+    }
 
     // The unlocked variants: this runs inside withRatingWriteLock already, and
     // the locking entry points would try to take the same script lock a second
-    // time in one execution. Keeping the whole submission - both rating sets
-    // and the assignment row below - under the single outer lock is also what
-    // stops a submission from half-applying.
+    // time in one execution. Keeping both rating sets and the assignment row
+    // under the single outer lock is what stops a submission half-applying.
     if (cbcRatings.length) IPATService.saveCBCRatingsUnlocked(row.ipatRecordId, { ratings: cbcRatings }, user, { skipRaterGuard: true })
     if (jfRatings.length)  IPATService.saveJFRatingsUnlocked(row.ipatRecordId, { ratings: jfRatings }, user, { skipRaterGuard: true })
 
@@ -960,8 +1035,21 @@ const IPATRaterAssignmentService = (() => {
     }
   }
 
+  // Everything before the first write is read-only: who is asking, which
+  // assignment, does it belong to them, are all the required questions
+  // answered. None of it needs the lock, and all of it was being done inside
+  // it - on a script-wide lock, where the whole cluster queues behind each
+  // submission, that time is paid by everyone waiting.
+  //
+  // So validate first, take the lock second. The status check is deliberately
+  // repeated inside: between validating and acquiring the lock, the same rater
+  // could have submitted from another tab, and only the re-check under the lock
+  // can rule that out. It is the one condition that can change underneath us -
+  // ownership and the question count cannot.
   function submitAssignmentRatings(assignmentId, body, user) {
-    return withRatingWriteLock(() => submitAssignmentRatingsUnlocked(assignmentId, body, user))
+    const prepared = prepareAssignmentSubmission_(assignmentId, body, user)
+    if (prepared.alreadyCompleted) return prepared.response
+    return withRatingWriteLock(() => commitAssignmentSubmission_(prepared, user))
   }
 
   // ── GET MY OWN RESULTS (ratee views their final score) ───────────────────

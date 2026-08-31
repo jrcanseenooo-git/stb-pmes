@@ -797,7 +797,12 @@
 
     <!-- ══════════════════════ GENERATE ASSIGNMENTS MODAL ══════════════════════ -->
     <teleport to="body">
-      <div v-if="showGenerateModal" class="modal-overlay" @click.self="showGenerateModal = false">
+      <!-- While a generation is running the modal is sealed: no overlay click, no
+           close button, no Cancel. It rewrites an entire office's assignments and
+           can delete submitted responses, so a half-finished run is the one state
+           worth preventing outright - and closing the dialog would not stop the
+           request anyway, it would only hide it. -->
+      <div v-if="showGenerateModal" class="modal-overlay" @click.self="!generating && (showGenerateModal = false)">
         <div class="modal" style="max-width:480px">
           <div class="modal-hd">
             <div class="modal-icon">
@@ -810,7 +815,7 @@
               <h3 class="modal-title">Generate / Backfill Rater Assignments</h3>
               <p class="modal-sub">Creates missing rater assignments for {{ assignmentScopeLabel }} without changing completed ratings</p>
             </div>
-            <button class="modal-close" @click="showGenerateModal = false">
+            <button v-if="!generating" class="modal-close" @click="showGenerateModal = false">
               <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M2 2l11 11M13 2L2 13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
             </button>
           </div>
@@ -853,7 +858,7 @@
             </div>
           </div>
           <div class="modal-footer">
-            <button class="btn" @click="showGenerateModal = false; generateResult = null">{{ generateResult ? 'Close' : 'Cancel' }}</button>
+            <button class="btn" :disabled="generating" @click="showGenerateModal = false; generateResult = null">{{ generateResult ? 'Close' : 'Cancel' }}</button>
             <button v-if="!generateResult" class="btn btn-primary" :disabled="generating" @click="generateAssignments">
               <span v-if="generating" class="spinner-sm"></span>
               {{ generating ? 'Checking and backfilling…' : 'Generate / Backfill Assignments' }}
@@ -1048,7 +1053,24 @@ const JF_INDICATORS = computed(() =>
 
 async function loadAssessmentContent(force = false) {
   if (assessmentQuestions.value.length && !force) return
-  loadingAssessment.value = true
+
+  // Paint the question set from the last visit so the form appears at once,
+  // then fetch and replace it. The questions are the slowest thing on this
+  // screen for a rater, and they change perhaps once a semester.
+  //
+  // The fetch is never skipped, so the cached copy is only ever on screen for
+  // the second or two before the fresh one lands - far less time than it takes
+  // to answer anything. That matters, because the server counts the questions
+  // it expects when validating a submission: answering a stale set would be
+  // rejected. Showing it briefly is safe; trusting it is not.
+  const cachedContent = readSnapshot('content', 'all', 'all')
+  if (cachedContent && !assessmentQuestions.value.length) {
+    assessmentQuestions.value = cachedContent.rows
+    const cachedCategories = readSnapshot('categories', 'all', 'all')
+    if (cachedCategories) assessmentCategories.value = cachedCategories.rows
+  }
+
+  loadingAssessment.value = !assessmentQuestions.value.length
   assessmentLoadError.value = ''
   try {
     // Settled, not all: categories only supply the display label and blurb for
@@ -1073,6 +1095,8 @@ async function loadAssessmentContent(force = false) {
     // "not configured" text, which is the accurate advice in that case.
     assessmentQuestions.value  = questions
     assessmentCategories.value = cData?.items || (Array.isArray(cData) ? cData : [])
+    writeSnapshot('content', 'all', 'all', assessmentQuestions.value)
+    writeSnapshot('categories', 'all', 'all', assessmentCategories.value)
   } catch (e) {
     // The request itself failed - expired session, network drop, server error.
     // Surfacing it matters: without this the banner fell back to "no active
@@ -1783,8 +1807,22 @@ onMounted(() => {
   window.addEventListener('focus', handleWindowFocusForNewData)
 })
 
+// Closing the tab does not cancel the request - Apps Script carries on and the
+// office is left with whatever the run had reached. The browser's own "leave
+// site?" prompt is the only thing that can stop that, so arm it while a
+// generation is in flight and disarm it the moment the run ends.
+function warnIfGenerating(event) {
+  if (!generating.value) return
+  event.preventDefault()
+  event.returnValue = ''
+  return ''
+}
+
+onMounted(() => window.addEventListener('beforeunload', warnIfGenerating))
+
 onUnmounted(() => {
   window.removeEventListener('focus', handleWindowFocusForNewData)
+  window.removeEventListener('beforeunload', warnIfGenerating)
 })
 
 async function handlePeriodChange() {
@@ -2128,6 +2166,21 @@ function openGenerateModal() {
 
 async function generateAssignments() {
   if (!generateForm.value.semester || !generateForm.value.year) { showToast('Semester and year required', 'error'); return }
+  if (generating.value) return
+
+  // Generate/Backfill rewrites who rates whom for an entire office, can remove
+  // assignments that no longer match the Rating Tagging, and takes a while. It
+  // was one click with nothing in between.
+  const semesterLabel = generateForm.value.semester === '1' ? '1st Semester' : '2nd Semester'
+  const confirmed = await confirm({
+    title: 'Generate / Backfill Rater Assignments',
+    message: `This will create any missing rating tasks for ${semesterLabel} ${generateForm.value.year} in ` +
+      `${assignmentScopeLabel.value}, and remove tasks that no longer match the current Rating Tagging - ` +
+      `including any responses already submitted against them.\n\n` +
+      `Completed ratings that are still valid are kept. This can take up to a minute, and must not be interrupted.`,
+    confirmLabel: 'Generate / Backfill'
+  })
+  if (!confirmed) return
 
   generating.value = true
   try {
@@ -2140,7 +2193,10 @@ async function generateAssignments() {
       ? `Reconciled assignments: ${generated} added, ${removed} invalid removed for ${ratees} affected employee(s) in ${result.scopeLabel || assignmentScopeLabel.value}`
       : `Assignments are already complete for this period in ${result.scopeLabel || assignmentScopeLabel.value}`)
     await loadRecords()
-  } catch (e) { console.error('[Evaluation] Could not generate assignments', e); showToast(e?.message || 'Could not generate assignments. Please try again or contact the system administrator.', 'error') }
+  } catch (e) {
+    console.error('[Evaluation] Could not generate assignments', e)
+    showToast(e?.message || 'Could not generate assignments. Please try again or contact the system administrator.', 'error')
+  }
   finally { generating.value = false }
 }
 

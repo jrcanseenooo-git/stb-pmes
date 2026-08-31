@@ -153,7 +153,12 @@
                     <span class="rm-multi-value">{{ sourceRolesLabel(row) }}</span>
                     <span class="rm-multi-caret" aria-hidden="true">▾</span>
                   </button>
-                  <div v-if="openMenu === menuKey(block, index)" class="rm-multi-menu" @click.stop>
+                  <div
+                    v-if="openMenu === menuKey(block, index)"
+                    class="rm-multi-menu"
+                    @click.stop
+                    @wheel="onMenuWheel"
+                  >
                     <p v-if="!roleOptionsForRow(row).length" class="rm-multi-none">
                       No roles found in Office Structure.
                     </p>
@@ -517,6 +522,17 @@ function toggleSourceRole(row, role) {
 
 function closeMenus() {
   openMenu.value = ''
+}
+
+// The menu sits inside .pui-table-wrap, which is overflow:auto. A wheel over an
+// open menu chains up to that wrapper, so the whole card scrolls away beneath
+// the options the admin is trying to read. overscroll-behavior in the CSS stops
+// the chaining once the menu is scrolled to an edge; this stops it in the case
+// that behaviour does not cover - a menu whose options already fit, which has
+// no scroll of its own to consume the gesture.
+function onMenuWheel(event) {
+  const el = event.currentTarget
+  if (!el || el.scrollHeight <= el.clientHeight) event.preventDefault()
 }
 
 function addRoleBlock(role) {

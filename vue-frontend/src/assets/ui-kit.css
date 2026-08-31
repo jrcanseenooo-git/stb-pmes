@@ -777,6 +777,9 @@
   min-width: 100%;
   max-height: 240px;
   overflow-y: auto;
+  /* Keep the wheel inside the menu: the wrapper behind it is overflow:auto,
+     so without this the whole card scrolls out from under the options. */
+  overscroll-behavior: contain;
   padding: 6px;
   background: #fff;
   border: 1px solid #E2E8F0;

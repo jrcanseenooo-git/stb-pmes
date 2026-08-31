@@ -955,9 +955,11 @@ import { usePermissions } from '@/composables/usePermissions'
 import { useBranding } from '@/composables/useBranding'
 import { useConfirm } from '@/composables/useConfirm'
 import { useOrgOptions } from '@/composables/useOrgOptions'
+import { useAuthStore } from '@/stores/auth'
 
 const { confirm } = useConfirm()
 const route = useRoute()
+const authStore = useAuthStore()
 const { hasPermission, isAdmin, canGenerateAssignments } = usePermissions()
 const { isClusterPortal, portalSubtitle } = useBranding()
 const canViewBureauMonitoring = hasPermission('view_bureau_monitoring')
@@ -1800,16 +1802,70 @@ async function handlePeriodChange() {
 }
 
 // ── My Tasks ──
+// Last-known task and result lists, kept so a return to this screen paints
+// immediately instead of waiting on a request whose floor is ~1.6s.
+//
+// sessionStorage, not localStorage: it is scoped to the tab and cleared when
+// that tab closes, so a shared workstation does not keep one person's ratee
+// names and scores around for the next. The key carries the signed-in user's id
+// as well, so a different account in the same tab cannot read the previous
+// one's snapshot even before the tab is closed.
+//
+// Every read is wrapped: private windows and browsers with site data blocked
+// throw on access rather than returning null, and a failure here must never
+// stop the page rendering - it just means no head start.
+const SNAPSHOT_VERSION = 'v1'
+
+function snapshotKey(kind, semester, year) {
+  const uid = authStore.profile?.id || authStore.profile?.email || 'anon'
+  return `pmes.eval.${SNAPSHOT_VERSION}.${kind}.${uid}.${semester}.${year}`
+}
+
+function readSnapshot(kind, semester, year) {
+  try {
+    const raw = sessionStorage.getItem(snapshotKey(kind, semester, year))
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed?.rows) && parsed.rows.length ? parsed : null
+  } catch (e) {
+    return null
+  }
+}
+
+function writeSnapshot(kind, semester, year, rows) {
+  try {
+    sessionStorage.setItem(
+      snapshotKey(kind, semester, year),
+      JSON.stringify({ at: new Date().toISOString(), rows })
+    )
+  } catch (e) {
+    // Quota exceeded, or storage unavailable. The screen works without it.
+  }
+}
+
 async function loadMyTasks() {
   const requestedSemester = String(tasksSemester.value)
   const requestedYear = String(tasksYear.value)
-  loadingTasks.value = true
+  // Show the previous answer immediately, then replace it when the fresh one
+  // lands. A request that reads no data at all still costs ~1.6s here - Apps
+  // Script parses the whole project on every execution - so the wait is a floor
+  // the backend cannot optimise away. The list was almost always identical to
+  // last time, and staring at a spinner to be told so is what reads as lag.
+  const cached = readSnapshot('tasks', requestedSemester, requestedYear)
+  if (cached && !myTasks.value.length) {
+    myTasks.value = cached.rows
+    tasksLastUpdatedAt.value = cached.at ? new Date(cached.at) : null
+  }
+  // Only occupy the screen with a spinner when there is genuinely nothing to
+  // show; otherwise the refresh happens quietly behind the visible list.
+  loadingTasks.value = !myTasks.value.length
   try {
     const data = await ipatAssignmentsApi.getMyRatees({ semester: requestedSemester, year: requestedYear })
     if (requestedSemester !== String(tasksSemester.value) || requestedYear !== String(tasksYear.value)) return
     myTasks.value = Array.isArray(data) ? data : (data?.items || [])
     tasksLastUpdatedAt.value = new Date()
     hasNewTaskData.value = false
+    writeSnapshot('tasks', requestedSemester, requestedYear, myTasks.value)
     // Deep link from My Rating Tasks: ?assignment=<id> opens that exact task so
     // the portal list can hand off directly into the form the user clicked.
     const requestedAssignment = String(route.query.assignment || '')
@@ -1853,13 +1909,22 @@ async function switchToMyResults() {
 async function loadMyResults() {
   const requestedSemester = String(tasksSemester.value)
   const requestedYear = String(tasksYear.value)
-  loadingResults.value = true
+  const cached = readSnapshot('results', requestedSemester, requestedYear)
+  if (cached && !myResults.value.length) {
+    myResults.value = cached.rows
+    tasksLastUpdatedAt.value = cached.at ? new Date(cached.at) : null
+    if (activeView.value === 'my-results' && !selectedResult.value) {
+      selectedResult.value = myResults.value[0] || null
+    }
+  }
+  loadingResults.value = !myResults.value.length
   try {
     const data = await ipatAssignmentsApi.getMyResults({ semester: requestedSemester, year: requestedYear })
     if (requestedSemester !== String(tasksSemester.value) || requestedYear !== String(tasksYear.value)) return
     myResults.value = data || []
     tasksLastUpdatedAt.value = new Date()
     hasNewTaskData.value = false
+    writeSnapshot('results', requestedSemester, requestedYear, myResults.value)
     if (activeView.value === 'my-results') {
       selectedResult.value = myResults.value[0] || null
     }
@@ -2018,6 +2083,11 @@ async function submitRatings() {
     if (selectedTask.value?.id === assignment.id) selectedTask.value = { ...selectedTask.value, status: 'Completed' }
     activeAssignment.value = { ...assignment }
     myTasks.value = myTasks.value.map(t => t.id === assignment.id ? { ...t, status: 'Completed' } : t)
+    // Keep the stored snapshot in step with what just happened. Without this the
+    // next visit would paint this task as Pending again for a moment before the
+    // refresh corrected it - and a rater seeing their submitted work listed as
+    // outstanding is exactly the kind of thing that gets reported as a bug.
+    writeSnapshot('tasks', String(tasksSemester.value), String(tasksYear.value), myTasks.value)
     showToast('Ratings submitted successfully!')
     closeDetailModal()
     const allDone = myTasks.value.length > 0 && myTasks.value.every(t => t.status === 'Completed')

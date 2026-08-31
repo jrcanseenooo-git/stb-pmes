@@ -669,28 +669,24 @@ const IPATRaterAssignmentService = (() => {
             ? RaterMatrixService.eligibleRatersFor(ratee, allUsers, matrixRows, a.raterType)
             : []
           const counts = raterCountsByType[a.raterType] || {}
-          const uncovered = eligible.find(person =>
-            String(person.id || '') !== String(current.raterId || '') &&
-            Number(counts[String(person.id || '')] || 0) === 0
-          )
-          if (uncovered && String(current.status || 'Pending') !== 'Completed') {
-            assignmentIdsToRemove.add(String(current.id))
-            countRater(a.raterType, current.raterId, -1)
-            countRater(a.raterType, uncovered.id, 1)
-            replacedAssignments += 1
-            selectedRater = {
-              raterId: uncovered.id,
-              raterName: uncovered.fullName,
-              raterType: a.raterType
-            }
-          } else {
-          // Generate / Backfill creates only missing work.  Replacing a pending
-          // assignment on every run both changes an administrator's existing
-          // rater decision and turns an otherwise read-mostly backfill into
-          // hundreds of slow per-row spreadsheet writes.  Completed ratings
-          // were already preserved; pending assignments must be preserved too.
-            return
-          }
+          // A valid existing assignment is now always kept, whether pending or
+          // completed. Backfill fills empty slots; it does not reassign work
+          // that someone already holds.
+          //
+          // It used to hand a still-pending task to a newly registered person
+          // who had none, so that they were not left with an empty list. But
+          // the task simply vanished from the original rater's My Rating Tasks
+          // - possibly mid-way through a period, with no notice and no trace -
+          // and a late registration in one office could quietly reshuffle work
+          // that colleagues were part-way through. Coverage for a new joiner is
+          // not worth silently taking a task off someone else; they receive the
+          // slots that are genuinely unfilled, and the rest stay put.
+          //
+          // `eligible` and `counts` are still computed above because they feed
+          // the coverage reporting the admin sees after a run.
+          void eligible
+          void counts
+          return
         }
         if (sameType.length && selectedRater === a) {
           sameType.forEach(item => assignmentIdsToRemove.add(String(item.id)))

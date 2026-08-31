@@ -196,30 +196,49 @@ const IPATRaterAssignmentService = (() => {
     return (linked.length * 1000) + (completed * 100) + (hasScore * 10) - (created || 0) / 10000000000000
   }
 
+  // Marks one assignment Completed. This runs INSIDE the script-wide rating
+  // lock, and Apps Script offers no finer-grained lock - so every rating
+  // submission in the whole cluster queues behind whatever this does.
+  //
+  // It used to pull the entire assignments sheet with getDataRange().getValues()
+  // purely to locate one row by id, which meant each submission read that table
+  // twice while holding the gate (the caller reads it too). Time spent here is
+  // multiplied by everyone waiting, so during a rating period - when an office
+  // submits within the same few minutes - it is exactly the wrong place to be
+  // transferring a whole table.
+  //
+  // Ask Sheets to find the row instead, then touch only that row.
   function writeAssignmentCompleted(assignSheet, assignmentId, allRows) {
-    const values = assignSheet.getDataRange().getValues()
-    const headers = values[0] || []
+    const lastRow = assignSheet.getLastRow()
+    const lastColumn = assignSheet.getLastColumn()
+    if (lastRow < 2 || lastColumn < 1) throw HttpError('Assignment not found', 404)
+
+    const headers = assignSheet.getRange(1, 1, 1, lastColumn).getValues()[0]
     const idIdx = headers.indexOf('id')
     const statusIdx = headers.indexOf('status')
     const updatedAtIdx = headers.indexOf('updatedAt')
+    if (idIdx < 0) throw HttpError('Assignment not found', 404)
+
+    const hit = assignSheet.getRange(2, idIdx + 1, lastRow - 1, 1)
+      .createTextFinder(String(assignmentId))
+      .matchEntireCell(true)
+      .findNext()
+    if (!hit) throw HttpError('Assignment not found', 404)
+
     const now = new Date().toISOString()
+    const rowRange = assignSheet.getRange(hit.getRow(), 1, 1, lastColumn)
+    const rowValues = rowRange.getValues()[0]
+    if (statusIdx >= 0) rowValues[statusIdx] = 'Completed'
+    if (updatedAtIdx >= 0) rowValues[updatedAtIdx] = now
+    rowRange.setValues([rowValues])
+    SpreadsheetService.invalidateSheet(assignSheet)
 
-    for (let i = 1; i < values.length; i++) {
-      if (String(values[i][idIdx]) === String(assignmentId)) {
-        if (statusIdx >= 0) values[i][statusIdx] = 'Completed'
-        if (updatedAtIdx >= 0) values[i][updatedAtIdx] = now
-        assignSheet.getRange(i + 1, 1, 1, headers.length).setValues([values[i]])
-        SpreadsheetService.invalidateSheet(assignSheet)
-        const row = allRows.find(r => String(r.id) === String(assignmentId))
-        if (row) {
-          row.status = 'Completed'
-          row.updatedAt = now
-        }
-        return row
-      }
+    const row = (allRows || []).find(r => String(r.id) === String(assignmentId))
+    if (row) {
+      row.status = 'Completed'
+      row.updatedAt = now
     }
-
-    throw HttpError('Assignment not found', 404)
+    return row
   }
 
   function completeAssignmentFromRows(assignSheet, assignmentId, row, allRows, user) {

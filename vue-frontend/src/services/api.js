@@ -355,8 +355,34 @@ async function gasSendWithRetry(method, route, data = {}) {
     if ((method === 'POST' && (isRatingSubmission || isRatingDraftSave)) ||
         (method === 'PATCH' && isUserApproval)) {
       if (err?.status !== 429) throw err
-      await new Promise(r => setTimeout(r, 1200))
-      return gasSend(method, route, data)
+
+      // Apps Script offers only a SCRIPT-WIDE lock, so every rating submission
+      // in the whole cluster serialises through one gate. A single retry was
+      // enough for an occasional collision but not for a rating period where a
+      // whole office submits within the same few minutes: the second attempt
+      // lands in the same queue and the rater is told to try again, having
+      // already answered every question.
+      //
+      // Back off further each time, and jitter each wait. Without jitter every
+      // client rejected by the same busy moment returns together and collides
+      // again - the retry itself becomes the pile-up.
+      //
+      // Safe to repeat: a 429 means tryLock() failed, so the request never
+      // entered the critical section and wrote nothing. Other write failures
+      // stay non-retryable because they are ambiguous about what was applied.
+      const backoffMs = [1200, 3000, 6000, 10000]
+      let lastError = err
+      for (const base of backoffMs) {
+        const jittered = base + Math.floor(Math.random() * base * 0.4)
+        await new Promise(r => setTimeout(r, jittered))
+        try {
+          return await gasSend(method, route, data)
+        } catch (retryError) {
+          if (retryError?.status !== 429) throw retryError
+          lastError = retryError
+        }
+      }
+      throw lastError
     }
 
     throw err

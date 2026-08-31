@@ -148,14 +148,16 @@
                     type="button"
                     class="pui-input rm-multi-toggle"
                     :class="{ 'rm-multi-empty': !sourceRoleList(row).length }"
-                    @click.stop="toggleMenu(block, index)"
+                    @click.stop="toggleMenu(block, index, $event)"
                   >
                     <span class="rm-multi-value">{{ sourceRolesLabel(row) }}</span>
                     <span class="rm-multi-caret" aria-hidden="true">▾</span>
                   </button>
+                  <Teleport to="body">
                   <div
                     v-if="openMenu === menuKey(block, index)"
-                    class="rm-multi-menu"
+                    class="rm-multi-menu rm-multi-menu-float"
+                    :style="menuStyle"
                     @click.stop
                     @wheel="onMenuWheel"
                   >
@@ -176,6 +178,7 @@
                       <span v-if="!officeRoles.includes(opt)" class="rm-multi-stale">not in structure</span>
                     </label>
                   </div>
+                  </Teleport>
                 </div>
                 <span v-else class="pui-muted" style="font-size:12px;">The person themselves</span>
               </td>
@@ -302,6 +305,19 @@ const roleBlocks = ref([])
 // nobody, and the people it was meant to cover end up rated by no one at all.
 const officeRoles = ref([])
 const openMenu = ref('')
+const menuPos = ref({ left: 0, width: 0, top: null, bottom: null, maxHeight: 240 })
+
+const menuStyle = computed(() => {
+  const pos = menuPos.value
+  const style = {
+    left: pos.left + 'px',
+    width: pos.width + 'px',
+    maxHeight: pos.maxHeight + 'px'
+  }
+  if (pos.top === null) style.bottom = pos.bottom + 'px'
+  else style.top = pos.top + 'px'
+  return style
+})
 const coverage = ref({})
 const actionNotice = ref({ show: false, type: 'info', title: '', message: '' })
 const scopes = ref(['self', 'same-section', 'same-division', 'office-wide', 'same-section-preferred'])
@@ -355,8 +371,16 @@ const actionNoticeTitleColor = computed(() => {
 onMounted(() => {
   reload()
   document.addEventListener('click', closeMenus)
+  // Capture phase: the card scrolls, not the window, and a scroll event on an
+  // inner element does not bubble.
+  window.addEventListener('scroll', closeMenus, true)
+  window.addEventListener('resize', closeMenus)
 })
-onBeforeUnmount(() => document.removeEventListener('click', closeMenus))
+onBeforeUnmount(() => {
+  document.removeEventListener('click', closeMenus)
+  window.removeEventListener('scroll', closeMenus, true)
+  window.removeEventListener('resize', closeMenus)
+})
 
 function raterTypeLabel(type) { return RATER_TYPE_LABELS[type] || type }
 function raterTypeHint(type) { return RATER_TYPE_HINTS[type] || '' }
@@ -482,9 +506,43 @@ function menuKey(block, index) {
   return String(block?.role || '') + '::' + index
 }
 
-function toggleMenu(block, index) {
+// The menu renders at body level rather than beside the button. Inside the row
+// it was a child of .pui-table-wrap, which is overflow:auto, so the card clipped
+// it: open the last row of a block and most of the options were simply cut off,
+// with the card's own scrollbar as the only way to reach them. Nothing about a
+// dropdown should require scrolling the page behind it.
+//
+// Escaping the wrapper means the menu no longer moves with it, so it is placed
+// against the button's viewport rect at open time and dismissed on any scroll
+// or resize rather than left floating somewhere it no longer belongs.
+function toggleMenu(block, index, event) {
   const key = menuKey(block, index)
-  openMenu.value = openMenu.value === key ? '' : key
+  if (openMenu.value === key) {
+    openMenu.value = ''
+    return
+  }
+  positionMenu(event && event.currentTarget)
+  openMenu.value = key
+}
+
+function positionMenu(button) {
+  if (!button || typeof button.getBoundingClientRect !== 'function') return
+  const rect = button.getBoundingClientRect()
+  const gap = 4
+  const margin = 8
+  const desired = 240
+  const below = window.innerHeight - rect.bottom - margin
+  const above = rect.top - margin
+  // Open upward only when there is genuinely more room there, so a row near the
+  // bottom of the screen still shows a usable list instead of a sliver.
+  const openUp = below < Math.min(desired, 160) && above > below
+  menuPos.value = {
+    left: rect.left,
+    width: rect.width,
+    maxHeight: Math.max(120, Math.min(desired, (openUp ? above : below) - gap)),
+    top: openUp ? null : rect.bottom + gap,
+    bottom: openUp ? window.innerHeight - rect.top + gap : null
+  }
 }
 
 function sourceRoleList(row) {

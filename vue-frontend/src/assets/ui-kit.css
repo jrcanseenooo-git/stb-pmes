@@ -805,4 +805,13 @@
    never silently cleared, but it is marked so it does not read as current. */
 .rm-multi-stale { margin-left: auto; padding-left: 10px; color: #B45309; font-size: 11px; }
 
+/* Rendered at body level so the card cannot clip it. Fixed positioning means
+   min-width:100% would resolve against the viewport, so the width is set
+   explicitly from the button rect instead. */
+.rm-multi-menu-float {
+  position: fixed;
+  min-width: 0;
+  z-index: 1000;
+}
+
 .rm-multi-none { margin: 0; padding: 8px; color: #94A3B8; font-size: 12px; }

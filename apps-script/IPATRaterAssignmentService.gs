@@ -919,6 +919,10 @@ const IPATRaterAssignmentService = (() => {
         ...a,
         ipatStatus:   rec?.status || 'Draft',
         overallScore: rec?.overallScore || null,
+        // The assignment row stores only rateeDivisionId, so the task card had
+        // nothing to print but the id. The record carries the name and is
+        // already loaded here, so this costs no extra read.
+        rateeDivisionName: rec?.divisionName || '',
         cbcDeductionHasDeduction: hasCbcDeduction
       }
     })

@@ -822,11 +822,29 @@
           <div class="modal-body">
             <div v-if="generateResult" class="gen-result">
               <div class="gen-result-title">Backfill Complete</div>
-              <div class="gen-result-stat">{{ generateResult.generated }} missing assignment/s · {{ generateResult.ratees }} employee/s checked</div>
+              <div class="gen-result-stat">Created {{ generateResult.generated }} rating task/s that were missing · {{ generateResult.ratees }} employee/s checked</div>
               <div class="gen-result-breakdown">
                 <span v-for="(count, type) in generateResult.breakdown" :key="type" class="gen-chip">
                   {{ type }}: {{ count }}
                 </span>
+              </div>
+              <div v-if="(generateResult.incomplete || []).length" class="gen-incomplete">
+                <div class="gen-incomplete-title">
+                  {{ generateResult.incomplete.length }} employee/s still have an unfilled rater slot
+                </div>
+                <p class="gen-incomplete-sub">
+                  Nobody in the office matched these rater types for them, usually because their
+                  section has no one in the required role. They can still be rated by everyone else:
+                  the missing component is dropped and the remaining weights are rescaled.
+                  To close a gap, add the person to the section or adjust the Rating Tagging matrix.
+                </p>
+                <ul class="gen-incomplete-list">
+                  <li v-for="(item, idx) in generateResult.incomplete" :key="idx">
+                    <strong>{{ item.rateeName }}</strong>
+                    <span class="gen-incomplete-role">{{ item.role || 'no role set' }}</span>
+                    <span class="gen-incomplete-miss">needs {{ (item.missing || []).join(', ') || 'a rater' }}</span>
+                  </li>
+                </ul>
               </div>
               <p class="gen-result-note">Existing ratings were preserved. Users with newly added assignments can now open Evaluation to complete them.</p>
             </div>
@@ -3108,6 +3126,14 @@ async function finalizeRecord() {
 .gen-result-breakdown{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:12px;}
 .gen-chip{background:#EBF4FF;color:#1A56B0;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;}
 .gen-result-note{font-size:12px;color:#64748B;max-width:320px;margin:0 auto;}
+/* Amber, not red: an unfilled slot is a staffing gap to review, not a failure. */
+.gen-incomplete{margin:14px auto 4px;max-width:420px;text-align:left;background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:10px 12px;}
+.gen-incomplete-title{font-size:12px;font-weight:800;color:#92400E;margin-bottom:4px;}
+.gen-incomplete-sub{font-size:11px;line-height:1.6;color:#78350F;margin:0 0 8px;}
+.gen-incomplete-list{list-style:none;margin:0;padding:0;max-height:180px;overflow-y:auto;}
+.gen-incomplete-list li{display:flex;flex-wrap:wrap;gap:6px;align-items:baseline;font-size:11px;color:#78350F;padding:3px 0;border-top:1px solid #FDE68A;}
+.gen-incomplete-role{color:#A16207;}
+.gen-incomplete-miss{margin-left:auto;font-weight:700;}
 
 /* Assignment context */
 .assignment-banner{display:flex;align-items:center;gap:9px;background:#EBF4FF;border:1px solid #BFDBFE;border-radius:10px;padding:9px 14px;margin:12px 0 0;font-size:12px;color:#1A56B0;flex-shrink:0;box-shadow:inset 0 1px 0 rgba(255,255,255,.7);}

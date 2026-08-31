@@ -812,9 +812,23 @@ const PortalService = (() => {
     return canonicalDivisionName_(raw)
   }
 
+  // Plenty of people legitimately have no section: a Division Chief, an
+  // Assistant Division Chief, anyone reporting straight to the division. Filing
+  // them under "Unassigned" reads as a data-entry error against staff whose
+  // records are complete, and it heaped every such person from every division
+  // into one meaningless bucket on the section rollups.
+  //
+  // They are division-level, and the label says so - qualified by the division
+  // so the rollups stay per-division instead of merging nine divisions into a
+  // single row. "Unassigned" now means what it says: no section AND no
+  // division, which really is missing data.
   function sectionLabel_(row) {
-    const raw = String(row.rateeSection || row.section || row.sectionName || 'Unassigned').trim()
-    return canonicalSectionName_(raw)
+    const raw = String(row.rateeSection || row.section || row.sectionName || '').trim()
+    if (raw) return canonicalSectionName_(raw)
+    const division = divisionLabel_(row)
+    return division && division !== 'Unassigned'
+      ? division + ' (division-level)'
+      : 'Unassigned'
   }
 
   function canonicalDivisionName_(value) {

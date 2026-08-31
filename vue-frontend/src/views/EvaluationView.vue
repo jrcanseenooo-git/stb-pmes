@@ -822,7 +822,11 @@
           <div class="modal-body">
             <div v-if="generateResult" class="gen-result">
               <div class="gen-result-title">Backfill Complete</div>
-              <div class="gen-result-stat">Created {{ generateResult.generated }} rating task/s that were missing · {{ generateResult.ratees }} employee/s checked</div>
+              <div class="gen-result-stat">
+                Created {{ generateResult.generated }} rating task/s that were missing
+                <span v-if="generateResult.ratees"> for {{ generateResult.ratees }} employee/s</span>
+                · {{ generateResult.totalRatees || generateResult.ratees }} employee/s checked
+              </div>
               <div class="gen-result-breakdown">
                 <span v-for="(count, type) in generateResult.breakdown" :key="type" class="gen-chip">
                   {{ type }}: {{ count }}
@@ -2225,11 +2229,16 @@ async function generateAssignments() {
     let done = false
     let guard = 0
     let result = null
+    // Every counter the panel shows has to be summed across slices. Mixing an
+    // accumulated total with a field carried over from the final slice alone is
+    // what made a finished run read "14 created / 2 employees checked" with a
+    // breakdown adding up to 2: generated and incomplete were accumulated,
+    // ratees and breakdown were whatever the last slice happened to hold.
     const totals = {
       generated: 0, replaced: 0, removedAssignments: 0, removedResponses: 0,
-      recomputedRecords: 0, recordsCreated: 0
+      recomputedRecords: 0, recordsCreated: 0, ratees: 0
     }
-    const rateesTouched = new Set()
+    const breakdown = {}
     const incomplete = []
     const unmapped = []
 
@@ -2240,7 +2249,9 @@ async function generateAssignments() {
       Object.keys(totals).forEach(k => { totals[k] += Number(slice?.[k] || 0) })
       ;(slice?.incomplete || []).forEach(i => incomplete.push(i))
       ;(slice?.unmapped || []).forEach(u => unmapped.push(u))
-      if (Number(slice?.ratees || 0)) rateesTouched.add(offset)
+      Object.entries(slice?.breakdown || {}).forEach(([type, count]) => {
+        breakdown[type] = (breakdown[type] || 0) + Number(count || 0)
+      })
       const total = Number(slice?.totalRatees || 0)
       const through = Number(slice?.nextOffset || 0)
       if (total) {
@@ -2251,7 +2262,7 @@ async function generateAssignments() {
       offset = through
     }
 
-    result = { ...result, ...totals, incomplete, unmapped }
+    result = { ...result, ...totals, breakdown, incomplete, unmapped }
     generateResult.value = result
     const generated = Number(result.generated || 0)
     const total = Number(result.totalRatees || 0)

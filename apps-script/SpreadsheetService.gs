@@ -189,6 +189,82 @@ const SpreadsheetService = (() => {
     return getAllRows(sheet).find(r => r.id === id) || null
   }
 
+  // Rows where `columnName` equals any of `values`, read WITHOUT pulling the
+  // whole sheet: Sheets locates the matching cells, and only the rows around
+  // them are transferred. Use it where the answer is a handful of rows out of a
+  // table that keeps growing - one person's assessment records out of an
+  // office's history, one record's assignments out of every assignment ever
+  // made - so the cost tracks the result rather than the accumulated table.
+  //
+  // Not a general replacement for getAllRows: it costs a round trip per value,
+  // so it loses on small tables and on anything needing most of the rows, and
+  // it deliberately bypasses the row cache (callers here want live data).
+  const TARGETED_LOOKUP_MAX_VALUES = 3
+
+  function findRowsByColumn(sheet, columnName, values) {
+    const wanted = (Array.isArray(values) ? values : [values])
+      .map(v => String(v || '').trim())
+      .filter(Boolean)
+    if (!wanted.length) return []
+
+    // Above about three values the searches cost more round trips than simply
+    // reading the table once, so hand those back to the cached full read. A
+    // rater's task list points at a dozen different records; a ratee's own
+    // results point at one or two. Same call site, opposite right answer - so
+    // the choice belongs here rather than in each caller.
+    if (wanted.length > TARGETED_LOOKUP_MAX_VALUES) {
+      const wantedSet = {}
+      wanted.forEach(v => { wantedSet[v] = true })
+      return getAllRows(sheet).filter(r => wantedSet[String(r[columnName] || '').trim()])
+    }
+
+    const lastRow = sheet.getLastRow()
+    const lastColumn = sheet.getLastColumn()
+    if (lastRow < 2 || lastColumn < 1) return []
+
+    const headers = sheet.getRange(1, 1, 1, lastColumn).getValues()[0]
+    const columnIdx = headers.indexOf(columnName)
+    if (columnIdx < 0) return []
+
+    const rowNumbers = {}
+    wanted.forEach(value => {
+      sheet.getRange(2, columnIdx + 1, lastRow - 1, 1)
+        .createTextFinder(value)
+        .matchEntireCell(true)
+        .findAll()
+        .forEach(cell => { rowNumbers[cell.getRow()] = true })
+    })
+
+    const sorted = Object.keys(rowNumbers).map(Number).sort((a, b) => a - b)
+    if (!sorted.length) return []
+
+    // Contiguous runs are read as one range rather than row by row, so a block
+    // of consecutive matches costs a single call instead of one per row.
+    const rows = []
+    let start = sorted[0]
+    let length = 1
+    const flush = () => {
+      sheet.getRange(start, 1, length, lastColumn).getValues().forEach(values_ => {
+        const record = {}
+        headers.forEach((h, i) => {
+          const val = values_[i]
+          if (val === 'TRUE' || val === true) record[h] = true
+          else if (val === 'FALSE' || val === false) record[h] = false
+          else record[h] = val
+        })
+        if (record.id) rows.push(record)
+      })
+    }
+    for (let i = 1; i < sorted.length; i++) {
+      if (sorted[i] === start + length) { length++; continue }
+      flush()
+      start = sorted[i]
+      length = 1
+    }
+    flush()
+    return rows
+  }
+
   // ── Neutralise spreadsheet formula injection ──
   //
   // Sheets parses a written string the same way it parses typed input, so a
@@ -348,7 +424,7 @@ const SpreadsheetService = (() => {
 
   return {
     getSpreadsheet, getSpreadsheetId,
-    getSheet, findSheet, getAllRows, getRow,
+    getSheet, findSheet, getAllRows, getRow, findRowsByColumn,
     appendRow, appendRows, updateRow,
     invalidateSheet,
     hardDeleteRow, softDelete,

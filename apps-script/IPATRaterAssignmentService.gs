@@ -60,6 +60,33 @@ const IPATRaterAssignmentService = (() => {
     return String(value || '').replace(/[\u200B-\u200D\uFEFF]/g, '').trim().toLowerCase()
   }
 
+  // The cheap half of the identity: what the profile already tells us, with no
+  // sheet read at all. This is enough for the overwhelming majority of users,
+  // because assignment and record rows carry the same user id the profile does.
+  function profileIdentityFast_(profile) {
+    const ids = {}
+    const emails = {}
+    const addId = (value) => {
+      const key = String(value || '').trim()
+      if (key) ids[key] = true
+    }
+    addId(profile && profile.id)
+    addId(profile && profile.personnelId)
+    addId(profile && profile.officePersonnelId)
+    const email = normalizeEmail_(profile && profile.email)
+    if (email) emails[email] = true
+    return { ids: Object.keys(ids), emails: Object.keys(emails) }
+  }
+
+  // The full version additionally scans the roster to map a central account onto
+  // an office Personnel row that was created with a DIFFERENT id. That scan is a
+  // whole-sheet read, and it was previously paid on every single call to
+  // getMyRatees and getMyResults - including the common case where the profile's
+  // own id already matched and the extra ids changed nothing.
+  //
+  // Callers now start with profileIdentityFast_ and only fall back to this when
+  // the fast identity found nothing, so the read happens for the accounts that
+  // actually need it rather than for everyone.
   function profileRosterIdentity_(profile) {
     const ids = {}
     const emails = {}
@@ -749,20 +776,35 @@ const IPATRaterAssignmentService = (() => {
 
   function getMyRatees(params, user) {
     const profile = AuthService.getProfile(user)
-    const identity = profileRosterIdentity_(profile)
     const assignSheet = SpreadsheetService.getSheet(SHEET.IPAT_ASSIGNMENTS)
 
-    let rows = activeProtocolAssignments(SpreadsheetService.getAllRows(assignSheet)).filter(r =>
-      rowBelongsToProfile_(r, identity).rater
+    // One rater's own tasks - a handful of rows out of every assignment the
+    // office has ever generated. Same shape as getMyResults: ask for the rows
+    // that match, and only fall back to the roster scan and a full read when the
+    // profile's own ids matched nothing. Assignment rows carry no raterEmail
+    // column, so ids are the only thing that can match and the targeted lookup
+    // misses nothing.
+    let identity = profileIdentityFast_(profile)
+    let rows = activeProtocolAssignments(
+      SpreadsheetService.findRowsByColumn(assignSheet, 'raterId', identity.ids)
     )
+    if (!rows.length) {
+      identity = profileRosterIdentity_(profile)
+      rows = activeProtocolAssignments(SpreadsheetService.getAllRows(assignSheet)).filter(r =>
+        rowBelongsToProfile_(r, identity).rater
+      )
+    }
     if (params.semester) rows = rows.filter(r => String(r.semester) === String(params.semester))
     if (params.year)     rows = rows.filter(r => String(r.year) === String(params.year))
     if (params.status)   rows = rows.filter(r => r.status === params.status)
+    if (!rows.length) return []
 
-    // Attach IPAT record scores for context without re-reading the sheet per task.
+    // Record scores for context. Only the records these tasks point at, rather
+    // than every record in the office.
     const ipatSheet = SpreadsheetService.getSheet(SHEET.IPAT_RECORDS)
     const recordsById = {}
-    SpreadsheetService.getAllRows(ipatSheet).forEach(r => {
+    const wantedRecordIds = rows.map(a => String(a.ipatRecordId || '')).filter(Boolean)
+    SpreadsheetService.findRowsByColumn(ipatSheet, 'id', wantedRecordIds).forEach(r => {
       recordsById[String(r.id)] = r
     })
 
@@ -908,18 +950,37 @@ const IPATRaterAssignmentService = (() => {
 
   function getMyResults(params, user) {
     const profile     = AuthService.getProfile(user)
-    const identity    = profileRosterIdentity_(profile)
     IPATService.ensureRecordSchema()
     const recSheet    = SpreadsheetService.getSheet(SHEET.IPAT_RECORDS)
     const assignSheet = SpreadsheetService.getSheet(SHEET.IPAT_ASSIGNMENTS)
 
-    let rows = SpreadsheetService.getAllRows(recSheet).filter(r =>
-      rowBelongsToProfile_(r, identity).ratee
-    )
+    // A ratee is reading their OWN results - one or two rows out of every
+    // assessment record the office holds. Ask Sheets for those rows instead of
+    // transferring the whole table and discarding all but two, and start from
+    // the identity that needs no sheet read at all.
+    //
+    // The roster scan only runs when the fast identity matched nothing, which is
+    // the case it exists for: a central account whose office Personnel row was
+    // created under a different id. Records carry no rateeEmail column, so ids
+    // are the only thing that can match here and a targeted lookup is complete.
+    let identity = profileIdentityFast_(profile)
+    let rows = SpreadsheetService.findRowsByColumn(recSheet, 'rateeId', identity.ids)
+    if (!rows.length) {
+      identity = profileRosterIdentity_(profile)
+      rows = SpreadsheetService.getAllRows(recSheet).filter(r =>
+        rowBelongsToProfile_(r, identity).ratee
+      )
+    }
     if (params.semester) rows = rows.filter(r => String(r.semester) === String(params.semester))
     if (params.year)     rows = rows.filter(r => String(r.year)     === String(params.year))
+    if (!rows.length) return []
 
-    const allAssignments = activeProtocolAssignments(SpreadsheetService.getAllRows(assignSheet))
+    // Only the assignments attached to this person's own records, rather than
+    // every assignment in the office. They drive the progress counters below and
+    // break ties between duplicate records, so nothing wider is needed.
+    const allAssignments = activeProtocolAssignments(
+      SpreadsheetService.findRowsByColumn(assignSheet, 'ipatRecordId', rows.map(r => r.id))
+    )
     const grouped = {}
     rows.forEach(r => {
       const key = [r.rateeId, r.semester, r.year].map(String).join('|')

@@ -1,8 +1,18 @@
 const AuthService = (() => {
 
-  const FIREBASE_PROJECT_ID  = PropertiesService.getScriptProperties().getProperty('FIREBASE_PROJECT_ID')
-  const ALLOWED_EMAIL_DOMAIN = PropertiesService.getScriptProperties().getProperty('ALLOWED_EMAIL_DOMAIN') || 'dswd.gov.ph'
-  const BOOTSTRAP_ADMIN_EMAILS = (PropertiesService.getScriptProperties().getProperty('BOOTSTRAP_ADMIN_EMAILS') || 'systemadmin@dswd.gov.ph')
+  // One fetch of the whole property store instead of a getProperty() call per
+  // constant. This runs at module load, which in Apps Script means on EVERY
+  // request whatever the route - three separate round trips to the properties
+  // service before any handler had begun. getProperties() returns them all in
+  // one, and the values below are unchanged, so no call site is affected.
+  const SCRIPT_PROPS_ = (() => {
+    try { return PropertiesService.getScriptProperties().getProperties() || {} }
+    catch (e) { return {} }
+  })()
+
+  const FIREBASE_PROJECT_ID  = SCRIPT_PROPS_.FIREBASE_PROJECT_ID || ''
+  const ALLOWED_EMAIL_DOMAIN = SCRIPT_PROPS_.ALLOWED_EMAIL_DOMAIN || 'dswd.gov.ph'
+  const BOOTSTRAP_ADMIN_EMAILS = (SCRIPT_PROPS_.BOOTSTRAP_ADMIN_EMAILS || 'systemadmin@dswd.gov.ph')
     .split(/[,\n|]+/)
     .map(normalizeEmail_)
     .filter(Boolean)

@@ -15,14 +15,22 @@
 
 const FirebaseAuthService = (() => {
 
-  const PROPS        = PropertiesService.getScriptProperties()
-  const PROJECT_ID   = PROPS.getProperty('FIREBASE_PROJECT_ID')   || 'pmes-1cb6d'
-  const CLIENT_EMAIL = PROPS.getProperty('FIREBASE_CLIENT_EMAIL') || ''
-  const PRIVATE_KEY  = (PROPS.getProperty('FIREBASE_PRIVATE_KEY') || '').replace(/\\n/g, '\n')
+  // One fetch of the whole property store rather than a getProperty() call per
+  // constant. Module load runs on every request in Apps Script, so these were
+  // four separate round trips to the properties service before any handler
+  // started. The resolved values are identical; nothing below changes.
+  const PROPS = (() => {
+    try { return PropertiesService.getScriptProperties().getProperties() || {} }
+    catch (e) { return {} }
+  })()
+
+  const PROJECT_ID   = PROPS.FIREBASE_PROJECT_ID   || 'pmes-1cb6d'
+  const CLIENT_EMAIL = PROPS.FIREBASE_CLIENT_EMAIL || ''
+  const PRIVATE_KEY  = (PROPS.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n')
   // Public Firebase Web API key (NOT a secret - it is already shipped in the
   // frontend bundle). Prefer a Script Property; fall back to the known value so
   // token verification cannot silently fail-open if the property is unset.
-  const WEB_API_KEY  = PROPS.getProperty('FIREBASE_WEB_API_KEY') || 'AIzaSyDf-fc_WBHb45Env4XJ5Gsw6lRfHORptnQ'
+  const WEB_API_KEY  = PROPS.FIREBASE_WEB_API_KEY || 'AIzaSyDf-fc_WBHb45Env4XJ5Gsw6lRfHORptnQ'
 
   const ADMIN_BASE   = `https://identitytoolkit.googleapis.com/v1/projects/${PROJECT_ID}`
 
@@ -335,7 +343,7 @@ const FirebaseAuthService = (() => {
   function testSetup() {
     Logger.log('Testing Firebase Service Account access...')
     Logger.log('Project ID:    ' + PROJECT_ID)
-    const testEmail = PROPS.getProperty('FIREBASE_TEST_EMAIL')
+    const testEmail = PROPS.FIREBASE_TEST_EMAIL
     Logger.log('Client Email:  ' + (CLIENT_EMAIL || '❌ NOT SET'))
     Logger.log('Private Key:   ' + (PRIVATE_KEY ? '✅ set (' + PRIVATE_KEY.length + ' chars)' : '❌ NOT SET'))
 

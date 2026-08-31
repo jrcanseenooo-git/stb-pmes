@@ -861,7 +861,7 @@
             <button class="btn" :disabled="generating" @click="showGenerateModal = false; generateResult = null">{{ generateResult ? 'Close' : 'Cancel' }}</button>
             <button v-if="!generateResult" class="btn btn-primary" :disabled="generating" @click="generateAssignments">
               <span v-if="generating" class="spinner-sm"></span>
-              {{ generating ? 'Checking and backfilling…' : 'Generate / Backfill Assignments' }}
+              {{ generating ? generateProgressLabel : 'Generate / Backfill Assignments' }}
             </button>
           </div>
         </div>
@@ -1187,6 +1187,7 @@ const loadingResults = ref(false)
 
 // Generate Assignments
 const showGenerateModal = ref(false)
+const generateProgressLabel = ref('Checking and backfilling…')
 const generateForm  = ref({ semester: String(new Date().getMonth() < 6 ? 1 : 2), year: currentYear })
 const generating    = ref(false)
 const generateResult = ref(null)
@@ -2182,7 +2183,21 @@ async function generateAssignments() {
   })
   if (!confirmed) return
 
+  // A large office can run past a minute, and the transport may retry once
+  // behind the scenes after waiting for the first run to finish. Without any
+  // sign of life the admin concludes it has hung and reaches for the tab close,
+  // which is the one thing that can leave the office half-generated. Say what
+  // is happening instead.
   generating.value = true
+  generateProgressLabel.value = 'Checking and backfilling…'
+  const startedAt = Date.now()
+  const progressTimer = setInterval(() => {
+    const seconds = Math.round((Date.now() - startedAt) / 1000)
+    generateProgressLabel.value = seconds < 30
+      ? `Checking and backfilling… ${seconds}s`
+      : `Still working — large offices take a while… ${seconds}s`
+  }, 1000)
+
   try {
     const result = await ipatAssignmentsApi.generate(generateForm.value)
     generateResult.value = result
@@ -2197,7 +2212,7 @@ async function generateAssignments() {
     console.error('[Evaluation] Could not generate assignments', e)
     showToast(e?.message || 'Could not generate assignments. Please try again or contact the system administrator.', 'error')
   }
-  finally { generating.value = false }
+  finally { clearInterval(progressTimer); generating.value = false }
 }
 
 // ── Rater type helpers ──

@@ -64,12 +64,17 @@ function readCacheTtl(route) {
   return matched ? matched[1] : DEFAULT_READ_CACHE_TTL_MS
 }
 
+// The one write that is safe to repeat - see the retry in gasSendWithRetry.
+function isGenerateAssignmentsRoute(route) {
+  return /^ipat-assignments\/generate$/.test(String(route || ''))
+}
+
 function requestTimeoutMs(route) {
   // First-time Generate/Backfill may create records and assignments for an
   // entire office. The Vercel proxy permits that write for up to 60 seconds;
   // the browser must wait a little longer or it aborts a healthy request and
   // reports a misleading raw AbortController error.
-  return /^ipat-assignments\/generate$/.test(String(route || ''))
+  return isGenerateAssignmentsRoute(route)
     ? LONG_WRITE_TIMEOUT_MS
     : API_TIMEOUT_MS
 }
@@ -314,6 +319,27 @@ async function gasSendWithRetry(method, route, data = {}) {
     // and are rethrown untouched.
     if (err?.[TRANSIENT] && method === 'GET') {
       await new Promise(r => setTimeout(r, 400))
+      return gasSend(method, route, data)
+    }
+
+    // Generate/Backfill is the one write that is safe to repeat, and it is the
+    // one most likely to need it. A long run can lose its reply rather than
+    // fail: Apps Script answers /exec with a redirect to a single-use echo URL,
+    // and for a slow request that URL can 404 with an HTML page, or the proxy's
+    // 60-second ceiling can arrive first. Either way the client sees a non-JSON
+    // body and reports "the server returned an unexpected response" - while the
+    // generation itself carried on and very likely finished.
+    //
+    // Repeating it is safe for two independent reasons. It only ever creates
+    // what is missing and reconciles what no longer matches, so a second run
+    // over finished work reports nothing to do. And it runs under the script
+    // lock, so a retry cannot execute alongside the original - it waits, then
+    // finds the work already done.
+    //
+    // The wait is long on purpose: it is there to let the first run finish, not
+    // to back off from contention.
+    if (err?.[TRANSIENT] && method === 'POST' && isGenerateAssignmentsRoute(route)) {
+      await new Promise(r => setTimeout(r, 25000))
       return gasSend(method, route, data)
     }
 

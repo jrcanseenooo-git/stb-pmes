@@ -16,8 +16,9 @@ const OfficeRegistryService = (() => {
   const DEFAULT_REQUESTED_ROLES = ['Technical Staff', 'Section Head', 'Division Chief', 'Assistant Bureau Director', 'Bureau Director']
   // Version suffix: bump whenever the monitoring payload SHAPE changes, so a
   // cached copy of the old shape cannot be served to a frontend expecting the
-  // new fields. v2 added assessments.descriptors and assignments.pendingPersonnel.
-  const MONITORING_CACHE_KEY = 'OfficeRegistryService.monitoring.default.v2'
+  // new fields. v2 added assessments.descriptors and assignments.pendingPersonnel;
+  // v3 added assignments.pendingRaters.
+  const MONITORING_CACHE_KEY = 'OfficeRegistryService.monitoring.default.v3'
   // Building this payload opens every participating office's spreadsheet and
   // reads three tabs from each - roughly 32 spreadsheet operations for 8
   // offices, which is seconds of wall time. At the old 120s TTL almost every
@@ -119,6 +120,7 @@ const OfficeRegistryService = (() => {
       all.completedAssignments += item.assignments.completed
       all.pendingAssignments += item.assignments.pending
       all.pendingPersonnel += (item.assignments.pendingPersonnel || 0)
+      all.pendingRaters += (item.assignments.pendingRaters || 0)
       const d = item.assessments.descriptors || EMPTY_DESCRIPTORS
       all.outstanding += (d.outstanding || 0)
       all.verySatisfactory += (d.verySatisfactory || 0)
@@ -137,6 +139,8 @@ const OfficeRegistryService = (() => {
       pendingAssignments: 0,
       // Cluster dashboard: people still to rate, and how those already rated landed.
       pendingPersonnel: 0,
+      // Raters who still owe at least one submission.
+      pendingRaters: 0,
       outstanding: 0,
       verySatisfactory: 0,
       satisfactory: 0,
@@ -586,6 +590,44 @@ const OfficeRegistryService = (() => {
   // inside the per-office loop that already has the rows loaded - so they cost
   // no extra spreadsheet reads and ride the existing monitoring cache.
 
+  // The named people behind the counts. The cluster view could say an office
+  // had five Outstanding and three Needs Improvement, but not who - so the
+  // Undersecretary had to open each office's own dashboard to find out.
+  //
+  // Built from scoreRows, which every caller has already filtered, so this adds
+  // no spreadsheet reads. Capped at five per band: this rides in a payload that
+  // covers nine offices and is meant to be scanned, not exhaustive.
+  function namedPerformers_(scoreRows) {
+    const band = (row) => {
+      const score = Number(row.overallScore)
+      if (isFinite(score) && score > 0 && typeof IPATService !== 'undefined') {
+        return IPATService.qualitativeDescriptor(score)
+      }
+      return String(row.descriptor || '').trim()
+    }
+    const shape = (row) => ({
+      id: String(row.rateeId || ''),
+      name: String(row.rateeName || '').trim() || 'Unnamed',
+      division: String(row.rateeDivisionName || row.divisionName || '').trim(),
+      score: Math.round(Number(row.overallScore) * 100) / 100,
+      descriptor: band(row)
+    })
+    const rows = (scoreRows || []).map(shape)
+    const pick = (labels) => rows
+      .filter(r => labels.indexOf(r.descriptor) !== -1)
+      .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))
+    const outstanding = pick(['Outstanding'])
+    // Ascending here: the lowest score is the one that needs attention first.
+    const needs = pick(['Needs Improvement', 'Requires Immediate Intervention'])
+      .sort((a, b) => a.score - b.score || a.name.localeCompare(b.name))
+    return {
+      outstanding: outstanding.slice(0, 5),
+      outstandingTotal: outstanding.length,
+      needsImprovement: needs.slice(0, 5),
+      needsImprovementTotal: needs.length
+    }
+  }
+
   function descriptorBreakdown_(records) {
     // Derive from the numeric score first so older stored descriptors cannot
     // override the current protocol bands after an interpretation update.
@@ -617,6 +659,21 @@ const OfficeRegistryService = (() => {
 
   // Distinct PEOPLE still carrying an unsubmitted rating task. Counting tasks
   // instead would overstate this several-fold - one person routinely holds five.
+  // Distinct RATERS still holding unfinished work. pendingPersonnelCount_ below
+  // counts the other side of the same rows - ratees still waiting to be rated -
+  // and the two answer different questions. "How many of our people still owe
+  // ratings" is the one an office is chased about, so it gets its own field
+  // rather than borrowing a number that means something else.
+  function pendingRatersCount_(assignments) {
+    const seen = {}
+    assignments.forEach(row => {
+      if (String(row.status || 'Pending') === 'Completed') return
+      const key = String(row.raterId || '').trim()
+      if (key) seen[key] = true
+    })
+    return Object.keys(seen).length
+  }
+
   function pendingPersonnelCount_(assignments) {
     const seen = {}
     assignments.forEach(row => {
@@ -644,7 +701,7 @@ const OfficeRegistryService = (() => {
    */
   function summarizeOfficeCached_(row, forceRefresh) {
     const cache = monitoringCache_()
-    const key = 'ORS.officeSummary.v2.' + String(row && (row.officeId || row.officeCode) || '')
+    const key = 'ORS.officeSummary.v3.' + String(row && (row.officeId || row.officeCode) || '')
 
     if (cache && !forceRefresh) {
       try {
@@ -719,13 +776,15 @@ const OfficeRegistryService = (() => {
             averageOverall: scoreRows.length
               ? Math.round((scoreRows.reduce((sum, r) => sum + Number(r.overallScore || 0), 0) / scoreRows.length) * 100) / 100
               : null,
-            descriptors: descriptorBreakdown_(records)
+            descriptors: descriptorBreakdown_(records),
+            performers: namedPerformers_(scoreRows)
           },
           assignments: {
             total: assignments.length,
             completed: assignments.filter(r => String(r.status || '') === 'Completed').length,
             pending: assignments.filter(r => String(r.status || 'Pending') !== 'Completed').length,
-            pendingPersonnel: pendingPersonnelCount_(assignments)
+            pendingPersonnel: pendingPersonnelCount_(assignments),
+            pendingRaters: pendingRatersCount_(assignments)
           },
           lastActivityAt: latestDates.length ? latestDates[latestDates.length - 1] : ''
         }
@@ -781,13 +840,15 @@ const OfficeRegistryService = (() => {
         averageOverall: scoreRows.length
           ? Math.round((scoreRows.reduce((sum, r) => sum + Number(r.overallScore || 0), 0) / scoreRows.length) * 100) / 100
           : null,
-        descriptors: descriptorBreakdown_(records)
+        descriptors: descriptorBreakdown_(records),
+        performers: namedPerformers_(scoreRows)
       },
       assignments: {
         total: assignments.length,
         completed: assignments.filter(r => String(r.status || '') === 'Completed').length,
         pending: assignments.filter(r => String(r.status || 'Pending') !== 'Completed').length,
-        pendingPersonnel: pendingPersonnelCount_(assignments)
+        pendingPersonnel: pendingPersonnelCount_(assignments),
+        pendingRaters: pendingRatersCount_(assignments)
       },
       lastActivityAt: latestDates.length ? latestDates[latestDates.length - 1] : ''
     }

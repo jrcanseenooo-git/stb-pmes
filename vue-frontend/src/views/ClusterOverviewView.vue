@@ -44,13 +44,24 @@
           <div v-if="loading" class="signal-empty">Loading…</div>
           <div v-else-if="!topOutstanding.length" class="signal-empty">No Outstanding ratings yet.</div>
           <div v-else class="signal-list">
-            <button v-for="office in topOutstanding" :key="`out-${office.officeId}`" class="signal-row" type="button" @click="openOfficeDetail(office)">
-              <div>
-                <strong>{{ officeDisplayName(office) }}</strong>
-                <small>{{ office.outstandingCount }} Outstanding of {{ office.assessments.total }} rated</small>
-              </div>
-              <span>{{ office.outstandingCount }}</span>
-            </button>
+            <div v-for="office in topOutstanding" :key="`out-${office.officeId}`" class="signal-block">
+              <button class="signal-row" type="button" @click="openOfficeDetail(office)">
+                <div>
+                  <strong>{{ officeDisplayName(office) }}</strong>
+                  <small>{{ office.outstandingCount }} Outstanding of {{ office.assessments.total }} rated</small>
+                </div>
+                <span>{{ office.outstandingCount }}</span>
+              </button>
+              <ul v-if="performers(office, 'outstanding').length" class="signal-people">
+                <li v-for="person in performers(office, 'outstanding')" :key="person.id || person.name">
+                  <span class="signal-person-name">{{ person.name }}</span>
+                  <span class="signal-person-score sp-good">{{ person.score }} · {{ person.descriptor }}</span>
+                </li>
+                <li v-if="moreCount(office, 'outstanding')" class="signal-people-more">
+                  +{{ moreCount(office, 'outstanding') }} more - open the office for the full list
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
 
@@ -59,13 +70,24 @@
           <div v-if="loading" class="signal-empty">Loading…</div>
           <div v-else-if="!topNeedsImprovement.length" class="signal-empty">No records below Satisfactory.</div>
           <div v-else class="signal-list">
-            <button v-for="office in topNeedsImprovement" :key="`imp-${office.officeId}`" class="signal-row" type="button" @click="openOfficeDetail(office)">
-              <div>
-                <strong>{{ officeDisplayName(office) }}</strong>
-                <small>{{ office.coachingCount }} needing improvement</small>
-              </div>
-              <span>{{ office.coachingCount }}</span>
-            </button>
+            <div v-for="office in topNeedsImprovement" :key="`imp-${office.officeId}`" class="signal-block">
+              <button class="signal-row" type="button" @click="openOfficeDetail(office)">
+                <div>
+                  <strong>{{ officeDisplayName(office) }}</strong>
+                  <small>{{ office.coachingCount }} needing improvement</small>
+                </div>
+                <span>{{ office.coachingCount }}</span>
+              </button>
+              <ul v-if="performers(office, 'needsImprovement').length" class="signal-people">
+                <li v-for="person in performers(office, 'needsImprovement')" :key="person.id || person.name">
+                  <span class="signal-person-name">{{ person.name }}</span>
+                  <span class="signal-person-score sp-low">{{ person.score }} · {{ person.descriptor }}</span>
+                </li>
+                <li v-if="moreCount(office, 'needsImprovement')" class="signal-people-more">
+                  +{{ moreCount(office, 'needsImprovement') }} more - open the office for the full list
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
 
@@ -166,7 +188,7 @@
           <tr>
             <th scope="col">Office</th>
             <th scope="col">Personnel</th>
-            <th scope="col">Rating Tasks</th>
+            <th scope="col">Raters Outstanding</th>
             <th scope="col">Completion</th>
             <th scope="col">Last Activity</th>
           </tr>
@@ -191,7 +213,10 @@
               </span>
             </td>
             <td style="white-space:nowrap;">
-              {{ office.assignments.completed }} / {{ office.assignments.total }}
+              {{ pendingRaters(office) }} / {{ office.personnel.active || 0 }}
+              <span style="display:block; color:#64748B; font-weight:600; font-size:11px;">
+                still to finish
+              </span>
             </td>
             <td style="min-width:140px;">
               <ProgressBar
@@ -255,10 +280,6 @@
             </div>
           </div>
 
-          <div class="office-health-note">
-            <strong>{{ detail.office.health || 'Status unavailable' }}</strong>
-            <span>{{ detail.office.healthNote || 'No additional office status note.' }}</span>
-          </div>
         </div>
 
         <div v-else class="detail-body">
@@ -407,6 +428,32 @@ const pendingWorkload = computed(() =>
   allPendingWorkload.value.slice(0, 3)
 )
 
+// Raters who still owe at least one submission, against the office headcount:
+// "89 of our 114 people have not finished" is the sentence a focal acts on.
+// The raw task total answers a different question - 485 pending rows says
+// nothing about how many people that is, since one rater holds several.
+//
+// Older cached payloads predate the field; falling back to the ratee-side
+// count would quietly show a different number under the same heading, so an
+// absent value reads as 0 until the cache turns over.
+// The named people the cluster payload now carries per office, so the
+// Undersecretary reads who is Outstanding or struggling without opening each
+// office's own dashboard. An older cached payload simply has no list, which
+// renders as the office row alone rather than an error.
+function performers(office, band) {
+  const list = office?.assessments?.performers?.[band]
+  return Array.isArray(list) ? list : []
+}
+
+function moreCount(office, band) {
+  const total = Number(office?.assessments?.performers?.[band + 'Total'] || 0)
+  return Math.max(0, total - performers(office, band).length)
+}
+
+function pendingRaters(office) {
+  return Number(office?.assignments?.pendingRaters || 0)
+}
+
 function officeDisplayCode(office) {
   return officeAcronym(office) || office?.officeCode || ''
 }
@@ -517,6 +564,16 @@ async function load(forceRefresh = false) {
 </script>
 
 <style scoped>
+/* Named people under each office in the performance cards. */
+.signal-block { border-bottom: 1px solid #F1F5F9; padding-bottom: 6px; }
+.signal-block:last-child { border-bottom: 0; padding-bottom: 0; }
+.signal-people { list-style: none; margin: 2px 0 4px; padding: 0 10px 0 14px; }
+.signal-people li { display: flex; align-items: baseline; gap: 8px; padding: 3px 0; font-size: 12px; }
+.signal-person-name { color: #334155; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.signal-person-score { margin-left: auto; white-space: nowrap; font-weight: 700; font-size: 11px; }
+.sp-good { color: #1A56B0; }
+.sp-low { color: #B45309; }
+.signal-people-more { color: #94A3B8; font-size: 11px; font-style: italic; }
 .cluster-signals{
   background:#FFFFFF;
   border:1px solid #DCE6F2;

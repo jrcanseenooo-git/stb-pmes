@@ -42,7 +42,7 @@
             </transition>
           </RouterLink>
 
-          <RouterLink v-if="showPortalNav" :to="dashboardPath" class="nav-item" active-class="active" :title="collapsed ? 'Dashboard' : ''">
+          <RouterLink v-if="showPortalNav && !isUndersecretary" :to="dashboardPath" class="nav-item" active-class="active" :title="collapsed ? 'Dashboard' : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <rect x="1" y="1" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.4" />
@@ -280,21 +280,8 @@
           <div v-if="!collapsed" class="nav-label">Account</div>
           <div v-else class="nav-divider"></div>
 
-          <RouterLink v-if="showPortalNav" to="/my-notifications" class="nav-item" active-class="active" :title="collapsed ? 'Assessment Status' : ''">
-            <div class="nav-icon">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path d="M8 1.5a4.5 4.5 0 014.5 4.5v3l1.5 2.5H2L3.5 9V6A4.5 4.5 0 018 1.5zM6.5 12.5a1.5 1.5 0 003 0"
-                  stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
-              </svg>
-            </div>
-            <transition name="fade">
-              <span v-if="!collapsed" class="nav-label-text">
-                Assessment Status
-                <span v-if="notifStore.unreadCount > 0" class="nav-badge">{{ notifStore.unreadCount }}</span>
-              </span>
-            </transition>
-            <span v-if="collapsed && notifStore.unreadCount > 0" class="nav-badge-dot"></span>
-          </RouterLink>
+          <!-- Assessment Status is no longer linked from the sidebar. The route
+               still resolves, so any existing link or bookmark keeps working. -->
 
           <RouterLink v-if="showPortalNav" to="/help" class="nav-item" active-class="active" :title="collapsed ? 'Rating Guide' : ''">
             <div class="nav-icon">

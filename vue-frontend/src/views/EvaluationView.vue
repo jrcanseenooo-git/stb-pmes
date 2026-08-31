@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="eval-page">
 
     <!-- Content card -->
@@ -2195,17 +2195,51 @@ async function generateAssignments() {
     const seconds = Math.round((Date.now() - startedAt) / 1000)
     generateProgressLabel.value = seconds < 30
       ? `Checking and backfilling… ${seconds}s`
-      : `Still working — large offices take a while… ${seconds}s`
+      : `Still working - large offices take a while… ${seconds}s`
   }, 1000)
 
   try {
-    const result = await ipatAssignmentsApi.generate(generateForm.value)
+    // The backend processes the roster in slices so no single request can
+    // outlive the 60-second gateway or Apps Script's six-minute ceiling. Drive
+    // it to completion here, accumulating the per-slice counters, so the admin
+    // still performs one action and sees one result.
+    let offset = 0
+    let done = false
+    let guard = 0
+    let result = null
+    const totals = {
+      generated: 0, replaced: 0, removedAssignments: 0, removedResponses: 0,
+      recomputedRecords: 0, recordsCreated: 0
+    }
+    const rateesTouched = new Set()
+    const incomplete = []
+    const unmapped = []
+
+    while (!done && guard < 100) {
+      guard += 1
+      const slice = await ipatAssignmentsApi.generate({ ...generateForm.value, offset })
+      result = slice
+      Object.keys(totals).forEach(k => { totals[k] += Number(slice?.[k] || 0) })
+      ;(slice?.incomplete || []).forEach(i => incomplete.push(i))
+      ;(slice?.unmapped || []).forEach(u => unmapped.push(u))
+      if (Number(slice?.ratees || 0)) rateesTouched.add(offset)
+      const total = Number(slice?.totalRatees || 0)
+      const through = Number(slice?.nextOffset || 0)
+      if (total) {
+        generateProgressLabel.value = `Processing ${Math.min(through, total)} of ${total} employees…`
+      }
+      done = slice?.done !== false && (slice?.done === true || !total || through >= total)
+      if (Number(slice?.nextOffset || 0) <= offset) done = true
+      offset = through
+    }
+
+    result = { ...result, ...totals, incomplete, unmapped }
     generateResult.value = result
     const generated = Number(result.generated || 0)
-    const ratees = Number(result.ratees || 0)
+    const total = Number(result.totalRatees || 0)
     const removed = Number(result.removedAssignments || 0)
     showToast(generated || removed
-      ? `Reconciled assignments: ${generated} added, ${removed} invalid removed for ${ratees} affected employee(s) in ${result.scopeLabel || assignmentScopeLabel.value}`
+      ? `Reconciled assignments: ${generated} added, ${removed} invalid removed across ${total} employee(s) in ${result.scopeLabel || assignmentScopeLabel.value}`
       : `Assignments are already complete for this period in ${result.scopeLabel || assignmentScopeLabel.value}`)
     await loadRecords()
   } catch (e) {

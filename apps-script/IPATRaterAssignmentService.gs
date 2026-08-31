@@ -554,7 +554,24 @@ const IPATRaterAssignmentService = (() => {
     const unmappedRoles = {}
     const incompleteRatees = []
 
-    evaluatable.forEach(ratee => {
+    // Processed in slices, not all at once. An office of 111 people cannot be
+    // generated inside a single request: the proxy gives up at 60 seconds and
+    // Apps Script itself stops at six minutes, and because the rows are appended
+    // at the very end, a run that dies part-way saves NOTHING. That is why
+    // WALANG-GUTOM sat at 136 assignments with 69 fully-active people holding
+    // none at all - not even their own Self-rating, which cannot fail. Every
+    // attempt was dying before it reached the append.
+    //
+    // The slice is stable across calls because it indexes the roster in sheet
+    // order, and nothing this function writes reorders that sheet. The client
+    // calls back with the returned offset until `done`, so each request stays
+    // well inside both ceilings and the admin sees real progress instead of a
+    // spinner that ends in a timeout.
+    const chunkSize = Math.max(1, Math.min(Number(body.limit) || 20, 50))
+    const chunkOffset = Math.max(0, Number(body.offset) || 0)
+    const chunk = evaluatable.slice(chunkOffset, chunkOffset + chunkSize)
+
+    chunk.forEach(ratee => {
       const role = roleOf(ratee.role)
       const resolution = RaterMatrixService.resolveRatersFor(
         ratee, allUsers, prevAssign, matrixRows, matrixHelpers
@@ -821,7 +838,15 @@ const IPATRaterAssignmentService = (() => {
         unmappedList.map(u => `${u.role} (${u.personnel})`).join(', '), user)
     }
 
+    const processedThrough = chunkOffset + chunk.length
     return {
+      // Slice bookkeeping. The client repeats the call with `nextOffset` until
+      // `done`, accumulating the counters above across the whole run.
+      totalRatees: evaluatable.length,
+      processed:   chunk.length,
+      nextOffset:  processedThrough,
+      done:        processedThrough >= evaluatable.length,
+
       generated:  assignments.length,
       replaced:   replacedAssignments,
       removedAssignments,

@@ -143,14 +143,35 @@
                 </select>
               </td>
               <td>
-                <input
-                  v-if="row.scope !== 'self'"
-                  v-model="row.sourceRoles"
-                  class="pui-input"
-                  type="text"
-                  placeholder="e.g. Section Head"
-                  @input="markDirty"
-                />
+                <div v-if="row.scope !== 'self'" class="rm-multi" :data-menu="menuKey(block, index)">
+                  <button
+                    type="button"
+                    class="pui-input rm-multi-toggle"
+                    :class="{ 'rm-multi-empty': !sourceRoleList(row).length }"
+                    @click.stop="toggleMenu(block, index)"
+                  >
+                    <span class="rm-multi-value">{{ sourceRolesLabel(row) }}</span>
+                    <span class="rm-multi-caret" aria-hidden="true">▾</span>
+                  </button>
+                  <div v-if="openMenu === menuKey(block, index)" class="rm-multi-menu" @click.stop>
+                    <p v-if="!roleOptionsForRow(row).length" class="rm-multi-none">
+                      No roles found in Office Structure.
+                    </p>
+                    <label
+                      v-for="opt in roleOptionsForRow(row)"
+                      :key="opt"
+                      class="rm-multi-opt"
+                    >
+                      <input
+                        type="checkbox"
+                        :checked="sourceRoleList(row).includes(opt)"
+                        @change="toggleSourceRole(row, opt)"
+                      />
+                      <span>{{ opt }}</span>
+                      <span v-if="!officeRoles.includes(opt)" class="rm-multi-stale">not in structure</span>
+                    </label>
+                  </div>
+                </div>
                 <span v-else class="pui-muted" style="font-size:12px;">The person themselves</span>
               </td>
               <td>
@@ -178,18 +199,18 @@
 
     <div v-if="!loading" class="pui-card" style="padding:16px;">
       <div class="pui-row" style="gap:10px; flex-wrap:wrap;">
-        <input
-          v-model="newRoleName"
-          class="pui-input"
-          style="max-width:280px;"
-          type="text"
-          placeholder="Add a role, e.g. Program Manager"
-          @keyup.enter="addRoleBlock(newRoleName)"
-        />
-        <button class="pui-btn" type="button" :disabled="!newRoleName.trim()" @click="addRoleBlock(newRoleName)">
+        <select v-model="newRoleName" class="pui-select" style="max-width:280px;">
+          <option value="">{{ addableRoles.length ? 'Select a role to add…' : 'Every office role already has rules' }}</option>
+          <option v-for="r in addableRoles" :key="r" :value="r">{{ r }}</option>
+        </select>
+        <button class="pui-btn" type="button" :disabled="!newRoleName" @click="addRoleBlock(newRoleName)">
           Add Role
         </button>
       </div>
+      <p v-if="!officeRoles.length" class="pui-hint" style="margin-top:10px; color:#92400E;">
+        No roles were found for this office in Office Structure, so there is nothing to choose from.
+        Add the office's roles there first - rules can only be written against roles that exist.
+      </p>
       <p class="pui-hint" style="margin-top:10px;">
         Rating weights are not set here. They follow the rater type and are managed centrally under
         assessment rules, so the same weight applies consistently across every office.
@@ -199,7 +220,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useToast } from 'vue-toastification'
 import { raterMatrixApi } from '@/services/api'
 import { useConfirm } from '@/composables/useConfirm'
@@ -271,6 +292,11 @@ const errorTitle = ref('Something went wrong')
 const dirty = ref(false)
 const newRoleName = ref('')
 const roleBlocks = ref([])
+// The roles this office actually declared in Office Structure. Rules are only
+// meaningful against these: a rater rule naming a role nobody holds matches
+// nobody, and the people it was meant to cover end up rated by no one at all.
+const officeRoles = ref([])
+const openMenu = ref('')
 const coverage = ref({})
 const actionNotice = ref({ show: false, type: 'info', title: '', message: '' })
 const scopes = ref(['self', 'same-section', 'same-division', 'office-wide', 'same-section-preferred'])
@@ -318,7 +344,14 @@ const actionNoticeTitleColor = computed(() => {
   return '#92400e'
 })
 
-onMounted(reload)
+// The menu is a plain absolutely-positioned panel, so nothing else dismisses
+// it. Without this, one left open stays open while the administrator scrolls
+// and clicks elsewhere, covering the rows beneath it.
+onMounted(() => {
+  reload()
+  document.addEventListener('click', closeMenus)
+})
+onBeforeUnmount(() => document.removeEventListener('click', closeMenus))
 
 function raterTypeLabel(type) { return RATER_TYPE_LABELS[type] || type }
 function raterTypeHint(type) { return RATER_TYPE_HINTS[type] || '' }
@@ -430,6 +463,60 @@ function applyMatrix(matrix) {
   roleBlocks.value = groupRows(matrix?.items || [])
   if (matrix?.scopes?.length) scopes.value = matrix.scopes
   if (matrix?.raterTypes?.length) raterTypes.value = matrix.raterTypes
+  if (Array.isArray(matrix?.officeRoles)) officeRoles.value = matrix.officeRoles
+}
+
+// Roles that have no rules yet. A role already carrying a block is not offered
+// again, because a second block for it would silently shadow the first.
+const addableRoles = computed(() => {
+  const taken = new Set(roleBlocks.value.map(b => String(b.role || '')))
+  return (officeRoles.value || []).filter(r => !taken.has(String(r)))
+})
+
+function menuKey(block, index) {
+  return String(block?.role || '') + '::' + index
+}
+
+function toggleMenu(block, index) {
+  const key = menuKey(block, index)
+  openMenu.value = openMenu.value === key ? '' : key
+}
+
+function sourceRoleList(row) {
+  return String(row?.sourceRoles || '')
+    .split(',')
+    .map(x => x.trim())
+    .filter(Boolean)
+}
+
+// Roles saved before this dropdown existed - or since removed from Office
+// Structure - are still offered, but only for the row already holding them.
+// Dropping them from the list would silently clear a rule the administrator
+// never asked to change.
+function roleOptionsForRow(row) {
+  const chosen = sourceRoleList(row)
+  const known = officeRoles.value || []
+  return known.concat(chosen.filter(r => !known.includes(r)))
+}
+
+function sourceRolesLabel(row) {
+  const chosen = sourceRoleList(row)
+  if (!chosen.length) return 'Select role(s)…'
+  if (chosen.length <= 2) return chosen.join(', ')
+  return chosen.slice(0, 2).join(', ') + ' +' + (chosen.length - 2)
+}
+
+function toggleSourceRole(row, role) {
+  const chosen = sourceRoleList(row)
+  const next = chosen.includes(role)
+    ? chosen.filter(r => r !== role)
+    : chosen.concat([role])
+  row.sourceRoles = next.join(',')
+  markDirty()
+}
+
+function closeMenus() {
+  openMenu.value = ''
 }
 
 function addRoleBlock(role) {

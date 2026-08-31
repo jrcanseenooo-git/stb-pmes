@@ -206,9 +206,14 @@ const RaterMatrixService = (() => {
       requireView_(profile)
       const officeId = resolveOfficeId_(profile, params)
       const items = rows_(officeId, user)
+      // The office's own roles, so Rating Tagging can offer them instead of
+      // asking an administrator to retype a role name from memory. A typo here
+      // is not cosmetic: a rule filed against "Sr. Technical Staff" matches
+      // nobody, and the people in that role are silently rated by no one.
       return {
         officeId: officeId,
         items: items,
+        officeRoles: roleOrderForOffice_(officeId, user),
         scopes: SCOPES,
         raterTypes: VALID_RATER_TYPES,
         isSeeded: items.length > 0
@@ -248,6 +253,7 @@ const RaterMatrixService = (() => {
       return {
         officeId: officeId,
         items: savedRows,
+        officeRoles: roleOrderForOffice_(officeId, user),
         scopes: SCOPES,
         raterTypes: VALID_RATER_TYPES,
         isSeeded: savedRows.length > 0

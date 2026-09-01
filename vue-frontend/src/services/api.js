@@ -354,11 +354,23 @@ async function gasSendWithRetry(method, route, data = {}) {
     // no questions at all - reported to the rater as "no active assessment
     // questions are configured", sending them to an administrator over what was
     // really a momentary server hiccup. Both are idempotent GETs.
-    const isProfileBootstrap = method === 'GET' && (
-      /^auth\/(whoami|me)$/.test(route) ||
-      /^assessment-(content|categories)$/.test(route)
-    )
-    if (isProfileBootstrap && [429, 500, 502, 503, 504].includes(Number(err?.status))) {
+    // Every GET in this app is a read: it computes a view of the sheets and
+    // changes nothing. Repeating one is always safe, so the retry now covers
+    // all of them rather than a hand-listed few.
+    //
+    // The list was auth/whoami and the assessment questions, added one at a
+    // time as each was reported. Everything else surfaced a momentary hiccup
+    // straight to the user - an office administrator opening their dashboard
+    // met "The service is busy right now" on first load, and pressing Try
+    // again fixed it, because Try again is exactly the retry that should have
+    // happened automatically. Growing the list one route per complaint just
+    // means the next unlisted screen fails the same way.
+    //
+    // Writes are deliberately excluded: a POST that timed out is ambiguous
+    // about whether it applied, and rating submissions have their own narrow
+    // 429-only retry below, where a failed tryLock proves nothing was written.
+    const isIdempotentRead = method === 'GET'
+    if (isIdempotentRead && [429, 500, 502, 503, 504].includes(Number(err?.status))) {
       for (const delay of [500, 1200]) {
         await new Promise(resolve => setTimeout(resolve, delay))
         try {

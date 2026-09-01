@@ -100,3 +100,37 @@ window.addEventListener('pmes:auth-expired', async () => {
     setTimeout(() => { handlingAuthExpiry = false }, 2000)
   }
 })
+
+// A deploy replaces every hashed asset. A page a user left open still points at
+// the previous set, so its next lazy-loaded view - opening Evaluation, say -
+// requests a chunk that no longer exists. The page then breaks in a way that
+// looks like a system fault to the person sitting in front of it, mid-rating.
+//
+// Vite raises this as vite:preloadError. Reloading picks up the current
+// index.html and its assets, which is exactly what "please refresh the page"
+// asks the user to do - so do it for them instead of showing them a failure.
+//
+// Guarded by a session flag: if the chunk is missing for any reason a reload
+// cannot fix, this must not become a refresh loop. One attempt, then let the
+// error surface normally.
+const RELOAD_FLAG = 'pmes-chunk-reload'
+window.addEventListener('vite:preloadError', (event) => {
+  let alreadyTried = false
+  try {
+    alreadyTried = sessionStorage.getItem(RELOAD_FLAG) === '1'
+    if (!alreadyTried) sessionStorage.setItem(RELOAD_FLAG, '1')
+  } catch (e) {
+    // Storage blocked (private window, strict settings). Without a way to
+    // remember an attempt, do not reload at all - a loop is worse than an error.
+    return
+  }
+  if (alreadyTried) return
+  event.preventDefault()
+  window.location.reload()
+})
+
+// A completed navigation means the current assets loaded, so any earlier
+// failure is spent and the next one deserves its own attempt.
+router.afterEach(() => {
+  try { sessionStorage.removeItem(RELOAD_FLAG) } catch (e) { /* nothing to clear */ }
+})

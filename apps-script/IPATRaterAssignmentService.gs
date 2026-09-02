@@ -559,10 +559,17 @@ const IPATRaterAssignmentService = (() => {
     // is per type, which cannot answer "who is carrying the least overall" -
     // the question that decides whether one person ends up with four tasks and
     // another with none.
+    // Self is excluded deliberately. Everybody rates themselves exactly once, so
+    // counting it would put every single person on at least one and make "holds
+    // nothing" impossible to express - which silently disables the balancing
+    // below, since it looks for people carrying none. Excluding it also costs
+    // nothing in ordering: it is the same constant for everyone.
+    //
+    // So load here reads as "how many colleagues this person has to rate".
     const raterLoad = {}
-    const bumpLoad = (raterId, delta) => {
+    const bumpLoad = (raterId, rateeId, delta) => {
       const id = String(raterId || '')
-      if (!id) return
+      if (!id || id === String(rateeId || '')) return
       raterLoad[id] = Math.max(0, Number(raterLoad[id] || 0) + delta)
     }
     const loadOf = (raterId) => Number(raterLoad[String(raterId || '')] || 0)
@@ -572,7 +579,7 @@ const IPATRaterAssignmentService = (() => {
       // Seeded from what people already hold, so a backfill filling a few empty
       // slots hands them to whoever is carrying least right now - not to
       // whoever happens to win the draw again.
-      bumpLoad(assignment.raterId, 1)
+      bumpLoad(assignment.raterId, assignment.rateeId, 1)
     })
     existingAssign.forEach(assignment => {
       const key = String(assignment.rateeId || '')
@@ -775,7 +782,7 @@ const IPATRaterAssignmentService = (() => {
         if (!(validExisting && selectedRater !== a)) countRater(a.raterType, selectedRater.raterId, 1)
         // Counted as the run proceeds, so the second ratee's pick already knows
         // what the first ratee's pick took on.
-        bumpLoad(selectedRater.raterId, 1)
+        bumpLoad(selectedRater.raterId, ratee.id, 1)
         touchedRateeIds.add(ratee.id)
       })
 
@@ -816,6 +823,9 @@ const IPATRaterAssignmentService = (() => {
     const rateeById = {}
     chunk.forEach(ratee => { rateeById[String(ratee.id)] = ratee })
     assignments.forEach(assignment => {
+      // A Self row is the person rating themselves; it can never be handed to
+      // anyone else.
+      if (String(assignment.raterId) === String(assignment.rateeId)) return
       if (loadOf(assignment.raterId) < 2) return
       const ratee = rateeById[String(assignment.rateeId)]
       if (!ratee) return
@@ -844,11 +854,11 @@ const IPATRaterAssignmentService = (() => {
       )
       if (!idle) return
       countRater(assignment.raterType, assignment.raterId, -1)
-      bumpLoad(assignment.raterId, -1)
+      bumpLoad(assignment.raterId, ratee.id, -1)
       assignment.raterId = idle.id
       assignment.raterName = idle.fullName || idle.name || ''
       countRater(assignment.raterType, idle.id, 1)
-      bumpLoad(idle.id, 1)
+      bumpLoad(idle.id, ratee.id, 1)
     })
 
     if (assignmentIdsToRemove.size) {

@@ -163,13 +163,36 @@ const IPATRaterAssignmentService = (() => {
     }
   }
 
-  // ── Random selection with anti-repeat ────────────────────────────────────
-  function _selectRandom(pool, excludeIds, prevId) {
+  // ── Selection: least-loaded first, random among ties, anti-repeat ─────────
+  //
+  // This used to pick uniformly at random from the eligible pool, which shares
+  // work only on average and not within one office. EPAHP has three Assistant
+  // Division Chiefs and three slots they could fill; the draw gave one of them
+  // two, another one, and the third none - so that person opened the system to
+  // find nothing but their own self-rating, while a colleague held four tasks.
+  // Nothing was broken; the coin simply landed the same way three times.
+  //
+  // Preferring the least-loaded candidate makes the spread deliberate. Ties are
+  // still broken at random, so this does not become alphabetical or by row
+  // order, and the previous period's rater is still avoided first so people do
+  // not rate the same colleague every cycle.
+  //
+  // loadOf is optional: callers that do not track load keep the old behaviour.
+  function _selectRandom(pool, excludeIds, prevId, loadOf) {
     const eligible = pool.filter(u => !excludeIds.includes(u.id))
     if (!eligible.length) return null
     const withoutPrev = eligible.filter(u => u.id !== prevId)
     const candidates  = withoutPrev.length ? withoutPrev : eligible
-    return candidates[Math.floor(Math.random() * candidates.length)]
+    if (typeof loadOf !== 'function') {
+      return candidates[Math.floor(Math.random() * candidates.length)]
+    }
+    let lightest = Infinity
+    candidates.forEach(u => {
+      const load = Number(loadOf(u.id) || 0)
+      if (load < lightest) lightest = load
+    })
+    const leastLoaded = candidates.filter(u => Number(loadOf(u.id) || 0) === lightest)
+    return leastLoaded[Math.floor(Math.random() * leastLoaded.length)]
   }
 
   // ── Lookup previous cycle's rater id for a given ratee + raterType ────────
@@ -532,8 +555,24 @@ const IPATRaterAssignmentService = (() => {
       if (!raterCountsByType[type]) raterCountsByType[type] = {}
       raterCountsByType[type][id] = Math.max(0, Number(raterCountsByType[type][id] || 0) + delta)
     }
+    // Total tasks held by each rater, across every rater type. countRater above
+    // is per type, which cannot answer "who is carrying the least overall" -
+    // the question that decides whether one person ends up with four tasks and
+    // another with none.
+    const raterLoad = {}
+    const bumpLoad = (raterId, delta) => {
+      const id = String(raterId || '')
+      if (!id) return
+      raterLoad[id] = Math.max(0, Number(raterLoad[id] || 0) + delta)
+    }
+    const loadOf = (raterId) => Number(raterLoad[String(raterId || '')] || 0)
+
     activeProtocolAssignments(existingAssign).forEach(assignment => {
       countRater(assignment.raterType, assignment.raterId, 1)
+      // Seeded from what people already hold, so a backfill filling a few empty
+      // slots hands them to whoever is carrying least right now - not to
+      // whoever happens to win the draw again.
+      bumpLoad(assignment.raterId, 1)
     })
     existingAssign.forEach(assignment => {
       const key = String(assignment.rateeId || '')
@@ -546,7 +585,7 @@ const IPATRaterAssignmentService = (() => {
     // hardcoded STB role branches this replaced. An office using its own role
     // names no longer falls through to an empty list and a silent skip.
     const matrixRows = _loadMatrixRows({ officeId: generationScope.officeId }, user)
-    const matrixHelpers = { selectRandom: _selectRandom, prevRaterId: _prevRaterId }
+    const matrixHelpers = { selectRandom: _selectRandom, prevRaterId: _prevRaterId, loadOf: loadOf }
 
     // Exceptions are collected and returned rather than swallowed. A role with
     // no matrix entry, or a configured rater who does not exist on the roster,
@@ -734,6 +773,9 @@ const IPATRaterAssignmentService = (() => {
         assignments.push(newAssignment)
         existingByRole[a.raterType] = [newAssignment]
         if (!(validExisting && selectedRater !== a)) countRater(a.raterType, selectedRater.raterId, 1)
+        // Counted as the run proceeds, so the second ratee's pick already knows
+        // what the first ratee's pick took on.
+        bumpLoad(selectedRater.raterId, 1)
         touchedRateeIds.add(ratee.id)
       })
 

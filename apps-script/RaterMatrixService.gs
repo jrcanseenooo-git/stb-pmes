@@ -420,13 +420,14 @@ const RaterMatrixService = (() => {
       ? helpers.prevRaterId(prevAssign, ratee.id, raterType)
       : null
 
-    let pick = helpers.selectRandom(primary, excluded, prevId)
+    const loadOf = helpers && helpers.loadOf
+    let pick = helpers.selectRandom(primary, excluded, prevId, loadOf)
     if (pick) return pick
 
     const fallback = String(row.fallbackScope || '')
     if (fallback) {
       const secondary = poolForScope_(byRole, ratee, fallback)
-      pick = helpers.selectRandom(secondary, excluded, prevId)
+      pick = helpers.selectRandom(secondary, excluded, prevId, loadOf)
       if (pick) return pick
     }
 

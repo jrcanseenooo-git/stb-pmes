@@ -790,6 +790,67 @@ const IPATRaterAssignmentService = (() => {
       })
     })
 
+    // ── Make sure nobody is left with nothing to rate ─────────────────────
+    //
+    // Preferring the least-loaded candidate is not on its own enough. Consider
+    // one division with three Section Heads, each needing one Peer drawn from
+    // the other two. Nobody can rate themselves, so when the third person's own
+    // slot is reached, the only two candidates may both already hold a task -
+    // and the third ends up rating no one. Measured over the real shape of that
+    // group, it still happened about a quarter of the time, and the office
+    // reports it as the system forgetting someone.
+    //
+    // The greedy pass cannot see this coming: it fills each slot in turn with
+    // the best choice available at that moment, and the constraint only becomes
+    // visible once every slot is filled. So it is repaired afterwards - move a
+    // slot from someone holding two or more to someone holding none, provided
+    // the matrix already allows them to rate that person.
+    //
+    // eligibleRatersFor is the same rule the original pick used, so a repaired
+    // assignment is one the generator could legitimately have produced; this
+    // widens nobody's scope and crosses no division or section boundary.
+    //
+    // Only assignments created in this run are touched, and every one of them
+    // is Pending, so no submitted rating and no task anyone already holds is
+    // disturbed.
+    const rateeById = {}
+    chunk.forEach(ratee => { rateeById[String(ratee.id)] = ratee })
+    assignments.forEach(assignment => {
+      if (loadOf(assignment.raterId) < 2) return
+      const ratee = rateeById[String(assignment.rateeId)]
+      if (!ratee) return
+      let eligible = []
+      try {
+        eligible = RaterMatrixService.eligibleRatersFor(
+          ratee, allUsers, matrixRows, assignment.raterType
+        ) || []
+      } catch (e) {
+        Logger.log('[IPAT Assignments] balance lookup skipped: ' + (e && e.message || e))
+        return
+      }
+      // Whoever is already rating this person, so a repair cannot hand one
+      // ratee the same rater twice.
+      const alreadyRating = new Set(
+        (existingAssignmentsByRatee[String(ratee.id)] || [])
+          .map(item => String(item.raterId || ''))
+      )
+      assignments.forEach(other => {
+        if (String(other.rateeId) === String(ratee.id)) alreadyRating.add(String(other.raterId || ''))
+      })
+      const idle = eligible.find(person =>
+        String(person.id) !== String(ratee.id) &&
+        loadOf(person.id) === 0 &&
+        !alreadyRating.has(String(person.id))
+      )
+      if (!idle) return
+      countRater(assignment.raterType, assignment.raterId, -1)
+      bumpLoad(assignment.raterId, -1)
+      assignment.raterId = idle.id
+      assignment.raterName = idle.fullName || idle.name || ''
+      countRater(assignment.raterType, idle.id, 1)
+      bumpLoad(idle.id, 1)
+    })
+
     if (assignmentIdsToRemove.size) {
       const values = assignSheet.getDataRange().getValues()
       const headers = values[0] || []

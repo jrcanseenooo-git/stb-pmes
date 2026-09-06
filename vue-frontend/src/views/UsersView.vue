@@ -1952,11 +1952,14 @@ function showToast(msg, type='success') {
 .access-mode-impact span{font-weight:700;}
 .access-mode-impact strong{color:#0D2137;font-weight:800;}
 .access-mode-save{min-height:38px;white-space:nowrap;}
-.control-strip{display:grid;grid-template-columns:minmax(260px,1fr) 190px 150px;gap:10px;align-items:center;}
+/* Search plus three filters stay on one row wherever the row can still hold a
+   usable search field. The columns were fixed widths for two filters, so the
+   division select pushed Status onto a line of its own. */
+.control-strip{display:grid;grid-template-columns:minmax(150px,1.7fr) repeat(3,minmax(96px,0.9fr));gap:10px;align-items:center;}
 .search-box{display:flex;align-items:center;gap:8px;background:#fff;border:1.5px solid #DDE7F3;border-radius:9px;padding:9px 12px;min-width:0;}
 .search-box:focus-within{border-color:#2F80ED;box-shadow:0 0 0 3px rgba(47,128,237,.09);}
 .search-box input{border:none;outline:none;font-size:13px;color:#1A2332;width:100%;min-width:0;}
-.filter-select{height:39px;border:1.5px solid #DDE7F3;background:#fff;border-radius:9px;padding:0 12px;color:#1A2332;font-size:13px;outline:none;}
+.filter-select{height:39px;min-width:0;max-width:100%;border:1.5px solid #DDE7F3;background:#fff;border-radius:9px;padding:0 10px;color:#1A2332;font-size:13px;outline:none;cursor:pointer;text-overflow:ellipsis;}
 .filter-select:focus{border-color:#2F80ED;box-shadow:0 0 0 3px rgba(47,128,237,.09);}
 
 /* Buttons */
@@ -2070,17 +2073,23 @@ function showToast(msg, type='success') {
   .access-mode-header{grid-template-columns:1fr;}
   .access-mode-body{grid-template-columns:1fr;}
   .access-mode-save{width:max-content;}
-  .control-strip{grid-template-columns:1fr;}
   .focal-routing-shell,.route-table-head,.division-route-row{grid-template-columns:1fr;}
   .route-table-head{display:none;}
   .focal-slot-label.compact{display:inline-flex;}
   .maintenance-grid,.maintenance-summary{grid-template-columns:1fr;}
   .maintenance-hd,.maintenance-actions{flex-direction:column;align-items:stretch;}
 }
+/* Below this the row can no longer give search a usable width: put it on its
+   own line and let the three filters share the one under it. */
+@media (max-width: 640px){
+  .control-strip{grid-template-columns:repeat(3,minmax(0,1fr));}
+  .control-strip .search-box{grid-column:1 / -1;}
+}
 @media (max-width: 560px){
   .content{padding:12px;}
   .page-panel{padding:14px;}
   .summary-grid{grid-template-columns:1fr;}
+  .control-strip{grid-template-columns:repeat(2,minmax(0,1fr));}
   .page-heading h1{font-size:20px;}
   .top-actions .btn{width:100%;justify-content:center;}
   .access-mode-footer{align-items:stretch;flex-direction:column;}

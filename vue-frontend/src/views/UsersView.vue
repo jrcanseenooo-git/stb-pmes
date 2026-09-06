@@ -964,7 +964,7 @@ const isEditingOwnRole = computed(() => Boolean(
   String(editingUser.value.id || '') === String(authStore.profileId) &&
   !canManageUsers.value
 ))
-const { loadOrgOptions, optionsForOffice, currentDivisions } = useOrgOptions()
+const { loadOrgOptions, optionsForOffice, allDivisions } = useOrgOptions()
 const activeUsersCount = computed(() => users.value.filter(u => u.status === 'Active').length)
 const inactiveUsersCount = computed(() => users.value.filter(u => u.status === 'Inactive').length)
 const pendingUsersCount = computed(() => users.value.filter(u => u.status === 'Pending').length)
@@ -1011,9 +1011,14 @@ function divisionKey(value) {
   return String(value ?? '').trim().toLowerCase()
 }
 
+// Every office's divisions, not just the viewer's: a central administrator
+// looking at another office's accounts must be able to filter them by their
+// own divisions rather than see the whole office land under 'outside
+// structure'. Two offices using the same division name share one option, since
+// the accounts themselves only record the name.
 const structureDivisionNames = computed(() => {
   const seen = new Map()
-  for (const division of currentDivisions.value || []) {
+  for (const division of allDivisions.value || []) {
     const name = String(division?.name || '').trim()
     if (name && !seen.has(divisionKey(name))) seen.set(divisionKey(name), name)
   }

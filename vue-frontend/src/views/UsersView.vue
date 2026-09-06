@@ -102,6 +102,10 @@
           <option value="">All roles</option>
           <option v-for="role in roleOptions" :key="role" :value="role">{{ role }}</option>
         </select>
+        <select v-model="divisionFilter" class="filter-select">
+          <option value="">All divisions</option>
+          <option v-for="division in divisionFilterOptions" :key="division" :value="division">{{ division }}</option>
+        </select>
         <select v-model="statusFilter" class="filter-select">
           <option value="">All status</option>
           <option value="Pending">Pending activation{{ pendingUsersCount ? ` (${pendingUsersCount})` : '' }}</option>
@@ -889,6 +893,7 @@ const systemScopeDescription = computed(() =>
 const search        = ref('')
 const roleFilter    = ref('')
 const statusFilter  = ref('')
+const divisionFilter = ref('')
 const currentPage   = ref(1)
 const pageSize      = ref(10)
 const pageSizeOptions = [10, 25, 50]
@@ -952,7 +957,7 @@ const isEditingOwnRole = computed(() => Boolean(
   String(editingUser.value.id || '') === String(authStore.profileId) &&
   !canManageUsers.value
 ))
-const { loadOrgOptions, optionsForOffice } = useOrgOptions()
+const { loadOrgOptions, optionsForOffice, currentDivisions } = useOrgOptions()
 const activeUsersCount = computed(() => users.value.filter(u => u.status === 'Active').length)
 const inactiveUsersCount = computed(() => users.value.filter(u => u.status === 'Inactive').length)
 const pendingUsersCount = computed(() => users.value.filter(u => u.status === 'Pending').length)
@@ -985,6 +990,25 @@ const userFormRoleOptions = computed(() => {
   return [...new Set([...roles, ...pinned])]
 })
 const roleOptions = computed(() => [...new Set(users.value.map(u => u.role).filter(Boolean))].sort())
+/**
+ * Divisions offered in the directory filter.
+ *
+ * The office structure is the source of truth, so a division that exists there
+ * but has no accounts yet is still selectable. Divisions found on accounts are
+ * appended too - someone carried over from an older structure must not become
+ * unfilterable because their division was since renamed away.
+ */
+const divisionFilterOptions = computed(() => {
+  const fromStructure = (currentDivisions.value || []).map(division => division.name)
+  const fromUsers = users.value.map(u => u.division)
+  const seen = new Map()
+  for (const value of [...fromStructure, ...fromUsers]) {
+    const name = String(value || '').trim()
+    const key = name.toLowerCase()
+    if (key && !seen.has(key)) seen.set(key, name)
+  }
+  return [...seen.values()].sort((a, b) => a.localeCompare(b))
+})
 const preservedSheetNames = computed(() =>
   maintenancePreview.value?.preservedDataSheets || ['Users', 'Divisions', 'MasterKRALibrary']
 )
@@ -1611,7 +1635,9 @@ const filteredUsers = computed(() => {
       fields.some(field => searchable(field).includes(q))
     const matchesRole = !roleFilter.value || u.role === roleFilter.value
     const matchesStatus = !statusFilter.value || u.status === statusFilter.value
-    return matchesSearch && matchesRole && matchesStatus
+    const matchesDivision = !divisionFilter.value ||
+      searchable(u.division).trim() === searchable(divisionFilter.value).trim()
+    return matchesSearch && matchesRole && matchesStatus && matchesDivision
   })
 })
 
@@ -1638,7 +1664,7 @@ function goToPage(page) {
   currentPage.value = Math.min(Math.max(Number(page) || 1, 1), totalPages.value)
 }
 
-watch([search, roleFilter, statusFilter, pageSize], () => {
+watch([search, roleFilter, statusFilter, divisionFilter, pageSize], () => {
   currentPage.value = 1
 })
 

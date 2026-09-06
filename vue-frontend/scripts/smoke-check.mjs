@@ -75,7 +75,10 @@ if (!failures.length) {
       message: 'Duplicate Office Personnel management remains exposed alongside User Management.'
     },
     {
-      ok: appLayout.includes('v-if="showPortalNav" :to="dashboardPath"'),
+      // The portal Dashboard link may carry extra guards beside showPortalNav
+      // (the Undersecretary, for one, has no dashboard). What matters is that
+      // it routes through dashboardPath rather than a hardcoded destination.
+      ok: /v-if="showPortalNav[^"]*" :to="dashboardPath"/.test(appLayout),
       message: 'Portal Dashboard navigation bypasses the role-aware dashboard destination.'
     }
   ]

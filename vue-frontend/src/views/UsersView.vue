@@ -104,7 +104,14 @@
         </select>
         <select v-model="divisionFilter" class="filter-select">
           <option value="">All divisions</option>
-          <option v-for="division in divisionFilterOptions" :key="division" :value="division">{{ division }}</option>
+          <option v-for="division in structureDivisionOptions" :key="division.value" :value="division.value">
+            {{ division.label }}
+          </option>
+          <optgroup v-if="offStructureDivisionOptions.length" label="Outside office structure">
+            <option v-for="division in offStructureDivisionOptions" :key="division.value" :value="division.value">
+              {{ division.label }}
+            </option>
+          </optgroup>
         </select>
         <select v-model="statusFilter" class="filter-select">
           <option value="">All status</option>
@@ -998,16 +1005,62 @@ const roleOptions = computed(() => [...new Set(users.value.map(u => u.role).filt
  * appended too - someone carried over from an older structure must not become
  * unfilterable because their division was since renamed away.
  */
-const divisionFilterOptions = computed(() => {
-  const fromStructure = (currentDivisions.value || []).map(division => division.name)
-  const fromUsers = users.value.map(u => u.division)
+const UNASSIGNED_DIVISION = '__no_division__'
+
+function divisionKey(value) {
+  return String(value ?? '').trim().toLowerCase()
+}
+
+const structureDivisionNames = computed(() => {
   const seen = new Map()
-  for (const value of [...fromStructure, ...fromUsers]) {
-    const name = String(value || '').trim()
-    const key = name.toLowerCase()
-    if (key && !seen.has(key)) seen.set(key, name)
+  for (const division of currentDivisions.value || []) {
+    const name = String(division?.name || '').trim()
+    if (name && !seen.has(divisionKey(name))) seen.set(divisionKey(name), name)
   }
-  return [...seen.values()].sort((a, b) => a.localeCompare(b))
+  return seen
+})
+
+function countUsersInDivision(predicate) {
+  return users.value.filter(predicate).length
+}
+
+const structureDivisionOptions = computed(() =>
+  [...structureDivisionNames.value.values()]
+    .sort((a, b) => a.localeCompare(b))
+    .map(name => ({
+      value: name,
+      label: `${name} (${countUsersInDivision(u => divisionKey(u.division) === divisionKey(name))})`
+    }))
+)
+
+/**
+ * Accounts the office structure does not account for.
+ *
+ * A division the structure no longer lists - renamed, retired, or typed by
+ * hand before the registry existed - would otherwise leave its people
+ * invisible to every filter option, which is exactly when an administrator
+ * needs to find them. Blank divisions get their own entry for the same reason.
+ */
+const offStructureDivisionOptions = computed(() => {
+  const stray = new Map()
+  let unassigned = 0
+  for (const user of users.value) {
+    const name = String(user.division || '').trim()
+    if (!name) { unassigned += 1; continue }
+    const key = divisionKey(name)
+    if (structureDivisionNames.value.has(key)) continue
+    const entry = stray.get(key) || { name, count: 0 }
+    entry.count += 1
+    stray.set(key, entry)
+  }
+  const options = [...stray.values()]
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map(item => ({ value: item.name, label: `${item.name} (${item.count})` }))
+
+  if (unassigned) {
+    options.push({ value: UNASSIGNED_DIVISION, label: `No division set (${unassigned})` })
+  }
+  return options
 })
 const preservedSheetNames = computed(() =>
   maintenancePreview.value?.preservedDataSheets || ['Users', 'Divisions', 'MasterKRALibrary']
@@ -1635,8 +1688,11 @@ const filteredUsers = computed(() => {
       fields.some(field => searchable(field).includes(q))
     const matchesRole = !roleFilter.value || u.role === roleFilter.value
     const matchesStatus = !statusFilter.value || u.status === statusFilter.value
-    const matchesDivision = !divisionFilter.value ||
-      searchable(u.division).trim() === searchable(divisionFilter.value).trim()
+    const matchesDivision = !divisionFilter.value || (
+      divisionFilter.value === UNASSIGNED_DIVISION
+        ? !divisionKey(u.division)
+        : divisionKey(u.division) === divisionKey(divisionFilter.value)
+    )
     return matchesSearch && matchesRole && matchesStatus && matchesDivision
   })
 })

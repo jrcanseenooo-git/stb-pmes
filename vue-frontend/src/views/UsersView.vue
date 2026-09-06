@@ -964,7 +964,7 @@ const isEditingOwnRole = computed(() => Boolean(
   String(editingUser.value.id || '') === String(authStore.profileId) &&
   !canManageUsers.value
 ))
-const { loadOrgOptions, optionsForOffice, allDivisions } = useOrgOptions()
+const { loadOrgOptions, optionsForOffice, currentOfficeId, currentOfficeCode } = useOrgOptions()
 const activeUsersCount = computed(() => users.value.filter(u => u.status === 'Active').length)
 const inactiveUsersCount = computed(() => users.value.filter(u => u.status === 'Inactive').length)
 const pendingUsersCount = computed(() => users.value.filter(u => u.status === 'Pending').length)
@@ -1011,14 +1011,33 @@ function divisionKey(value) {
   return String(value ?? '').trim().toLowerCase()
 }
 
-// Every office's divisions, not just the viewer's: a central administrator
-// looking at another office's accounts must be able to filter them by their
-// own divisions rather than see the whole office land under 'outside
-// structure'. Two offices using the same division name share one option, since
-// the accounts themselves only record the name.
+/**
+ * The divisions this directory can actually be filtered by.
+ *
+ * Only the offices the visible accounts belong to, plus the viewer's own
+ * office. Offering every office in the cluster buried an office admin's four
+ * divisions in thirty belonging to offices whose people they cannot see; an
+ * administrator whose directory does span offices still gets each of theirs,
+ * so their accounts do not all land under 'outside structure'. Two offices
+ * using one division name share an option - accounts record only the name.
+ */
+const directoryDivisions = computed(() => {
+  const officeIds = new Map()
+  officeIds.set(String(currentOfficeId.value || ''), String(currentOfficeCode.value || ''))
+  for (const user of users.value) {
+    const officeId = String(user.officeId || '')
+    if (officeId && !officeIds.has(officeId)) officeIds.set(officeId, String(user.officeCode || ''))
+  }
+  const divisions = []
+  for (const [officeId, officeCode] of officeIds) {
+    divisions.push(...(optionsForOffice(officeId, officeCode).divisions || []))
+  }
+  return divisions
+})
+
 const structureDivisionNames = computed(() => {
   const seen = new Map()
-  for (const division of allDivisions.value || []) {
+  for (const division of directoryDivisions.value) {
     const name = String(division?.name || '').trim()
     if (name && !seen.has(divisionKey(name))) seen.set(divisionKey(name), name)
   }

@@ -139,34 +139,6 @@ export function useOrgOptions() {
     return (office && byOffice[office.officeId]) || { divisions: [], sections: [], requestedRoles: [] }
   }
 
-  /**
-   * Every division the cluster knows about, across all participating offices.
-   *
-   * The per-office lists answer "what may this account be assigned to". A
-   * directory that spans offices needs the other question - "what divisions
-   * exist anywhere" - or filtering it can only ever describe the viewer's own
-   * office. Each entry carries the office it belongs to so a caller can group
-   * or label them; a name used by two offices stays two entries.
-   */
-  const allDivisions = computed(() => {
-    const opts = rawOptions.value || {}
-    const offices = opts.offices || []
-    const officeIds = new Set([STB_OFFICE_ID, ...offices.map(office => office.officeId)])
-    const officeNameById = new Map(offices.map(office => [office.officeId, office.officeName]))
-    const seen = new Map()
-    for (const officeId of officeIds) {
-      const officeName = officeNameById.get(officeId) ||
-        (officeId === STB_OFFICE_ID ? 'Social Technology Bureau' : officeId)
-      for (const division of optionsForOffice(officeId).divisions || []) {
-        const name = String(division?.name || '').trim()
-        if (!name) continue
-        const key = `${officeKey(officeId)}:${name.toLowerCase()}`
-        if (!seen.has(key)) seen.set(key, { ...division, name, officeId, officeName })
-      }
-    }
-    return [...seen.values()]
-  })
-
   const currentOfficeId = computed(() => authStore.profile?.officeId || STB_OFFICE_ID)
   const currentOfficeCode = computed(() => authStore.profile?.officeCode || currentOfficeId.value)
   const currentOrgOptions = computed(() => optionsForOffice(currentOfficeId.value, currentOfficeCode.value))
@@ -180,7 +152,6 @@ export function useOrgOptions() {
     loadOrgOptions,
     invalidateOrgOptions,
     optionsForOffice,
-    allDivisions,
     currentOfficeId,
     currentOfficeCode,
     currentOrgOptions,

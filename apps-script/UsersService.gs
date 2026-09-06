@@ -413,6 +413,22 @@ const UsersService = (() => {
     // isolation. This prevents an update from turning an office account into a
     // central administrator simply by mixing a role, scope, and access group
     // that are individually valid values.
+    // Bureau accounts created before office IDs existed carry no office and a
+    // CLUSTER_PORTAL scope, a combination the check below rejects outright. An
+    // office administrator cannot supply the missing office either - the strip
+    // above removes office fields from their request, by design. So every one
+    // of those rows was unsaveable: correcting a division or a section failed
+    // on an office the editor was never allowed to set. Stamp the office that
+    // already governs the row - a blank office is STB, the same reading
+    // rowBelongsToOffice_ and the directory scope apply - and let the edit
+    // through. This moves no account between offices; it names the one it was
+    // always in.
+    if (!officeIdentityKeys_(existing).length) {
+      updateBody.officeId = updateBody.officeId || 'STB'
+      updateBody.officeCode = updateBody.officeCode || 'STB'
+      updateBody.officeName = updateBody.officeName || 'Social Technology Bureau'
+    }
+
     const authorityFields = ['role', 'systemScope', 'officeId', 'officeCode', 'officeName', 'officeRole', 'permissionGroups', 'permissions', 'centralRoles']
     if (authorityFields.some(field => Object.prototype.hasOwnProperty.call(updateBody, field))) {
       validateAuthorityConfiguration_({ ...existing, ...updateBody })

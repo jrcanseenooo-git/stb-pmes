@@ -14,6 +14,9 @@ const UsersService = (() => {
     'officeId', 'officeCode', 'officeName', 'systemScope', 'officeRole', 'centralRoles'
   ]
 
+  // Every spelling of the home bureau that has ever reached the Users sheet.
+  const STB_OFFICE_ALIASES = ['STB', 'OFF-STB', 'SOCIAL TECHNOLOGY BUREAU']
+
   // Built once per request. A user-list request may evaluate hundreds of
   // records, so resolving office aliases per row would turn a correctness fix
   // into a new performance problem.
@@ -938,9 +941,18 @@ const UsersService = (() => {
     // different aliases.  Resolve every known alias through the central office
     // registry, then require an intersection.  This broadens no access: an
     // account still has to match the one registry office assigned to the admin.
+    //
+    // A row that carries no office at all is Bureau personnel from before
+    // office IDs existed - the great majority of STB's directory. With no keys
+    // to intersect it matched nobody, so an STB office administrator saw only
+    // the accounts created since, and could neither open nor correct the rest.
+    // Read a blank office as STB, which is what every other layer already
+    // assumes for these rows. No other office gains anything: their keys never
+    // include STB.
     const rowKeys = officeIdentityKeys_(row)
     const profileKeys = officeIdentityKeys_(profile)
-    return rowKeys.some(key => profileKeys.indexOf(key) >= 0)
+    const effectiveRowKeys = rowKeys.length ? rowKeys : STB_OFFICE_ALIASES
+    return effectiveRowKeys.some(key => profileKeys.indexOf(key) >= 0)
   }
 
   function officeIdentityKeys_(subject) {
@@ -952,8 +964,8 @@ const UsersService = (() => {
 
     // Keep the established STB aliases equivalent, including legacy rows that
     // were created before office IDs were introduced.
-    if (keys.some(key => ['STB', 'OFF-STB', 'SOCIAL TECHNOLOGY BUREAU'].indexOf(key) >= 0)) {
-      return ['STB', 'OFF-STB', 'SOCIAL TECHNOLOGY BUREAU']
+    if (keys.some(key => STB_OFFICE_ALIASES.indexOf(key) >= 0)) {
+      return STB_OFFICE_ALIASES.slice()
     }
 
     try {

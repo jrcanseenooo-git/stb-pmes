@@ -141,6 +141,11 @@ const AuthService = (() => {
     const suppliedOffice = String(normalized.officeId || normalized.officeCode || normalized.officeName || '').trim()
     const suppliedScope = String(normalized.systemScope || '').trim()
     normalized.accessConfigurationValid = !!(suppliedOffice && suppliedScope)
+    // Preserved because the invalid branch below blanks every office field, which
+    // makes a row that named an office indistinguishable from one that never had
+    // one. OfficeScopeService needs to tell those two apart: the second is a
+    // legacy Bureau row, the first is a misconfiguration.
+    normalized.suppliedOfficeIdentity = suppliedOffice
     if (normalized.accessConfigurationValid) {
       normalized.officeId = String(normalized.officeId || normalized.officeCode || normalized.officeName).trim()
       normalized.officeCode = String(normalized.officeCode || normalized.officeId).trim()

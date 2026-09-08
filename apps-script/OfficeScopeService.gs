@@ -35,7 +35,7 @@ const OfficeScopeService = (() => {
     if (!isAssessmentScopedResource(resource)) return work()
 
     const profile = AuthService.getProfile(user)
-    if (!profile.accessConfigurationValid) {
+    if (!profile.accessConfigurationValid && !hasNoOfficeAtAll_(profile)) {
       throw HttpError('Your office and system scope are incomplete. Contact a central administrator to complete your access assignment.', 403)
     }
     const targetOfficeId = resolveTargetOfficeId_(profile, params || {})
@@ -43,6 +43,29 @@ const OfficeScopeService = (() => {
 
     const officeSpreadsheet = OfficeRegistryService.getSpreadsheetForOffice(targetOfficeId, user)
     return SpreadsheetService.withSpreadsheet(officeSpreadsheet, work)
+  }
+
+  // An account that names no office of any kind is Bureau personnel from before
+  // office IDs existed - the great majority of STB's directory, and the same
+  // population UsersService.sameOffice_ already reads as STB. There is nowhere
+  // to redirect it to: STB's working data is the central database, which is
+  // where the request already is. Refusing it only hid rating assignments that
+  // had been generated for those people and were sitting in that very database.
+  //
+  // This grants nothing. The row still carries no permissions, because
+  // AuthService.getEffectiveAccess returns none while its access configuration
+  // is incomplete. A row that DOES name an office but no system scope stays an
+  // error: that one is genuinely misconfigured, and letting it run unscoped
+  // would show it the central database instead of its own office's.
+  function hasNoOfficeAtAll_(profile) {
+    const supplied = profile || {}
+    // suppliedOfficeIdentity is what the Users row actually held. The normalized
+    // officeId/officeCode/officeName are blanked for any incomplete row, so they
+    // cannot answer this question on their own.
+    return !String(
+      supplied.suppliedOfficeIdentity ||
+      supplied.officeId || supplied.officeCode || supplied.officeName || ''
+    ).trim()
   }
 
   function resolveTargetOfficeId_(profile, params) {

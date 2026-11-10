@@ -263,7 +263,13 @@
             </transition>
           </RouterLink>
 
-          <RouterLink v-if="showCentralAdminNav && !isUndersecretary" to="/office-registry" class="nav-item" active-class="active" :title="collapsed ? officeRegistryLabel : ''">
+          <!-- Gated on the registry permission itself, not on `!isUndersecretary`.
+               The role test hid this from exactly one person and showed it to
+               every other monitoring-only account - an office monitor sees the
+               Central Administration group because of `view_cluster_monitoring`
+               and so inherited this link, which they can neither use nor should
+               see. The backend now refuses them too (requireRegistryAdmin_). -->
+          <RouterLink v-if="canManageOfficeRegistry" to="/office-registry" class="nav-item" active-class="active" :title="collapsed ? officeRegistryLabel : ''">
             <div class="nav-icon">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <path d="M2.5 13.5h11M3.5 13.5V3.5h5v10M8.5 6.5h4v7M5.2 6h1.6M5.2 8.5h1.6M10.2 9h1.2M10.2 11h1.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>

@@ -34,7 +34,7 @@ const OfficeRegistryService = (() => {
   const OFFICE_SUMMARY_TTL_SECONDS = 1800
 
   function list(params, user) {
-    requireCentralAdmin_(user)
+    requireRegistryAdmin_(user)
     let rows = includeBuiltInStb_(SpreadsheetService.getAllRows(registrySheet_()))
     if (params.status) rows = rows.filter(r => r.officeStatus === params.status)
     if (params.search) {
@@ -67,7 +67,7 @@ const OfficeRegistryService = (() => {
   }
 
   function get(id, user) {
-    requireCentralAdmin_(user)
+    requireRegistryAdmin_(user)
     const row = findByIdOrCode_(id)
     if (!row) throw HttpError('Office record not found.', 404)
     return safeRegistryRow_(row)
@@ -366,7 +366,7 @@ const OfficeRegistryService = (() => {
   }
 
   function provision_(body, user) {
-    const profile = requireCentralAdmin_(user)
+    const profile = requireRegistryAdmin_(user)
     const now = new Date().toISOString()
     const input = normalizeInput_(body)
     validateInput_(input)
@@ -441,7 +441,7 @@ const OfficeRegistryService = (() => {
   }
 
   function update(id, body, user) {
-    const profile = requireCentralAdmin_(user)
+    const profile = requireRegistryAdmin_(user)
     const row = findByIdOrCode_(id)
     if (!row) throw HttpError('Office record not found.', 404)
     if (isStbRow_(row)) throw HttpError('STB is the built-in central office and cannot be edited from the office registry.', 400)
@@ -468,7 +468,7 @@ const OfficeRegistryService = (() => {
   }
 
   function validate(id, user) {
-    const profile = requireCentralAdmin_(user)
+    const profile = requireRegistryAdmin_(user)
     const row = findByIdOrCode_(id)
     if (!row) throw HttpError('Office record not found.', 404)
     if (isStbRow_(row)) throw HttpError('STB uses the central PMES database and does not require office spreadsheet validation.', 400)
@@ -494,7 +494,7 @@ const OfficeRegistryService = (() => {
   // so this re-validates afterward and reports whatever is still wrong
   // rather than claiming success.
   function repair(id, user) {
-    const profile = requireCentralAdmin_(user)
+    const profile = requireRegistryAdmin_(user)
     const row = findByIdOrCode_(id)
     if (!row) throw HttpError('Office record not found.', 404)
     if (isStbRow_(row)) throw HttpError('STB uses the central PMES database and does not require office spreadsheet repair.', 400)
@@ -517,7 +517,7 @@ const OfficeRegistryService = (() => {
   }
 
   function activate(id, user) {
-    const profile = requireCentralAdmin_(user)
+    const profile = requireRegistryAdmin_(user)
     const row = findByIdOrCode_(id)
     if (!row) throw HttpError('Office record not found.', 404)
     if (isStbRow_(row)) throw HttpError('STB uses the central PMES database and does not require office spreadsheet activation.', 400)
@@ -867,6 +867,28 @@ const OfficeRegistryService = (() => {
     const profile = AuthService.getProfile(user)
     if (!isCentralAdminProfile_(profile)) {
       throw HttpError('Access denied. Central administrator role required.', 403)
+    }
+    return profile
+  }
+
+  // The registry itself - the office list, its administrator emails, its
+  // provisioning state, and every write that creates or repairs an office.
+  //
+  // Deliberately NARROWER than requireCentralAdmin_, which also admits
+  // `view_cluster_monitoring`. Cluster monitoring is oversight: it reads how
+  // far each office has got with its ratings. The registry is administration:
+  // it names who runs each office and can provision or deactivate one. Holding
+  // the first was granting the second, so an account created purely to watch
+  // assessment progress could read every office's administrator contacts and
+  // provisioning history, and the Office Registry screen appeared in its
+  // sidebar. monitoring() keeps requireCentralAdmin_; everything else takes this.
+  function requireRegistryAdmin_(user) {
+    const profile = AuthService.getProfile(user)
+    const allowed = AuthService.hasPermission(profile, 'manage_office_registry') ||
+      AuthService.hasPermission(profile, 'provision_office_spreadsheets') ||
+      AuthService.hasPermission(profile, 'validate_office_spreadsheets')
+    if (!allowed) {
+      throw HttpError('Access denied. Office registry administration is required.', 403)
     }
     return profile
   }

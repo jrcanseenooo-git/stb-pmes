@@ -7,6 +7,13 @@
       "runtimeArgs": ["run", "dev", "--prefix", "vue-frontend"],
       "port": 5173,
       "autoPort": true
+    },
+    {
+      "name": "pmes-frontend-preview",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "preview", "--prefix", "vue-frontend"],
+      "port": 4173,
+      "autoPort": true
     }
   ]
 }

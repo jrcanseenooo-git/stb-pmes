@@ -12,6 +12,16 @@ import { auth, googleProvider } from '@/firebase'
 import { authApi } from '@/services/api'
 
 const ALLOWED_DOMAIN = import.meta.env.VITE_ALLOWED_EMAIL_DOMAIN || 'dswd.gov.ph'
+const EXTRA_DOMAINS = (import.meta.env.VITE_EXTRA_EMAIL_DOMAINS || '')
+  .split(/[,\n|]+/)
+  .map(domain => domain.trim().toLowerCase().replace(/^@/, ''))
+  .filter(Boolean)
+// Kept generic once EXTRA_DOMAINS is in play: naming only the corporate domain
+// would tell an allowlisted driver their own address is not permitted, which is
+// exactly the message that sent them to the admin in the first place.
+const NOT_PERMITTED_MESSAGE = EXTRA_DOMAINS.length
+  ? 'This account is not permitted to sign in. Contact the System Administrator.'
+  : `Only @${ALLOWED_DOMAIN} accounts are permitted.`
 const BOOTSTRAP_ADMIN_EMAILS = (import.meta.env.VITE_BOOTSTRAP_ADMIN_EMAILS || 'systemadmin@dswd.gov.ph')
   .split(/[,\n|]+/)
   .map(email => email.trim().toLowerCase())
@@ -180,10 +190,21 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   // ── Domain check ──
+  // This is a courtesy check, not the security boundary: it catches a typo'd
+  // personal address before it costs a Firebase round trip. The real gate is
+  // AuthService.verifyToken, which admits a non-corporate address only if it
+  // is named exactly in the EXTERNAL_EMAIL_ALLOWLIST script property.
+  //
+  // EXTRA_DOMAINS exists because some personnel hold no dswd.gov.ph mailbox at
+  // all - Pag-abot's drivers are the case that forced it. Listing a domain
+  // here does NOT grant anyone access; it only stops this screen from refusing
+  // to try. Someone at an extra domain who is not on the server's allowlist
+  // signs in to Firebase and is then turned away by the backend.
   function isAllowedEmail(email) {
     if (!email) return false
     if (import.meta.env.DEV) return true
-    return email.endsWith(`@${ALLOWED_DOMAIN}`)
+    if (email.endsWith(`@${ALLOWED_DOMAIN}`)) return true
+    return EXTRA_DOMAINS.some(domain => email.endsWith(`@${domain}`))
   }
 
   // ── Resolve onboarding state + PMES profile via Apps Script ──
@@ -300,7 +321,7 @@ export const useAuthStore = defineStore('auth', () => {
   // ── Email / Password login ──
   async function loginWithEmail(email, password) {
     if (!isAllowedEmail(email)) {
-      throw new Error(`Only @${ALLOWED_DOMAIN} accounts are permitted.`)
+      throw new Error(NOT_PERMITTED_MESSAGE)
     }
     loading.value = true
     error.value   = null
@@ -348,7 +369,7 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const cred = await withPopupTimeout(signInWithPopup(auth, googleProvider))
       const adopted = await adoptFirebaseUser(cred.user)
-      if (!adopted) throw new Error(`Only @${ALLOWED_DOMAIN} accounts are permitted.`)
+      if (!adopted) throw new Error(NOT_PERMITTED_MESSAGE)
       return { redirected: false }
     } catch (e) {
       const popupFallbackCodes = new Set([
@@ -421,7 +442,7 @@ export const useAuthStore = defineStore('auth', () => {
   function friendlyGoogleError(e) {
     const code = e?.code || ''
     const message = String(e?.message || '')
-    if (message.includes(`Only @${ALLOWED_DOMAIN}`)) return message
+    if (message.includes(NOT_PERMITTED_MESSAGE)) return message
     const map = {
       'auth/account-exists-with-different-credential': 'This email already uses another sign-in method. Use email/password or contact the system administrator.',
       'auth/network-request-failed': 'Network error. Check your connection and try again.',

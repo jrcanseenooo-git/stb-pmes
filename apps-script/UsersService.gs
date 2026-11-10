@@ -888,9 +888,17 @@ const UsersService = (() => {
     const officeKey = String(row.officeId || row.officeCode || '').trim().toUpperCase()
     const role = String(row.role || '').trim()
     const groups = _normaliseList(row.permissionGroups).split(',').filter(Boolean)
+    // Must mirror AuthService.getEffectiveAccess's centralOnlyGroups exactly.
+    // If the two lists disagree, a group either saves and is then stripped on
+    // read (granting nothing, with no error to explain it) or is refused at
+    // save while the runtime would have honoured it.
+    //
+    // 'cluster-monitoring-admin' is not central: it grants only
+    // view_cluster_monitoring, and the personnel assigned to watch cluster
+    // assessment progress belong to an office. See the note in AuthService.
     const centralGroups = [
       'system-admin', 'cluster-system-admin', 'cluster-technical-admin',
-      'cluster-assessment-admin', 'cluster-monitoring-admin'
+      'cluster-assessment-admin'
     ]
     const validScopes = ['STB_FULL', 'CLUSTER_PORTAL', 'OFFICE_ADMIN', 'OFFICE_FULL_PMES', 'CLUSTER_ADMIN']
     if (validScopes.indexOf(scope) < 0) {

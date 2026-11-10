@@ -39,7 +39,8 @@
         <!-- Heading -->
         <div class="form-heading">
           <h2>Welcome back</h2>
-          <p>Sign in with your <strong>{{ domain }}</strong> account to continue</p>
+          <p v-if="hasExtraDomains">Sign in with your PMES account to continue</p>
+          <p v-else>Sign in with your <strong>{{ domain }}</strong> account to continue</p>
         </div>
 
         <!-- Error -->
@@ -186,6 +187,9 @@ const loginMethod = ref('')
 const error       = ref('')
 
 const domain      = import.meta.env.VITE_ALLOWED_EMAIL_DOMAIN || 'dswd.gov.ph'
+// Personnel without a corporate mailbox (Pag-abot's drivers) sign in here too,
+// so the heading must not tell them they need an address they will never have.
+const hasExtraDomains = !!String(import.meta.env.VITE_EXTRA_EMAIL_DOMAINS || '').trim()
 const currentYear = computed(() => new Date().getFullYear())
 const GOOGLE_REDIRECT_PENDING_KEY = 'pmes.googleRedirectPending'
 const googleRedirectPending = ref(sessionStorage.getItem(GOOGLE_REDIRECT_PENDING_KEY) === '1')

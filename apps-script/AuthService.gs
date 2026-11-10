@@ -16,6 +16,31 @@ const AuthService = (() => {
     .split(/[,\n|]+/)
     .map(normalizeEmail_)
     .filter(Boolean)
+
+  // Named exceptions to the domain gate, for personnel who hold no corporate
+  // mailbox at all. Pag-abot's drivers are the reason this exists: they are
+  // Administrative Aide IV (Driver II) staff who must rate and be rated, and
+  // DSWD never issued them a dswd.gov.ph address, so the domain check locked
+  // them out of a system they are required to use.
+  //
+  // These are EXACT ADDRESSES, never domains - adding 'gmail.com' here would
+  // open PMES, which holds real personnel performance records, to every Gmail
+  // account in existence. An address listed here still gets it no further than
+  // the login screen: it must also have an approved Users row, and that row is
+  // what binds the person to an office. The list lives in a Script Property so
+  // no personal address is committed to this repo or served to a browser.
+  const EXTERNAL_EMAIL_ALLOWLIST = (SCRIPT_PROPS_.EXTERNAL_EMAIL_ALLOWLIST || '')
+    .split(/[,\n|;]+/)
+    .map(normalizeEmail_)
+    .filter(Boolean)
+
+  function isPermittedEmail_(email) {
+    const normalized = normalizeEmail_(email)
+    if (!normalized) return false
+    if (!ALLOWED_EMAIL_DOMAIN) return true
+    if (normalized.endsWith('@' + ALLOWED_EMAIL_DOMAIN.toLowerCase())) return true
+    return EXTERNAL_EMAIL_ALLOWLIST.indexOf(normalized) !== -1
+  }
   const DEFAULT_STB_OFFICE = {
     officeId: 'STB',
     officeCode: 'STB',
@@ -224,7 +249,7 @@ const AuthService = (() => {
         if (payload.iss !== 'https://securetoken.google.com/' + FIREBASE_PROJECT_ID) return null
       }
       const claimEmail = normalizeEmail_(payload.email)
-      if (ALLOWED_EMAIL_DOMAIN && !claimEmail.endsWith('@' + ALLOWED_EMAIL_DOMAIN.toLowerCase())) return null
+      if (!isPermittedEmail_(claimEmail)) return null
 
       // ── Authoritative signature verification (the security-critical step) ──
       // The payload above is attacker-controllable; nothing is trusted until
@@ -242,7 +267,7 @@ const AuthService = (() => {
 
       // Re-check the domain against Google's authoritative email, not the claim.
       const email = normalizeEmail_(verified.email)
-      if (ALLOWED_EMAIL_DOMAIN && !email.endsWith('@' + ALLOWED_EMAIL_DOMAIN.toLowerCase())) return null
+      if (!isPermittedEmail_(email)) return null
 
       const result = { uid: verified.uid, email: verified.email, name: verified.name }
       if (cache) cache.put(cacheKey, JSON.stringify(result), 300)   // 5 minutes
@@ -636,7 +661,21 @@ const AuthService = (() => {
     const roleGroups = normalizedProfile.role === 'System Administrator' && !centralSystemAdmin
       ? []
       : (ROLE_GROUPS[normalizedProfile.role] || [])
-    const centralOnlyGroups = ['system-admin', 'cluster-system-admin', 'cluster-technical-admin', 'cluster-assessment-admin', 'cluster-monitoring-admin']
+    // Groups that administer the cluster - provisioning offices, managing the
+    // registry, central user administration. These stay bound to an STB/central
+    // System Administrator account.
+    //
+    // 'cluster-monitoring-admin' is deliberately NOT among them. It grants only
+    // view_cluster_monitoring: read assessment progress across the offices. The
+    // people who actually do that work sit in an office - the assigned monitor
+    // for the Cluster Assessment Overview is OUSI personnel, not STB - so
+    // requiring a central account to hold it meant the only ways to grant it
+    // were to move the person to STB or to relabel their role 'Undersecretary',
+    // both of which misstate who they are. It confers no administration: the
+    // registry is gated separately by OfficeRegistryService.requireRegistryAdmin_.
+    // Only a manage_users holder can set it; the office-admin edit path cannot
+    // (see UsersService.applyOfficeRaterTaggingDelegation_).
+    const centralOnlyGroups = ['system-admin', 'cluster-system-admin', 'cluster-technical-admin', 'cluster-assessment-admin']
     const explicitGroups = _splitList(normalizedProfile.permissionGroups)
       .filter(group => centralSystemAdmin || centralOnlyGroups.indexOf(group) < 0)
     const scopeGroups = []

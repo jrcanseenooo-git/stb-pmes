@@ -218,12 +218,16 @@ function canManageRaterMatrix(profile) {
     permissions.includes('manage_office_registry')
 }
 
+// Mirrors OfficeRegistryService.requireRegistryAdmin_. `view_cluster_monitoring`
+// used to be accepted here, so anyone granted cluster oversight could open the
+// registry - the office list with its administrator emails and provisioning
+// history - by typing the URL. Monitoring reads assessment progress; it is not
+// authority over how offices are configured.
 function canViewCentralRegistry(profile) {
   const permissions = profile?.permissions || []
   return permissions.includes('manage_office_registry') ||
     permissions.includes('provision_office_spreadsheets') ||
-    permissions.includes('validate_office_spreadsheets') ||
-    permissions.includes('view_cluster_monitoring')
+    permissions.includes('validate_office_spreadsheets')
 }
 
 function preferredDashboardPath(profile) {
@@ -285,6 +289,12 @@ router.beforeEach(async (to) => {
   if (auth.needsRegistration) return { path: "/auth/register" };
   if (auth.needsActivation)   return { path: "/auth/pending" };
   if (to.path === '/office-registry' && !canViewCentralRegistry(auth.profile)) {
+    // A cluster monitor has no office structure to be sent to - /office-management
+    // requires canManageOfficePersonnel and would bounce them to /unauthorized.
+    // Return them to the one central screen they are entitled to instead.
+    if ((auth.profile?.permissions || []).includes('view_cluster_monitoring')) {
+      return { path: '/cluster-overview' }
+    }
     return { path: '/office-management', query: { ...to.query, tab: 'structure' } }
   }
   if (!canUseStbOnlyPaths(auth.profile) && STB_ONLY_PATHS.has(to.path)) {

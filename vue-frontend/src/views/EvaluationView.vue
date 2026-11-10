@@ -521,7 +521,7 @@
                     <div class="fpo-label">FPO Weighted Score</div>
                     <div class="fpo-score">{{ fpoWeighted }}</div>
                     <div v-if="activeRecord?.fpoScore" class="fpo-converted">
-                      Raw {{ usesIpcrfForFpo ? 'IPCRF' : 'FPO' }} score: <strong>{{ activeRecord.fpoScore }}</strong> × 0.55
+                      Raw {{ usesIpcrfForFpo ? 'IPCRF' : 'FPO' }}: <strong>{{ activeRecord.fpoScore }} / 5</strong> · Scoring basis: <strong>{{ normalizedFourPointScore(activeRecord.fpoScore, true)?.toFixed(2) }} / 4</strong> × 55%
                     </div>
                   </div>
                   <div v-if="usesIpcrfForFpo" class="fpo-update">
@@ -555,7 +555,7 @@
                       <span class="fpo-manual-help">Type the rating, then press Enter or click away to save.</span>
                     </div>
                     <div v-if="fpoManualInput && Number(fpoManualInput) >= 1 && Number(fpoManualInput) <= 5" class="fpo-manual-result">
-                      <span class="fpo-calc-formula">{{ fpoManualInput }} × 0.55</span>
+                      <span class="fpo-calc-formula">{{ normalizedFourPointScore(fpoManualInput, true)?.toFixed(2) }} × 0.55</span>
                       <span class="fpo-calc-eq">=</span>
                       <span class="fpo-calc-value">{{ fpoManualWeighted }}</span>
                       <span class="fpo-calc-caption">weighted FPO</span>

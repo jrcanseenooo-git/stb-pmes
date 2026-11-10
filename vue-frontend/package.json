@@ -4,6 +4,9 @@
   "type": "module",
   "description": "Performance Monitoring and Evaluation System - Bureau Frontend",
   "private": true,
+  "overrides": {
+    "@grpc/grpc-js": "1.13.6"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
